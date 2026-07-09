@@ -41,6 +41,12 @@ export default function Presentation({ logo, name, onNameChange, onReset }: Prop
           <span className="align-super text-[10px]">®</span>
         </p>
         <div className="flex items-center gap-4">
+          <a
+            href="/admin"
+            className="text-sm text-white/60 hover:text-white"
+          >
+            Admin
+          </a>
           <input
             value={name}
             onChange={(e) => onNameChange(e.target.value)}

@@ -55,9 +55,17 @@ export default function Landing({ onLogo }: Props) {
           {SERVICE_NAME}
           <span className="align-super text-xs">®</span>
         </p>
-        <p className="font-mono text-xs uppercase text-white/40">
-          Proof of concept
-        </p>
+        <div className="flex items-center gap-6">
+          <p className="hidden font-mono text-xs uppercase text-white/40 sm:block">
+            Proof of concept
+          </p>
+          <a
+            href="/admin"
+            className="rounded-lg border border-white/15 px-4 py-1.5 text-sm text-white/80 hover:border-white/50 hover:text-white"
+          >
+            Admin
+          </a>
+        </div>
       </header>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-12 pb-24">
