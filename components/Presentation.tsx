@@ -12,6 +12,8 @@ import AppIcons from "@/components/scenes/AppIcons";
 import Browser from "@/components/scenes/Browser";
 import Social from "@/components/scenes/Social";
 import Badge from "@/components/scenes/Badge";
+import Merch from "@/components/scenes/Merch";
+import Generated from "@/components/scenes/Generated";
 
 type Props = {
   logo: LogoData;
@@ -63,6 +65,8 @@ export default function Presentation({ logo, name, onNameChange, onReset }: Prop
       <Browser {...scene} />
       <Social {...scene} />
       <Badge {...scene} />
+      <Merch {...scene} />
+      <Generated {...scene} />
 
       <footer className="flex items-center justify-between px-6 py-10 md:px-12">
         <p className="font-mono text-xs uppercase text-white/40">
