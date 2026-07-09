@@ -6,6 +6,21 @@ export default function AppIcons({ logo, name, variants }: SceneProps) {
   const primary = logo.colors[0].hex;
   const onPrimary = isDark(primary) ? variants.white : variants.black;
 
+  // Small variant tiles, deduped by background so a monochrome logo
+  // (whose primary color is black or white) doesn't repeat a tile.
+  const smallSpecs = [
+    { bg: "#F1F3F4", svg: logo.svg, caption: "#F1F3F4" },
+    { bg: "#000000", svg: variants.white, caption: "#000000" },
+    { bg: primary, svg: onPrimary, caption: primary.toUpperCase() },
+  ];
+  const seen = new Set<string>();
+  const small = smallSpecs.filter((s) => {
+    const k = s.bg.toUpperCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
   return (
     <section className="bg-[#050505] px-6 py-16 md:px-12">
       <Caption n="04" title="App icon" />
@@ -19,53 +34,29 @@ export default function AppIcons({ logo, name, variants }: SceneProps) {
             <img
               src={svgToDataUri(onPrimary)}
               alt=""
-              className="max-h-[50%] w-1/2 object-contain"
+              className="max-h-[58%] w-[64%] object-contain"
             />
           </div>
           <p className="mt-3 text-center text-sm text-white/80">{name}</p>
         </div>
-        <div>
-          <div className="flex size-24 items-center justify-center rounded-[22.5%] bg-[#F1F3F4]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={svgToDataUri(logo.svg)}
-              alt=""
-              className="max-h-[50%] w-1/2 object-contain"
-            />
+        {small.map((s) => (
+          <div key={s.caption + s.bg}>
+            <div
+              className="flex size-28 items-center justify-center rounded-[22.5%] ring-1 ring-white/10"
+              style={{ background: s.bg }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={svgToDataUri(s.svg)}
+                alt=""
+                className="max-h-[58%] w-[62%] object-contain"
+              />
+            </div>
+            <p className="mt-2 text-center font-mono text-[10px] tabular-nums text-white/40">
+              {s.caption}
+            </p>
           </div>
-          <p className="mt-2 text-center font-mono text-[10px] tabular-nums text-white/40">
-            #F1F3F4
-          </p>
-        </div>
-        <div>
-          <div className="flex size-24 items-center justify-center rounded-[22.5%] bg-[#000000] ring-1 ring-white/10">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={svgToDataUri(variants.white)}
-              alt=""
-              className="max-h-[50%] w-1/2 object-contain"
-            />
-          </div>
-          <p className="mt-2 text-center font-mono text-[10px] tabular-nums text-white/40">
-            #000000
-          </p>
-        </div>
-        <div>
-          <div
-            className="flex size-24 items-center justify-center rounded-[22.5%]"
-            style={{ background: primary }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={svgToDataUri(onPrimary)}
-              alt=""
-              className="max-h-[50%] w-1/2 object-contain"
-            />
-          </div>
-          <p className="mt-2 text-center font-mono text-[10px] tabular-nums text-white/40">
-            {primary}
-          </p>
-        </div>
+        ))}
       </div>
     </section>
   );

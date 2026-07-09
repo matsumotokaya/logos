@@ -65,6 +65,17 @@ export function textOn(hex: string): string {
   return isDark(hex) ? "#F1F3F4" : "#0A0A0A";
 }
 
+/** True when a color is (near) neutral — no meaningful chroma. */
+export function isGrayscale(hex: string, tolerance = 14): boolean {
+  const { r, g, b } = hexToRgb(hex);
+  return Math.max(r, g, b) - Math.min(r, g, b) <= tolerance;
+}
+
+/** A hairline border color that stays visible on top of the given background. */
+export function hairlineOn(hex: string): string {
+  return isDark(hex) ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)";
+}
+
 /** Darken a hex color by a factor (0..1). */
 export function darken(hex: string, factor: number): string {
   const { r, g, b } = hexToRgb(hex);

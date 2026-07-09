@@ -16,7 +16,7 @@ export default function UsageGrid({ logo, name, variants }: SceneProps) {
             <img
               src={svgToDataUri(logo.svg)}
               alt={`${name} logo`}
-              className="max-h-[45%] w-[38%] object-contain"
+              className="max-h-[55%] w-1/2 object-contain"
             />
           </div>
           <p className="mt-2 font-mono text-[10px] uppercase text-white/40">
@@ -32,7 +32,7 @@ export default function UsageGrid({ logo, name, variants }: SceneProps) {
             <img
               src={svgToDataUri(monoOnPrimary)}
               alt=""
-              className="max-h-[45%] w-[38%] object-contain"
+              className="max-h-[55%] w-1/2 object-contain"
             />
           </div>
           <p className="mt-2 font-mono text-[10px] uppercase text-white/40">
@@ -45,7 +45,7 @@ export default function UsageGrid({ logo, name, variants }: SceneProps) {
             <img
               src={svgToDataUri(variants.white)}
               alt=""
-              className="max-h-[45%] w-[38%] object-contain"
+              className="max-h-[55%] w-1/2 object-contain"
             />
           </div>
           <p className="mt-2 font-mono text-[10px] uppercase text-white/40">
@@ -58,7 +58,7 @@ export default function UsageGrid({ logo, name, variants }: SceneProps) {
             <img
               src={svgToDataUri(variants.black)}
               alt=""
-              className="max-h-[45%] w-[38%] object-contain"
+              className="max-h-[55%] w-1/2 object-contain"
             />
           </div>
           <p className="mt-2 font-mono text-[10px] uppercase text-white/40">

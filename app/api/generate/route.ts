@@ -1,23 +1,32 @@
 import { NextResponse } from "next/server";
+import { luminance } from "@/lib/color";
 
 // Image generation can take a while on the model side.
 export const maxDuration = 60;
 
 const MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
 
+// {surface} is filled with a product color chosen to contrast the logo ink.
 const SCENE_PROMPTS: Record<string, string> = {
-  mug: "a matte ceramic coffee mug with the logo printed on its side, standing on a dark stone table",
-  tote: "a natural off-white cotton tote bag with the logo printed on the center, hanging against a dark concrete wall",
-  cap: "a black baseball cap with the logo embroidered on the front panel, resting on a dark surface",
+  mug: "a {surface} matte ceramic coffee mug with the logo printed large on its side, standing on a dark stone surface",
+  tote: "a {surface} cotton tote bag with the logo printed large on the center, hanging against a dark concrete wall",
+  cap: "a {surface} baseball cap with the logo embroidered on the front panel, resting on a dark surface",
 };
 
-function buildPrompt(target: string, brandName: string, primaryHex: string) {
-  const scene = SCENE_PROMPTS[target];
+// The attached logo is rasterized on a white background, so its dominant color is the ink.
+function surfaceFor(inkHex: string): string {
+  return luminance(inkHex) < 0.45
+    ? "cream off-white"
+    : "matte charcoal black";
+}
+
+function buildPrompt(target: string, brandName: string, inkHex: string) {
+  const scene = SCENE_PROMPTS[target].replace("{surface}", surfaceFor(inkHex));
   return [
     `Create a photorealistic product mockup photo for the brand "${brandName}": ${scene}.`,
     "Use the exact logo from the attached image. Reproduce its shape and colors precisely — do not redraw, distort, restyle or add elements to the logo.",
-    `The brand's primary color is ${primaryHex}; you may use it as a subtle accent in the scene.`,
-    "Cinematic dark editorial studio aesthetic: near-black background, soft directional lighting, shallow depth of field, premium brand-guideline presentation style.",
+    "The logo must be clearly legible with strong contrast against the product surface. Never render the logo in the same tone as the product it sits on (no black logo on a black product, no white logo on a white product).",
+    "Cinematic dark editorial studio aesthetic: near-black surroundings, soft directional lighting, shallow depth of field, premium brand-guideline presentation style. The product itself stays light or dark as specified so the logo reads clearly.",
     "No text anywhere in the image other than the logo itself.",
   ].join(" ");
 }

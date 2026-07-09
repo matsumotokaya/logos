@@ -1,5 +1,6 @@
 import { Caption, type SceneProps } from "./shared";
-import { hexToRgb, rgbToCmyk, textOn, type RGB } from "@/lib/color";
+import { hexToRgb, rgbToCmyk, textOn, hairlineOn, type RGB } from "@/lib/color";
+import { svgToDataUri } from "@/lib/svg";
 
 type Band = {
   name: string;
@@ -21,7 +22,7 @@ const NEUTRALS: { name: string; hex: string }[] = [
   { name: "Off-White", hex: "#F1F3F4" },
 ];
 
-export default function Palette({ logo }: SceneProps) {
+export default function Palette({ logo, name, variants }: SceneProps) {
   const bands: Band[] = logo.colors.map((c, i) => ({
     name: EXTRACTED_NAMES[i] ?? `Accent 0${i + 1}`,
     hex: c.hex,
@@ -36,6 +37,11 @@ export default function Palette({ logo }: SceneProps) {
     bands.push({ name: neutral.name, hex: neutral.hex, rgb, cmyk: rgbToCmyk(rgb) });
   }
 
+  const textColor = (hex: string) => textOn(hex);
+  // Logo variant that contrasts with a given band background.
+  const contrastLogo = (hex: string) =>
+    textOn(hex) === "#F1F3F4" ? variants.white : variants.black;
+
   return (
     <section className="bg-background">
       <div className="px-6 py-16 md:px-12">
@@ -44,12 +50,26 @@ export default function Palette({ logo }: SceneProps) {
       {bands.map((band, i) => (
         <div
           key={`${band.hex}-${band.name}`}
-          className={`flex items-start justify-between px-6 py-10 md:px-16 ${
-            i === 0 ? "min-h-[38vh]" : "min-h-[22vh]"
+          className={`flex items-center justify-between gap-6 px-6 py-10 md:px-16 ${
+            i === 0 ? "min-h-[40vh]" : "min-h-[24vh]"
           }`}
-          style={{ background: band.hex, color: textOn(band.hex) }}
+          style={{
+            background: band.hex,
+            color: textColor(band.hex),
+            borderTop: `1px solid ${hairlineOn(band.hex)}`,
+          }}
         >
-          <p className="text-sm font-medium uppercase">{band.name}</p>
+          <div className="flex items-center gap-8">
+            {i === 0 && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={svgToDataUri(contrastLogo(band.hex))}
+                alt={`${name} logo on the primary color`}
+                className="hidden h-14 w-auto md:block"
+              />
+            )}
+            <p className="text-base font-medium uppercase">{band.name}</p>
+          </div>
           <dl className="grid grid-cols-[auto_auto] gap-x-10 gap-y-1 font-mono text-xs tabular-nums">
             <dt className="opacity-60">HEX</dt>
             <dd>{band.hex}</dd>
