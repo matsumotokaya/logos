@@ -53,6 +53,13 @@ export type Order = {
   orderedAt: string;
 };
 
+/**
+ * Cached photoreal mockups for one logo, keyed by scene slot ("mug", "tote",
+ * "cap", …). Values are image data URLs. Generating these calls a paid API,
+ * so results are persisted and reused instead of regenerated on every visit.
+ */
+export type GeneratedMockups = Record<string, string>;
+
 export interface BrandRepo {
   getCompany(): Promise<Company>;
   saveCompany(company: Company): Promise<void>;
@@ -66,4 +73,9 @@ export interface BrandRepo {
   listInventory(): Promise<InventoryItem[]>;
   listOrders(): Promise<Order[]>;
   placeOrder(itemId: string, qty: number): Promise<Order>;
+
+  /** All cached mockups for a logo (keyed by a stable hash of its master SVG). */
+  getMockups(logoKey: string): Promise<GeneratedMockups>;
+  /** Persist one generated mockup so it is never regenerated for this logo. */
+  saveMockup(logoKey: string, slot: string, image: string): Promise<void>;
 }

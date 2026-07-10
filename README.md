@@ -6,22 +6,30 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 
 事業構想・ビジネスモデルは [PRODUCT.md](PRODUCT.md) を参照。
 
-## 生成されるシーン(`/`)
+## 生成されるプレゼンテーション(`/`)
+
+SVGをアップロードすると、以下が1本のガイドラインドキュメントとして生成される。冒頭に Splash(オープニングアニメーション)と Contents(目次)、続いて番号付きの10シーンが並ぶ。
 
 | # | シーン | 内容 |
 |---|--------|------|
-| — | Hero | 巨大タイポ + ロゴマーク + メタ行 |
-| 01 | Construction | ベジェのアンカー/ハンドルを実データから抽出して可視化 |
-| 02 | Color | 面積加重で色を自動抽出し、HEX/RGB/CMYK付きカラーバンドに展開 |
-| 03 | Logo usage | 配色パターングリッド(白地/ブランドカラー地/黒地/白抜き) |
-| 04 | App icon | iOS風アイコンと配色バリエーション |
-| 05 | Web | ブラウザクローム内ファビコン + 48/32/16pxサイズランプ |
-| 06 | Social | 認証バッジ付きプロフィールカードのモックアップ |
-| 07 | On-site | ラニヤード付き社員証モックアップ |
-| 08 | Merch | Tシャツへのmultiply合成(コードベースの精密配置) |
-| 09 | Generated | Gemini API(Nano Banana)によるマグカップ/トート/キャップの写実モックアップ生成 |
+| — | Splash | 巨大タイポ + ロゴマークのオープニング演出(スクロールキュー・リプレイ/一時停止) |
+| — | Contents | 全シーンへ飛べる目次ナビ |
+| 01 | The mark (Identity) | ロゴの意味・最小サイズ・余白などアイデンティティの基本 |
+| 02 | Construction | ベジェのアンカー/ハンドルを実データから抽出して可視化 |
+| 03 | Color | 面積加重で色を自動抽出し、HEX/RGB/CMYK付きカラーバンドに展開 |
+| 04 | Logo usage | 配色パターングリッド(白地/ブランドカラー地/黒地/白抜き) |
+| 05 | App icon | iOS風アイコンと配色バリエーション |
+| 06 | Web | ブラウザクローム内ファビコン + 48/32/16pxサイズランプ |
+| 07 | Social | 認証バッジ付きプロフィールカードのモックアップ |
+| 08 | On-site | ラニヤード付き社員証モックアップ |
+| 09 | Merchandise | Tシャツへのmultiply合成(コードベースの精密配置) |
+| 10 | Generated | Gemini API(Nano Banana)によるマグカップ/トート/キャップの写実モックアップ生成 |
 
-ロゴが手元になくても、ランディングの「View the sample presentation」でサンプルを確認できる。
+ロゴが手元になくても、ランディングの「サンプルを見る」からサンプルプレゼンを確認できる。
+
+## 多言語対応
+
+UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh-Hans の5言語**に対応。ヘッダーの `LanguageSwitcher` で切り替え、選択は永続化され `<html lang>` にも反映される。英語を正本の型([lib/i18n/dictionaries.ts](lib/i18n/dictionaries.ts) の `Dict`)とし、全ロケールが完全な辞書を持つ(実行時フォールバックの穴を作らない)。
 
 ## 管理コンソール(`/admin`)
 
@@ -30,12 +38,14 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 ## アーキテクチャ
 
 - **Next.js (App Router) + TypeScript + Tailwind CSS v4**
+- アニメーションは **motion**(scroll-in reveal 等)と **gsap**(Splashの演出)
 - ロゴ解析は**全てクライアントサイド**(サーバー・DB不要)。アップロードされたSVGは外部送信されない
   - [lib/svg.ts](lib/svg.ts) — SVG正規化・計算済みスタイルの属性焼き込み・色抽出・単色変換・アウトライン化
   - [lib/paths.ts](lib/paths.ts) — path `d` 属性のパーサ(ベジェ骨格抽出)
   - [lib/color.ts](lib/color.ts) — HEX/RGB/CMYK変換・輝度判定
   - [lib/raster.ts](lib/raster.ts) — SVG→PNGラスタライズ(生成AIへの入力用)
-- シーンは [components/scenes/](components/scenes/) にプラグイン式で追加できる
+- UIコピーは [lib/i18n/](lib/i18n/) で5言語対応(en/ja/ko/zh-Hant/zh-Hans)
+- シーンは [components/scenes/](components/scenes/) にプラグイン式で追加できる([Reveal](components/scenes/Reveal.tsx) / [shared](components/scenes/shared.tsx) を共通部品として利用)
 - 写実モックアップ生成は [app/api/generate/route.ts](app/api/generate/route.ts) が Gemini API を呼び出すサーバーサイドルート(APIキーを隠すため)
 - データ永続化は [lib/store/](lib/store/) の `BrandRepo` インターフェースで抽象化。現在は localStorage 実装([lib/store/local.ts](lib/store/local.ts))だが、実DB(Supabase等)への移行はこのインターフェースを実装するだけで済む
 

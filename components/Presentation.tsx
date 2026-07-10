@@ -3,8 +3,12 @@
 import { useMemo } from "react";
 import { recolorSvg, type LogoData } from "@/lib/svg";
 import { SERVICE_NAME } from "@/lib/config";
+import { useI18n } from "@/lib/i18n";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import type { Variants } from "@/components/scenes/shared";
-import Hero from "@/components/scenes/Hero";
+import Splash from "@/components/scenes/Splash";
+import Contents from "@/components/scenes/Contents";
+import Identity from "@/components/scenes/Identity";
 import Construction from "@/components/scenes/Construction";
 import Palette from "@/components/scenes/Palette";
 import UsageGrid from "@/components/scenes/UsageGrid";
@@ -23,10 +27,11 @@ type Props = {
 };
 
 export default function Presentation({ logo, name, onNameChange, onReset }: Props) {
+  const { dict, format } = useI18n();
   const variants = useMemo<Variants>(
     () => ({
-      white: recolorSvg(logo.svg, "#F1F3F4"),
-      black: recolorSvg(logo.svg, "#0A0A0A"),
+      white: recolorSvg(logo.svg, "#F4F4F2"),
+      black: recolorSvg(logo.svg, "#101012"),
     }),
     [logo.svg]
   );
@@ -34,52 +39,81 @@ export default function Presentation({ logo, name, onNameChange, onReset }: Prop
   const scene = { logo, name, variants };
 
   return (
-    <main>
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-background/90 px-6 py-4 backdrop-blur-sm md:px-12">
-        <p className="text-base font-medium">
-          {SERVICE_NAME}
-          <span className="align-super text-[10px]">®</span>
-        </p>
-        <div className="flex items-center gap-4">
+    <main className="bg-paper text-ink">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-hairline bg-paper/90 px-6 py-4 backdrop-blur-sm md:px-12">
+        <div className="flex items-baseline gap-4">
+          <p className="font-display text-base font-medium">
+            {SERVICE_NAME}
+            <span className="align-super text-[10px]">®</span>
+          </p>
+          <p className="hidden font-mono text-xs uppercase text-ink-muted sm:block">
+            {dict.doc.brandGuidelines} — {name}
+          </p>
+        </div>
+        <div className="flex items-center gap-5">
+          <LanguageSwitcher />
           <a
             href="/admin"
-            className="text-sm text-white/60 hover:text-white"
+            className="text-sm text-ink-muted transition-colors hover:text-ink"
           >
-            Admin
+            {dict.header.admin}
           </a>
           <input
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
-            aria-label="Brand name"
-            className="w-40 rounded-lg border border-white/15 bg-transparent px-3 py-1.5 text-sm focus:border-white/50 focus:outline-none"
+            aria-label={dict.header.brandName}
+            className="w-40 border-b border-hairline bg-transparent px-1 py-1.5 text-sm focus:border-ink focus:outline-none"
           />
           <button
             type="button"
             onClick={onReset}
-            className="rounded-lg bg-white px-4 py-1.5 text-sm font-medium text-black hover:bg-white/85"
+            className="bg-ink px-4 py-1.5 text-sm font-medium text-paper transition-colors hover:bg-accent"
           >
-            New logo
+            {dict.header.newLogo}
           </button>
         </div>
       </header>
 
-      <Hero {...scene} />
-      <Construction {...scene} />
-      <Palette {...scene} />
-      <UsageGrid {...scene} />
-      <AppIcons {...scene} />
-      <Browser {...scene} />
-      <Social {...scene} />
-      <Badge {...scene} />
-      <Merch {...scene} />
-      <Generated {...scene} />
+      <Splash {...scene} />
+      <Contents />
+      {/* Anchor wrappers for the table of contents; offset for the sticky header. */}
+      <div id="s01" className="scroll-mt-16">
+        <Identity {...scene} />
+      </div>
+      <div id="s02" className="scroll-mt-16">
+        <Construction {...scene} />
+      </div>
+      <div id="s03" className="scroll-mt-16">
+        <Palette {...scene} />
+      </div>
+      <div id="s04" className="scroll-mt-16">
+        <UsageGrid {...scene} />
+      </div>
+      <div id="s05" className="scroll-mt-16">
+        <AppIcons {...scene} />
+      </div>
+      <div id="s06" className="scroll-mt-16">
+        <Browser {...scene} />
+      </div>
+      <div id="s07" className="scroll-mt-16">
+        <Social {...scene} />
+      </div>
+      <div id="s08" className="scroll-mt-16">
+        <Badge {...scene} />
+      </div>
+      <div id="s09" className="scroll-mt-16">
+        <Merch {...scene} />
+      </div>
+      <div id="s10" className="scroll-mt-16">
+        <Generated {...scene} />
+      </div>
 
-      <footer className="flex items-center justify-between px-6 py-10 md:px-12">
-        <p className="font-mono text-xs uppercase text-white/40">
-          Generated with {SERVICE_NAME} — working title
+      <footer className="flex items-center justify-between border-t border-hairline px-6 py-10 md:px-12">
+        <p className="font-mono text-xs uppercase text-ink-muted">
+          {format(dict.footer.generatedWith, { service: SERVICE_NAME })}
         </p>
-        <p className="font-mono text-xs uppercase text-white/40">
-          {new Date().getFullYear()}
+        <p className="font-mono text-xs uppercase text-ink-muted">
+          {dict.doc.version} 1.0 — {new Date().getFullYear()}
         </p>
       </footer>
     </main>

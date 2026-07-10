@@ -1,9 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { analyzeSvg, type LogoData } from "@/lib/svg";
 import { SAMPLE_SVG, SAMPLE_NAME } from "@/lib/sample";
-import { SERVICE_NAME, SERVICE_TAGLINE } from "@/lib/config";
+import { SERVICE_NAME } from "@/lib/config";
+import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/cn";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type Props = {
   onLogo: (logo: LogoData, suggestedName: string) => void;
@@ -16,18 +20,19 @@ function nameFromFile(fileName: string): string {
 }
 
 export default function Landing({ onLogo }: Props) {
+  const { dict } = useI18n();
+  const reducedMotion = useReducedMotion();
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dragDepth = useRef(0);
 
   const handleFile = async (file: File) => {
     setError(null);
     const isSvg =
       file.type === "image/svg+xml" || /\.svg$/i.test(file.name);
     if (!isSvg) {
-      setError(
-        "This proof of concept accepts SVG only. PNG and Illustrator support is on the roadmap."
-      );
+      setError(dict.landing.errors.svgOnly);
       return;
     }
     try {
@@ -35,7 +40,9 @@ export default function Landing({ onLogo }: Props) {
       const logo = analyzeSvg(source, file.name);
       onLogo(logo, nameFromFile(file.name));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not read this file.");
+      setError(
+        e instanceof Error ? e.message : dict.landing.errors.readFailed
+      );
     }
   };
 
@@ -44,100 +51,164 @@ export default function Landing({ onLogo }: Props) {
     try {
       onLogo(analyzeSvg(SAMPLE_SVG, "sample.svg"), SAMPLE_NAME);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load the sample.");
+      setError(
+        e instanceof Error ? e.message : dict.landing.errors.sampleFailed
+      );
     }
   };
 
+  const container = {
+    hidden: {},
+    show: {
+      transition: reducedMotion
+        ? { staggerChildren: 0, delayChildren: 0 }
+        : { staggerChildren: 0.07 },
+    },
+  };
+  const item = {
+    hidden: reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: reducedMotion ? 0 : 0.45,
+        ease: "easeOut" as const,
+      },
+    },
+  };
+
   return (
-    <main className="flex min-h-dvh flex-col px-6 md:px-12">
-      <header className="flex items-center justify-between py-6">
-        <p className="text-lg font-medium">
+    <main
+      className="relative flex min-h-dvh flex-col bg-paper text-ink"
+      onDragEnter={(e) => {
+        e.preventDefault();
+        dragDepth.current += 1;
+        setDragging(true);
+      }}
+      onDragOver={(e) => e.preventDefault()}
+      onDragLeave={() => {
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (dragDepth.current === 0) setDragging(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        dragDepth.current = 0;
+        setDragging(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) handleFile(file);
+      }}
+    >
+      {/* Page-wide drag-over frame: hairline accent, no fills, no glow. */}
+      <div
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none fixed inset-2 z-50 border border-accent transition-opacity duration-150",
+          dragging ? "opacity-100" : "opacity-0"
+        )}
+      />
+
+      <header className="flex items-center justify-between border-b border-hairline px-6 py-5 md:px-10">
+        <p className="font-display text-xl font-medium">
           {SERVICE_NAME}
-          <span className="align-super text-xs">®</span>
+          <span className="align-super text-[0.55em]">®</span>
         </p>
         <div className="flex items-center gap-6">
-          <p className="hidden font-mono text-xs uppercase text-white/40 sm:block">
-            Proof of concept
-          </p>
+          <LanguageSwitcher />
           <a
             href="/admin"
-            className="rounded-lg border border-white/15 px-4 py-1.5 text-sm text-white/80 hover:border-white/50 hover:text-white"
+            className="font-mono text-xs uppercase text-ink-muted transition-colors hover:text-ink"
           >
-            Admin
+            {dict.header.admin}
           </a>
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-12 pb-24">
-        <div className="max-w-3xl text-center">
-          <h1 className="text-balance text-5xl font-medium leading-tight md:text-7xl">
-            {SERVICE_TAGLINE}
-          </h1>
-          <p className="mx-auto mt-6 max-w-xl text-pretty text-white/50">
-            Drop a single SVG logo and get a Behance-grade brand presentation
-            — construction grid, color system, app icons, favicons and mockups.
-            Zero touch.
-          </p>
-        </div>
+      <motion.div
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-6 py-16 md:px-10 md:py-24"
+      >
+        <motion.p
+          variants={item}
+          className="font-mono text-xs uppercase text-ink-muted"
+        >
+          <span aria-hidden="true" className="mr-3 inline-block size-2 bg-accent align-middle" />
+          {dict.landing.kicker}
+        </motion.p>
 
-        <div className="w-full max-w-xl">
-          <label
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragging(false);
-              const file = e.dataTransfer.files?.[0];
-              if (file) handleFile(file);
-            }}
-            className={`flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed px-8 py-14 transition-colors ${
-              dragging
-                ? "border-white/60 bg-white/5"
-                : "border-white/20 hover:border-white/40"
-            }`}
-          >
-            <span className="text-lg">Drop your logo here</span>
-            <span className="font-mono text-xs uppercase text-white/40">
-              SVG only — for now
-            </span>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".svg,image/svg+xml"
-              className="sr-only"
-              aria-label="Upload an SVG logo"
+        <motion.h1
+          variants={item}
+          className="mt-6 max-w-5xl text-balance font-display text-5xl font-medium leading-[0.98] md:text-[7vw] md:leading-[0.95]"
+        >
+          {dict.landing.headline}
+        </motion.h1>
+
+        <motion.p
+          variants={item}
+          className="mt-8 max-w-prose text-pretty text-lg text-ink-muted"
+        >
+          {dict.landing.sub}
+        </motion.p>
+
+        <motion.div variants={item} className="mt-12">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
               aria-describedby={error ? "upload-error" : undefined}
-              aria-invalid={error ? true : undefined}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFile(file);
-                e.target.value = "";
-              }}
-            />
-          </label>
+              className="bg-ink px-8 py-4 text-sm font-medium text-paper transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {dict.landing.upload}
+            </button>
+            <div className="font-mono text-xs uppercase text-ink-faint">
+              <p className={cn("transition-colors", dragging && "text-accent")}>
+                {dict.landing.drop}
+              </p>
+              <p className="mt-1">{dict.landing.svgOnly}</p>
+            </div>
+          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".svg,image/svg+xml"
+            className="sr-only"
+            aria-label={dict.landing.upload}
+            aria-describedby={error ? "upload-error" : undefined}
+            aria-invalid={error ? true : undefined}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file);
+              e.target.value = "";
+            }}
+          />
           {error && (
             <p
               id="upload-error"
               aria-live="polite"
-              className="mt-3 text-sm text-red-400"
+              className="mt-4 max-w-prose text-pretty text-sm text-red-600"
             >
               {error}
             </p>
           )}
-          <div className="mt-6 text-center">
+          <div className="mt-8">
             <button
               type="button"
               onClick={loadSample}
-              className="text-sm text-white/60 underline underline-offset-4 hover:text-white"
+              className="text-sm text-ink-muted underline underline-offset-4 transition-colors hover:text-ink"
             >
-              No logo at hand? View the sample presentation
+              {dict.landing.sample}
+              <span aria-hidden="true"> →</span>
             </button>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
+
+      <footer className="border-t border-hairline px-6 py-5 md:px-10">
+        <p className="font-mono text-xs text-ink-faint">
+          {dict.landing.privacy}
+        </p>
+      </footer>
     </main>
   );
 }

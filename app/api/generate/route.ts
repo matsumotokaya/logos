@@ -11,6 +11,7 @@ const SCENE_PROMPTS: Record<string, string> = {
   mug: "a {surface} matte ceramic coffee mug with the logo printed large on its side, standing on a dark stone surface",
   tote: "a {surface} cotton tote bag with the logo printed large on the center, hanging against a dark concrete wall",
   cap: "a {surface} baseball cap with the logo embroidered on the front panel, resting on a dark surface",
+  wall: "a minimal architectural interior with a large smooth concrete or plaster wall, the logo applied to the wall as a clean flat white sign, centered with generous empty space around it",
 };
 
 // The attached logo is rasterized on a white background, so its dominant color is the ink.
@@ -22,6 +23,16 @@ function surfaceFor(inkHex: string): string {
 
 function buildPrompt(target: string, brandName: string, inkHex: string) {
   const scene = SCENE_PROMPTS[target].replace("{surface}", surfaceFor(inkHex));
+  if (target === "wall") {
+    // Brand hero scene: white sign in daylight instead of the dark studio look.
+    return [
+      `Create a photorealistic brand hero photo for the brand "${brandName}": ${scene}.`,
+      "Use the exact logo shape from the attached image, rendered entirely in matte white — do not redraw, distort, restyle or add elements to the logo.",
+      "The wall is a muted mid-to-dark tone so the white sign stays clearly legible.",
+      "Editorial architectural photography: soft natural daylight, subtle material texture, generous negative space, premium brand-guideline presentation style.",
+      "No text anywhere in the image other than the logo itself.",
+    ].join(" ");
+  }
   return [
     `Create a photorealistic product mockup photo for the brand "${brandName}": ${scene}.`,
     "Use the exact logo from the attached image. Reproduce its shape and colors precisely — do not redraw, distort, restyle or add elements to the logo.",

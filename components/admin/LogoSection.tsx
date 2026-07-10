@@ -2,6 +2,7 @@
 
 // Registered logo grid: role assignment, presentation link, deletion.
 
+import Link from "next/link";
 import { LOGO_ROLE_LABELS, type LogoRole, type StoredLogo } from "@/lib/store";
 import { svgToDataUri } from "@/lib/svg";
 
@@ -24,12 +25,12 @@ export default function LogoSection({ logos, onChangeRole, onDelete }: Props) {
         <p className="text-pretty text-sm text-gray-500">
           ロゴがまだありません。トップページからSVGをアップロードすると、ここに表示されます。
         </p>
-        <a
+        <Link
           href="/"
           className="mt-3 inline-block text-sm text-gray-900 underline underline-offset-2"
         >
           アップロードへ →
-        </a>
+        </Link>
       </div>
     );
   }

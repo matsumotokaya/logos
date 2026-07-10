@@ -4,6 +4,7 @@
 import type {
   BrandRepo,
   Company,
+  GeneratedMockups,
   InventoryItem,
   Order,
   StoredLogo,
@@ -14,7 +15,11 @@ const KEYS = {
   logos: "logos.v1.logos",
   inventory: "logos.v1.inventory",
   orders: "logos.v1.orders",
+  mockups: "logos.v1.mockups",
 } as const;
+
+// logoKey -> { slot -> image }. Object insertion order doubles as LRU order.
+type MockupMap = Record<string, GeneratedMockups>;
 
 const DEFAULT_COMPANY: Company = {
   name: "",
@@ -144,5 +149,38 @@ export class LocalStorageRepo implements BrandRepo {
     orders.push(order);
     write(KEYS.orders, orders);
     return order;
+  }
+
+  async getMockups(logoKey: string): Promise<GeneratedMockups> {
+    const map = read<MockupMap>(KEYS.mockups, {});
+    return map[logoKey] ?? {};
+  }
+
+  async saveMockup(
+    logoKey: string,
+    slot: string,
+    image: string
+  ): Promise<void> {
+    if (typeof window === "undefined") return;
+    const map = read<MockupMap>(KEYS.mockups, {});
+    // Re-insert this logo last so it counts as most-recently-used.
+    const entry = { ...(map[logoKey] ?? {}), [slot]: image };
+    delete map[logoKey];
+    map[logoKey] = entry;
+
+    // Images are large; if the quota is hit, evict the least-recently-used
+    // logos (oldest keys first) and retry until it fits or only this one is left.
+    const keys = Object.keys(map);
+    let evict = 0;
+    for (;;) {
+      try {
+        window.localStorage.setItem(KEYS.mockups, JSON.stringify(map));
+        return;
+      } catch {
+        if (evict >= keys.length - 1) return; // can't shrink further
+        delete map[keys[evict]];
+        evict += 1;
+      }
+    }
   }
 }

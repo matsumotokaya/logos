@@ -1,12 +1,18 @@
-import { Caption, type SceneProps } from "./shared";
+"use client";
+
+import { SectionIntro, type SceneProps } from "./shared";
 import { hexToRgb, rgbToCmyk, textOn, hairlineOn, type RGB } from "@/lib/color";
 import { svgToDataUri } from "@/lib/svg";
+import { useI18n } from "@/lib/i18n";
+import Reveal from "./Reveal";
 
 type Band = {
   name: string;
   hex: string;
   rgb: RGB;
   cmyk: [number, number, number, number];
+  /** Visual weight within the mark (0..1). Absent for added neutrals. */
+  share?: number;
 };
 
 const EXTRACTED_NAMES = [
@@ -23,11 +29,14 @@ const NEUTRALS: { name: string; hex: string }[] = [
 ];
 
 export default function Palette({ logo, name, variants }: SceneProps) {
+  const { dict } = useI18n();
+
   const bands: Band[] = logo.colors.map((c, i) => ({
     name: EXTRACTED_NAMES[i] ?? `Accent 0${i + 1}`,
     hex: c.hex,
     rgb: c.rgb,
     cmyk: c.cmyk,
+    share: c.share,
   }));
 
   const extracted = new Set(logo.colors.map((c) => c.hex.toUpperCase()));
@@ -37,25 +46,30 @@ export default function Palette({ logo, name, variants }: SceneProps) {
     bands.push({ name: neutral.name, hex: neutral.hex, rgb, cmyk: rgbToCmyk(rgb) });
   }
 
-  const textColor = (hex: string) => textOn(hex);
   // Logo variant that contrasts with a given band background.
   const contrastLogo = (hex: string) =>
     textOn(hex) === "#F1F3F4" ? variants.white : variants.black;
 
   return (
-    <section className="bg-background">
-      <div className="px-6 py-16 md:px-12">
-        <Caption n="02" title="Color" />
-      </div>
+    <section className="bg-paper">
+      <Reveal>
+        <SectionIntro
+          n="03"
+          title={dict.scenes.color}
+          lead={dict.sections.color.lead}
+        />
+      </Reveal>
+
+      {/* Full-bleed color bands — the color surfaces themselves are the exhibit. */}
       {bands.map((band, i) => (
         <div
           key={`${band.hex}-${band.name}`}
-          className={`flex items-center justify-between gap-6 px-6 py-10 md:px-16 ${
-            i === 0 ? "min-h-[40vh]" : "min-h-[24vh]"
+          className={`flex items-center justify-between gap-6 px-6 py-10 md:px-12 ${
+            i === 0 ? "min-h-[40vh]" : "min-h-[22vh]"
           }`}
           style={{
             background: band.hex,
-            color: textColor(band.hex),
+            color: textOn(band.hex),
             borderTop: `1px solid ${hairlineOn(band.hex)}`,
           }}
         >
@@ -68,15 +82,21 @@ export default function Palette({ logo, name, variants }: SceneProps) {
                 className="hidden h-14 w-auto md:block"
               />
             )}
-            <p className="text-base font-medium uppercase">{band.name}</p>
+            <p className="font-mono text-xs uppercase">{band.name}</p>
           </div>
           <dl className="grid grid-cols-[auto_auto] gap-x-10 gap-y-1 font-mono text-xs tabular-nums">
             <dt className="opacity-60">HEX</dt>
-            <dd>{band.hex}</dd>
+            <dd>{band.hex.toUpperCase()}</dd>
             <dt className="opacity-60">RGB</dt>
             <dd>{`${band.rgb.r}, ${band.rgb.g}, ${band.rgb.b}`}</dd>
             <dt className="opacity-60">CMYK</dt>
             <dd>{band.cmyk.join(", ")}</dd>
+            {band.share !== undefined && (
+              <>
+                <dt className="opacity-60">SHARE</dt>
+                <dd>{`${Math.round(band.share * 100)}%`}</dd>
+              </>
+            )}
           </dl>
         </div>
       ))}
