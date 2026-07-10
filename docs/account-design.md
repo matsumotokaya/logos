@@ -39,6 +39,10 @@ localStorage PoC から Supabase への移行にあたり、**最初から法人
 - guest・非公開ロゴには付与しない
 - **実装は組織・公開機能が入るフェーズまで先送り**(スキーマ上は handles テーブルだけ先に確保)
 
+### 補足: ロゴアセットの正規参照URL(CDN層)
+
+プレゼンページとは別に、ロゴファイルそのものを参照する `/l/[id]/[variant].[ext]` を用意する(ロゴCDN)。層1と同じ「所有者を含まない・壊れない」原則。詳細は [data-model.md §4](data-model.md) を参照。
+
 ## 3. エンティティモデル
 
 ```
@@ -112,6 +116,7 @@ public.handles(ユーザー/組織の共有名前空間 — 層2 URL用)
 
 > 実装時は必ず実際のデータベースに問い合わせて現状確認してから適用する。
 > `auth.users` は直接参照しない(トリガーで `public.users` に同期し、FKはすべて `public.users(user_id)` へ張る)。
+> ロゴ周辺の追加テーブル(logo_variants / logo_presentations / tags / bookmarks)と logos への追加カラムは [data-model.md §3](data-model.md) に定義。
 
 ```sql
 -- 認証ミラー(auth.users の INSERT トリガーで自動作成)

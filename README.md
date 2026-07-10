@@ -4,7 +4,7 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 
 サービス名は仮。[lib/config.ts](lib/config.ts) の `SERVICE_NAME` を変更すれば全体に反映される。
 
-事業構想・ビジネスモデルは [PRODUCT.md](PRODUCT.md) を、アカウント・権限・URL設計(Supabase移行方針)は [docs/account-design.md](docs/account-design.md) を参照。
+事業構想・ビジネスモデルは [PRODUCT.md](PRODUCT.md) を、アカウント・権限・URL設計(Supabase移行方針)は [docs/account-design.md](docs/account-design.md) を、ロゴのデータモデル・CDN URL・サイト構造は [docs/data-model.md](docs/data-model.md) を参照。
 
 ## 生成されるプレゼンテーション(`/`)
 
