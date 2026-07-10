@@ -1,11 +1,14 @@
 // localStorage implementation of BrandRepo. Client-side only.
 // All methods are async so a network-backed implementation is a drop-in swap.
 
+import type { LogoData } from "@/lib/svg";
 import type {
   BrandRepo,
   Company,
   GeneratedMockups,
   InventoryItem,
+  LogoActivityAction,
+  LogoPatch,
   Order,
   StoredLogo,
 } from "./types";
@@ -66,6 +69,22 @@ function newId(): string {
     : `id-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 }
 
+// Entries saved before the canonical-record fields existed get defaults,
+// so old localStorage data keeps working after the schema extension.
+function normalizeLogo(raw: StoredLogo): StoredLogo {
+  return {
+    ...raw,
+    updatedAt: raw.updatedAt ?? raw.createdAt,
+    logoType: raw.logoType ?? null,
+    parentId: raw.parentId ?? null,
+    visibility: raw.visibility ?? "draft",
+    credits: raw.credits ?? [],
+    trademarks: raw.trademarks ?? [],
+    activities: raw.activities ?? [],
+    tags: raw.tags ?? [],
+  };
+}
+
 export class LocalStorageRepo implements BrandRepo {
   async getCompany(): Promise<Company> {
     return read<Company>(KEYS.company, DEFAULT_COMPANY);
@@ -77,12 +96,15 @@ export class LocalStorageRepo implements BrandRepo {
 
   async listLogos(): Promise<StoredLogo[]> {
     const logos = read<StoredLogo[]>(KEYS.logos, []);
-    return [...logos].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return logos
+      .map(normalizeLogo)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async getLogo(id: string): Promise<StoredLogo | null> {
     const logos = read<StoredLogo[]>(KEYS.logos, []);
-    return logos.find((l) => l.id === id) ?? null;
+    const found = logos.find((l) => l.id === id);
+    return found ? normalizeLogo(found) : null;
   }
 
   async saveLogo(logo: StoredLogo): Promise<void> {
@@ -93,22 +115,52 @@ export class LocalStorageRepo implements BrandRepo {
     write(KEYS.logos, logos);
   }
 
-  async updateLogo(
-    id: string,
-    patch: Partial<Pick<StoredLogo, "title" | "role">>
-  ): Promise<void> {
+  async updateLogo(id: string, patch: LogoPatch): Promise<void> {
     const logos = read<StoredLogo[]>(KEYS.logos, []);
     const idx = logos.findIndex((l) => l.id === id);
     if (idx < 0) return;
-    logos[idx] = { ...logos[idx], ...patch };
+    const before = normalizeLogo(logos[idx]);
+    const now = new Date().toISOString();
+    const action: LogoActivityAction =
+      patch.visibility !== undefined && patch.visibility !== before.visibility
+        ? "visibility_changed"
+        : "info_updated";
+    logos[idx] = {
+      ...before,
+      ...patch,
+      updatedAt: now,
+      activities: [...before.activities, { id: newId(), action, at: now }],
+    };
+    write(KEYS.logos, logos);
+  }
+
+  async replaceLogoData(id: string, data: LogoData): Promise<void> {
+    const logos = read<StoredLogo[]>(KEYS.logos, []);
+    const idx = logos.findIndex((l) => l.id === id);
+    if (idx < 0) return;
+    const before = normalizeLogo(logos[idx]);
+    const now = new Date().toISOString();
+    // Overwrite in place — no version is kept (docs/data-model.md §2.1).
+    // The generated-mockup cache is keyed by SVG content, so replacing the
+    // file naturally stops matching the old cache entries.
+    logos[idx] = {
+      ...before,
+      data,
+      updatedAt: now,
+      activities: [
+        ...before.activities,
+        { id: newId(), action: "file_updated", at: now },
+      ],
+    };
     write(KEYS.logos, logos);
   }
 
   async deleteLogo(id: string): Promise<void> {
-    write(
-      KEYS.logos,
-      read<StoredLogo[]>(KEYS.logos, []).filter((l) => l.id !== id)
-    );
+    const remaining = read<StoredLogo[]>(KEYS.logos, [])
+      .filter((l) => l.id !== id)
+      // Children of the deleted logo become roots instead of dangling.
+      .map((l) => (l.parentId === id ? { ...l, parentId: null } : l));
+    write(KEYS.logos, remaining);
   }
 
   async listInventory(): Promise<InventoryItem[]> {

@@ -32,6 +32,11 @@ node verify.mjs   # import { chromium } from "playwright"
 - Rename via `header input` on /p/[id] persists to the gallery card title
 - Probes: unknown id → "Logo not found"; legacy `/?logo=<id>` redirects; re-upload same SVG dedupes to same id; non-SVG file → inline `#upload-error`
 
+- Logo info page `/admin/logos/[id]`: basic-info selects persist immediately;
+  credits/trademarks are draft + 保存 button; file replace via `SVGを差し替え`
+  filechooser; seed legacy-shaped rows via `localStorage.setItem("logos.v1.logos", ...)`
+  to test migration defaults
+
 ## Gotchas
 
 - Splash scene animates on presentation load — wait ~2.5s before screenshots

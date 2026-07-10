@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { LogoData } from "@/lib/svg";
-import { repo } from "@/lib/store";
+import { createStoredLogo, repo } from "@/lib/store";
 import { newLogoId } from "@/lib/id";
 import Landing from "@/components/Landing";
 
@@ -26,13 +26,14 @@ export default function Home() {
     }
 
     const id = newLogoId();
-    await repo.saveLogo({
-      id,
-      title: suggestedName,
-      role: existing.length === 0 ? "brand" : "other",
-      data,
-      createdAt: new Date().toISOString(),
-    });
+    await repo.saveLogo(
+      createStoredLogo({
+        id,
+        title: suggestedName,
+        role: existing.length === 0 ? "brand" : "other",
+        data,
+      })
+    );
     const company = await repo.getCompany();
     if (!company.name) await repo.saveCompany({ ...company, name: suggestedName });
     router.push(`/p/${id}`);

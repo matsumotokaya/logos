@@ -68,17 +68,23 @@ export default function LogoSection({ logos, onChangeRole, onDelete }: Props) {
                 )
               )}
             </select>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link
+                href={`/admin/logos/${logo.id}`}
+                className="text-xs font-medium text-gray-900 underline underline-offset-2"
+              >
+                ロゴ情報
+              </Link>
               <a
                 href={`/p/${logo.id}`}
                 className="text-xs text-gray-900 underline underline-offset-2"
               >
-                プレゼンを開く
+                プレゼン
               </a>
               <button
                 type="button"
                 onClick={() => onDelete(logo.id)}
-                className="text-xs text-red-600 hover:text-red-800"
+                className="ml-auto text-xs text-red-600 hover:text-red-800"
               >
                 削除
               </button>

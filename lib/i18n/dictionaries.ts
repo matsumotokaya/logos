@@ -34,6 +34,7 @@ export type Dict = {
     brand: string;
     corporate: string;
     service: string;
+    subsidiary: string;
     other: string;
   };
   notFound: {
@@ -132,6 +133,7 @@ const en: Dict = {
     brand: "Brand",
     corporate: "Corporate",
     service: "Service",
+    subsidiary: "Subsidiary",
     other: "Other",
   },
   notFound: {
@@ -246,6 +248,7 @@ const ja: Dict = {
     brand: "ブランド",
     corporate: "コーポレート",
     service: "サービス",
+    subsidiary: "子会社・グループ",
     other: "その他",
   },
   notFound: {
@@ -360,6 +363,7 @@ const ko: Dict = {
     brand: "브랜드",
     corporate: "기업",
     service: "서비스",
+    subsidiary: "자회사·그룹",
     other: "기타",
   },
   notFound: {
@@ -473,6 +477,7 @@ const zhHant: Dict = {
     brand: "品牌",
     corporate: "企業",
     service: "服務",
+    subsidiary: "子公司・集團",
     other: "其他",
   },
   notFound: {
@@ -586,6 +591,7 @@ const zhHans: Dict = {
     brand: "品牌",
     corporate: "企业",
     service: "服务",
+    subsidiary: "子公司・集团",
     other: "其他",
   },
   notFound: {
