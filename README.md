@@ -73,6 +73,21 @@ npm run dev   # http://localhost:3000
 GEMINI_API_KEY=（Google AI Studioで発行したキー、課金有効なプロジェクトのもの）
 ```
 
+### Supabase(DB移行)
+
+スキーマの正本は [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql)(アカウント・組織・ロゴ正本・RLS一式)。セットアップ手順:
+
+1. Supabase の SQL Editor で `supabase/migrations/0001_init.sql` を実行(冪等・再実行可)
+2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(ゲスト投稿の前提)
+3. `.env.local` に以下を追加:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=（プロジェクトURL）
+NEXT_PUBLIC_SUPABASE_ANON_KEY=（anon / publishable キー）
+```
+
+Supabase MCP(read-only)は [.mcp.json](.mcp.json) に設定済み。環境変数 `SUPABASE_ACCESS_TOKEN`(Dashboard → Account → Access Tokens で発行)を設定すると次回セッションから利用できる。
+
 Vercelにデプロイする場合は同じ環境変数を Settings → Environment Variables に追加する。
 
 ## 制約(PoC段階)
@@ -85,6 +100,8 @@ Vercelにデプロイする場合は同じ環境変数を Settings → Environme
 
 - **作業履歴の集約**: ロゴ情報ページはセレクト変更のたびに「情報更新」が1行記録され、履歴がすぐ長くなる。連続する同種操作をまとめる集約(例: 一定時間内の同種更新を1行に)をSupabase移行時に検討する
 - **公開範囲(visibility)は保存のみ**: アクセス制御・トップギャラリーの絞り込みにはまだ反映されない。DB移行(認証導入)後に有効化する
+- **公開範囲変更のadmin限定はアプリ側制御**: RLSは行単位のため「editorは編集可だがvisibilityは変更不可」を列単位で強制できない。現状はアプリ側で制御(0001_init.sqlにも注記)
+- **プレゼン編集にUndoがない**: blur即保存のため取り消し手段は「自動生成コピーへの復帰」のみ。本格運用では編集の取り消しを検討
 
 ## デプロイ
 

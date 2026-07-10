@@ -278,8 +278,10 @@ logo_* の子テーブルはすべて「SELECT は親ロゴの閲覧権限に準
 
 ## 8. アセットの保存先
 
-- 現PoCは SVG テキストを DB(localStorage)に直持ちしている。Supabase移行時は **マスターSVG・バリエーション・生成モックアップ画像をすべて Storage に置き、DBはパス参照**にする(logo_candidates.file_path / logo_variants.file_path / logo_mockups.image_path)
-- R2移行(§7 Step B)の際は Storage→R2 へオブジェクトをコピーするだけで、スキーマ変更は不要
+**2026-07-11 実装判断(Supabaseスキーマ確定時)**: SVGは数KB程度と小さいため、**マスターSVG・バリエーションはDBに直持ち**(`logo_candidates.svg` / `logo_variants.svg`)とし、**生成モックアップ画像(大きい)だけ Storage**(`logo_mockups.image_path`、バケット `mockups`)に置く。CDN配信ルート(§7)はDBから読んで返せばよく、むしろ単純になる。
+
+- R2移行(§7 Step B)の際にSVGをR2オブジェクト化するかは、その時点のCDN要件で判断(スキーマ上は svg カラム→パス参照への変更のみ)
+- 適用済みスキーマの正本は [../supabase/migrations/0001_init.sql](../supabase/migrations/0001_init.sql)
 
 ## 9. サイト構造(ここまでの全設計の統合)
 
