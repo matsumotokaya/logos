@@ -36,7 +36,8 @@ const DEFAULT_COMPANY: Company = {
 };
 
 // Dummy inventory so the admin screen demonstrates the ordering business model.
-const SEED_INVENTORY: Omit<InventoryItem, "id">[] = [
+// Shared with the Supabase implementation (seeded per organization).
+export const SEED_INVENTORY: Omit<InventoryItem, "id">[] = [
   { name: "Tシャツ", spec: "ホワイト / シルクスクリーン / S-XL", category: "アパレル", emoji: "👕", unit: "枚", unitPrice: 1800, stock: 24, parLevel: 60, pendingQty: 0, lastOrderedAt: null },
   { name: "Tシャツ", spec: "ブラック / シルクスクリーン / S-XL", category: "アパレル", emoji: "👕", unit: "枚", unitPrice: 1800, stock: 51, parLevel: 60, pendingQty: 0, lastOrderedAt: null },
   { name: "パーカー", spec: "グレー / 刺繍 / M-XL", category: "アパレル", emoji: "🧥", unit: "枚", unitPrice: 4200, stock: 8, parLevel: 20, pendingQty: 0, lastOrderedAt: null },

@@ -34,8 +34,14 @@ export default function Home() {
         data,
       })
     );
-    const company = await repo.getCompany();
-    if (!company.name) await repo.saveCompany({ ...company, name: suggestedName });
+    // Naming the company profile is best-effort — it must never block the
+    // presentation from opening.
+    try {
+      const company = await repo.getCompany();
+      if (!company.name) await repo.saveCompany({ ...company, name: suggestedName });
+    } catch {
+      // ignore
+    }
     router.push(`/p/${id}`);
   };
 
