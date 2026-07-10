@@ -1,67 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import type { LogoData } from "@/lib/svg";
 import { repo } from "@/lib/store";
+import { newLogoId } from "@/lib/id";
 import Landing from "@/components/Landing";
-import Presentation from "@/components/Presentation";
 
-async function persistLogo(data: LogoData, title: string): Promise<void> {
-  try {
+export default function Home() {
+  const router = useRouter();
+
+  // Legacy /?logo=<id> links redirect to the permalink.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("logo");
+    if (id) router.replace(`/p/${id}`);
+  }, [router]);
+
+  const handleLogo = async (data: LogoData, suggestedName: string) => {
+    // Re-uploading the same file opens the existing entry instead of duplicating it.
     const existing = await repo.listLogos();
-    // Re-uploading the same file should not create a duplicate entry.
-    if (existing.some((l) => l.data.svg === data.svg)) return;
+    const dup = existing.find((l) => l.data.svg === data.svg);
+    if (dup) {
+      router.push(`/p/${dup.id}`);
+      return;
+    }
+
+    const id = newLogoId();
     await repo.saveLogo({
-      id: crypto.randomUUID(),
-      title,
+      id,
+      title: suggestedName,
       role: existing.length === 0 ? "brand" : "other",
       data,
       createdAt: new Date().toISOString(),
     });
     const company = await repo.getCompany();
-    if (!company.name) await repo.saveCompany({ ...company, name: title });
-  } catch {
-    // Persistence is best-effort in the PoC; the presentation still works.
-  }
-}
+    if (!company.name) await repo.saveCompany({ ...company, name: suggestedName });
+    router.push(`/p/${id}`);
+  };
 
-export default function Home() {
-  const [logo, setLogo] = useState<LogoData | null>(null);
-  const [name, setName] = useState("Brand");
-
-  // Allow the admin screen to open a stored logo via /?logo=<id>.
-  useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("logo");
-    if (!id) return;
-    repo.getLogo(id).then((stored) => {
-      if (stored) {
-        setName(stored.title);
-        setLogo(stored.data);
-      }
-    });
-  }, []);
-
-  if (!logo) {
-    return (
-      <Landing
-        onLogo={(data, suggestedName) => {
-          setName(suggestedName);
-          setLogo(data);
-          void persistLogo(data, suggestedName);
-        }}
-      />
-    );
-  }
-
-  return (
-    <Presentation
-      logo={logo}
-      name={name}
-      onNameChange={setName}
-      onReset={() => {
-        window.history.replaceState(null, "", "/");
-        setLogo(null);
-      }}
-    />
-  );
+  return <Landing onLogo={handleLogo} />;
 }

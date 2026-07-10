@@ -6,7 +6,17 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 
 事業構想・ビジネスモデルは [PRODUCT.md](PRODUCT.md) を、アカウント・権限・URL設計(Supabase移行方針)は [docs/account-design.md](docs/account-design.md) を、ロゴのデータモデル・CDN URL・サイト構造は [docs/data-model.md](docs/data-model.md) を参照。
 
-## 生成されるプレゼンテーション(`/`)
+## ページ構成
+
+| パス | 内容 |
+|---|---|
+| `/` | ロゴ投稿UI(メイン導線)+ アップ済みロゴのギャラリー。カードから各プレゼンへ |
+| `/p/[id]` | 生成されたブランドプレゼンテーション(共有可能な固有URL)。`/p/sample` はサンプル |
+| `/admin` | 管理コンソール |
+
+URL体系の設計意図(所有者を含まない壊れないパーマリンク等)は [docs/account-design.md](docs/account-design.md) を参照。
+
+## 生成されるプレゼンテーション(`/p/[id]`)
 
 SVGをアップロードすると、以下が1本のガイドラインドキュメントとして生成される。冒頭に Splash(オープニングアニメーション)と Contents(目次)、続いて番号付きの10シーンが並ぶ。
 

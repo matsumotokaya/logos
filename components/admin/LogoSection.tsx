@@ -70,7 +70,7 @@ export default function LogoSection({ logos, onChangeRole, onDelete }: Props) {
             </select>
             <div className="flex items-center justify-between">
               <a
-                href={`/?logo=${logo.id}`}
+                href={`/p/${logo.id}`}
                 className="text-xs text-gray-900 underline underline-offset-2"
               >
                 プレゼンを開く

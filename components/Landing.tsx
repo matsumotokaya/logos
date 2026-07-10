@@ -1,16 +1,17 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { analyzeSvg, type LogoData } from "@/lib/svg";
-import { SAMPLE_SVG, SAMPLE_NAME } from "@/lib/sample";
 import { SERVICE_NAME } from "@/lib/config";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import Gallery from "@/components/Gallery";
 
 type Props = {
-  onLogo: (logo: LogoData, suggestedName: string) => void;
+  onLogo: (logo: LogoData, suggestedName: string) => Promise<void>;
 };
 
 function nameFromFile(fileName: string): string {
@@ -38,21 +39,10 @@ export default function Landing({ onLogo }: Props) {
     try {
       const source = await file.text();
       const logo = analyzeSvg(source, file.name);
-      onLogo(logo, nameFromFile(file.name));
+      await onLogo(logo, nameFromFile(file.name));
     } catch (e) {
       setError(
         e instanceof Error ? e.message : dict.landing.errors.readFailed
-      );
-    }
-  };
-
-  const loadSample = () => {
-    setError(null);
-    try {
-      onLogo(analyzeSvg(SAMPLE_SVG, "sample.svg"), SAMPLE_NAME);
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : dict.landing.errors.sampleFailed
       );
     }
   };
@@ -127,7 +117,7 @@ export default function Landing({ onLogo }: Props) {
         variants={container}
         initial="hidden"
         animate="show"
-        className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-6 py-16 md:px-10 md:py-24"
+        className="mx-auto flex min-h-[70dvh] w-full max-w-6xl flex-col justify-center px-6 py-16 md:px-10 md:py-24"
       >
         <motion.p
           variants={item}
@@ -192,17 +182,18 @@ export default function Landing({ onLogo }: Props) {
             </p>
           )}
           <div className="mt-8">
-            <button
-              type="button"
-              onClick={loadSample}
+            <Link
+              href="/p/sample"
               className="text-sm text-ink-muted underline underline-offset-4 transition-colors hover:text-ink"
             >
               {dict.landing.sample}
               <span aria-hidden="true"> →</span>
-            </button>
+            </Link>
           </div>
         </motion.div>
       </motion.div>
+
+      <Gallery />
 
       <footer className="border-t border-hairline px-6 py-5 md:px-10">
         <p className="font-mono text-xs text-ink-faint">

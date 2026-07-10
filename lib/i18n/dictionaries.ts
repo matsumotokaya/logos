@@ -26,6 +26,21 @@ export type Dict = {
       sampleFailed: string;
     };
   };
+  gallery: {
+    title: string;
+    empty: string;
+  };
+  roles: {
+    brand: string;
+    corporate: string;
+    service: string;
+    other: string;
+  };
+  notFound: {
+    title: string;
+    body: string;
+    back: string;
+  };
   doc: {
     brandGuidelines: string;
     version: string;
@@ -108,6 +123,21 @@ const en: Dict = {
       readFailed: "Could not read this file.",
       sampleFailed: "Could not load the sample.",
     },
+  },
+  gallery: {
+    title: "Gallery",
+    empty: "No logos here yet. Upload one above, or start with the sample.",
+  },
+  roles: {
+    brand: "Brand",
+    corporate: "Corporate",
+    service: "Service",
+    other: "Other",
+  },
+  notFound: {
+    title: "Logo not found",
+    body: "This presentation may have been deleted, or the link may be wrong.",
+    back: "Back to top",
   },
   doc: {
     brandGuidelines: "Brand Guidelines",
@@ -208,6 +238,21 @@ const ja: Dict = {
       sampleFailed: "サンプルを読み込めませんでした。",
     },
   },
+  gallery: {
+    title: "ギャラリー",
+    empty: "まだロゴがありません。上のフォームからアップロードするか、サンプルをご覧ください。",
+  },
+  roles: {
+    brand: "ブランド",
+    corporate: "コーポレート",
+    service: "サービス",
+    other: "その他",
+  },
+  notFound: {
+    title: "ロゴが見つかりません",
+    body: "このプレゼンテーションは削除されたか、リンクが正しくない可能性があります。",
+    back: "トップへ戻る",
+  },
   doc: {
     brandGuidelines: "ブランドガイドライン",
     version: "バージョン",
@@ -307,6 +352,21 @@ const ko: Dict = {
       sampleFailed: "샘플을 불러올 수 없습니다.",
     },
   },
+  gallery: {
+    title: "갤러리",
+    empty: "아직 로고가 없습니다. 위에서 업로드하거나 샘플을 살펴보세요.",
+  },
+  roles: {
+    brand: "브랜드",
+    corporate: "기업",
+    service: "서비스",
+    other: "기타",
+  },
+  notFound: {
+    title: "로고를 찾을 수 없습니다",
+    body: "이 프레젠테이션은 삭제되었거나 링크가 올바르지 않을 수 있습니다.",
+    back: "홈으로 돌아가기",
+  },
   doc: {
     brandGuidelines: "브랜드 가이드라인",
     version: "버전",
@@ -405,6 +465,21 @@ const zhHant: Dict = {
       sampleFailed: "無法載入範例。",
     },
   },
+  gallery: {
+    title: "圖庫",
+    empty: "還沒有標誌。從上方上傳,或先看看範例簡報。",
+  },
+  roles: {
+    brand: "品牌",
+    corporate: "企業",
+    service: "服務",
+    other: "其他",
+  },
+  notFound: {
+    title: "找不到標誌",
+    body: "此簡報可能已被刪除,或連結有誤。",
+    back: "回到首頁",
+  },
   doc: {
     brandGuidelines: "品牌規範",
     version: "版本",
@@ -502,6 +577,21 @@ const zhHans: Dict = {
       readFailed: "无法读取此文件。",
       sampleFailed: "无法加载示例。",
     },
+  },
+  gallery: {
+    title: "图库",
+    empty: "还没有标志。从上方上传,或先看看示例演示。",
+  },
+  roles: {
+    brand: "品牌",
+    corporate: "企业",
+    service: "服务",
+    other: "其他",
+  },
+  notFound: {
+    title: "找不到标志",
+    body: "此演示可能已被删除,或链接有误。",
+    back: "返回首页",
   },
   doc: {
     brandGuidelines: "品牌规范",
