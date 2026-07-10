@@ -85,13 +85,15 @@ export type LogoActivityAction =
   | "created"
   | "file_updated"
   | "info_updated"
-  | "visibility_changed";
+  | "visibility_changed"
+  | "presentation_updated";
 
 export const ACTIVITY_LABELS: Record<LogoActivityAction, string> = {
   created: "登録",
   file_updated: "ファイル差し替え",
   info_updated: "情報更新",
   visibility_changed: "公開範囲変更",
+  presentation_updated: "プレゼン編集",
 };
 
 /** Append-only work-history entry (who/when comes with user accounts). */
@@ -156,6 +158,34 @@ export function createStoredLogo(args: {
   };
 }
 
+/** Per-scene copy overrides, keyed by scene slug ("color", "usage", …). */
+export type SceneTextOverride = {
+  /** Replaces the auto-generated lead paragraph of the section. */
+  lead?: string;
+};
+
+/**
+ * Layer B of the canonical record (docs/data-model.md): the editorial,
+ * blog-like content of a presentation. One per logo. When a field is empty
+ * the presentation falls back to its auto-generated copy, so an unedited
+ * presentation still works end to end.
+ */
+export type LogoPresentation = {
+  catchphrase: string; // shown on the Splash cover
+  story: string; // shown in the Identity section body
+  sceneTexts: Record<string, SceneTextOverride>;
+  updatedAt: string; // ISO 8601
+};
+
+export function emptyPresentation(): LogoPresentation {
+  return {
+    catchphrase: "",
+    story: "",
+    sceneTexts: {},
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export type Company = {
   name: string;
   description: string;
@@ -206,6 +236,10 @@ export interface BrandRepo {
   /** Overwrite the master file in place (no version kept), logging the update. */
   replaceLogoData(id: string, data: LogoData): Promise<void>;
   deleteLogo(id: string): Promise<void>;
+
+  /** Layer B editorial content; returns an empty presentation when unedited. */
+  getPresentation(logoId: string): Promise<LogoPresentation>;
+  savePresentation(logoId: string, presentation: LogoPresentation): Promise<void>;
 
   listInventory(): Promise<InventoryItem[]>;
   listOrders(): Promise<Order[]>;

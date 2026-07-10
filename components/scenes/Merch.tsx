@@ -21,6 +21,7 @@ export default function Merch({ logo, name, variants }: SceneProps) {
         n="09"
         title={dict.scenes.merch}
         lead={dict.sections.merch.lead}
+        slug="merch"
       />
       <Reveal className="px-6 pb-16 md:px-12 md:pb-24">
         <div className="relative overflow-hidden border border-hairline">

@@ -2,20 +2,23 @@
 // All methods are async so a network-backed implementation is a drop-in swap.
 
 import type { LogoData } from "@/lib/svg";
-import type {
-  BrandRepo,
-  Company,
-  GeneratedMockups,
-  InventoryItem,
-  LogoActivityAction,
-  LogoPatch,
-  Order,
-  StoredLogo,
+import {
+  emptyPresentation,
+  type BrandRepo,
+  type Company,
+  type GeneratedMockups,
+  type InventoryItem,
+  type LogoActivityAction,
+  type LogoPatch,
+  type LogoPresentation,
+  type Order,
+  type StoredLogo,
 } from "./types";
 
 const KEYS = {
   company: "logos.v1.company",
   logos: "logos.v1.logos",
+  presentations: "logos.v1.presentations",
   inventory: "logos.v1.inventory",
   orders: "logos.v1.orders",
   mockups: "logos.v1.mockups",
@@ -161,6 +164,44 @@ export class LocalStorageRepo implements BrandRepo {
       // Children of the deleted logo become roots instead of dangling.
       .map((l) => (l.parentId === id ? { ...l, parentId: null } : l));
     write(KEYS.logos, remaining);
+    const presentations = read<Record<string, LogoPresentation>>(
+      KEYS.presentations,
+      {}
+    );
+    if (id in presentations) {
+      delete presentations[id];
+      write(KEYS.presentations, presentations);
+    }
+  }
+
+  async getPresentation(logoId: string): Promise<LogoPresentation> {
+    const map = read<Record<string, LogoPresentation>>(KEYS.presentations, {});
+    return map[logoId] ?? emptyPresentation();
+  }
+
+  async savePresentation(
+    logoId: string,
+    presentation: LogoPresentation
+  ): Promise<void> {
+    const map = read<Record<string, LogoPresentation>>(KEYS.presentations, {});
+    const now = new Date().toISOString();
+    map[logoId] = { ...presentation, updatedAt: now };
+    write(KEYS.presentations, map);
+
+    // Record the edit in the logo's work history.
+    const logos = read<StoredLogo[]>(KEYS.logos, []);
+    const idx = logos.findIndex((l) => l.id === logoId);
+    if (idx < 0) return;
+    const before = normalizeLogo(logos[idx]);
+    logos[idx] = {
+      ...before,
+      updatedAt: now,
+      activities: [
+        ...before.activities,
+        { id: newId(), action: "presentation_updated", at: now },
+      ],
+    };
+    write(KEYS.logos, logos);
   }
 
   async listInventory(): Promise<InventoryItem[]> {

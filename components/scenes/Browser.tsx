@@ -26,6 +26,7 @@ export default function Browser({ logo, name, variants }: SceneProps) {
         n="06"
         title={dict.scenes.web}
         lead={dict.sections.web.lead}
+        slug="web"
       />
       <Reveal className="px-6 pb-16 md:px-12 md:pb-24">
         <div className="grid min-h-[70vh] md:grid-cols-2">

@@ -7,7 +7,12 @@ import { rasterizeSvg } from "@/lib/raster";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import Reveal from "./Reveal";
-import { Caption, type SceneProps } from "./shared";
+import {
+  Caption,
+  EditableText,
+  usePresentationEdit,
+  type SceneProps,
+} from "./shared";
 
 type PlateState =
   | { status: "idle" }
@@ -17,6 +22,7 @@ type PlateState =
 
 export default function Identity({ logo, name, variants }: SceneProps) {
   const { dict, format } = useI18n();
+  const { story, save } = usePresentationEdit();
   const [plate, setPlate] = useState<PlateState>({ status: "idle" });
 
   const primary = logo.colors[0].hex;
@@ -124,9 +130,14 @@ export default function Identity({ logo, name, variants }: SceneProps) {
             colors: logo.colors.length,
           })}
         </p>
-        <p className="mt-4 max-w-prose leading-relaxed text-pretty text-ink-muted">
-          {dict.identity.body}
-        </p>
+        {/* The brand story (layer B) replaces the generic body when written. */}
+        <EditableText
+          value={story}
+          fallback={dict.identity.body}
+          onSave={(next) => save({ story: next })}
+          ariaLabel={dict.identity.title}
+          className="mt-4 max-w-prose leading-relaxed text-pretty text-ink-muted"
+        />
       </Reveal>
 
       {/* Spec strip. */}

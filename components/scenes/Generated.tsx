@@ -136,6 +136,7 @@ export default function Generated({ logo, name }: SceneProps) {
         n="10"
         title={dict.scenes.generated}
         lead={dict.sections.generated.lead}
+        slug="generated"
       />
       <Reveal className="px-6 pb-16 md:px-12 md:pb-24">
         <div className="grid gap-x-4 gap-y-8 md:grid-cols-3">

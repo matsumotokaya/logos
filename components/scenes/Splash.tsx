@@ -6,7 +6,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { useI18n } from "@/lib/i18n";
-import type { SceneProps } from "./shared";
+import {
+  EditableText,
+  usePresentationEdit,
+  type SceneProps,
+} from "./shared";
 
 const INK = "#101012";
 /** Outline draw-on, eased slow → fast → slow. */
@@ -29,6 +33,7 @@ type DrawShape = {
 
 export default function Splash({ logo, name }: SceneProps) {
   const { dict } = useI18n();
+  const { catchphrase, editing, save } = usePresentationEdit();
   const sectionRef = useRef<HTMLElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
@@ -313,6 +318,17 @@ export default function Splash({ logo, name }: SceneProps) {
           aria-label={`${name} logo`}
           className="mx-auto h-[22vh] w-full max-w-4xl md:h-[26vh]"
         />
+        {/* Cover catchphrase (layer B). Static — outside the reveal timeline
+            so it stays put while the mark loops, and stays editable. */}
+        {(catchphrase || editing) && (
+          <EditableText
+            value={catchphrase}
+            fallback={dict.splash.catchphrase}
+            onSave={(next) => save({ catchphrase: next })}
+            ariaLabel={dict.splash.catchphrase}
+            className="max-w-2xl text-center font-display text-xl font-medium text-balance text-ink-muted md:text-2xl"
+          />
+        )}
         {/* Always-on transport control — a fixed player affordance, not part
             of the reveal. Toggles the auto-replay loop. */}
         <button

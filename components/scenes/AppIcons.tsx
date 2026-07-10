@@ -33,6 +33,7 @@ export default function AppIcons({ logo, name, variants }: SceneProps) {
         n="05"
         title={dict.scenes.appIcon}
         lead={dict.sections.appIcon.lead}
+        slug="appIcon"
       />
       <Reveal className="px-6 pb-16 md:px-12 md:pb-24">
         <div className="flex flex-wrap items-end gap-12">

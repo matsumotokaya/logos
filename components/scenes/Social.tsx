@@ -18,6 +18,7 @@ export default function Social({ logo, name, variants }: SceneProps) {
         n="07"
         title={dict.scenes.social}
         lead={dict.sections.social.lead}
+        slug="social"
       />
       <Reveal className="flex justify-center px-6 pb-16 md:px-12 md:pb-24">
         <div className="w-full max-w-md overflow-hidden rounded-xl border border-hairline bg-paper shadow-sm">

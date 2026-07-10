@@ -26,6 +26,7 @@ export default function Construction({ logo }: SceneProps) {
           n="02"
           title={dict.scenes.construction}
           lead={dict.sections.construction.lead}
+          slug="construction"
         />
       </Reveal>
 

@@ -8,9 +8,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { analyzeSvg, type LogoData } from "@/lib/svg";
 import { SAMPLE_SVG, SAMPLE_NAME } from "@/lib/sample";
-import { repo } from "@/lib/store";
+import { emptyPresentation, repo, type LogoPresentation } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
 import Presentation from "@/components/Presentation";
+import type { PresentationTextPatch } from "@/components/scenes/shared";
 
 type State =
   | { status: "loading" }
@@ -26,11 +27,13 @@ export default function PresentationPage({
   const router = useRouter();
   const { dict } = useI18n();
   const [state, setState] = useState<State>({ status: "loading" });
+  const [pres, setPres] = useState<LogoPresentation | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       let next: State;
+      let nextPres: LogoPresentation | null = null;
       if (id === "sample") {
         try {
           next = {
@@ -44,16 +47,46 @@ export default function PresentationPage({
         }
       } else {
         const stored = await repo.getLogo(id);
-        next = stored
-          ? { status: "ready", logo: stored.data, name: stored.title, stored: true }
-          : { status: "missing" };
+        if (stored) {
+          next = { status: "ready", logo: stored.data, name: stored.title, stored: true };
+          nextPres = await repo.getPresentation(id);
+        } else {
+          next = { status: "missing" };
+        }
       }
-      if (!cancelled) setState(next);
+      if (cancelled) return;
+      setState(next);
+      setPres(nextPres);
     })();
     return () => {
       cancelled = true;
     };
   }, [id]);
+
+  // Apply one in-place edit (blur) to layer B and persist it. No-op saves
+  // (blur without change) are skipped so the work history stays clean.
+  const handleSavePresentation = async (patch: PresentationTextPatch) => {
+    const base = pres ?? emptyPresentation();
+    let next: LogoPresentation;
+    if ("sceneLead" in patch) {
+      const { slug, lead } = patch.sceneLead;
+      const sceneTexts = { ...base.sceneTexts };
+      if (lead) sceneTexts[slug] = { ...sceneTexts[slug], lead };
+      else delete sceneTexts[slug];
+      next = { ...base, sceneTexts };
+    } else {
+      next = { ...base, ...patch };
+    }
+    if (
+      next.catchphrase === base.catchphrase &&
+      next.story === base.story &&
+      JSON.stringify(next.sceneTexts) === JSON.stringify(base.sceneTexts)
+    ) {
+      return;
+    }
+    setPres(next);
+    await repo.savePresentation(id, next);
+  };
 
   if (state.status === "loading") {
     return <main className="min-h-dvh bg-paper" />;
@@ -89,6 +122,10 @@ export default function PresentationPage({
         if (state.stored) void repo.updateLogo(id, { title: name });
       }}
       onReset={() => router.push("/")}
+      presentation={pres}
+      onSavePresentation={
+        state.stored ? (patch) => void handleSavePresentation(patch) : undefined
+      }
     />
   );
 }

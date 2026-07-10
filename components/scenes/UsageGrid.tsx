@@ -50,6 +50,7 @@ export default function UsageGrid({ logo, name, variants }: SceneProps) {
         n="04"
         title={dict.scenes.usage}
         lead={dict.sections.usage.lead}
+        slug="usage"
       />
       <Reveal className="px-6 pb-16 md:px-12 md:pb-24">
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 lg:grid-cols-4">

@@ -30,6 +30,7 @@ export default function Badge({ logo, name, variants }: SceneProps) {
         n="08"
         title={dict.scenes.onsite}
         lead={dict.sections.onsite.lead}
+        slug="onsite"
       />
       <Reveal className="flex flex-col items-center px-6 pb-16 md:px-12 md:pb-24">
         {/* Lanyard strap */}

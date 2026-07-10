@@ -57,6 +57,7 @@ export default function Palette({ logo, name, variants }: SceneProps) {
           n="03"
           title={dict.scenes.color}
           lead={dict.sections.color.lead}
+          slug="color"
         />
       </Reveal>
 

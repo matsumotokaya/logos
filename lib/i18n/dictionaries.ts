@@ -7,6 +7,8 @@ export type Dict = {
     newLogo: string;
     brandName: string;
     language: string;
+    edit: string;
+    editDone: string;
   };
   footer: {
     generatedWith: string; // {service}
@@ -52,6 +54,7 @@ export type Dict = {
     replay: string;
     pause: string;
     play: string;
+    catchphrase: string;
   };
   identity: {
     title: string;
@@ -105,6 +108,8 @@ const en: Dict = {
     newLogo: "New logo",
     brandName: "Brand name",
     language: "Language",
+    edit: "Edit",
+    editDone: "Done",
   },
   footer: {
     generatedWith: "Generated with {service}",
@@ -151,6 +156,7 @@ const en: Dict = {
     replay: "Replay",
     pause: "Stop",
     play: "Play",
+    catchphrase: "Write a catchphrase…",
   },
   identity: {
     title: "The mark",
@@ -220,6 +226,8 @@ const ja: Dict = {
     newLogo: "新しいロゴ",
     brandName: "ブランド名",
     language: "言語",
+    edit: "編集",
+    editDone: "完了",
   },
   footer: {
     generatedWith: "{service} で生成",
@@ -266,6 +274,7 @@ const ja: Dict = {
     replay: "リプレイ",
     pause: "停止",
     play: "再生",
+    catchphrase: "キャッチコピーを書く…",
   },
   identity: {
     title: "ロゴマーク",
@@ -335,6 +344,8 @@ const ko: Dict = {
     newLogo: "새 로고",
     brandName: "브랜드명",
     language: "언어",
+    edit: "편집",
+    editDone: "완료",
   },
   footer: {
     generatedWith: "{service}(으)로 생성",
@@ -381,6 +392,7 @@ const ko: Dict = {
     replay: "다시 재생",
     pause: "정지",
     play: "재생",
+    catchphrase: "캐치프레이즈를 작성…",
   },
   identity: {
     title: "로고 마크",
@@ -450,6 +462,8 @@ const zhHant: Dict = {
     newLogo: "新標誌",
     brandName: "品牌名稱",
     language: "語言",
+    edit: "編輯",
+    editDone: "完成",
   },
   footer: {
     generatedWith: "由 {service} 生成",
@@ -495,6 +509,7 @@ const zhHant: Dict = {
     replay: "重播",
     pause: "停止",
     play: "播放",
+    catchphrase: "撰寫標語…",
   },
   identity: {
     title: "標誌",
@@ -564,6 +579,8 @@ const zhHans: Dict = {
     newLogo: "新标志",
     brandName: "品牌名称",
     language: "语言",
+    edit: "编辑",
+    editDone: "完成",
   },
   footer: {
     generatedWith: "由 {service} 生成",
@@ -609,6 +626,7 @@ const zhHans: Dict = {
     replay: "重播",
     pause: "停止",
     play: "播放",
+    catchphrase: "撰写标语…",
   },
   identity: {
     title: "标志",
