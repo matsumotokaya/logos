@@ -245,7 +245,7 @@ $$;
 
 | Step | 内容 | 備考 |
 |---|---|---|
-| 1 | サイト構造分離: `/`(投稿UI+公開ギャラリー)、`/p/[id]`(プレゼン) | localStorage のままでも先行実装可能 |
+| 1 | **ページづくり**: サイト構造分離(`/` 投稿UI+ギャラリー、`/p/[id]` プレゼン)、ロゴ情報ページ、プレゼン編集モード([data-model.md](data-model.md) の編集サーフェス) | localStorage のまま先行実装し、データ構造を固める |
 | 2 | Supabaseプロジェクト作成 + 上記スキーマ適用 + Anonymous Sign-in 有効化 | ユーザー作業: プロジェクト作成 |
 | 3 | `SupabaseRepo` 実装(logos / mockups / company→organizations) + Storage(SVG・モックアップ画像) | RLSは最初から有効 |
 | 4 | 匿名→本登録の昇格フロー(サインアップUI) | user_id不変でデータ移行不要 |
