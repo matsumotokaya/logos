@@ -18,6 +18,7 @@ import { meta as breathing } from "./008-breathing/meta";
 import { meta as ambientBackground } from "./009-ambient-background/meta";
 import { meta as guidelineReveal } from "./010-guideline-reveal/meta";
 import { meta as lockupVariations } from "./011-lockup-variations/meta";
+import { meta as extrudeTurntable } from "./012-extrude-turntable/meta";
 
 export type ExperimentEntry = {
   meta: ExperimentMeta;
@@ -30,17 +31,6 @@ export type ExperimentEntry = {
 
 /** Roadmap stubs — implemented one by one, each judged against 001. */
 const planned: ExperimentMeta[] = [
-  {
-    id: "012",
-    slug: "extrude-turntable",
-    title: "Extrude Turntable",
-    category: "three",
-    tech: ["three"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg"],
-    status: "planned",
-  },
   {
     id: "013",
     slug: "material-study",
@@ -131,6 +121,10 @@ const implemented: ExperimentEntry[] = [
   {
     meta: lockupVariations,
     Component: dynamic(() => import("./011-lockup-variations"), { ssr: false }),
+  },
+  {
+    meta: extrudeTurntable,
+    Component: dynamic(() => import("./012-extrude-turntable"), { ssr: false }),
   },
 ];
 
