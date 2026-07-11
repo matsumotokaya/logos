@@ -15,6 +15,9 @@ import { meta as particleAssemble } from "./005-particle-assemble/meta";
 import { meta as gradientSweep } from "./006-gradient-sweep/meta";
 import { meta as embossLongShadow } from "./007-emboss-long-shadow/meta";
 import { meta as breathing } from "./008-breathing/meta";
+import { meta as ambientBackground } from "./009-ambient-background/meta";
+import { meta as guidelineReveal } from "./010-guideline-reveal/meta";
+import { meta as lockupVariations } from "./011-lockup-variations/meta";
 
 export type ExperimentEntry = {
   meta: ExperimentMeta;
@@ -27,39 +30,6 @@ export type ExperimentEntry = {
 
 /** Roadmap stubs — implemented one by one, each judged against 001. */
 const planned: ExperimentMeta[] = [
-  {
-    id: "009",
-    slug: "ambient-background",
-    title: "Ambient Background",
-    category: "ambient",
-    tech: ["css", "canvas"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg", "png"],
-    status: "planned",
-  },
-  {
-    id: "010",
-    slug: "guideline-reveal",
-    title: "Guideline Reveal",
-    category: "presentation",
-    tech: ["gsap", "svg"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg"],
-    status: "planned",
-  },
-  {
-    id: "011",
-    slug: "lockup-variations",
-    title: "Lockup Variations",
-    category: "presentation",
-    tech: ["gsap", "svg"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg"],
-    status: "planned",
-  },
   {
     id: "012",
     slug: "extrude-turntable",
@@ -149,6 +119,18 @@ const implemented: ExperimentEntry[] = [
   {
     meta: breathing,
     Component: dynamic(() => import("./008-breathing"), { ssr: false }),
+  },
+  {
+    meta: ambientBackground,
+    Component: dynamic(() => import("./009-ambient-background"), { ssr: false }),
+  },
+  {
+    meta: guidelineReveal,
+    Component: dynamic(() => import("./010-guideline-reveal"), { ssr: false }),
+  },
+  {
+    meta: lockupVariations,
+    Component: dynamic(() => import("./011-lockup-variations"), { ssr: false }),
   },
 ];
 

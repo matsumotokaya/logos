@@ -56,9 +56,9 @@ app/lab/page.tsx        # 薄いルート(本体への影響はこの1ファイ�
 | 006 | Gradient Sweep | 質感 | gsap, css | ✅ 実装済み |
 | 007 | Emboss / Long Shadow | 質感 | gsap, css | ✅ 実装済み |
 | 008 | Breathing | 常駐ループ | gsap | ✅ 実装済み |
-| 009 | Ambient Background | 常駐ループ | css, canvas | 予定 |
-| 010 | Guideline Reveal | プレゼンテーション | gsap, svg | 予定 |
-| 011 | Lockup Variations | プレゼンテーション | gsap, svg | 予定 |
+| 009 | Ambient Background | 常駐ループ | gsap, css | ✅ 実装済み |
+| 010 | Guideline Reveal | プレゼンテーション | gsap, svg | ✅ 実装済み |
+| 011 | Lockup Variations | プレゼンテーション | gsap | ✅ 実装済み |
 | 012 | Extrude Turntable | 3D | three | 予定 |
 | 013 | Material Study | 3D | three | 予定 |
 | 014 | Gallery Space | 3D | three | 予定 |
