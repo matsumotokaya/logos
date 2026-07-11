@@ -14,8 +14,10 @@ import {
   type StoredLogo,
 } from "@/lib/store";
 import { SERVICE_NAME } from "@/lib/config";
+import { hasSupabase, listMyOrgs, type Organization } from "@/lib/org";
 import CompanyCard from "@/components/admin/CompanyCard";
 import LogoSection from "@/components/admin/LogoSection";
+import OrgSection from "@/components/admin/OrgSection";
 import InventorySection from "@/components/admin/InventorySection";
 
 const yen = new Intl.NumberFormat("ja-JP");
@@ -29,6 +31,7 @@ export default function AdminPage() {
   const [logos, setLogos] = useState<StoredLogo[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [org, setOrg] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,12 +41,15 @@ export default function AdminPage() {
       repo.listLogos(),
       repo.listInventory(),
       repo.listOrders(),
-    ]).then(([c, l, inv, o]) => {
+      // The primary org (first joined) backs the company profile and members.
+      hasSupabase ? listMyOrgs().then((os) => os[0] ?? null) : Promise.resolve(null),
+    ]).then(([c, l, inv, o, primaryOrg]) => {
       if (cancelled) return;
       setCompany(c);
       setLogos(l);
       setInventory(inv);
       setOrders(sortOrders(o));
+      setOrg(primaryOrg);
       setLoading(false);
     });
     return () => {
@@ -148,6 +154,19 @@ export default function AdminPage() {
             onSave={handleSaveCompany}
           />
         </section>
+
+        {/* Members & roles (Supabase mode) */}
+        {org && (
+          <section className="flex flex-col gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">メンバーと権限</h2>
+              <p className="text-pretty text-xs text-gray-500">
+                組織のメンバーを招待し、役割(編集・購買・閲覧など)を割り当てます。
+              </p>
+            </div>
+            <OrgSection org={org} />
+          </section>
+        )}
 
         {/* Logos */}
         <section className="flex flex-col gap-3">

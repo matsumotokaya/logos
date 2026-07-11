@@ -30,6 +30,7 @@ type LogoRow = {
   parent_logo_id: string | null;
   visibility: StoredLogo["visibility"];
   owner_user_id: string | null;
+  owner_org_id: string | null;
   created_at: string;
   updated_at: string;
   logo_candidates: {
@@ -53,7 +54,7 @@ type LogoRow = {
 };
 
 const LOGO_SELECT = `
-  id, title, role, logo_type, parent_logo_id, visibility, owner_user_id, created_at, updated_at,
+  id, title, role, logo_type, parent_logo_id, visibility, owner_user_id, owner_org_id, created_at, updated_at,
   logo_candidates ( id, is_primary, svg, analysis ),
   logo_credits ( id, role, name, contact ),
   logo_trademarks ( id, status, jurisdiction, registration_no, trademark_type, nice_classes, goods_services ),
@@ -61,11 +62,23 @@ const LOGO_SELECT = `
   logo_tags ( tags ( name ) )
 `;
 
-function rowToStoredLogo(row: LogoRow, currentUserId: string | null): StoredLogo | null {
+// Roles that may edit an org's logos.
+const EDIT_ROLES = new Set(["owner", "admin", "editor"]);
+
+function rowToStoredLogo(
+  row: LogoRow,
+  currentUserId: string | null,
+  orgRoles: Map<string, string>
+): StoredLogo | null {
   const primary =
     row.logo_candidates.find((c) => c.is_primary) ?? row.logo_candidates[0];
   if (!primary) return null; // defensive: a logo without a master file
   const data = { ...(primary.analysis ?? {}), svg: primary.svg } as LogoData;
+  // UI gate only — writes are also enforced by RLS server-side.
+  const canEdit =
+    (row.owner_user_id !== null && row.owner_user_id === currentUserId) ||
+    (row.owner_org_id !== null &&
+      EDIT_ROLES.has(orgRoles.get(row.owner_org_id) ?? ""));
   return {
     id: row.id,
     title: row.title,
@@ -76,9 +89,8 @@ function rowToStoredLogo(row: LogoRow, currentUserId: string | null): StoredLogo
     logoType: row.logo_type,
     parentId: row.parent_logo_id,
     visibility: row.visibility,
-    // UI gate only — writes are also enforced by RLS server-side. Org-owned
-    // logos will extend this once org membership drives editing.
-    canEdit: row.owner_user_id !== null && row.owner_user_id === currentUserId,
+    canEdit,
+    ownerOrgId: row.owner_org_id,
     credits: row.logo_credits.map((c) => ({
       id: c.id,
       role: c.role as StoredLogo["credits"][number]["role"],
@@ -149,6 +161,17 @@ export class SupabaseRepo implements BrandRepo {
     return created!.org_id as string;
   }
 
+  /** Map of org_id → my role, for org-owned logo access decisions. */
+  private async myOrgRoles(): Promise<Map<string, string>> {
+    const uid = await this.ensureAuth();
+    const { data, error } = await supabase
+      .from("org_members")
+      .select("org_id, role")
+      .eq("user_id", uid);
+    throwOn(error);
+    return new Map((data ?? []).map((m) => [m.org_id as string, m.role as string]));
+  }
+
   private async logActivity(
     logoId: string,
     action: LogoActivityAction
@@ -191,31 +214,37 @@ export class SupabaseRepo implements BrandRepo {
 
   async listLogos(): Promise<StoredLogo[]> {
     const uid = await this.ensureAuth();
-    // Owned logos only. RLS also grants SELECT on every unlisted/public logo
-    // (for permalinks and the future public directory), so without this filter
-    // the personal gallery and admin would show other people's logos.
-    // Org-owned logos join here once org ownership lands (Step 5).
+    const roles = await this.myOrgRoles();
+    // My logos: owned by me personally, or owned by an org I belong to. RLS also
+    // grants SELECT on every unlisted/public logo (for permalinks and the future
+    // public directory), so without this filter the personal gallery and admin
+    // would show other people's logos.
+    const orgIds = [...roles.keys()];
+    const orFilter =
+      `owner_user_id.eq.${uid}` +
+      (orgIds.length ? `,owner_org_id.in.(${orgIds.join(",")})` : "");
     const { data, error } = await supabase
       .from("logos")
       .select(LOGO_SELECT)
-      .eq("owner_user_id", uid)
+      .or(orFilter)
       .order("created_at", { ascending: false });
     throwOn(error);
     return (data as unknown as LogoRow[]).flatMap((row) => {
-      const logo = rowToStoredLogo(row, uid);
+      const logo = rowToStoredLogo(row, uid, roles);
       return logo ? [logo] : [];
     });
   }
 
   async getLogo(id: string): Promise<StoredLogo | null> {
     const uid = await this.ensureAuth();
+    const roles = await this.myOrgRoles();
     const { data, error } = await supabase
       .from("logos")
       .select(LOGO_SELECT)
       .eq("id", id)
       .maybeSingle();
     throwOn(error);
-    return data ? rowToStoredLogo(data as unknown as LogoRow, uid) : null;
+    return data ? rowToStoredLogo(data as unknown as LogoRow, uid, roles) : null;
   }
 
   async saveLogo(logo: StoredLogo): Promise<void> {

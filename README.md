@@ -13,7 +13,7 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | `/` | ロゴ投稿UI(メイン導線)+ アップ済みロゴのギャラリー。カードから各プレゼンへ |
 | `/p/[id]` | 生成されたブランドプレゼンテーション(共有可能な固有URL)。**所有者のみ**ヘッダーの「編集」でキャッチコピー・ストーリー・各シーンのリード文をその場で書き換えられる(空にすると自動生成コピーに戻る)。`/p/sample` はサンプル(編集不可) |
 | `/admin` | 管理コンソール |
-| `/admin/logos/[id]` | ロゴ情報ページ(正本の編集: 正式名称・ロゴ形式・役割・親子関係・公開範囲・タグ・制作クレジット・商標情報・マスターファイル差し替え・作業履歴) |
+| `/admin/logos/[id]` | ロゴ情報ページ(正本の編集: 正式名称・ロゴ形式・役割・親子関係・公開範囲・タグ・制作クレジット・商標情報・マスターファイル差し替え・**組織への所有移管**・作業履歴) |
 
 URL体系の設計意図(所有者を含まない壊れないパーマリンク等)は [docs/account-design.md](docs/account-design.md) を参照。
 
@@ -77,7 +77,7 @@ GEMINI_API_KEY=（Google AI Studioで発行したキー、課金有効なプロ�
 
 スキーマの正本は [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql)(アカウント・組織・ロゴ正本・RLS一式)。セットアップ手順:
 
-1. Supabase の SQL Editor で `supabase/migrations/0001_init.sql` を実行(冪等・再実行可)
+1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0004、いずれも冪等・再実行可)
 2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(ゲスト投稿の前提)
 3. `.env.local` に以下を追加:
 

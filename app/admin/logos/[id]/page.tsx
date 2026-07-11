@@ -27,6 +27,7 @@ import {
   type TrademarkType,
 } from "@/lib/store";
 import { analyzeSvg, svgToDataUri } from "@/lib/svg";
+import { hasSupabase, listMyOrgs, transferLogoToOrg, type Organization } from "@/lib/org";
 
 // Nice classes are edited as free text ("9, 35, 42") and parsed on save.
 type TrademarkDraft = Omit<LogoTrademark, "niceClasses"> & { niceClasses: string };
@@ -86,15 +87,24 @@ export default function LogoInfoPage({
   const [tmDraft, setTmDraft] = useState<TrademarkDraft[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
+  // Orgs the viewer can transfer this logo into (owner/admin roles).
+  const [adminOrgs, setAdminOrgs] = useState<Organization[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [l, all] = await Promise.all([repo.getLogo(id), repo.listLogos()]);
+      const [l, all, orgs] = await Promise.all([
+        repo.getLogo(id),
+        repo.listLogos(),
+        hasSupabase
+          ? listMyOrgs().then((os) => os.filter((o) => o.myRole === "owner" || o.myRole === "admin"))
+          : Promise.resolve([]),
+      ]);
       if (cancelled) return;
       setLogo(l);
       setAllLogos(all);
+      setAdminOrgs(orgs);
       if (l) {
         setTitleDraft(l.title);
         setCreditsDraft(l.credits);
@@ -106,6 +116,14 @@ export default function LogoInfoPage({
       cancelled = true;
     };
   }, [id]);
+
+  const transfer = async (orgId: string) => {
+    const target = adminOrgs.find((o) => o.id === orgId);
+    if (!target) return;
+    if (!window.confirm(`このロゴの所有を「${target.name || "（無名の組織）"}」に移管しますか？`)) return;
+    await transferLogoToOrg(id, orgId);
+    setLogo(await repo.getLogo(id));
+  };
 
   // Persist a patch and refresh the record (activities, updatedAt) without
   // clobbering in-progress credit/trademark drafts.
@@ -294,6 +312,50 @@ export default function LogoInfoPage({
             </label>
           </div>
         </Card>
+
+        {hasSupabase && (
+          <Card
+            title="所有者"
+            note="ロゴの所有を組織に移管できます。移管してもURL・作図・制作クレジットは変わらず、組織メンバーが権限に応じて編集できるようになります。"
+          >
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-gray-600">
+                現在の所有:{" "}
+                <span className="font-medium text-gray-900">
+                  {logo.ownerOrgId
+                    ? adminOrgs.find((o) => o.id === logo.ownerOrgId)?.name || "組織"
+                    : "個人（あなた）"}
+                </span>
+              </p>
+              {adminOrgs.filter((o) => o.id !== logo.ownerOrgId).length > 0 ? (
+                <label className="flex flex-col gap-1">
+                  <span className={labelCls}>組織に移管</span>
+                  <select
+                    aria-label="移管先の組織"
+                    defaultValue=""
+                    onChange={(e) => e.target.value && void transfer(e.target.value)}
+                    className={`${inputCls} sm:w-2/3`}
+                  >
+                    <option value="" disabled>
+                      移管先を選択…
+                    </option>
+                    {adminOrgs
+                      .filter((o) => o.id !== logo.ownerOrgId)
+                      .map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name || "（無名の組織）"}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              ) : (
+                <p className="text-xs text-gray-400">
+                  移管先にできる組織がありません（オーナー／管理者の組織が必要です）。
+                </p>
+              )}
+            </div>
+          </Card>
+        )}
 
         <Card
           title="マスターファイル"

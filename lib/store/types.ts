@@ -86,7 +86,8 @@ export type LogoActivityAction =
   | "file_updated"
   | "info_updated"
   | "visibility_changed"
-  | "presentation_updated";
+  | "presentation_updated"
+  | "transferred";
 
 export const ACTIVITY_LABELS: Record<LogoActivityAction, string> = {
   created: "登録",
@@ -94,6 +95,7 @@ export const ACTIVITY_LABELS: Record<LogoActivityAction, string> = {
   info_updated: "情報更新",
   visibility_changed: "公開範囲変更",
   presentation_updated: "プレゼン編集",
+  transferred: "所有者の移管",
 };
 
 /** Append-only work-history entry (who/when comes with user accounts). */
@@ -125,6 +127,8 @@ export type StoredLogo = {
    * treated as editable. Writes are always enforced by RLS server-side too.
    */
   canEdit?: boolean;
+  /** Transient: the owning org id, or null when personally owned. */
+  ownerOrgId?: string | null;
 };
 
 /** Fields editable through updateLogo. File content goes through replaceLogoData. */
