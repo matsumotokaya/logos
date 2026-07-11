@@ -9,7 +9,7 @@
         "--project-ref=xhbdfzceyfrxsmaixkne"
       ],
       "env": {
-        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN_LOGOS}"
       }
     }
   }
