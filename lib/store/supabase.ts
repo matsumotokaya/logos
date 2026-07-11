@@ -191,9 +191,14 @@ export class SupabaseRepo implements BrandRepo {
 
   async listLogos(): Promise<StoredLogo[]> {
     const uid = await this.ensureAuth();
+    // Owned logos only. RLS also grants SELECT on every unlisted/public logo
+    // (for permalinks and the future public directory), so without this filter
+    // the personal gallery and admin would show other people's logos.
+    // Org-owned logos join here once org ownership lands (Step 5).
     const { data, error } = await supabase
       .from("logos")
       .select(LOGO_SELECT)
+      .eq("owner_user_id", uid)
       .order("created_at", { ascending: false });
     throwOn(error);
     return (data as unknown as LogoRow[]).flatMap((row) => {
