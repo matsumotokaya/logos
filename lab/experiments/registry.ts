@@ -19,6 +19,8 @@ import { meta as ambientBackground } from "./009-ambient-background/meta";
 import { meta as guidelineReveal } from "./010-guideline-reveal/meta";
 import { meta as lockupVariations } from "./011-lockup-variations/meta";
 import { meta as extrudeTurntable } from "./012-extrude-turntable/meta";
+import { meta as materialStudy } from "./013-material-study/meta";
+import { meta as gallerySpace } from "./014-gallery-space/meta";
 
 export type ExperimentEntry = {
   meta: ExperimentMeta;
@@ -31,28 +33,6 @@ export type ExperimentEntry = {
 
 /** Roadmap stubs — implemented one by one, each judged against 001. */
 const planned: ExperimentMeta[] = [
-  {
-    id: "013",
-    slug: "material-study",
-    title: "Material Study",
-    category: "three",
-    tech: ["three"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg"],
-    status: "planned",
-  },
-  {
-    id: "014",
-    slug: "gallery-space",
-    title: "Gallery Space",
-    category: "three",
-    tech: ["three"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg"],
-    status: "planned",
-  },
   {
     id: "015",
     slug: "lottie-roundtrip",
@@ -125,6 +105,14 @@ const implemented: ExperimentEntry[] = [
   {
     meta: extrudeTurntable,
     Component: dynamic(() => import("./012-extrude-turntable"), { ssr: false }),
+  },
+  {
+    meta: materialStudy,
+    Component: dynamic(() => import("./013-material-study"), { ssr: false }),
+  },
+  {
+    meta: gallerySpace,
+    Component: dynamic(() => import("./014-gallery-space"), { ssr: false }),
   },
 ];
 
