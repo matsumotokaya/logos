@@ -49,8 +49,8 @@ app/lab/page.tsx        # 薄いルート(本体への影響はこの1ファイ�
 | # | 名前 | カテゴリ | 技術 | 状態 |
 |---|------|---------|------|------|
 | 001 | Classic Reveal(基準器) | Reveal | gsap, svg | ✅ 実装済み |
-| 002 | Mask Wipe | Reveal | gsap, svg | 予定 |
-| 003 | Blur Focus | Reveal | gsap, css | 予定 |
+| 002 | Mask Wipe | Reveal | gsap, css | ✅ 実装済み |
+| 003 | Blur Focus | Reveal | gsap, css | ✅ 実装済み |
 | 004 | Path Stagger | Reveal | gsap, svg | 予定 |
 | 005 | Particle Assemble | Reveal | canvas | 予定 |
 | 006 | Gradient Sweep | 質感 | gsap, svg | 予定 |

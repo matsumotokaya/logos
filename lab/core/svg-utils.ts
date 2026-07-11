@@ -150,6 +150,35 @@ export function mountLogoSvg(host: HTMLElement, svgMarkup: string): MountedLogo 
   return { svg, shapes };
 }
 
+/**
+ * Render a logo (SVG or PNG) into a host as static, centered, contain-fit
+ * content — no shape enumeration. For experiments that animate the whole mark
+ * as one unit (mask/blur/scale on the container), which also gives them PNG
+ * support for free.
+ */
+export function mountLogo(host: HTMLElement, logo: LabLogo): void {
+  if (logo.kind === "png" && logo.pngDataUri) {
+    host.innerHTML = "";
+    const img = document.createElement("img");
+    img.src = logo.pngDataUri;
+    img.alt = logo.name;
+    img.style.cssText =
+      "width:100%;height:100%;object-fit:contain;display:block";
+    host.appendChild(img);
+    return;
+  }
+  if (logo.svg) {
+    host.innerHTML = logo.svg;
+    const svg = host.querySelector("svg");
+    if (svg) {
+      svg.style.width = "100%";
+      svg.style.height = "100%";
+      svg.style.display = "block";
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    }
+  }
+}
+
 /** getTotalLength that never throws (text and some degenerate shapes lack it). */
 export function safeTotalLength(el: SVGGraphicsElement): number {
   const geo = el as SVGGeometryElement;

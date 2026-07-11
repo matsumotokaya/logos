@@ -8,6 +8,8 @@ import dynamic from "next/dynamic";
 import type { ExperimentMeta } from "@/lab/core/experiment-api";
 import type { ExperimentComponent } from "@/lab/core/experiment-api";
 import { meta as classicReveal } from "./001-classic-reveal/meta";
+import { meta as maskWipe } from "./002-mask-wipe/meta";
+import { meta as blurFocus } from "./003-blur-focus/meta";
 
 export type ExperimentEntry = {
   meta: ExperimentMeta;
@@ -20,28 +22,6 @@ export type ExperimentEntry = {
 
 /** Roadmap stubs — implemented one by one, each judged against 001. */
 const planned: ExperimentMeta[] = [
-  {
-    id: "002",
-    slug: "mask-wipe",
-    title: "Mask Wipe",
-    category: "reveal",
-    tech: ["gsap", "svg"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg", "png"],
-    status: "planned",
-  },
-  {
-    id: "003",
-    slug: "blur-focus",
-    title: "Blur Focus",
-    category: "reveal",
-    tech: ["gsap", "css"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg", "png"],
-    status: "planned",
-  },
   {
     id: "004",
     slug: "path-stagger",
@@ -191,6 +171,14 @@ const implemented: ExperimentEntry[] = [
   {
     meta: classicReveal,
     Component: dynamic(() => import("./001-classic-reveal"), { ssr: false }),
+  },
+  {
+    meta: maskWipe,
+    Component: dynamic(() => import("./002-mask-wipe"), { ssr: false }),
+  },
+  {
+    meta: blurFocus,
+    Component: dynamic(() => import("./003-blur-focus"), { ssr: false }),
   },
 ];
 
