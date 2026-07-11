@@ -32,6 +32,23 @@ export type Dict = {
     title: string;
     empty: string;
   };
+  auth: {
+    signIn: string;
+    signOut: string;
+    title: string;
+    subtitle: string;
+    continueWith: string; // {provider}
+    or: string;
+    email: string;
+    password: string;
+    createAccount: string;
+    signInEmail: string;
+    working: string;
+    haveAccount: string;
+    needAccount: string;
+    checkEmail: string;
+    close: string;
+  };
   roles: {
     brand: string;
     corporate: string;
@@ -133,6 +150,23 @@ const en: Dict = {
   gallery: {
     title: "Gallery",
     empty: "No logos here yet. Upload one above, or start with the sample.",
+  },
+  auth: {
+    signIn: "Sign in",
+    signOut: "Sign out",
+    title: "Save your work",
+    subtitle: "Create an account to keep your logos, edit them later and share them. Everything you have already made carries over.",
+    continueWith: "Continue with {provider}",
+    or: "or",
+    email: "Email",
+    password: "Password",
+    createAccount: "Create account",
+    signInEmail: "Sign in",
+    working: "Please wait…",
+    haveAccount: "I already have an account",
+    needAccount: "Create a new account",
+    checkEmail: "Check your inbox to confirm your email address.",
+    close: "Close",
   },
   roles: {
     brand: "Brand",
@@ -252,6 +286,23 @@ const ja: Dict = {
     title: "ギャラリー",
     empty: "まだロゴがありません。上のフォームからアップロードするか、サンプルをご覧ください。",
   },
+  auth: {
+    signIn: "ログイン",
+    signOut: "ログアウト",
+    title: "作業内容を保存",
+    subtitle: "アカウントを作成すると、ロゴを保存して後から編集・共有できます。ここまで作成した内容はそのまま引き継がれます。",
+    continueWith: "{provider} で続ける",
+    or: "または",
+    email: "メールアドレス",
+    password: "パスワード",
+    createAccount: "アカウントを作成",
+    signInEmail: "ログイン",
+    working: "処理中…",
+    haveAccount: "すでにアカウントをお持ちの方",
+    needAccount: "新規アカウントを作成",
+    checkEmail: "確認メールを送信しました。メール内のリンクから認証してください。",
+    close: "閉じる",
+  },
   roles: {
     brand: "ブランド",
     corporate: "コーポレート",
@@ -370,6 +421,23 @@ const ko: Dict = {
     title: "갤러리",
     empty: "아직 로고가 없습니다. 위에서 업로드하거나 샘플을 살펴보세요.",
   },
+  auth: {
+    signIn: "로그인",
+    signOut: "로그아웃",
+    title: "작업 내용 저장",
+    subtitle: "계정을 만들면 로고를 저장하고 나중에 편집·공유할 수 있습니다. 지금까지 만든 내용은 그대로 이어집니다.",
+    continueWith: "{provider}(으)로 계속하기",
+    or: "또는",
+    email: "이메일",
+    password: "비밀번호",
+    createAccount: "계정 만들기",
+    signInEmail: "로그인",
+    working: "처리 중…",
+    haveAccount: "이미 계정이 있습니다",
+    needAccount: "새 계정 만들기",
+    checkEmail: "확인 메일을 보냈습니다. 메일의 링크로 인증해 주세요.",
+    close: "닫기",
+  },
   roles: {
     brand: "브랜드",
     corporate: "기업",
@@ -487,6 +555,23 @@ const zhHant: Dict = {
     title: "圖庫",
     empty: "還沒有標誌。從上方上傳,或先看看範例簡報。",
   },
+  auth: {
+    signIn: "登入",
+    signOut: "登出",
+    title: "儲存您的作品",
+    subtitle: "建立帳號即可保存標誌、日後編輯與分享。您目前建立的內容都會保留。",
+    continueWith: "使用 {provider} 繼續",
+    or: "或",
+    email: "電子郵件",
+    password: "密碼",
+    createAccount: "建立帳號",
+    signInEmail: "登入",
+    working: "處理中…",
+    haveAccount: "我已經有帳號",
+    needAccount: "建立新帳號",
+    checkEmail: "確認信已寄出,請至信箱點擊連結完成驗證。",
+    close: "關閉",
+  },
   roles: {
     brand: "品牌",
     corporate: "企業",
@@ -603,6 +688,23 @@ const zhHans: Dict = {
   gallery: {
     title: "图库",
     empty: "还没有标志。从上方上传,或先看看示例演示。",
+  },
+  auth: {
+    signIn: "登录",
+    signOut: "退出登录",
+    title: "保存您的作品",
+    subtitle: "创建账号即可保存标志、稍后编辑与分享。您目前创建的内容都会保留。",
+    continueWith: "使用 {provider} 继续",
+    or: "或",
+    email: "电子邮箱",
+    password: "密码",
+    createAccount: "创建账号",
+    signInEmail: "登录",
+    working: "处理中…",
+    haveAccount: "我已有账号",
+    needAccount: "创建新账号",
+    checkEmail: "确认邮件已发送,请到邮箱点击链接完成验证。",
+    close: "关闭",
   },
   roles: {
     brand: "品牌",

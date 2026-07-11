@@ -119,6 +119,12 @@ export type StoredLogo = {
   activities: LogoActivity[];
   // Discovery metadata (layer C)
   tags: string[];
+  /**
+   * Transient (not persisted): whether the current viewer may edit this logo.
+   * Set by the repo. undefined means "no auth model" (localStorage mode),
+   * treated as editable. Writes are always enforced by RLS server-side too.
+   */
+  canEdit?: boolean;
 };
 
 /** Fields editable through updateLogo. File content goes through replaceLogoData. */

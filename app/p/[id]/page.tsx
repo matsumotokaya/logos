@@ -16,7 +16,13 @@ import type { PresentationTextPatch } from "@/components/scenes/shared";
 type State =
   | { status: "loading" }
   | { status: "missing" }
-  | { status: "ready"; logo: LogoData; name: string; stored: boolean };
+  | {
+      status: "ready";
+      logo: LogoData;
+      name: string;
+      stored: boolean;
+      canEdit: boolean;
+    };
 
 export default function PresentationPage({
   params,
@@ -41,6 +47,7 @@ export default function PresentationPage({
             logo: analyzeSvg(SAMPLE_SVG, "sample.svg"),
             name: SAMPLE_NAME,
             stored: false,
+            canEdit: false,
           };
         } catch {
           next = { status: "missing" };
@@ -48,7 +55,13 @@ export default function PresentationPage({
       } else {
         const stored = await repo.getLogo(id);
         if (stored) {
-          next = { status: "ready", logo: stored.data, name: stored.title, stored: true };
+          next = {
+            status: "ready",
+            logo: stored.data,
+            name: stored.title,
+            stored: true,
+            canEdit: stored.canEdit ?? true,
+          };
           nextPres = await repo.getPresentation(id);
         } else {
           next = { status: "missing" };
@@ -124,7 +137,9 @@ export default function PresentationPage({
       onReset={() => router.push("/")}
       presentation={pres}
       onSavePresentation={
-        state.stored ? (patch) => void handleSavePresentation(patch) : undefined
+        state.stored && state.canEdit
+          ? (patch) => void handleSavePresentation(patch)
+          : undefined
       }
     />
   );

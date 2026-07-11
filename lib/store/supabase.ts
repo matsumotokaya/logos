@@ -3,7 +3,7 @@
 // session first — guests get an anonymous session (docs/account-design.md §1),
 // which later upgrades to a permanent account with the same user_id.
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { ensureSession, supabase } from "@/lib/supabase/client";
 import type { LogoData } from "@/lib/svg";
 import {
   emptyPresentation,
@@ -19,13 +19,6 @@ import {
 } from "./types";
 import { SEED_INVENTORY } from "./local";
 
-// lib/store/index.ts only instantiates SupabaseRepo when the env vars are
-// present; the placeholders keep this module importable without them.
-const supabase: SupabaseClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://placeholder.supabase.co",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "placeholder"
-);
-
 // ---------------------------------------------------------------------------
 // Row ↔ app-type mapping
 
@@ -36,6 +29,7 @@ type LogoRow = {
   logo_type: StoredLogo["logoType"];
   parent_logo_id: string | null;
   visibility: StoredLogo["visibility"];
+  owner_user_id: string | null;
   created_at: string;
   updated_at: string;
   logo_candidates: {
@@ -59,7 +53,7 @@ type LogoRow = {
 };
 
 const LOGO_SELECT = `
-  id, title, role, logo_type, parent_logo_id, visibility, created_at, updated_at,
+  id, title, role, logo_type, parent_logo_id, visibility, owner_user_id, created_at, updated_at,
   logo_candidates ( id, is_primary, svg, analysis ),
   logo_credits ( id, role, name, contact ),
   logo_trademarks ( id, status, jurisdiction, registration_no, trademark_type, nice_classes, goods_services ),
@@ -67,7 +61,7 @@ const LOGO_SELECT = `
   logo_tags ( tags ( name ) )
 `;
 
-function rowToStoredLogo(row: LogoRow): StoredLogo | null {
+function rowToStoredLogo(row: LogoRow, currentUserId: string | null): StoredLogo | null {
   const primary =
     row.logo_candidates.find((c) => c.is_primary) ?? row.logo_candidates[0];
   if (!primary) return null; // defensive: a logo without a master file
@@ -82,6 +76,9 @@ function rowToStoredLogo(row: LogoRow): StoredLogo | null {
     logoType: row.logo_type,
     parentId: row.parent_logo_id,
     visibility: row.visibility,
+    // UI gate only — writes are also enforced by RLS server-side. Org-owned
+    // logos will extend this once org membership drives editing.
+    canEdit: row.owner_user_id !== null && row.owner_user_id === currentUserId,
     credits: row.logo_credits.map((c) => ({
       id: c.id,
       role: c.role as StoredLogo["credits"][number]["role"],
@@ -122,20 +119,11 @@ function throwOn(error: { message: string } | null): void {
 }
 
 export class SupabaseRepo implements BrandRepo {
-  private authPromise: Promise<string> | null = null;
-  private orgPromise: Promise<string> | null = null;
-
   /** Resolve the current user id, signing in anonymously on first contact. */
-  private ensureAuth(): Promise<string> {
-    this.authPromise ??= (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) return data.session.user.id;
-      const { data: anon, error } = await supabase.auth.signInAnonymously();
-      throwOn(error);
-      if (!anon.user) throw new Error("Anonymous sign-in failed.");
-      return anon.user.id;
-    })();
-    return this.authPromise;
+  private async ensureAuth(): Promise<string> {
+    const id = await ensureSession();
+    if (!id) throw new Error("No Supabase session.");
+    return id;
   }
 
   /**
@@ -143,25 +131,22 @@ export class SupabaseRepo implements BrandRepo {
    * owner via the 0002 trigger). Company profile, inventory and orders hang
    * off it — the same shape the real multi-tenant phase will use.
    */
-  private ensureOrg(): Promise<string> {
-    this.orgPromise ??= (async () => {
-      const uid = await this.ensureAuth();
-      const { data, error } = await supabase
-        .from("organizations")
-        .select("org_id")
-        .order("created_at")
-        .limit(1);
-      throwOn(error);
-      if (data && data.length > 0) return data[0].org_id as string;
-      const { data: created, error: insErr } = await supabase
-        .from("organizations")
-        .insert({ name: "", created_by: uid })
-        .select("org_id")
-        .single();
-      throwOn(insErr);
-      return created!.org_id as string;
-    })();
-    return this.orgPromise;
+  private async ensureOrg(): Promise<string> {
+    const uid = await this.ensureAuth();
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("org_id")
+      .order("created_at")
+      .limit(1);
+    throwOn(error);
+    if (data && data.length > 0) return data[0].org_id as string;
+    const { data: created, error: insErr } = await supabase
+      .from("organizations")
+      .insert({ name: "", created_by: uid })
+      .select("org_id")
+      .single();
+    throwOn(insErr);
+    return created!.org_id as string;
   }
 
   private async logActivity(
@@ -205,27 +190,27 @@ export class SupabaseRepo implements BrandRepo {
   // ---------- logos ----------
 
   async listLogos(): Promise<StoredLogo[]> {
-    await this.ensureAuth();
+    const uid = await this.ensureAuth();
     const { data, error } = await supabase
       .from("logos")
       .select(LOGO_SELECT)
       .order("created_at", { ascending: false });
     throwOn(error);
     return (data as unknown as LogoRow[]).flatMap((row) => {
-      const logo = rowToStoredLogo(row);
+      const logo = rowToStoredLogo(row, uid);
       return logo ? [logo] : [];
     });
   }
 
   async getLogo(id: string): Promise<StoredLogo | null> {
-    await this.ensureAuth();
+    const uid = await this.ensureAuth();
     const { data, error } = await supabase
       .from("logos")
       .select(LOGO_SELECT)
       .eq("id", id)
       .maybeSingle();
     throwOn(error);
-    return data ? rowToStoredLogo(data as unknown as LogoRow) : null;
+    return data ? rowToStoredLogo(data as unknown as LogoRow, uid) : null;
   }
 
   async saveLogo(logo: StoredLogo): Promise<void> {

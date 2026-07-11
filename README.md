@@ -11,7 +11,7 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | パス | 内容 |
 |---|---|
 | `/` | ロゴ投稿UI(メイン導線)+ アップ済みロゴのギャラリー。カードから各プレゼンへ |
-| `/p/[id]` | 生成されたブランドプレゼンテーション(共有可能な固有URL)。ヘッダーの「編集」でキャッチコピー・ストーリー・各シーンのリード文をその場で書き換えられる(空にすると自動生成コピーに戻る)。`/p/sample` はサンプル(編集不可) |
+| `/p/[id]` | 生成されたブランドプレゼンテーション(共有可能な固有URL)。**所有者のみ**ヘッダーの「編集」でキャッチコピー・ストーリー・各シーンのリード文をその場で書き換えられる(空にすると自動生成コピーに戻る)。`/p/sample` はサンプル(編集不可) |
 | `/admin` | 管理コンソール |
 | `/admin/logos/[id]` | ロゴ情報ページ(正本の編集: 正式名称・ロゴ形式・役割・親子関係・公開範囲・タグ・制作クレジット・商標情報・マスターファイル差し替え・作業履歴) |
 
@@ -86,7 +86,15 @@ NEXT_PUBLIC_SUPABASE_URL=（プロジェクトURL）
 NEXT_PUBLIC_SUPABASE_ANON_KEY=（anon / publishable キー）
 ```
 
-Supabase MCP(read-only)は [.mcp.json](.mcp.json) に設定済み。環境変数 `SUPABASE_ACCESS_TOKEN`(Dashboard → Account → Access Tokens で発行)を設定すると次回セッションから利用できる。
+Supabase MCP(read-only)は [.mcp.json](.mcp.json) に設定済み。環境変数 `SUPABASE_ACCESS_TOKEN_LOGOS`(logosプロジェクトを持つアカウントの Dashboard → Account → Access Tokens で発行)を設定すると次回セッションから利用できる。
+
+#### 認証(サインアップ)
+
+匿名でアップロード → アカウント作成で本登録に昇格(`user_id` 不変、ロゴはそのまま引き継ぎ)。UIは Google → Apple → Figma → メール の順(ヘッダー右の「ログイン」から)。有効化に必要な設定:
+
+- **メール+パスワード**: 既定で利用可。ただし **Confirm email が ON** だと確認メール後に本登録完了(UIは「確認メールを送信しました」を表示)。PoCで即時サインアップにしたい場合は Authentication → Providers → Email で **Confirm email を OFF** にする(組み込みSMTPは送信レート制限が厳しい点にも注意)
+- **Google / Apple / Figma**: ボタンは配線済み。各プロバイダを Authentication → Providers で有効化し、OAuthクライアント情報を登録すると点灯する(Google Cloud / Apple Developer / Figma でクライアント発行が必要)
+- **Adobe**: Supabaseに組み込みプロバイダが無いため未対応。デザイナー向けには Figma を採用している
 
 Vercelにデプロイする場合は同じ環境変数を Settings → Environment Variables に追加する。
 
@@ -102,6 +110,8 @@ Vercelにデプロイする場合は同じ環境変数を Settings → Environme
 - **公開範囲(visibility)は保存のみ**: アクセス制御・トップギャラリーの絞り込みにはまだ反映されない。DB移行(認証導入)後に有効化する
 - **公開範囲変更のadmin限定はアプリ側制御**: RLSは行単位のため「editorは編集可だがvisibilityは変更不可」を列単位で強制できない。現状はアプリ側で制御(0001_init.sqlにも注記)
 - **プレゼン編集にUndoがない**: blur即保存のため取り消し手段は「自動生成コピーへの復帰」のみ。本格運用では編集の取り消しを検討
+- **編集権限の判定は所有者(owner_user_id)一致のみ**: 組織メンバーによる編集権はまだUIゲートに反映されていない(RLSでは許可済み)。組織UI(Step 5)で対応
+- **OAuth(Google/Apple/Figma)は要プロバイダ設定**: ボタンは配線済みだがSupabase側で各プロバイダを有効化するまで点灯しない
 
 ## デプロイ
 

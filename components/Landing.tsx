@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import Gallery from "@/components/Gallery";
+import Account from "@/components/Account";
 
 type Props = {
   onLogo: (logo: LogoData, suggestedName: string) => Promise<void>;
@@ -104,6 +105,7 @@ export default function Landing({ onLogo }: Props) {
         </p>
         <div className="flex items-center gap-6">
           <LanguageSwitcher />
+          <Account />
           <a
             href="/admin"
             className="font-mono text-xs uppercase text-ink-muted transition-colors hover:text-ink"

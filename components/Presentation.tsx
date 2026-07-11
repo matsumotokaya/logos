@@ -7,6 +7,7 @@ import type { LogoPresentation } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import Account from "@/components/Account";
 import {
   PresentationEditProvider,
   type PresentationTextPatch,
@@ -86,6 +87,7 @@ export default function Presentation({
         </div>
         <div className="flex items-center gap-5">
           <LanguageSwitcher />
+          <Account />
           {editable && (
             <button
               type="button"
