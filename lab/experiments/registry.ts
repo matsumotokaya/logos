@@ -4,8 +4,10 @@
 // lazily-loaded component (heavy deps like three/lottie stay out of the
 // initial bundle); planned ones carry meta only and render as placeholders.
 
+import dynamic from "next/dynamic";
 import type { ExperimentMeta } from "@/lab/core/experiment-api";
 import type { ExperimentComponent } from "@/lab/core/experiment-api";
+import { meta as classicReveal } from "./001-classic-reveal/meta";
 
 export type ExperimentEntry = {
   meta: ExperimentMeta;
@@ -18,17 +20,6 @@ export type ExperimentEntry = {
 
 /** Roadmap stubs — implemented one by one, each judged against 001. */
 const planned: ExperimentMeta[] = [
-  {
-    id: "001",
-    slug: "classic-reveal",
-    title: "Classic Reveal",
-    category: "reveal",
-    tech: ["gsap", "svg"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg"],
-    status: "planned",
-  },
   {
     id: "002",
     slug: "mask-wipe",
@@ -196,7 +187,12 @@ const planned: ExperimentMeta[] = [
   },
 ];
 
-const implemented: ExperimentEntry[] = [];
+const implemented: ExperimentEntry[] = [
+  {
+    meta: classicReveal,
+    Component: dynamic(() => import("./001-classic-reveal"), { ssr: false }),
+  },
+];
 
 export const experiments: ExperimentEntry[] = [
   ...implemented,
