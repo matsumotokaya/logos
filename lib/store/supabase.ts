@@ -31,6 +31,8 @@ type LogoRow = {
   visibility: StoredLogo["visibility"];
   owner_user_id: string | null;
   owner_org_id: string | null;
+  allow_contact: boolean;
+  slug: string | null;
   created_at: string;
   updated_at: string;
   logo_candidates: {
@@ -54,7 +56,7 @@ type LogoRow = {
 };
 
 const LOGO_SELECT = `
-  id, title, role, logo_type, parent_logo_id, visibility, owner_user_id, owner_org_id, created_at, updated_at,
+  id, title, role, logo_type, parent_logo_id, visibility, owner_user_id, owner_org_id, allow_contact, slug, created_at, updated_at,
   logo_candidates ( id, is_primary, svg, analysis ),
   logo_credits ( id, role, name, contact ),
   logo_trademarks ( id, status, jurisdiction, registration_no, trademark_type, nice_classes, goods_services ),
@@ -89,6 +91,8 @@ function rowToStoredLogo(
     logoType: row.logo_type,
     parentId: row.parent_logo_id,
     visibility: row.visibility,
+    allowContact: row.allow_contact,
+    slug: row.slug,
     canEdit,
     ownerOrgId: row.owner_org_id,
     credits: row.logo_credits.map((c) => ({
@@ -235,6 +239,24 @@ export class SupabaseRepo implements BrandRepo {
     });
   }
 
+  async listPublicLogos(): Promise<StoredLogo[]> {
+    // The public directory (logo 図鑑) feed: every logo published as "public",
+    // regardless of owner. RLS grants SELECT on public logos to everyone.
+    const uid = await this.ensureAuth();
+    const roles = await this.myOrgRoles();
+    const { data, error } = await supabase
+      .from("logos")
+      .select(LOGO_SELECT)
+      .eq("visibility", "public")
+      .order("created_at", { ascending: false })
+      .limit(48);
+    throwOn(error);
+    return (data as unknown as LogoRow[]).flatMap((row) => {
+      const logo = rowToStoredLogo(row, uid, roles);
+      return logo ? [logo] : [];
+    });
+  }
+
   async getLogo(id: string): Promise<StoredLogo | null> {
     const uid = await this.ensureAuth();
     const roles = await this.myOrgRoles();
@@ -279,6 +301,8 @@ export class SupabaseRepo implements BrandRepo {
     if (patch.role !== undefined) row.role = patch.role;
     if (patch.logoType !== undefined) row.logo_type = patch.logoType;
     if (patch.parentId !== undefined) row.parent_logo_id = patch.parentId;
+    if (patch.allowContact !== undefined) row.allow_contact = patch.allowContact;
+    if (patch.slug !== undefined) row.slug = patch.slug || null;
 
     let action: LogoActivityAction = "info_updated";
     if (patch.visibility !== undefined) {

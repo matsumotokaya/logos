@@ -12,6 +12,7 @@ export type Dict = {
   };
   footer: {
     generatedWith: string; // {service}
+    contact: string;
   };
   landing: {
     kicker: string;
@@ -31,6 +32,7 @@ export type Dict = {
   gallery: {
     title: string;
     empty: string;
+    mine: string;
   };
   auth: {
     signIn: string;
@@ -133,6 +135,7 @@ const en: Dict = {
   },
   footer: {
     generatedWith: "Generated with {service}",
+    contact: "Contact the creator",
   },
   landing: {
     kicker: "Brand guidelines, generated",
@@ -153,6 +156,7 @@ const en: Dict = {
   gallery: {
     title: "Gallery",
     empty: "No logos here yet. Upload one above, or start with the sample.",
+    mine: "Your logos",
   },
   auth: {
     signIn: "Sign in",
@@ -271,6 +275,7 @@ const ja: Dict = {
   },
   footer: {
     generatedWith: "{service} で生成",
+    contact: "制作者にコンタクト",
   },
   landing: {
     kicker: "ブランドガイドラインを、自動生成",
@@ -291,6 +296,7 @@ const ja: Dict = {
   gallery: {
     title: "ギャラリー",
     empty: "まだロゴがありません。上のフォームからアップロードするか、サンプルをご覧ください。",
+    mine: "あなたのロゴ",
   },
   auth: {
     signIn: "ログイン",
@@ -409,6 +415,7 @@ const ko: Dict = {
   },
   footer: {
     generatedWith: "{service}(으)로 생성",
+    contact: "제작자에게 문의",
   },
   landing: {
     kicker: "브랜드 가이드라인, 자동 생성",
@@ -429,6 +436,7 @@ const ko: Dict = {
   gallery: {
     title: "갤러리",
     empty: "아직 로고가 없습니다. 위에서 업로드하거나 샘플을 살펴보세요.",
+    mine: "내 로고",
   },
   auth: {
     signIn: "로그인",
@@ -547,6 +555,7 @@ const zhHant: Dict = {
   },
   footer: {
     generatedWith: "由 {service} 生成",
+    contact: "聯絡創作者",
   },
   landing: {
     kicker: "品牌規範,自動生成",
@@ -566,6 +575,7 @@ const zhHant: Dict = {
   gallery: {
     title: "圖庫",
     empty: "還沒有標誌。從上方上傳,或先看看範例簡報。",
+    mine: "您的標誌",
   },
   auth: {
     signIn: "登入",
@@ -684,6 +694,7 @@ const zhHans: Dict = {
   },
   footer: {
     generatedWith: "由 {service} 生成",
+    contact: "联系创作者",
   },
   landing: {
     kicker: "品牌规范,自动生成",
@@ -703,6 +714,7 @@ const zhHans: Dict = {
   gallery: {
     title: "图库",
     empty: "还没有标志。从上方上传,或先看看示例演示。",
+    mine: "您的标志",
   },
   auth: {
     signIn: "登录",

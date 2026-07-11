@@ -22,6 +22,7 @@ type State =
       name: string;
       stored: boolean;
       canEdit: boolean;
+      contactEmail: string | null;
     };
 
 export default function PresentationPage({
@@ -48,6 +49,7 @@ export default function PresentationPage({
             name: SAMPLE_NAME,
             stored: false,
             canEdit: false,
+            contactEmail: null,
           };
         } catch {
           next = { status: "missing" };
@@ -55,12 +57,18 @@ export default function PresentationPage({
       } else {
         const stored = await repo.getLogo(id);
         if (stored) {
+          // The contact button targets the first credit with an email address.
+          const contactEmail = stored.allowContact
+            ? (stored.credits.find((c) => c.contact.includes("@"))?.contact ??
+              null)
+            : null;
           next = {
             status: "ready",
             logo: stored.data,
             name: stored.title,
             stored: true,
             canEdit: stored.canEdit ?? true,
+            contactEmail,
           };
           nextPres = await repo.getPresentation(id);
         } else {
@@ -135,6 +143,7 @@ export default function PresentationPage({
         if (state.stored) void repo.updateLogo(id, { title: name });
       }}
       onReset={() => router.push("/")}
+      contactEmail={state.contactEmail}
       presentation={pres}
       onSavePresentation={
         state.stored && state.canEdit

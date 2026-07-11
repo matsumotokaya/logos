@@ -27,7 +27,13 @@ import {
   type TrademarkType,
 } from "@/lib/store";
 import { analyzeSvg, svgToDataUri } from "@/lib/svg";
-import { hasSupabase, listMyOrgs, transferLogoToOrg, type Organization } from "@/lib/org";
+import {
+  hasSupabase,
+  listMyOrgs,
+  normalizeHandle,
+  transferLogoToOrg,
+  type Organization,
+} from "@/lib/org";
 
 // Nice classes are edited as free text ("9, 35, 42") and parsed on save.
 type TrademarkDraft = Omit<LogoTrademark, "niceClasses"> & { niceClasses: string };
@@ -83,6 +89,7 @@ export default function LogoInfoPage({
   const [loaded, setLoaded] = useState(false);
 
   const [titleDraft, setTitleDraft] = useState("");
+  const [slugDraft, setSlugDraft] = useState("");
   const [creditsDraft, setCreditsDraft] = useState<LogoCredit[]>([]);
   const [tmDraft, setTmDraft] = useState<TrademarkDraft[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -107,6 +114,7 @@ export default function LogoInfoPage({
       setAdminOrgs(orgs);
       if (l) {
         setTitleDraft(l.title);
+        setSlugDraft(l.slug ?? "");
         setCreditsDraft(l.credits);
         setTmDraft(l.trademarks.map(toTrademarkDraft));
       }
@@ -152,6 +160,17 @@ export default function LogoInfoPage({
     );
   }
 
+  if (logo.canEdit === false) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#F7F7F8] text-[#111827]">
+        <p className="text-sm text-gray-500">このロゴを管理する権限がありません。</p>
+        <Link href="/admin" className="text-sm underline underline-offset-2">
+          管理コンソールへ戻る
+        </Link>
+      </div>
+    );
+  }
+
   // Parent candidates: everything except self and its own descendants
   // (picking a descendant would create a cycle in the tree).
   const isDescendantOfSelf = (candidate: StoredLogo): boolean => {
@@ -177,6 +196,19 @@ export default function LogoInfoPage({
     }
     void patch({ title: next });
   };
+
+  // Slugs share the handle charset ([a-z0-9-]); normalize on commit.
+  const commitSlug = () => {
+    const normalized = normalizeHandle(slugDraft);
+    setSlugDraft(normalized);
+    if (normalized === (logo.slug ?? "")) return;
+    void patch({ slug: normalized || null });
+  };
+
+  // Visibility is an admin-level decision: personal logos are always yours to
+  // set, org-owned ones require owner/admin in the owning org.
+  const canAdminVisibility =
+    !hasSupabase || !logo.ownerOrgId || adminOrgs.some((o) => o.id === logo.ownerOrgId);
 
   const addTag = () => {
     const tag = tagInput.trim();
@@ -289,10 +321,24 @@ export default function LogoInfoPage({
                 ))}
               </select>
             </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelCls}>公開スラッグ（バニティURL用）</span>
+              <input
+                value={slugDraft}
+                onChange={(e) => setSlugDraft(e.target.value)}
+                onBlur={commitSlug}
+                placeholder="primary-mark"
+                className={inputCls}
+              />
+              <span className="text-xs text-gray-400">
+                /ハンドル/スラッグ でアクセスできます（公開ロゴのみ有効）。
+              </span>
+            </label>
             <label className="flex flex-col gap-1 sm:col-span-2">
               <span className={labelCls}>公開範囲</span>
               <select
                 value={logo.visibility}
+                disabled={!canAdminVisibility}
                 onChange={(e) =>
                   void patch({ visibility: e.target.value as LogoVisibility })
                 }
@@ -306,10 +352,35 @@ export default function LogoInfoPage({
                   </option>
                 ))}
               </select>
+              {!canAdminVisibility && (
+                <span className="text-xs text-gray-400">
+                  公開範囲の変更は管理者以上のみ行えます。
+                </span>
+              )}
               <span className="text-xs text-gray-400">
                 アクセス制御への反映はDB移行後に有効になります（現在は保存のみ）。
               </span>
             </label>
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={logo.allowContact}
+                  onChange={(e) => {
+                    // Optimistic flip so the checkbox responds instantly;
+                    // patch() re-syncs from the store afterwards.
+                    const next = e.target.checked;
+                    setLogo({ ...logo, allowContact: next });
+                    void patch({ allowContact: next });
+                  }}
+                  className="size-4"
+                />
+                公開プレゼンにコンタクトボタンを表示する
+              </label>
+              <span className="text-xs text-gray-400">
+                制作クレジットに連絡先（メールアドレス）があるときに表示されます。
+              </span>
+            </div>
           </div>
         </Card>
 

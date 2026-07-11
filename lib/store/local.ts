@@ -82,6 +82,8 @@ function normalizeLogo(raw: StoredLogo): StoredLogo {
     logoType: raw.logoType ?? null,
     parentId: raw.parentId ?? null,
     visibility: raw.visibility ?? "draft",
+    allowContact: raw.allowContact ?? false,
+    slug: raw.slug ?? null,
     credits: raw.credits ?? [],
     trademarks: raw.trademarks ?? [],
     activities: raw.activities ?? [],
@@ -103,6 +105,11 @@ export class LocalStorageRepo implements BrandRepo {
     return logos
       .map(normalizeLogo)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async listPublicLogos(): Promise<StoredLogo[]> {
+    // Single-user mode: the public directory is just my own public logos.
+    return (await this.listLogos()).filter((l) => l.visibility === "public");
   }
 
   async getLogo(id: string): Promise<StoredLogo | null> {

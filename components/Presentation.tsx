@@ -32,6 +32,8 @@ type Props = {
   name: string;
   onNameChange: (name: string) => void;
   onReset: () => void;
+  /** Creator contact address; renders a mailto link in the footer when set. */
+  contactEmail?: string | null;
   /** Layer B editorial content; null renders the auto-generated copy only. */
   presentation?: LogoPresentation | null;
   /** Present when the viewer may edit layer B in place (stored logos only). */
@@ -43,6 +45,7 @@ export default function Presentation({
   name,
   onNameChange,
   onReset,
+  contactEmail,
   presentation,
   onSavePresentation,
 }: Props) {
@@ -161,6 +164,15 @@ export default function Presentation({
         <p className="font-mono text-xs uppercase text-ink-muted">
           {format(dict.footer.generatedWith, { service: SERVICE_NAME })}
         </p>
+        {contactEmail && (
+          <a
+            href={`mailto:${contactEmail}`}
+            className="font-mono text-xs uppercase text-ink-muted transition-colors hover:text-accent"
+          >
+            {dict.footer.contact}
+            <span aria-hidden="true"> →</span>
+          </a>
+        )}
         <p className="font-mono text-xs uppercase text-ink-muted">
           {dict.doc.version} 1.0 — {new Date().getFullYear()}
         </p>

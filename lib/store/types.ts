@@ -116,6 +116,10 @@ export type StoredLogo = {
   logoType: LogoType | null;
   parentId: string | null; // self-referencing tree: corporate → brand → service…
   visibility: LogoVisibility;
+  /** Show a Contact button on the public presentation (targets credit contacts). */
+  allowContact: boolean;
+  /** Vanity path segment for /[handle]/[slug] (public logos with an owner handle). */
+  slug: string | null;
   credits: LogoCredit[];
   trademarks: LogoTrademark[];
   activities: LogoActivity[];
@@ -140,6 +144,8 @@ export type LogoPatch = Partial<
     | "logoType"
     | "parentId"
     | "visibility"
+    | "allowContact"
+    | "slug"
     | "credits"
     | "trademarks"
     | "tags"
@@ -161,6 +167,8 @@ export function createStoredLogo(args: {
     logoType: null,
     parentId: null,
     visibility: "draft",
+    allowContact: false,
+    slug: null,
     credits: [],
     trademarks: [],
     activities: [{ id: crypto.randomUUID(), action: "created", at: now }],
@@ -240,6 +248,8 @@ export interface BrandRepo {
   saveCompany(company: Company): Promise<void>;
 
   listLogos(): Promise<StoredLogo[]>;
+  /** Everyone's public logos — the discover gallery / logo directory. */
+  listPublicLogos(): Promise<StoredLogo[]>;
   getLogo(id: string): Promise<StoredLogo | null>;
   saveLogo(logo: StoredLogo): Promise<void>;
   updateLogo(id: string, patch: LogoPatch): Promise<void>;

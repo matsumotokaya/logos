@@ -18,6 +18,7 @@ import { hasSupabase, listMyOrgs, type Organization } from "@/lib/org";
 import CompanyCard from "@/components/admin/CompanyCard";
 import LogoSection from "@/components/admin/LogoSection";
 import OrgSection from "@/components/admin/OrgSection";
+import HandleCard from "@/components/admin/HandleCard";
 import InventorySection from "@/components/admin/InventorySection";
 
 const yen = new Intl.NumberFormat("ja-JP");
@@ -165,6 +166,19 @@ export default function AdminPage() {
               </p>
             </div>
             <OrgSection org={org} />
+          </section>
+        )}
+
+        {/* Vanity URL handle (Supabase mode) */}
+        {org && (
+          <section className="flex flex-col gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">公開URL（ハンドル）</h2>
+              <p className="text-pretty text-xs text-gray-500">
+                組織のハンドルを設定すると、公開ロゴを /ハンドル/スラッグ の短いURLで共有できます。
+              </p>
+            </div>
+            <HandleCard org={org} />
           </section>
         )}
 
