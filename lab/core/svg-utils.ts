@@ -179,6 +179,23 @@ export function mountLogo(host: HTMLElement, logo: LabLogo): void {
   }
 }
 
+/** A logo as a single data URI (SVG source or PNG), usable as a CSS mask or image src. */
+export function logoDataUri(logo: LabLogo): string {
+  if (logo.kind === "png" && logo.pngDataUri) return logo.pngDataUri;
+  return `data:image/svg+xml,${encodeURIComponent(logo.svg ?? "")}`;
+}
+
+/** Load a logo as a decoded HTMLImageElement (for canvas rasterization/sampling). */
+export function logoToImage(logo: LabLogo): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Could not load the logo image."));
+    img.src = logoDataUri(logo);
+  });
+}
+
 /** getTotalLength that never throws (text and some degenerate shapes lack it). */
 export function safeTotalLength(el: SVGGraphicsElement): number {
   const geo = el as SVGGeometryElement;
