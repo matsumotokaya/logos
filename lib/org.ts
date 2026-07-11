@@ -126,6 +126,7 @@ export async function inviteMember(
   throwOn(lookupErr);
 
   if (existing) {
+    // (org_id, user_id) is the real primary key, so this upsert is valid.
     const { error } = await supabase
       .from("org_members")
       .upsert({ org_id: orgId, user_id: existing.user_id, role }, { onConflict: "org_id,user_id" });
@@ -133,9 +134,12 @@ export async function inviteMember(
     return { joined: true };
   }
 
+  // Uniqueness on invites is a functional index (org_id, lower(email)), which
+  // PostgREST's onConflict can't target — replace any prior invite explicitly.
+  throwOn((await supabase.from("org_invites").delete().eq("org_id", orgId).eq("email", normalized)).error);
   const { error } = await supabase
     .from("org_invites")
-    .upsert({ org_id: orgId, email: normalized, role, invited_by: me }, { onConflict: "org_id,email" });
+    .insert({ org_id: orgId, email: normalized, role, invited_by: me });
   throwOn(error);
   return { joined: false };
 }
