@@ -21,6 +21,8 @@ import { meta as lockupVariations } from "./011-lockup-variations/meta";
 import { meta as extrudeTurntable } from "./012-extrude-turntable/meta";
 import { meta as materialStudy } from "./013-material-study/meta";
 import { meta as gallerySpace } from "./014-gallery-space/meta";
+import { meta as lottieRoundtrip } from "./015-lottie-roundtrip/meta";
+import { meta as videoExportHook } from "./016-video-export-hook/meta";
 
 export type ExperimentEntry = {
   meta: ExperimentMeta;
@@ -31,31 +33,8 @@ export type ExperimentEntry = {
 // Turbopack's production optimizer constant-folds such lookups to undefined
 // (leading-zero keys). Assign components directly to their entry.
 
-/** Roadmap stubs — implemented one by one, each judged against 001. */
-const planned: ExperimentMeta[] = [
-  {
-    id: "015",
-    slug: "lottie-roundtrip",
-    title: "Lottie 往復検証",
-    category: "export",
-    tech: ["lottie"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg"],
-    status: "planned",
-  },
-  {
-    id: "016",
-    slug: "video-export-hook",
-    title: "動画書き出しフック",
-    category: "export",
-    tech: ["canvas"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg", "png"],
-    status: "planned",
-  },
-];
+/** Roadmap stubs — implemented one by one, each judged against 001. All 16 done. */
+const planned: ExperimentMeta[] = [];
 
 const implemented: ExperimentEntry[] = [
   {
@@ -113,6 +92,14 @@ const implemented: ExperimentEntry[] = [
   {
     meta: gallerySpace,
     Component: dynamic(() => import("./014-gallery-space"), { ssr: false }),
+  },
+  {
+    meta: lottieRoundtrip,
+    Component: dynamic(() => import("./015-lottie-roundtrip"), { ssr: false }),
+  },
+  {
+    meta: videoExportHook,
+    Component: dynamic(() => import("./016-video-export-hook"), { ssr: false }),
   },
 ];
 
