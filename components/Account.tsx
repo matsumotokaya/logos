@@ -4,7 +4,7 @@
 // opens an auth dialog (Google → Apple → Figma → email), and a signed-in
 // indicator with sign-out. Renders nothing in localStorage mode.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth, type OAuthProvider } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
@@ -52,18 +52,32 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
   const { dict } = useI18n();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<"create" | "signin">("create");
+  // "form" collects credentials; "sent" is the post-signup confirm-email panel.
+  const [phase, setPhase] = useState<"form" | "sent">("form");
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Once the session becomes a real signed-in account (e.g. instant signup when
+  // email confirmation is off, or a successful sign-in), close the dialog.
+  useEffect(() => {
+    if (isSignedIn) dialogRef.current?.close();
+  }, [isSignedIn]);
 
   if (!enabled) return null;
 
-  const open = () => {
+  const open = (initial: "create" | "signin" = "create") => {
+    setMode(initial);
+    setPhase("form");
     setError(null);
-    setInfo(null);
     dialogRef.current?.showModal();
   };
   const close = () => dialogRef.current?.close();
+
+  const switchMode = (next: "create" | "signin") => {
+    setMode(next);
+    setPhase("form");
+    setError(null);
+  };
 
   // Read from the form via FormData rather than controlled state: React's
   // synthetic onChange does not fire for inputs inside a showModal() <dialog>
@@ -75,15 +89,19 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
     const password = String(form.get("password") ?? "");
     setBusy(true);
     setError(null);
-    setInfo(null);
     const { error, pendingConfirmation } =
       mode === "create"
         ? await signUpWithEmail(email, password)
         : await signInWithEmail(email, password);
     setBusy(false);
-    if (error) setError(error);
-    else if (pendingConfirmation) setInfo(dict.auth.checkEmail);
-    else close();
+    if (error) {
+      setError(error);
+    } else if (pendingConfirmation) {
+      // Email confirmation is on: show a terminal panel so the user can't
+      // re-submit updateUser (which would error "password unchanged").
+      setPhase("sent");
+    }
+    // Otherwise the session is now signed in; the effect above closes the dialog.
   };
 
   const oauth = async (provider: OAuthProvider) => {
@@ -112,7 +130,7 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
           </button>
         </div>
       ) : (
-        <button type="button" onClick={open} className={linkCls}>
+        <button type="button" onClick={() => open("create")} className={linkCls}>
           {dict.auth.signIn}
         </button>
       )}
@@ -128,99 +146,112 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
         <div className="flex flex-col gap-6 p-8">
           <div>
             <h2 className="font-display text-2xl font-medium text-balance">
-              {dict.auth.title}
+              {phase === "sent"
+                ? dict.auth.sentTitle
+                : mode === "create"
+                  ? dict.auth.title
+                  : dict.auth.signInTitle}
             </h2>
             <p className="mt-2 text-pretty text-sm text-ink-muted">
-              {dict.auth.subtitle}
+              {phase === "sent"
+                ? dict.auth.checkEmail
+                : mode === "create"
+                  ? dict.auth.subtitle
+                  : dict.auth.signInSubtitle}
             </p>
           </div>
 
-          <div className="flex flex-col gap-2">
-            {PROVIDERS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => void oauth(p.id)}
-                className="flex items-center justify-center gap-3 rounded-lg border border-hairline px-4 py-2.5 text-sm font-medium transition-colors hover:border-ink"
-              >
-                {p.icon}
-                {dict.auth.continueWith.replace("{provider}", p.label)}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="h-px flex-1 bg-hairline" />
-            <span className="font-mono text-xs uppercase text-ink-faint">
-              {dict.auth.or}
-            </span>
-            <span className="h-px flex-1 bg-hairline" />
-          </div>
-
-          <form onSubmit={submitEmail} className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-muted">{dict.auth.email}</span>
-              <input
-                type="email"
-                name="email"
-                required
-                autoComplete="email"
-                className="rounded-lg border border-hairline bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-muted">{dict.auth.password}</span>
-              <input
-                type="password"
-                name="password"
-                required
-                minLength={6}
-                autoComplete={mode === "create" ? "new-password" : "current-password"}
-                className="rounded-lg border border-hairline bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none"
-              />
-            </label>
-            {error && (
-              <p aria-live="polite" className="text-pretty text-sm text-red-600">
-                {error}
-              </p>
-            )}
-            {info && (
-              <p aria-live="polite" className="text-pretty text-sm text-accent">
-                {info}
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={busy}
-              className="mt-1 bg-ink px-4 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-accent disabled:opacity-50"
-            >
-              {busy
-                ? dict.auth.working
-                : mode === "create"
-                  ? dict.auth.createAccount
-                  : dict.auth.signInEmail}
-            </button>
-          </form>
-
-          <div className="flex items-center justify-between text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                setMode(mode === "create" ? "signin" : "create");
-                setError(null);
-              }}
-              className="text-ink-muted underline underline-offset-2 hover:text-ink"
-            >
-              {mode === "create" ? dict.auth.haveAccount : dict.auth.needAccount}
-            </button>
+          {phase === "sent" ? (
             <button
               type="button"
               onClick={close}
-              className="text-ink-faint hover:text-ink"
+              className="bg-ink px-4 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-accent"
             >
               {dict.auth.close}
             </button>
-          </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2">
+                {PROVIDERS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => void oauth(p.id)}
+                    className="flex items-center justify-center gap-3 rounded-lg border border-hairline px-4 py-2.5 text-sm font-medium transition-colors hover:border-ink"
+                  >
+                    {p.icon}
+                    {dict.auth.continueWith.replace("{provider}", p.label)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="h-px flex-1 bg-hairline" />
+                <span className="font-mono text-xs uppercase text-ink-faint">
+                  {dict.auth.or}
+                </span>
+                <span className="h-px flex-1 bg-hairline" />
+              </div>
+
+              {/* key forces fresh inputs when switching modes (autocomplete). */}
+              <form key={mode} onSubmit={submitEmail} className="flex flex-col gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-ink-muted">{dict.auth.email}</span>
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    autoComplete="email"
+                    className="rounded-lg border border-hairline bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-ink-muted">{dict.auth.password}</span>
+                  <input
+                    type="password"
+                    name="password"
+                    required
+                    minLength={6}
+                    autoComplete={mode === "create" ? "new-password" : "current-password"}
+                    className="rounded-lg border border-hairline bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                  />
+                </label>
+                {error && (
+                  <p aria-live="polite" className="text-pretty text-sm text-red-600">
+                    {error}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="mt-1 bg-ink px-4 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-accent disabled:opacity-50"
+                >
+                  {busy
+                    ? dict.auth.working
+                    : mode === "create"
+                      ? dict.auth.createAccount
+                      : dict.auth.signInEmail}
+                </button>
+              </form>
+
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  onClick={() => switchMode(mode === "create" ? "signin" : "create")}
+                  className="text-ink-muted underline underline-offset-2 hover:text-ink"
+                >
+                  {mode === "create" ? dict.auth.haveAccount : dict.auth.needAccount}
+                </button>
+                <button
+                  type="button"
+                  onClick={close}
+                  className="text-ink-faint hover:text-ink"
+                >
+                  {dict.auth.close}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </dialog>
     </>

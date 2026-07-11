@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import Gallery from "@/components/Gallery";
 import Account from "@/components/Account";
+import AdminLink from "@/components/AdminLink";
 
 type Props = {
   onLogo: (logo: LogoData, suggestedName: string) => Promise<void>;
@@ -106,12 +107,7 @@ export default function Landing({ onLogo }: Props) {
         <div className="flex items-center gap-6">
           <LanguageSwitcher />
           <Account />
-          <a
-            href="/admin"
-            className="font-mono text-xs uppercase text-ink-muted transition-colors hover:text-ink"
-          >
-            {dict.header.admin}
-          </a>
+          <AdminLink className="font-mono text-xs uppercase text-ink-muted transition-colors hover:text-ink" />
         </div>
       </header>
 

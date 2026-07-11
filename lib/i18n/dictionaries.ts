@@ -37,6 +37,9 @@ export type Dict = {
     signOut: string;
     title: string;
     subtitle: string;
+    signInTitle: string;
+    signInSubtitle: string;
+    sentTitle: string;
     continueWith: string; // {provider}
     or: string;
     email: string;
@@ -156,6 +159,9 @@ const en: Dict = {
     signOut: "Sign out",
     title: "Save your work",
     subtitle: "Create an account to keep your logos, edit them later and share them. Everything you have already made carries over.",
+    signInTitle: "Welcome back",
+    signInSubtitle: "Sign in to your account to manage your logos.",
+    sentTitle: "Check your email",
     continueWith: "Continue with {provider}",
     or: "or",
     email: "Email",
@@ -291,6 +297,9 @@ const ja: Dict = {
     signOut: "ログアウト",
     title: "作業内容を保存",
     subtitle: "アカウントを作成すると、ロゴを保存して後から編集・共有できます。ここまで作成した内容はそのまま引き継がれます。",
+    signInTitle: "おかえりなさい",
+    signInSubtitle: "アカウントにログインしてロゴを管理します。",
+    sentTitle: "確認メールを送信しました",
     continueWith: "{provider} で続ける",
     or: "または",
     email: "メールアドレス",
@@ -426,6 +435,9 @@ const ko: Dict = {
     signOut: "로그아웃",
     title: "작업 내용 저장",
     subtitle: "계정을 만들면 로고를 저장하고 나중에 편집·공유할 수 있습니다. 지금까지 만든 내용은 그대로 이어집니다.",
+    signInTitle: "다시 오신 것을 환영합니다",
+    signInSubtitle: "계정에 로그인하여 로고를 관리하세요.",
+    sentTitle: "확인 메일을 보냈습니다",
     continueWith: "{provider}(으)로 계속하기",
     or: "또는",
     email: "이메일",
@@ -560,6 +572,9 @@ const zhHant: Dict = {
     signOut: "登出",
     title: "儲存您的作品",
     subtitle: "建立帳號即可保存標誌、日後編輯與分享。您目前建立的內容都會保留。",
+    signInTitle: "歡迎回來",
+    signInSubtitle: "登入帳號以管理您的標誌。",
+    sentTitle: "確認信已寄出",
     continueWith: "使用 {provider} 繼續",
     or: "或",
     email: "電子郵件",
@@ -694,6 +709,9 @@ const zhHans: Dict = {
     signOut: "退出登录",
     title: "保存您的作品",
     subtitle: "创建账号即可保存标志、稍后编辑与分享。您目前创建的内容都会保留。",
+    signInTitle: "欢迎回来",
+    signInSubtitle: "登录账号以管理您的标志。",
+    sentTitle: "确认邮件已发送",
     continueWith: "使用 {provider} 继续",
     or: "或",
     email: "电子邮箱",
