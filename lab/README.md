@@ -51,11 +51,11 @@ app/lab/page.tsx        # 薄いルート(本体への影響はこの1ファイ�
 | 001 | Classic Reveal(基準器) | Reveal | gsap, svg | ✅ 実装済み |
 | 002 | Mask Wipe | Reveal | gsap, css | ✅ 実装済み |
 | 003 | Blur Focus | Reveal | gsap, css | ✅ 実装済み |
-| 004 | Path Stagger | Reveal | gsap, svg | 予定 |
-| 005 | Particle Assemble | Reveal | canvas | 予定 |
-| 006 | Gradient Sweep | 質感 | gsap, svg | 予定 |
-| 007 | Emboss / Long Shadow | 質感 | svg, css | 予定 |
-| 008 | Breathing | 常駐ループ | gsap | 予定 |
+| 004 | Path Stagger | Reveal | gsap, svg | ✅ 実装済み |
+| 005 | Particle Assemble | Reveal | canvas | ✅ 実装済み |
+| 006 | Gradient Sweep | 質感 | gsap, css | ✅ 実装済み |
+| 007 | Emboss / Long Shadow | 質感 | gsap, css | ✅ 実装済み |
+| 008 | Breathing | 常駐ループ | gsap | ✅ 実装済み |
 | 009 | Ambient Background | 常駐ループ | css, canvas | 予定 |
 | 010 | Guideline Reveal | プレゼンテーション | gsap, svg | 予定 |
 | 011 | Lockup Variations | プレゼンテーション | gsap, svg | 予定 |

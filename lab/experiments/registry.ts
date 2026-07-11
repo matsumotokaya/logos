@@ -10,6 +10,11 @@ import type { ExperimentComponent } from "@/lab/core/experiment-api";
 import { meta as classicReveal } from "./001-classic-reveal/meta";
 import { meta as maskWipe } from "./002-mask-wipe/meta";
 import { meta as blurFocus } from "./003-blur-focus/meta";
+import { meta as pathStagger } from "./004-path-stagger/meta";
+import { meta as particleAssemble } from "./005-particle-assemble/meta";
+import { meta as gradientSweep } from "./006-gradient-sweep/meta";
+import { meta as embossLongShadow } from "./007-emboss-long-shadow/meta";
+import { meta as breathing } from "./008-breathing/meta";
 
 export type ExperimentEntry = {
   meta: ExperimentMeta;
@@ -22,61 +27,6 @@ export type ExperimentEntry = {
 
 /** Roadmap stubs — implemented one by one, each judged against 001. */
 const planned: ExperimentMeta[] = [
-  {
-    id: "004",
-    slug: "path-stagger",
-    title: "Path Stagger",
-    category: "reveal",
-    tech: ["gsap", "svg"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg"],
-    status: "planned",
-  },
-  {
-    id: "005",
-    slug: "particle-assemble",
-    title: "Particle Assemble",
-    category: "reveal",
-    tech: ["canvas"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg", "png"],
-    status: "planned",
-  },
-  {
-    id: "006",
-    slug: "gradient-sweep",
-    title: "Gradient Sweep",
-    category: "texture",
-    tech: ["gsap", "svg"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg"],
-    status: "planned",
-  },
-  {
-    id: "007",
-    slug: "emboss-long-shadow",
-    title: "Emboss / Long Shadow",
-    category: "texture",
-    tech: ["svg", "css"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg"],
-    status: "planned",
-  },
-  {
-    id: "008",
-    slug: "breathing",
-    title: "Breathing",
-    category: "ambient",
-    tech: ["gsap"],
-    impressions: [],
-    duration: "—",
-    supports: ["svg", "png"],
-    status: "planned",
-  },
   {
     id: "009",
     slug: "ambient-background",
@@ -179,6 +129,26 @@ const implemented: ExperimentEntry[] = [
   {
     meta: blurFocus,
     Component: dynamic(() => import("./003-blur-focus"), { ssr: false }),
+  },
+  {
+    meta: pathStagger,
+    Component: dynamic(() => import("./004-path-stagger"), { ssr: false }),
+  },
+  {
+    meta: particleAssemble,
+    Component: dynamic(() => import("./005-particle-assemble"), { ssr: false }),
+  },
+  {
+    meta: gradientSweep,
+    Component: dynamic(() => import("./006-gradient-sweep"), { ssr: false }),
+  },
+  {
+    meta: embossLongShadow,
+    Component: dynamic(() => import("./007-emboss-long-shadow"), { ssr: false }),
+  },
+  {
+    meta: breathing,
+    Component: dynamic(() => import("./008-breathing"), { ssr: false }),
   },
 ];
 
