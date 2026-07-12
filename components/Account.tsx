@@ -1,10 +1,12 @@
 "use client";
 
 // Account control for the app headers: a "Sign in" affordance for guests that
-// opens an auth dialog (Google → Apple → Figma → email), and a signed-in
-// indicator with sign-out. Renders nothing in localStorage mode.
+// opens an auth dialog (Google → Apple → Figma → email), and for signed-in
+// users an avatar menu (admin console / labs / sign out). In localStorage
+// mode (no auth) the admin and labs links render as plain links.
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useAuth, type OAuthProvider } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
@@ -51,11 +53,13 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
     useAuth();
   const { dict } = useI18n();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"create" | "signin">("create");
   // "form" collects credentials; "sent" is the post-signup confirm-email panel.
   const [phase, setPhase] = useState<"form" | "sent">("form");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Once the session becomes a real signed-in account (e.g. instant signup when
   // email confirmation is off, or a successful sign-in), close the dialog.
@@ -63,7 +67,48 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
     if (isSignedIn) dialogRef.current?.close();
   }, [isSignedIn]);
 
-  if (!enabled) return null;
+  // Close the avatar menu on outside click or Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  // localStorage mode (no auth): keep admin/labs reachable as plain links.
+  if (!enabled) {
+    return (
+      <span className="flex items-center gap-4">
+        <Link
+          href="/admin"
+          className={cn(
+            "font-mono text-xs uppercase transition-colors",
+            tone === "dark" ? "text-ink-muted hover:text-ink" : "text-white/70 hover:text-white"
+          )}
+        >
+          {dict.header.admin}
+        </Link>
+        <Link
+          href="/labs"
+          className={cn(
+            "font-mono text-xs uppercase transition-colors",
+            tone === "dark" ? "text-ink-muted hover:text-ink" : "text-white/70 hover:text-white"
+          )}
+        >
+          {dict.header.labs}
+        </Link>
+      </span>
+    );
+  }
 
   const open = (initial: "create" | "signin" = "create") => {
     setMode(initial);
@@ -121,13 +166,77 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
       {loading ? (
         <span aria-hidden="true" className={cn("inline-block h-4 w-16 animate-pulse rounded", tone === "dark" ? "bg-hairline" : "bg-white/20")} />
       ) : isSignedIn ? (
-        <div className="flex items-center gap-3">
-          <span className={cn("hidden max-w-40 truncate font-mono text-xs sm:inline", tone === "dark" ? "text-ink-muted" : "text-white/70")}>
-            {user?.email}
-          </span>
-          <button type="button" onClick={() => void signOut()} className={linkCls}>
-            {dict.auth.signOut}
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((o) => !o)}
+            className={cn(
+              "flex items-center gap-2 rounded-full py-0.5 pr-2 pl-0.5 transition-colors",
+              tone === "dark" ? "hover:bg-ink/5" : "hover:bg-white/10"
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className="flex size-7 items-center justify-center rounded-full bg-accent font-mono text-xs font-semibold text-white"
+            >
+              {(user?.email?.[0] ?? "•").toUpperCase()}
+            </span>
+            <span className={cn("hidden max-w-36 truncate text-xs sm:inline", tone === "dark" ? "text-ink-muted" : "text-white/80")}>
+              {user?.email}
+            </span>
+            <svg
+              viewBox="0 0 12 12"
+              aria-hidden="true"
+              className={cn(
+                "size-2.5 transition-transform",
+                menuOpen && "rotate-180",
+                tone === "dark" ? "text-ink-faint" : "text-white/50"
+              )}
+            >
+              <path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
+
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute top-full right-0 z-50 mt-2 w-60 overflow-hidden rounded-xl border border-hairline bg-paper py-1.5 shadow-lg"
+            >
+              <p className="truncate border-b border-hairline px-4 pt-1.5 pb-2.5 font-mono text-xs text-ink-muted">
+                {user?.email}
+              </p>
+              <Link
+                role="menuitem"
+                href="/admin"
+                onClick={() => setMenuOpen(false)}
+                className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
+              >
+                {dict.header.admin}
+              </Link>
+              <Link
+                role="menuitem"
+                href="/labs"
+                onClick={() => setMenuOpen(false)}
+                className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
+              >
+                {dict.header.labs}
+              </Link>
+              <div aria-hidden="true" className="my-1.5 h-px bg-hairline" />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  void signOut();
+                }}
+                className="block w-full px-4 py-2 text-left text-sm text-ink-muted transition-colors hover:bg-ink/5 hover:text-ink"
+              >
+                {dict.auth.signOut}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <button type="button" onClick={() => open("create")} className={linkCls}>

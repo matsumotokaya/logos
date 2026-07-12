@@ -8,7 +8,6 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import Account from "@/components/Account";
-import AdminLink from "@/components/AdminLink";
 import {
   PresentationEditProvider,
   type PresentationTextPatch,
@@ -107,7 +106,6 @@ export default function Presentation({
               {editing ? dict.header.editDone : dict.header.edit}
             </button>
           )}
-          <AdminLink className="text-sm text-ink-muted transition-colors hover:text-ink" />
           <input
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
