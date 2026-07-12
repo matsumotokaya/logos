@@ -5,13 +5,14 @@
 // Plain fixed overlay, not <dialog> — React onChange misfires inside
 // showModal (see project memory).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import type { LabLogo } from "@/labs/motion/core/experiment-api";
 import { getNote, setNote } from "@/labs/motion/core/notes-store";
 import type { Template2D, LogoColorMode } from "@/labs/image/core/template-format";
 import type { ComposeMetrics, ComposeOptions } from "@/labs/image/core/pipeline";
 import { composeToUrl } from "@/labs/image/core/client";
+import { templateTechNotes } from "@/labs/image/core/tech-notes";
 import { noteKey } from "./TemplateCard";
 
 const WIDTHS = [1024, 1600, 2048, 2600];
@@ -47,6 +48,8 @@ export default function ComposeModal({
 
   const [rating, setRating] = useState(() => getNote(noteKey(template.id)).rating);
   const [memo, setMemo] = useState(() => getNote(noteKey(template.id)).note);
+
+  const techNotes = useMemo(() => templateTechNotes(template), [template]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -227,16 +230,53 @@ export default function ComposeModal({
                 <table className="w-full font-mono text-[10px] text-ink-muted">
                   <tbody>
                     <Row k="出力" v={`${metrics.outWidth}×${metrics.outHeight}px`} />
-                    <Row k="舞台ラスタライズ" v={`${metrics.stageMs}ms`} />
-                    <Row k="ロゴラスタライズ" v={`${metrics.logoMs}ms`} />
-                    <Row k="射影+ディスプレイス" v={`${metrics.warpMs}ms`} />
-                    <Row k="レイヤー合成" v={`${metrics.compositeMs}ms`} />
+                    <Row
+                      k="舞台ラスタライズ"
+                      v={`${metrics.stageMs}ms`}
+                      hint="舞台SVGをsharpでこの解像度にレンダリング"
+                    />
+                    <Row
+                      k="ロゴラスタライズ"
+                      v={`${metrics.logoMs}ms`}
+                      hint={`宛先矩形の最大辺×2倍(スーパーサンプル)= ${metrics.logoRasterPx.width}×${metrics.logoRasterPx.height}px でロゴを展開`}
+                    />
+                    <Row
+                      k="射影+ディスプレイス"
+                      v={`${metrics.warpMs}ms`}
+                      hint="ホモグラフィの逆写像+変位場サンプリングをピクセルごとに計算(純TypeScript)"
+                    />
+                    <Row
+                      k="レイヤー合成"
+                      v={`${metrics.compositeMs}ms`}
+                      hint="シャドウ→ロゴ→ライティング層の順にsharp.compositeでブレンド"
+                    />
                     <Row k="合計" v={`${metrics.totalMs}ms`} strong />
                     <Row k="外部APIコスト" v="$0.00(決定論的合成)" />
                   </tbody>
                 </table>
               </Control>
             )}
+
+            <Control label="技術解説(このテンプレートのパイプライン)">
+              <div className="space-y-2">
+                {techNotes.map((note) => (
+                  <details
+                    key={note.title}
+                    className="group rounded-lg border border-hairline open:bg-paper"
+                  >
+                    <summary className="cursor-pointer list-none px-2.5 py-1.5 text-[11px] font-medium text-ink marker:content-none">
+                      <span className="mr-1 inline-block text-ink-faint transition group-open:rotate-90">
+                        ›
+                      </span>
+                      {note.title}
+                    </summary>
+                    <p className="px-2.5 pb-2.5 text-[11px] leading-relaxed text-ink-muted">
+                      {note.body}
+                    </p>
+                  </details>
+                ))}
+              </div>
+            </Control>
 
             {url && (
               <a
@@ -297,10 +337,22 @@ function Control({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function Row({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
+function Row({
+  k,
+  v,
+  strong,
+  hint,
+}: {
+  k: string;
+  v: string;
+  strong?: boolean;
+  hint?: string;
+}) {
   return (
-    <tr className={cn(strong && "text-ink")}>
-      <td className="py-0.5 pr-2">{k}</td>
+    <tr className={cn(strong && "text-ink")} title={hint}>
+      <td className={cn("py-0.5 pr-2", hint && "underline decoration-dotted underline-offset-2")}>
+        {k}
+      </td>
       <td className="py-0.5 text-right">{v}</td>
     </tr>
   );

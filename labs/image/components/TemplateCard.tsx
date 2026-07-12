@@ -16,6 +16,7 @@ import {
 import { CATEGORY_LABELS } from "@/labs/image/core/template-format";
 import type { CatalogEntryDto, ComposeMetrics } from "@/labs/image/core/pipeline";
 import { composeToUrl } from "@/labs/image/core/client";
+import { BLEND_EXPLAIN } from "@/labs/image/core/tech-notes";
 
 export const noteKey = (templateId: string) => `img:${templateId}`;
 
@@ -159,12 +160,26 @@ export default function TemplateCard({
             <span className="rounded-full bg-ink/5 px-2 py-0.5">
               {CATEGORY_LABELS[template.category]}
             </span>
-            <span className="rounded-full border border-hairline px-2 py-0.5 font-mono">
+            <span
+              className="rounded-full border border-hairline px-2 py-0.5 font-mono"
+              title={BLEND_EXPLAIN[template.surface.logo.blend]}
+            >
               {template.surface.logo.blend}
             </span>
             {template.surface.displacement && (
-              <span className="rounded-full border border-hairline px-2 py-0.5 font-mono">
+              <span
+                className="rounded-full border border-hairline px-2 py-0.5 font-mono"
+                title={`ディスプレイスメント: RGBマップで面のシワ・凹凸を再現(強度${template.surface.displacement.strength}px)。詳細はカードを開いて「技術解説」参照`}
+              >
                 displace
+              </span>
+            )}
+            {template.surface.logo.shadow && (
+              <span
+                className="rounded-full border border-hairline px-2 py-0.5 font-mono"
+                title="コンタクトシャドウ: ロゴのアルファをぼかして落とす別レイヤー"
+              >
+                shadow
               </span>
             )}
             {(template.impressions ?? []).map((t) => (
