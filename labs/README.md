@@ -43,7 +43,7 @@
 
 - ✅ **Motion Lab**: 全16実験が実装済み(2026-07-12時点)。残タスクは採用判断(星評価・研究ノート)と、採用実験の本体プレゼンへの移植、組み合わせ検証(v2)
 - ✅ **Workflow Lab**(旧称 Image Lab、2026-07-12改称): 基盤要件書 Phase 1(2Dテンプレートフォーマット+決定論的合成エンジン+テンプレート3種+原価計測)が稼働中。次はテンプレート拡充と採用判断、その先に Phase 2(QAゲート+Blenderワーカー)
-- → **次: Generative Lab の立ち上げ**。探索モード要件書は確定済み(正本: [generative/README.md](generative/README.md))。Phase E1(3エンジン統合+表現テンプレート2系統)から着手する
+- ✅ **Generative Lab**: Phase E1(プロバイダ抽象化+FLUX.2/Recraft統合+表現テンプレート8種+プリセット3段ダイヤル+原価計測・監査ログ)が稼働中(2026-07-12)。APIキー未設定時はモックで全フローが動く。次は実APIキーでの実機検証と、Phase E2(逸脱スコアボード+ロゴ領域検出)
 - Campaign Lab は着手しない(素材側3ラボの成熟待ち)
 
 ## 研究所一覧
@@ -52,7 +52,7 @@
 |---|---|---|---|---|
 | [Motion Lab](motion/README.md) | `/labs/motion` | 保証 | ✅ 稼働中(16実験) | SVG・CSS・Canvas・Three.js・Lottie によるアルゴリズム表現 |
 | [Workflow Lab](workflow/README.md) | `/labs/workflow` | 保証 | ✅ 稼働中(Phase 1) | 決定論的合成+プロツール連携(旧称 Image Lab。旧URL `/labs/image` はリダイレクト) |
-| [Generative Lab](generative/README.md) | `/labs/generative` | 探索 | 準備中(要件確定) | 生成AIハーネス: 3エンジン・表現テンプレート・ダイヤル4軸・逸脱スコアボード・ショートビデオ |
+| [Generative Lab](generative/README.md) | `/labs/generative` | 探索 | ✅ 稼働中(Phase E1) | 生成AIハーネス: 3エンジン・表現テンプレート・ダイヤル4軸・逸脱スコアボード・ショートビデオ |
 | Campaign Lab | `/labs/campaign` | 統合 | 将来枠 | アセットを組み合わせた最終出力(CM・バナー・LP)。プレースホルダーのみ |
 
 ## ディレクトリ構成
@@ -63,14 +63,15 @@ labs/
   directory.ts       # 研究所カタログの正本(名前・モード・状態・研究範囲)
   motion/            # Motion Lab 本体(core / experiments / components)
   workflow/          # Workflow Lab 本体(core / engine / templates / components)
-  generative/        # Generative Lab(現状は要件書のみ。実装はPhase E1から)
+  generative/        # Generative Lab 本体(core / engine / templates / components)
   <slug>/            # 新しいラボはここに独立したディレクトリを作る
 app/labs/page.tsx        # 研究所インデックス(モード別グルーピング)
-app/labs/motion/page.tsx # 稼働中ラボの薄いルート(workflow も同様)
+app/labs/motion/page.tsx # 稼働中ラボの薄いルート(workflow / generative も同様)
 app/labs/[slug]/page.tsx # 準備中ラボのプレースホルダーページ
 app/lab/page.tsx         # 旧URL → /labs/motion リダイレクト
 app/labs/image/page.tsx  # 旧URL → /labs/workflow リダイレクト
-app/api/labs/workflow/*  # Workflow Lab の合成API(templates / compose / jobs)
+app/api/labs/workflow/*   # Workflow Lab の合成API(templates / compose / jobs)
+app/api/labs/generative/* # Generative Lab の生成API(templates / generate / jobs / outputs)
 ```
 
 ロゴレジストリ(選択ロゴ・アップロード)と研究ノート(星評価)は Motion Lab の `core/logo-store.ts` / `core/notes-store.ts` を全ラボの共有インフラとして使う(選んだロゴがラボ間で引き継がれるのは仕様)。

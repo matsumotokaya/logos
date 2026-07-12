@@ -1,0 +1,25 @@
+{
+  "format": "logos-expression-template@1",
+  "id": "embroidered-workwear",
+  "name": "Heritage workwear embroidery",
+  "nameJa": "ヘリテージワークウェア刺繍",
+  "taxonomy": "material",
+  "engine": "flux2",
+  "prompt": {
+    "existence": "The logo exists as dense chain-stitch embroidery, every shape rendered in raised thread",
+    "material": "Thick cotton threads with visible stitch direction, slightly puckering the heavy selvage denim beneath",
+    "environment": "The chest panel of a vintage workwear jacket laid on a workbench",
+    "light": "Soft window light raking across the stitches to show their relief",
+    "camera": "Macro product photograph, straight-on, crisp focus on the thread",
+    "mood": "Crafted, durable, warm",
+    "contextWrap": "The garment is merchandise for a business in this field: {context}",
+    "negative": "print, flat graphic, watermark, plastic"
+  },
+  "engineParams": { "steps": 32 },
+  "dials": {
+    "defaults": { "shape": 0.7, "color": 0.7, "text": 0.6, "world": 0.45 }
+  },
+  "logoTypes": ["symbol", "combination"],
+  "impressions": ["クラフト", "上質", "ヘリテージ"],
+  "notesJa": "刺繍は糸の物理で細部が丸くなる=形状逸脱が仕様。小さな文字は潰れるためワードマーク非対応(E-5の再構成提案の代表例)。"
+}

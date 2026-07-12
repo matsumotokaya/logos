@@ -1,0 +1,28 @@
+{
+  "format": "logos-expression-template@1",
+  "id": "blueprint-atelier",
+  "name": "Architect's blueprint sheet",
+  "nameJa": "建築ブループリント製図",
+  "taxonomy": "stylization",
+  "engine": "recraft",
+  "prompt": {
+    "existence": "The logo exists as a technical drawing on an architect's blueprint, redrawn in fine white construction lines",
+    "material": "Cyanotype blueprint paper, Prussian blue ground, white line work with dimension marks and construction circles",
+    "environment": "A full drafting sheet with a title block, fold creases and registration marks",
+    "light": "Flat archival scan lighting, no glare",
+    "camera": "Top-down flat reproduction",
+    "mood": "Precise, engineered, archival",
+    "contextWrap": "Annotations reference a business in this field: {context}",
+    "negative": "photorealistic scene, color photograph, watermark"
+  },
+  "engineParams": { "style": "digital_illustration" },
+  "dials": {
+    "defaults": { "shape": 0.8, "text": 0.6, "world": 0.5 },
+    "locks": {
+      "color": { "value": 0.1, "reasonJa": "青焼きの単色世界が主題のため、ブランドカラー保持は無効化(固定)" }
+    }
+  },
+  "logoTypes": ["symbol", "wordmark", "combination"],
+  "impressions": ["テック", "精密", "製図"],
+  "notesJa": "Motion Lab の製図演出(ガイドライン系実験)の生成AI版。本体プレゼンの Construction シーンと並べると保証/探索の対比が見える。"
+}

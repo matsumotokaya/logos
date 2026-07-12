@@ -1,0 +1,26 @@
+{
+  "format": "logos-expression-template@1",
+  "id": "gilded-deco-emblem",
+  "name": "Gilded Art Deco emblem",
+  "nameJa": "金彩アールデコ・エンブレム",
+  "taxonomy": "stylization",
+  "engine": "recraft",
+  "prompt": {
+    "existence": "The logo exists as a gilded Art Deco emblem, its shapes recut into stepped, symmetrical deco geometry",
+    "material": "Gold leaf and black lacquer inlay, fine sunburst linework radiating from the mark",
+    "environment": "A hotel-lobby brass plaque composition with a thin double border",
+    "light": "Warm directional light catching the gold relief",
+    "camera": "Straight-on, centered, formal",
+    "mood": "Opulent, ceremonial, 1930s grandeur",
+    "contextWrap": "The emblem crowns a business in this field: {context}",
+    "negative": "minimalism, flat design, watermark, plastic"
+  },
+  "engineParams": { "style": "realistic_image" },
+  "dials": {
+    "defaults": { "shape": 0.55, "color": 0.35, "text": 0.5, "world": 0.6 }
+  },
+  "mapping": { "strengthBase": 0.6 },
+  "logoTypes": ["symbol", "wordmark", "combination"],
+  "impressions": ["荘厳", "装飾", "ヘリテージ"],
+  "notesJa": "意図的に形状デフォルトを低くした「再解釈寄り」テンプレート。mapping.strengthBase を上書きしており、テンプレート単位チューニングの見本を兼ねる。"
+}

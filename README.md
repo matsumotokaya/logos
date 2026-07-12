@@ -32,7 +32,7 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | `/admin` | 管理コンソール |
 | `/admin/logos/[id]` | ロゴ情報ページ(正本の編集: 正式名称・ロゴ形式・役割・親子関係・公開範囲・公開スラッグ・コンタクト表示・タグ・制作クレジット・商標情報・マスターファイル差し替え・**組織への所有移管**・作業履歴) |
 | `/[handle]/[slug]` | バニティURL。組織ハンドル+ロゴスラッグを正規パーマリンク `/p/[id]` に解決(公開ロゴのみ) |
-| `/labs` | **研究所インデックス**(noindex)。表現R&Dのラボ群を**保証モード/探索モード/統合(将来枠)**で分類: 稼働中の [Motion Lab](labs/motion/README.md)(`/labs/motion`)・[Workflow Lab](labs/workflow/README.md)(`/labs/workflow`、旧称 Image Lab)と、準備中の [Generative Lab](labs/generative/README.md)・将来枠の Campaign Lab。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow` へリダイレクト |
+| `/labs` | **研究所インデックス**(noindex)。表現R&Dのラボ群を**保証モード/探索モード/統合(将来枠)**で分類: 稼働中の [Motion Lab](labs/motion/README.md)(`/labs/motion`)・[Workflow Lab](labs/workflow/README.md)(`/labs/workflow`、旧称 Image Lab)・[Generative Lab](labs/generative/README.md)(`/labs/generative`、探索モード)と、将来枠の Campaign Lab。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow` へリダイレクト |
 
 URL体系の設計意図(所有者を含まない壊れないパーマリンク等)は [docs/account-design.md](docs/account-design.md) を参照。
 
@@ -91,6 +91,8 @@ npm run dev   # http://localhost:3000
 ```
 GEMINI_API_KEY=（Google AI Studioで発行したキー、課金有効なプロジェクトのもの）
 ```
+
+Generative Lab(`/labs/generative`)の実エンジンを使うには `TOGETHER_API_KEY` / `RECRAFT_API_KEY` も設定する(未設定ならモックで全フローが動く)。詳細は [labs/generative/README.md](labs/generative/README.md)。
 
 ### Supabase(DB移行)
 

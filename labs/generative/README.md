@@ -1,8 +1,8 @@
 # Generative Lab — 探索モード(生成AIハーネス)
 
-生成AIにロゴを解釈させ、決定論では作れない表現を探す研究所。実験場は `/labs/generative`(準備中)。
+生成AIにロゴを解釈させ、決定論では作れない表現を探す研究所。実験場は `/labs/generative`(Phase E1 稼働中)。
 
-この文書は**探索モード開発要件の正本**(事業側の要件書 2026-07 を反映)と、この構想に至った**経緯**を兼ねる。[Workflow Lab の基盤要件書](../workflow/README.md)の続編であり、技術選定はディープリサーチ(2026年7月実施)に基づき決定済み。基盤要件書と本書で矛盾を見つけた場合は、実装ではなく質問で解消すること。
+この文書は**探索モード開発要件の正本**(事業側の要件書 2026-07 を反映)と**実装状況**、この構想に至った**経緯**を兼ねる。[Workflow Lab の基盤要件書](../workflow/README.md)の続編であり、技術選定はディープリサーチ(2026年7月実施)に基づき決定済み。基盤要件書と本書で矛盾を見つけた場合は、実装ではなく質問で解消すること。
 
 ## 経緯 — なぜ「保証」と「探索」の二層になったのか
 
@@ -123,10 +123,63 @@ QAゲート層を拡張し、探索モードでは**判定結果をユーザー�
 
 | Phase | 内容 | 状態 |
 |---|---|---|
-| **E1** | 3エンジン統合(抽象化レイヤー拡張)+表現テンプレートのデータ構造+マテリアル変換・様式化の2系統で各3〜5テンプレート。ダイヤルはプリセット3段のみ | 未着手 |
+| **E1** | 3エンジン統合(抽象化レイヤー拡張)+表現テンプレートのデータ構造+マテリアル変換・様式化の2系統で各3〜5テンプレート。ダイヤルはプリセット3段のみ | ✅ 実装済み(この実験場。Gemini対話層のみE3送り、実APIキーでの実機検証が残タスク) |
 | **E2** | 逸脱スコアボード(4段スコア+分解表示)+ロゴ領域検出 | 未着手 |
 | **E3** | ダイヤル4軸の詳細UI+ワードマーク対策UX+マルチターンセッション | 未着手 |
 | **E4** | 環境統合・シネマティック系統の追加+ベンチマーク運用の自動化 | 未着手 |
+
+## 実装ガイド(Phase E1 の構成)
+
+```
+labs/generative/
+  README.md              # このファイル(要件の正本+実装状況)
+  core/                  # isomorphic(クライアントはプロンプト/パラメータのプレビューに使う)
+    expression-format.ts # logos-expression-template@1 仕様の正本(型+バリデーション)
+    dials.ts             # プリセット3段(厳密/バランス/自由)→4軸の解決(ロック適用込み)
+    mapping.ts           # 4軸→エンジンパラメータ。係数はテンプレートのmappingで上書き可
+    prompt.ts            # プロンプト骨格の組み立て+ユーザー入力の無害化ラップ
+    api-types.ts         # ブラウザ⇄APIのDTO
+    client.ts            # ブラウザ側fetchヘルパ
+  engine/                # サーバー専用
+    providers/           # プロバイダ抽象化: together(FLUX.2) / recraft / gemini(E3スタブ) / mock
+    registry.ts          # templates/ のスキャン+バリデーション
+    logo-raster.ts       # ロゴ→参照PNG(白背景1024px)
+    storage.ts           # 生成物の即時回収先(var/generative-lab/outputs/)
+    job-log.ts           # 原価計測+監査ログ(var/generative-lab/jobs.jsonl)
+  templates/<id>/        # 表現テンプレート = template.json のみ(アセット不要)
+  components/            # カタログUI(Workflow Lab 同型+ハーネス可視化)
+app/labs/generative/page.tsx     # 薄いルート(noindex)
+app/api/labs/generative/templates # GET: カタログ+エンジン可用性
+app/api/labs/generative/generate  # POST: 生成(メタJSONを返し、画像は自前ストレージ経由)
+app/api/labs/generative/jobs      # GET: 原価・成功率集計(テンプレート別/エンジン別)
+app/api/labs/generative/outputs/[name] # GET: 生成物の配信(外部URLは一切参照しない)
+```
+
+### APIキー(.env.local)
+
+```
+TOGETHER_API_KEY=(api.together.ai → Settings → API Keys)
+RECRAFT_API_KEY=(recraft.ai → プロフィール → API)
+```
+
+キー未設定のエンジンは**モックプロバイダ**(サーバー内で決定論的に合成、透かし入り、コスト$0、ロゴはサーバー外に出ない)が代替し、UI・ジョブログの両方で `mock` と明示される。キーを設定すると再起動不要で実エンジンに切り替わる(可用性はリクエスト毎に判定)。
+
+### 実機検証の残項目(キー設定後に最初に確認)
+
+1. **Together**: `reference_images` に data URI を渡している(ドキュメント上は「画像URLの配列」)。実呼び出しで弾かれる場合は一時URL化が必要 → [engine/providers/together.ts](engine/providers/together.ts)
+2. **Recraft**: モデルslug `recraftv4_1` は要確認(V4.1系のAPI提供は確認済み、表記が違えば Swagger `/doc/#/` に合わせて修正。フォールバックは `recraftv3`)→ [engine/providers/recraft.ts](engine/providers/recraft.ts)
+3. **未解決事項1(ダイヤル4軸の実効性)**: 代表テンプレート(weathered-alpine-signage を想定)でプリセット3段の実生成を並べた検証シートを作り、事業側とレビュー
+
+### テンプレートの追加手順(コード変更不要)
+
+1. `labs/generative/templates/<id>/template.json` を置く(仕様は [core/expression-format.ts](core/expression-format.ts)。命名は「アートディレクション」単位、`prompt.existence` が先頭)
+2. 実験場をリロードする。バリデーションに通ればカタログに出現し、エラーがあればカードにエラー内容が表示される
+
+### データ取り扱い(実装済みの担保)
+
+- ロゴが外部に送られるのは**選択テンプレートのエンジン1社のみ**(Together=ZDR既定 / Recraft=学習不使用規定)。モック時はサーバー外に出ない
+- 生成物は受領後ただちに `var/generative-lab/outputs/` へ回収し、以後は自前URLのみを参照(Recraftの約24h公開URL対策)
+- 全ジョブを `var/generative-lab/jobs.jsonl` に記録: 監査(`logoSentTo`+ロゴhash)、原価(`costUsd`、失敗時も実費を計上)、成功率分析(テンプレート・エンジン・プリセット・ダイヤル・**実行プロンプト全文**)。この蓄積がE2スコアボードの土台になる
 
 ## 未解決事項(実装前・実装中に検証し、事業側とreviewする)
 

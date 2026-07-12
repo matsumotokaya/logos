@@ -128,7 +128,7 @@ export const LABS: LabInfo[] = [
     name: "Generative Lab",
     titleJa: "生成AI探索研究所",
     tagline: "逸脱を禁止せず、制御し・計測し・見せる——生成AIハーネスの実験場",
-    status: "planned",
+    status: "active",
     mode: "exploration",
     layer: "レイヤー3〜4: 生成AIハーネス(画像+映像。中〜重課金。無料キャンペーンは原価計算が前提)",
     description:
@@ -143,8 +143,12 @@ export const LABS: LabInfo[] = [
     ],
     modules: [
       {
-        title: "Phase E1〜E2: エンジン統合とスコアボード",
-        body: "3エンジン+表現テンプレートのデータ構造+マテリアル変換・様式化の2系統から着手し、逸脱スコアボード(ロゴ領域検出込み)で「ハーネス=計測して見せる」を形にする。",
+        title: "Phase E1: エンジン統合と表現テンプレート(稼働中)",
+        body: "プロバイダ抽象化+FLUX.2/Recraft(Gemini対話層はE3)、アートディレクション単位の表現テンプレート(コード変更なしで追加)、プリセット3段ダイヤル、全ジョブの原価計測・監査ログ。APIキー未設定時はモックで全フローが動く。",
+      },
+      {
+        title: "Phase E2: 逸脱スコアボード",
+        body: "シルエット類似・知覚類似(LPIPS)・文字保持(OCR)・意味類似(CLIP)の総合+4軸分解表示と、その前提となるロゴ領域検出。",
       },
       {
         title: "Phase E3〜E4: ダイヤル詳細とマルチターン",

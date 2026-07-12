@@ -1,0 +1,25 @@
+{
+  "format": "logos-expression-template@1",
+  "id": "neon-alley-1980s",
+  "name": "1980s Tokyo alley neon",
+  "nameJa": "1980年代・路地裏ネオン",
+  "taxonomy": "material",
+  "engine": "flux2",
+  "prompt": {
+    "existence": "The logo exists as a hand-bent glass neon sign, its shapes traced faithfully in glowing tube",
+    "material": "Real neon tubing with visible electrodes and mounting frame against a rain-darkened brick wall",
+    "environment": "A narrow 1980s Tokyo back alley at night, wet asphalt reflecting the sign",
+    "light": "The neon is the key light; deep shadows, subtle cyan spill from a distant vending machine",
+    "camera": "35mm photograph, eye level, shallow depth of field",
+    "mood": "Nostalgic, cinematic, quietly electric",
+    "contextWrap": "The sign belongs to a business in this field: {context}",
+    "negative": "text captions, watermark, people, cartoon"
+  },
+  "engineParams": { "steps": 32 },
+  "dials": {
+    "defaults": { "shape": 0.65, "color": 0.55, "text": 0.7, "world": 0.6 }
+  },
+  "logoTypes": ["symbol", "wordmark", "combination"],
+  "impressions": ["ノスタルジー", "シネマティック", "夜"],
+  "notesJa": "ネオン管はロゴの線を管に置き換える解釈が入るため、細部より輪郭の再現性を評価する。ワードマークは短い単語ほど成功しやすい。"
+}

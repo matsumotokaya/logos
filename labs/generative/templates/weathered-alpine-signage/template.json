@@ -1,0 +1,25 @@
+{
+  "format": "logos-expression-template@1",
+  "id": "weathered-alpine-signage",
+  "name": "Weathered alpine trail signage",
+  "nameJa": "風化した山岳サイネージ",
+  "taxonomy": "material",
+  "engine": "flux2",
+  "prompt": {
+    "existence": "The logo exists as powder-coated metal signage, sun-faded and weathered but structurally intact",
+    "material": "Enamel paint on steel, chipped at the edges, a thin crust of rime ice along the top",
+    "environment": "A mountain trailhead above the treeline, snowfields and granite behind",
+    "light": "Hard alpine daylight, thin air clarity, long cool shadows",
+    "camera": "Documentary photograph, slightly low angle, deep focus",
+    "mood": "Endured, honest, quietly heroic",
+    "contextWrap": "The sign marks the presence of a business in this field: {context}",
+    "negative": "pristine condition, showroom, watermark, people"
+  },
+  "engineParams": { "steps": 32 },
+  "dials": {
+    "defaults": { "shape": 0.75, "color": 0.5, "text": 0.65, "world": 0.65 }
+  },
+  "logoTypes": ["symbol", "wordmark", "combination"],
+  "impressions": ["アウトドア", "経年", "ドキュメンタリー"],
+  "notesJa": "要件書の「雪山の看板に風化して馴染むロゴ」の実装。色保持を下げるほど退色表現が乗る=色ダイヤルの検証にも使う代表テンプレート。"
+}

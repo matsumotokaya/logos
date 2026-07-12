@@ -1,0 +1,25 @@
+{
+  "format": "logos-expression-template@1",
+  "id": "bauhaus-exhibition-poster",
+  "name": "Bauhaus exhibition poster",
+  "nameJa": "バウハウス展ポスター",
+  "taxonomy": "stylization",
+  "engine": "recraft",
+  "prompt": {
+    "existence": "The logo exists as the central element of a Bauhaus exhibition poster, integrated into a strict geometric composition",
+    "material": "Flat spot-color print: circles, bars and diagonal grids echoing the logo's own geometry",
+    "environment": "A 1920s modernist poster layout with asymmetric balance and a narrow typographic band",
+    "light": "Flat print reproduction",
+    "camera": "Top-down, full poster in frame",
+    "mood": "Rational, bold, timeless",
+    "contextWrap": "The exhibition subject relates to this field: {context}",
+    "negative": "photorealism, texture noise, watermark, ornament"
+  },
+  "engineParams": { "style": "digital_illustration" },
+  "dials": {
+    "defaults": { "shape": 0.7, "color": 0.6, "text": 0.55, "world": 0.65 }
+  },
+  "logoTypes": ["symbol", "combination"],
+  "impressions": ["モダニズム", "幾何学", "アート"],
+  "notesJa": "ロゴの造形言語から周辺の幾何コンポジションを派生させる=Recraftの「造形展開」役割の見本。ワードマーク単体は構図が崩れやすく非対応。"
+}

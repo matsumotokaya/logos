@@ -1,0 +1,25 @@
+{
+  "format": "logos-expression-template@1",
+  "id": "riso-two-tone-poster",
+  "name": "Risograph two-tone poster",
+  "nameJa": "リソグラフ2色ポスター",
+  "taxonomy": "stylization",
+  "engine": "recraft",
+  "prompt": {
+    "existence": "The logo exists as the hero graphic of a risograph-printed poster, screened in two overlapping spot colors",
+    "material": "Visible riso grain, slight registration misalignment, ink soaking into uncoated warm-white paper",
+    "environment": "A gallery poster composition with generous margins and a small caption line",
+    "light": "Flat scan of the print",
+    "camera": "Top-down reproduction, full poster in frame",
+    "mood": "Playful, indie, hand-made",
+    "contextWrap": "The poster promotes a business in this field: {context}",
+    "negative": "photorealism, gradients, watermark, glossy"
+  },
+  "engineParams": { "style": "digital_illustration" },
+  "dials": {
+    "defaults": { "shape": 0.65, "color": 0.5, "text": 0.6, "world": 0.6 }
+  },
+  "logoTypes": ["symbol", "wordmark", "combination"],
+  "impressions": ["軽快", "インディー", "印刷"],
+  "notesJa": "2色分解でブランドカラーは必ず再解釈される=「色保持を中庸に下げると成功する」逆説の検証用。版ズレ表現が形状スコアにどう出るかはE2で計測。"
+}

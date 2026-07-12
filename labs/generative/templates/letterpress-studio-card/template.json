@@ -1,0 +1,28 @@
+{
+  "format": "logos-expression-template@1",
+  "id": "letterpress-studio-card",
+  "name": "Letterpress studio card macro",
+  "nameJa": "活版印圧・コットン名刺",
+  "taxonomy": "material",
+  "engine": "flux2",
+  "prompt": {
+    "existence": "The logo exists as a deep letterpress impression pressed into thick cotton paper, ink-free blind deboss",
+    "material": "600gsm cotton stock with visible fiber texture, the impression casting its own micro-shadows",
+    "environment": "A single business card on a printmaker's stone table, loupe and ink knife out of focus nearby",
+    "light": "One low-angle softbox skimming the surface to carve out the deboss",
+    "camera": "Extreme macro, shallow depth of field centered on the mark",
+    "mood": "Restrained, tactile, luxurious",
+    "contextWrap": "The card belongs to a business in this field: {context}",
+    "negative": "color printing, gloss, watermark, text other than the logo"
+  },
+  "engineParams": { "steps": 28 },
+  "dials": {
+    "defaults": { "shape": 0.85, "text": 0.8, "world": 0.3 },
+    "locks": {
+      "color": { "value": 0.1, "reasonJa": "インクなしの空押し表現のため、色保持は意味を持たない(固定)" }
+    }
+  },
+  "logoTypes": ["symbol", "wordmark", "combination"],
+  "impressions": ["ミニマル", "上質", "触感"],
+  "notesJa": "ダイヤルロックの代表例: 色軸を固定し、形状・文字の保持だけが効く。保証モードの名刺テンプレートとの見比べ(決定論 vs 探索)にも使える。"
+}
