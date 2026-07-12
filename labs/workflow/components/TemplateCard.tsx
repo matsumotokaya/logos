@@ -13,10 +13,10 @@ import {
   getServerNotesSnapshot,
   subscribeNotes,
 } from "@/labs/motion/core/notes-store";
-import { CATEGORY_LABELS } from "@/labs/image/core/template-format";
-import type { CatalogEntryDto, ComposeMetrics } from "@/labs/image/core/pipeline";
-import { composeToUrl } from "@/labs/image/core/client";
-import { BLEND_EXPLAIN } from "@/labs/image/core/tech-notes";
+import { CATEGORY_LABELS } from "@/labs/workflow/core/template-format";
+import type { CatalogEntryDto, ComposeMetrics } from "@/labs/workflow/core/pipeline";
+import { composeToUrl } from "@/labs/workflow/core/client";
+import { BLEND_EXPLAIN } from "@/labs/workflow/core/tech-notes";
 
 export const noteKey = (templateId: string) => `img:${templateId}`;
 

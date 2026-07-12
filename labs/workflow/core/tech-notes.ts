@@ -79,7 +79,7 @@ export function templateTechNotes(t: Template2D): TechNote[] {
       .join(" → ");
     notes.push({
       title: `ライティング(${t.lighting.length}レイヤー、焼き込み済み)`,
-      body: `ロゴを合成した最後に ${chain} の順で静的な光・影レイヤーを重ねる。スポット光やビネットなど実写のライティングをテンプレート側に閉じ込めており、生成AIによる自動照明調和(Firefly Object Compositeのような)には依存しない設計。この方式の品質限界は未解決事項として検証中(labs/image/README.md参照)。`,
+      body: `ロゴを合成した最後に ${chain} の順で静的な光・影レイヤーを重ねる。スポット光やビネットなど実写のライティングをテンプレート側に閉じ込めており、生成AIによる自動照明調和(Firefly Object Compositeのような)には依存しない設計。この方式の品質限界は未解決事項として検証中(labs/workflow/README.md参照)。`,
     });
   }
 

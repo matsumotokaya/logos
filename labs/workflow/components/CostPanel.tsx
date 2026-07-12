@@ -4,8 +4,8 @@
 // visible face of the "cost metering from day one" product requirement.
 
 import { useEffect, useState } from "react";
-import type { JobsSummary } from "@/labs/image/core/pipeline";
-import { fetchJobsSummary } from "@/labs/image/core/client";
+import type { JobsSummary } from "@/labs/workflow/core/pipeline";
+import { fetchJobsSummary } from "@/labs/workflow/core/client";
 
 export default function CostPanel({ refreshKey }: { refreshKey: number }) {
   const [summary, setSummary] = useState<JobsSummary | null>(null);
@@ -34,7 +34,7 @@ export default function CostPanel({ refreshKey }: { refreshKey: number }) {
             原価計測
           </h3>
           <span className="text-[11px] text-ink-faint">
-            全{summary.totalJobs}ジョブ(var/image-lab/jobs.jsonl)
+            全{summary.totalJobs}ジョブ(var/workflow-lab/jobs.jsonl)
           </span>
         </div>
         <table className="mt-3 w-full text-left font-mono text-[11px]">

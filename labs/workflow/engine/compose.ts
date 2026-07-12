@@ -17,12 +17,12 @@ import type {
   LogoColorMode,
   Point,
   Template2D,
-} from "@/labs/image/core/template-format";
+} from "@/labs/workflow/core/template-format";
 import type {
   ComposeLogo,
   ComposeMetrics,
   ComposeOptions,
-} from "@/labs/image/core/pipeline";
+} from "@/labs/workflow/core/pipeline";
 import {
   applyMat3,
   homographyFromPoints,

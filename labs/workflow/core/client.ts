@@ -19,14 +19,14 @@ export function logoPayload(logo: LabLogo): ComposeLogo | null {
 }
 
 export async function fetchCatalog(): Promise<CatalogEntryDto[]> {
-  const res = await fetch("/api/labs/image/templates");
+  const res = await fetch("/api/labs/workflow/templates");
   if (!res.ok) throw new Error(`カタログ取得に失敗 (${res.status})`);
   const json = (await res.json()) as { templates: CatalogEntryDto[] };
   return json.templates;
 }
 
 export async function fetchJobsSummary(): Promise<JobsSummary> {
-  const res = await fetch("/api/labs/image/jobs");
+  const res = await fetch("/api/labs/workflow/jobs");
   if (!res.ok) throw new Error(`集計取得に失敗 (${res.status})`);
   return (await res.json()) as JobsSummary;
 }
@@ -46,7 +46,7 @@ export async function composeToUrl(
   const payload = logoPayload(logo);
   if (!payload) throw new Error("このロゴは合成に使えない");
 
-  const res = await fetch("/api/labs/image/compose", {
+  const res = await fetch("/api/labs/workflow/compose", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ templateId, logo: payload, ...options }),

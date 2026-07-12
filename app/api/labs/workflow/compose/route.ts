@@ -3,10 +3,10 @@
 // Every job (success or failure) is metered into the JSONL cost log.
 
 import { performance } from "node:perf_hooks";
-import { composeTemplate } from "@/labs/image/engine/compose";
-import { appendJob, hashLogoSource } from "@/labs/image/engine/job-log";
-import { loadTemplate } from "@/labs/image/engine/registry";
-import type { ComposeLogo, ComposeRequest } from "@/labs/image/core/pipeline";
+import { composeTemplate } from "@/labs/workflow/engine/compose";
+import { appendJob, hashLogoSource } from "@/labs/workflow/engine/job-log";
+import { loadTemplate } from "@/labs/workflow/engine/registry";
+import type { ComposeLogo, ComposeRequest } from "@/labs/workflow/core/pipeline";
 
 const COLOR_MODES = ["original", "mono-dark", "mono-light"];
 const MAX_LOGO_BYTES = 3 * 1024 * 1024;

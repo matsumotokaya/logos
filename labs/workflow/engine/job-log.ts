@@ -1,6 +1,6 @@
 // Per-job cost metering — a product requirement from day one.
 //
-// Every compose job is appended to var/image-lab/jobs.jsonl (gitignored).
+// Every compose job is appended to var/workflow-lab/jobs.jsonl (gitignored).
 // The record shape anticipates Phase 3: external API cost and retry count
 // are recorded now (always 0 for deterministic composition) so the price
 // modelling queries don't change when the AI stage-generation layer lands.
@@ -10,9 +10,9 @@
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { appendFile, mkdir, readFile } from "node:fs/promises";
-import type { JobsSummary } from "@/labs/image/core/pipeline";
+import type { JobsSummary } from "@/labs/workflow/core/pipeline";
 
-const LOG_DIR = path.join(process.cwd(), "var", "image-lab");
+const LOG_DIR = path.join(process.cwd(), "var", "workflow-lab");
 const LOG_FILE = path.join(LOG_DIR, "jobs.jsonl");
 
 export type JobRecord = {

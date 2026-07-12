@@ -40,7 +40,7 @@ export type ComposeMetrics = {
   totalMs: number;
 };
 
-/** One catalog row from GET /api/labs/image/templates. */
+/** One catalog row from GET /api/labs/workflow/templates. */
 export type CatalogEntryDto = {
   id: string;
   template?: Template2D;
@@ -56,7 +56,7 @@ export type TemplateAggregate = {
   totalExternalCostUsd: number;
 };
 
-/** GET /api/labs/image/jobs — the unit-cost view for pricing work. */
+/** GET /api/labs/workflow/jobs — the unit-cost view for pricing work. */
 export type JobsSummary = {
   totalJobs: number;
   byTemplate: TemplateAggregate[];

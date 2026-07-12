@@ -9,10 +9,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import type { LabLogo } from "@/labs/motion/core/experiment-api";
 import { getNote, setNote } from "@/labs/motion/core/notes-store";
-import type { Template2D, LogoColorMode } from "@/labs/image/core/template-format";
-import type { ComposeMetrics, ComposeOptions } from "@/labs/image/core/pipeline";
-import { composeToUrl } from "@/labs/image/core/client";
-import { templateTechNotes } from "@/labs/image/core/tech-notes";
+import type { Template2D, LogoColorMode } from "@/labs/workflow/core/template-format";
+import type { ComposeMetrics, ComposeOptions } from "@/labs/workflow/core/pipeline";
+import { composeToUrl } from "@/labs/workflow/core/client";
+import { templateTechNotes } from "@/labs/workflow/core/tech-notes";
 import { noteKey } from "./TemplateCard";
 
 const WIDTHS = [1024, 1600, 2048, 2600];

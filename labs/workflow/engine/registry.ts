@@ -1,6 +1,6 @@
 // Template discovery — server only.
 //
-// Templates are data, not code: the server scans labs/image/templates/ at
+// Templates are data, not code: the server scans labs/workflow/templates/ at
 // request time, validates every template.json against the format spec and
 // checks that referenced assets exist. Broken templates stay visible in the
 // catalog with their errors — a designer dropping in a new directory gets
@@ -12,9 +12,9 @@ import {
   templateAssetPaths,
   validateTemplate,
   type Template2D,
-} from "@/labs/image/core/template-format";
+} from "@/labs/workflow/core/template-format";
 
-const TEMPLATES_DIR = path.join(process.cwd(), "labs", "image", "templates");
+const TEMPLATES_DIR = path.join(process.cwd(), "labs", "workflow", "templates");
 
 export type CatalogEntry = {
   /** Directory name (canonical id, even when template.json is broken). */

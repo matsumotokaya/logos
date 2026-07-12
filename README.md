@@ -17,7 +17,7 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | [PRODUCT.md](PRODUCT.md) | 事業構想・3層のプロダクト構想・収益モデル・差別化戦略 |
 | [docs/account-design.md](docs/account-design.md) | アカウント・権限・URL体系・RLS方針(Supabase設計) |
 | [docs/data-model.md](docs/data-model.md) | ロゴの正本(canonical record)・3層分離・CDN URL・サイト構造 |
-| [labs/README.md](labs/README.md) | **研究所群の入り口**: 体験レイヤー=課金の階段・4ラボの一覧と現在地・ラボ追加手順 |
+| [labs/README.md](labs/README.md) | **研究所群の入り口**: モード分類(保証/探索/統合)・体験レイヤー=課金の階段・ラボ一覧と現在地・ラボ追加手順 |
 | [labs/motion/README.md](labs/motion/README.md) | Motion Lab: 16実験カタログ・美的原則・使用技術とLottie比較 |
 | [AGENTS.md](AGENTS.md) | AIエージェント向けの開発上の注意(CLAUDE.md はこれを参照するだけ) |
 
@@ -32,7 +32,7 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | `/admin` | 管理コンソール |
 | `/admin/logos/[id]` | ロゴ情報ページ(正本の編集: 正式名称・ロゴ形式・役割・親子関係・公開範囲・公開スラッグ・コンタクト表示・タグ・制作クレジット・商標情報・マスターファイル差し替え・**組織への所有移管**・作業履歴) |
 | `/[handle]/[slug]` | バニティURL。組織ハンドル+ロゴスラッグを正規パーマリンク `/p/[id]` に解決(公開ロゴのみ) |
-| `/labs` | **研究所インデックス**(noindex)。表現R&Dのラボ群: 稼働中の [Motion Lab](labs/motion/README.md)(`/labs/motion`)・[Image Lab](labs/image/README.md)(`/labs/image`)と、準備中の Video / Workflow Lab。全体像は [labs/README.md](labs/README.md)。旧 `/lab` は `/labs/motion` へリダイレクト |
+| `/labs` | **研究所インデックス**(noindex)。表現R&Dのラボ群を**保証モード/探索モード/統合(将来枠)**で分類: 稼働中の [Motion Lab](labs/motion/README.md)(`/labs/motion`)・[Workflow Lab](labs/workflow/README.md)(`/labs/workflow`、旧称 Image Lab)と、準備中の [Generative Lab](labs/generative/README.md)・将来枠の Campaign Lab。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow` へリダイレクト |
 
 URL体系の設計意図(所有者を含まない壊れないパーマリンク等)は [docs/account-design.md](docs/account-design.md) を参照。
 

@@ -8,50 +8,69 @@
 
 **「ロゴが立派に見えるか」**。派手なエフェクトでロゴが埋もれる表現は失敗。静かでもロゴの造形が際立つ表現が成功。全ラボ・全実験がこの基準に従う。
 
+## 二つのモード + 統合(ラボ分類の考え方)
+
+ラボは技術ジャンルではなく、**「ロゴに触れるか、触れないか」**で分類する。2026-07 の再編でこの整理に至った(経緯の詳細は [generative/README.md](generative/README.md) の「経緯」節)。
+
+### 保証モード — ロゴを1ピクセルも崩さない(プロダクトの根幹)
+
+決定論的な処理だけでできており、出力のロゴ不変が**保証される**。ガイドライン・定番モックアップ・印刷入稿物など「絶対に崩せない用途」を担い、**通常業務で使うのはこちら**。「このプラットフォームはロゴの扱い方を心得ている」という信頼の証明であり、内部は複雑なワークフローの積み重ねになる。ジャンルは2つ:
+
+1. **プレゼンテーション表現**(Motion Lab): SVG・JavaScript・3D空間によるアルゴリズム表現。限界費用ゼロ
+2. **ワークフロー合成**(Workflow Lab): テンプレート+決定論的合成エンジン、その先の Photoshop・Figma・ヘッドレスBlender 連携。既存のロゴをそのまま使ったプレゼンテーションを作る
+
+### 探索モード — 生成AIで可能性を解放する
+
+その信頼の上で、生成AIにロゴを**解釈・変形させることを仕様として許容**し、決定論では作れない表現(風化した看板・ネオン・刺繍・シネマティック)を探す。見た目・情緒のインパクトを最大化できる代わりに、プロの現場で使えるかは**使う側がリスクとリターンを判断**し、生成の実費もかかる。ハーネスの定義は「逸脱の禁止」ではなく**「逸脱を制御し、計測し、見せる」**——逸脱スコアボードが全生成物に忠実度を付けて返す。画像と動画は同じラボで扱う(動画生成はほぼ必ず参照画像を起点にするため、「作ったブランドイメージを動かす」までが一連の流れ)。
+
+### 統合(将来枠)
+
+単発のアセットを組み合わせて、プロモーションビデオ・CM・バナー・LPという**マーケティングの最終アウトプット**に仕立てる領域。マーケの成果物は常に組み合わせで生まれる。素材側の3ラボが成熟してから着手する(今はプレースホルダー)。
+
 ## 体験のレイヤー = コストと課金の階段
 
 技術の階層は、そのままコスト・希少性・課金の階段になっている。下層は限界費用ゼロで全員に配り、上層は重課金で提供する。
 
-| レイヤー | 内容 | 担当ラボ | 課金 |
-|---|---|---|---|
-| 1 | 静的: 高品質ガイドラインテンプレートへのロゴ配置 | 本体プレゼン + Motion Lab(010) | 無料 |
-| 2 | SVG/3Dモーション(輪郭線ドロー等、アルゴリズムで実行) | **Motion Lab** | 無料 |
-| 2.5 | 非生成AIの高品質合成(2Dテンプレート合成は**Image Lab**で稼働、Blender/PhotoshopはWorkflow Lab) | **Image Lab** / Workflow Lab | 低〜中(無料体験の画像セットはここで変動費ゼロ成立) |
-| 3 | 生成AIハーネス(舞台だけAI生成、ロゴは決定論的合成) | **Image Lab** | 中 |
-| 4 | ショートビデオ 5〜10秒(Seedance/Veo/Higgsfield等) | **Video Lab** | 高(無料キャンペーンは原価計算前提) |
-| 5 | 30秒プロモビデオ(蓄積素材のテンプレート合成) | **Video Lab** | 最重課金 |
+| レイヤー | 内容 | モード | 担当ラボ | 課金 |
+|---|---|---|---|---|
+| 1 | 静的: 高品質ガイドラインテンプレートへのロゴ配置 | 保証 | 本体プレゼン + Motion Lab | 無料 |
+| 2 | SVG/3Dモーション(アルゴリズムで実行) | 保証 | **Motion Lab** | 無料 |
+| 2.5 | 非生成AIの高品質合成(テンプレート合成は稼働中、Blender/Photoshopは計画) | 保証 | **Workflow Lab** | 無料〜低中(無料体験の画像セットはここで変動費ゼロ成立) |
+| 3〜4 | 生成AIハーネス(画像+ショートビデオ、逸脱スコアボード付き) | 探索 | **Generative Lab** | 中〜重(無料キャンペーンは原価計算前提) |
+| 5+ | 統合(30秒プロモ・CM・バナー・LP) | 統合 | Campaign Lab(将来) | 最重課金 |
 
 ## 現在地と次の一手
 
-- ✅ **Motion Lab**: 全16実験が実装済み(2026-07-12時点)。残タスクは採用判断(星評価・研究ノートの記入)と、採用実験の本体プレゼンへの移植、組み合わせ検証(v2)
-- ✅ **Image Lab**: ディープリサーチ完了 → 開発要件書として確定(正本: [image/README.md](image/README.md))。**Phase 1(2Dテンプレートフォーマット+決定論的合成エンジン+テンプレート3種+原価計測)が稼働中**(2026-07-12)。大原則は「舞台はAIで生成し、ロゴは決定論的に合成する」。次はテンプレート拡充と採用判断、その先に Phase 2(QAゲート+Blenderワーカー)/ Phase 3(Recraft統合)
-- その後: Video Lab(ショートビデオAPI実測=課金設計の数字の根拠づくり)、Workflow Lab(プロツール連携。ヘッドレスBlenderは Image Lab Phase 2 と合流)
+- ✅ **Motion Lab**: 全16実験が実装済み(2026-07-12時点)。残タスクは採用判断(星評価・研究ノート)と、採用実験の本体プレゼンへの移植、組み合わせ検証(v2)
+- ✅ **Workflow Lab**(旧称 Image Lab、2026-07-12改称): 基盤要件書 Phase 1(2Dテンプレートフォーマット+決定論的合成エンジン+テンプレート3種+原価計測)が稼働中。次はテンプレート拡充と採用判断、その先に Phase 2(QAゲート+Blenderワーカー)
+- → **次: Generative Lab の立ち上げ**。探索モード要件書は確定済み(正本: [generative/README.md](generative/README.md))。Phase E1(3エンジン統合+表現テンプレート2系統)から着手する
+- Campaign Lab は着手しない(素材側3ラボの成熟待ち)
 
 ## 研究所一覧
 
-| ラボ | URL | 状態 | テーマ |
-|---|---|---|---|
-| [Motion Lab](motion/README.md) | `/labs/motion` | ✅ 稼働中(16実験) | SVG・CSS・Canvas・Three.js・Lottie によるアルゴリズム表現 |
-| [Image Lab](image/README.md) | `/labs/image` | ✅ 稼働中(Phase 1) | ブランドビジュアル生成パイプライン(テンプレート+決定論的合成、Phase 3で舞台生成AI) |
-| Video Lab | `/labs/video` | 準備中 | ショートビデオAPI比較+30秒プロモの組み立てパイプライン(Remotion等) |
-| Workflow Lab | `/labs/workflow` | 準備中 | Figma・ヘッドレスBlender・Photoshop API連携のモックアップ自動合成 |
-
-準備中ラボの研究対象・調査モジュール(ディープリサーチ計画)は各ページ(`/labs/<slug>`)と [directory.ts](directory.ts) に記載。
+| ラボ | URL | モード | 状態 | テーマ |
+|---|---|---|---|---|
+| [Motion Lab](motion/README.md) | `/labs/motion` | 保証 | ✅ 稼働中(16実験) | SVG・CSS・Canvas・Three.js・Lottie によるアルゴリズム表現 |
+| [Workflow Lab](workflow/README.md) | `/labs/workflow` | 保証 | ✅ 稼働中(Phase 1) | 決定論的合成+プロツール連携(旧称 Image Lab。旧URL `/labs/image` はリダイレクト) |
+| [Generative Lab](generative/README.md) | `/labs/generative` | 探索 | 準備中(要件確定) | 生成AIハーネス: 3エンジン・表現テンプレート・ダイヤル4軸・逸脱スコアボード・ショートビデオ |
+| Campaign Lab | `/labs/campaign` | 統合 | 将来枠 | アセットを組み合わせた最終出力(CM・バナー・LP)。プレースホルダーのみ |
 
 ## ディレクトリ構成
 
 ```
 labs/
-  README.md          # このファイル(研究所群の全体像)
-  directory.ts       # 研究所カタログの正本(名前・状態・研究範囲・調査モジュール)
+  README.md          # このファイル(研究所群の全体像・モード分類の正本)
+  directory.ts       # 研究所カタログの正本(名前・モード・状態・研究範囲)
   motion/            # Motion Lab 本体(core / experiments / components)
-  image/             # Image Lab 本体(core / engine / templates / components)
+  workflow/          # Workflow Lab 本体(core / engine / templates / components)
+  generative/        # Generative Lab(現状は要件書のみ。実装はPhase E1から)
   <slug>/            # 新しいラボはここに独立したディレクトリを作る
-app/labs/page.tsx        # 研究所インデックス
-app/labs/motion/page.tsx # 稼働中ラボの薄いルート(image も同様)
+app/labs/page.tsx        # 研究所インデックス(モード別グルーピング)
+app/labs/motion/page.tsx # 稼働中ラボの薄いルート(workflow も同様)
 app/labs/[slug]/page.tsx # 準備中ラボのプレースホルダーページ
 app/lab/page.tsx         # 旧URL → /labs/motion リダイレクト
-app/api/labs/image/*     # Image Lab の合成API(templates / compose / jobs)
+app/labs/image/page.tsx  # 旧URL → /labs/workflow リダイレクト
+app/api/labs/workflow/*  # Workflow Lab の合成API(templates / compose / jobs)
 ```
 
 ロゴレジストリ(選択ロゴ・アップロード)と研究ノート(星評価)は Motion Lab の `core/logo-store.ts` / `core/notes-store.ts` を全ラボの共有インフラとして使う(選んだロゴがラボ間で引き継がれるのは仕様)。

@@ -1,14 +1,8 @@
-// Thin route wrapper: everything for this lab lives under labs/image/ so the
-// main app’s code, routing and build are untouched. Internal R&D — noindex.
+// Legacy URL: the deterministic-composition lab was renamed from Image Lab
+// to Workflow Lab when the labs were reorganized into assurance/exploration
+// modes ("Image" now belongs to the generative exploration side).
+import { redirect } from "next/navigation";
 
-import type { Metadata } from "next";
-import ImageLabApp from "@/labs/image/components/ImageLabApp";
-
-export const metadata: Metadata = {
-  title: "Image Lab",
-  robots: { index: false, follow: false },
-};
-
-export default function ImageLabPage() {
-  return <ImageLabApp />;
+export default function LegacyImageLabPage() {
+  redirect("/labs/workflow");
 }

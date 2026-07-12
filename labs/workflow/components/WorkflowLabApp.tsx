@@ -1,6 +1,6 @@
 "use client";
 
-// Image Lab — catalog page root.
+// Workflow Lab — catalog page root.
 // Phase 1 of the brand-visual pipeline: pre-built stage templates +
 // deterministic composition. The bar is the same as every lab: does the
 // logo itself look dignified? The logo is never touched by generative AI.
@@ -18,16 +18,16 @@ import LogoRail from "@/labs/motion/components/LogoRail";
 import {
   CATEGORY_LABELS,
   type TemplateCategory,
-} from "@/labs/image/core/template-format";
-import type { CatalogEntryDto } from "@/labs/image/core/pipeline";
-import { fetchCatalog } from "@/labs/image/core/client";
+} from "@/labs/workflow/core/template-format";
+import type { CatalogEntryDto } from "@/labs/workflow/core/pipeline";
+import { fetchCatalog } from "@/labs/workflow/core/client";
 import TemplateCard from "./TemplateCard";
 import ComposeModal from "./ComposeModal";
 import CostPanel from "./CostPanel";
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as TemplateCategory[];
 
-export default function ImageLabApp() {
+export default function WorkflowLabApp() {
   const store = useSyncExternalStore(
     subscribeLogoStore,
     getLogoStoreState,
@@ -75,7 +75,7 @@ export default function ImageLabApp() {
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-6 py-3.5">
           <span className="h-2 w-2 rounded-full bg-accent" />
           <h1 className="font-display text-sm font-semibold tracking-tight">
-            Image Lab
+            Workflow Lab
           </h1>
           <p className="hidden text-[11px] text-ink-muted sm:block">
             — 舞台はテンプレート、ロゴは決定論的に合成。生成AIにロゴは触れさせない
@@ -137,7 +137,7 @@ export default function ImageLabApp() {
               </p>
             ) : catalog.length === 0 ? (
               <p className="py-16 text-center text-sm text-ink-muted">
-                テンプレートがまだない。labs/image/templates/ にディレクトリを追加する
+                テンプレートがまだない。labs/workflow/templates/ にディレクトリを追加する
               </p>
             ) : (
               <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -176,7 +176,7 @@ export default function ImageLabApp() {
 
 // The lab's whole premise ("logo untouched by AI") is easy to state and easy
 // to disbelieve without seeing the pipeline. This panel is the condensed,
-// UI-facing version of the requirement doc (labs/image/README.md) — the
+// UI-facing version of the requirement doc (labs/workflow/README.md) — the
 // 5-layer architecture and where Phase 1 sits in it. Each card's own
 // "技術解説" then drills into the specific numbers for that template.
 function ArchitectureNote() {
@@ -220,7 +220,7 @@ function ArchitectureNote() {
         </div>
         <p className="mt-4 max-w-3xl text-[11px] leading-relaxed text-ink-faint">
           大原則:「舞台はAIで生成し、ロゴは決定論的に合成する」。現行の画像生成・編集モデルは「ロゴをなるべく保つ」ことはできても「絶対に不変」は保証しないため、顧客のロゴを1ピクセルも崩さない価値はレイヤー合成・テンプレート差し替えという決定論的処理でのみ担保する。要件の正本は{" "}
-          <code className="rounded bg-ink/5 px-1 py-0.5 font-mono">labs/image/README.md</code>。
+          <code className="rounded bg-ink/5 px-1 py-0.5 font-mono">labs/workflow/README.md</code>。
         </p>
       </details>
     </div>

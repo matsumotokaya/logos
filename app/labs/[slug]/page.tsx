@@ -1,6 +1,6 @@
-// Placeholder pages for planned labs (/labs/image, /labs/video, /labs/workflow).
-// The active motion lab has its own static route at app/labs/motion/, which
-// takes precedence over this dynamic segment.
+// Placeholder pages for planned labs (/labs/generative, /labs/campaign).
+// Active labs have their own static routes (app/labs/motion/, app/labs/
+// workflow/), which take precedence over this dynamic segment.
 
 import type { Metadata } from "next";
 import Link from "next/link";

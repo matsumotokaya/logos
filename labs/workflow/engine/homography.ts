@@ -2,7 +2,7 @@
 // Pure TypeScript on raw RGBA buffers: no ImageMagick/OpenCV binary to deploy,
 // and every pixel decision stays auditable. ~2M px per render is fine in JS.
 
-import type { Point, SurfaceCorners } from "@/labs/image/core/template-format";
+import type { Point, SurfaceCorners } from "@/labs/workflow/core/template-format";
 
 /** Row-major 3x3 homography matrix. */
 export type Mat3 = [number, number, number, number, number, number, number, number, number];
