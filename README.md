@@ -4,7 +4,24 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 
 サービス名は仮。[lib/config.ts](lib/config.ts) の `SERVICE_NAME` を変更すれば全体に反映される。
 
-事業構想・ビジネスモデルは [PRODUCT.md](PRODUCT.md) を、アカウント・権限・URL設計(Supabase移行方針)は [docs/account-design.md](docs/account-design.md) を、ロゴのデータモデル・CDN URL・サイト構造は [docs/data-model.md](docs/data-model.md) を参照。
+## ドキュメント(正本マップ)
+
+**このREADMEが全ドキュメントの唯一の入り口。** ここ(または、ここからたどれるサブディレクトリのREADME)にリンクされていないドキュメントは存在しないものとして扱う。運用ルール:
+
+1. 新しいドキュメントを作るときは、必ずこの表かサブREADMEにリンクを追加する。リンクを張る場所がない=作らずに既存の正本を更新する
+2. **1テーマ=1正本**。似たテーマの文書を新設せず、既存文書を更新する(スコープは各正本の見出しに従う)
+3. サブディレクトリのREADME(例: [labs/README.md](labs/README.md))は、その配下の入り口を兼ねる
+
+| ドキュメント | 正本として扱う内容 |
+|---|---|
+| [PRODUCT.md](PRODUCT.md) | 事業構想・3層のプロダクト構想・収益モデル・差別化戦略 |
+| [docs/account-design.md](docs/account-design.md) | アカウント・権限・URL体系・RLS方針(Supabase設計) |
+| [docs/data-model.md](docs/data-model.md) | ロゴの正本(canonical record)・3層分離・CDN URL・サイト構造 |
+| [labs/README.md](labs/README.md) | **研究所群の入り口**: 体験レイヤー=課金の階段・4ラボの一覧と現在地・ラボ追加手順 |
+| [labs/motion/README.md](labs/motion/README.md) | Motion Lab: 16実験カタログ・美的原則・使用技術とLottie比較 |
+| [AGENTS.md](AGENTS.md) | AIエージェント向けの開発上の注意(CLAUDE.md はこれを参照するだけ) |
+
+このほか `.claude/skills/` はClaude Code用のツール定義であり、ドキュメントではない。
 
 ## ページ構成
 
