@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1250" viewBox="0 0 2000 1250">
+  <!-- Multiply layer: corner falloff. White = no-op. -->
+  <defs>
+    <radialGradient id="vig" cx="0.5" cy="0.42" r="1.0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.66" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#8f8f93" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+  <rect width="2000" height="1250" fill="url(#vig)"/>
+</svg>

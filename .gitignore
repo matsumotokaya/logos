@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# image lab job log (cost metering, runtime data)
+/var/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

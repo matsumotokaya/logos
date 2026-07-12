@@ -1,0 +1,33 @@
+{
+  "format": "logos-2d-template@1",
+  "id": "signage-wall",
+  "name": "Wall Signage",
+  "nameJa": "壁面サイン(ダーク)",
+  "category": "signage",
+  "canvas": { "width": 2000, "height": 1250 },
+  "stage": { "src": "stage.svg" },
+  "surface": {
+    "corners": {
+      "tl": [620, 350],
+      "tr": [1430, 390],
+      "br": [1430, 860],
+      "bl": [620, 900]
+    },
+    "logo": {
+      "blend": "over",
+      "opacity": 0.96,
+      "colorMode": "mono-light",
+      "placement": { "cx": 0.5, "cy": 0.5, "width": 0.55 },
+      "clearSpace": 0.3,
+      "minWidth": 0.3,
+      "maxWidth": 0.75,
+      "shadow": { "blur": 22, "opacity": 0.5, "dx": 8, "dy": 14 }
+    }
+  },
+  "lighting": [
+    { "src": "spotlight.svg", "blend": "screen", "opacity": 0.85 },
+    { "src": "vignette.svg", "blend": "multiply" }
+  ],
+  "impressions": ["堂々", "建築"],
+  "notesJa": "コンクリート壁への切り文字サイン想定。ロゴは白単色化(mono-light)+コンタクトシャドウで浮き上がり、スポットライトはscreen、周辺減光はmultiplyのライトレイヤー2枚で構成。"
+}

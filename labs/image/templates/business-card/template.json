@@ -1,0 +1,27 @@
+{
+  "format": "logos-2d-template@1",
+  "id": "business-card",
+  "name": "Business Card",
+  "nameJa": "名刺(デスク平置き)",
+  "category": "print",
+  "canvas": { "width": 2000, "height": 1500 },
+  "stage": { "src": "stage.svg" },
+  "surface": {
+    "corners": {
+      "tl": [580, 480],
+      "tr": [1450, 455],
+      "br": [1470, 995],
+      "bl": [610, 1030]
+    },
+    "logo": {
+      "blend": "multiply",
+      "placement": { "cx": 0.5, "cy": 0.47, "width": 0.5 },
+      "clearSpace": 0.25,
+      "minWidth": 0.28,
+      "maxWidth": 0.7
+    }
+  },
+  "lighting": [{ "src": "light.svg", "blend": "multiply" }],
+  "impressions": ["上質", "ミニマル"],
+  "notesJa": "紙への印刷を想定した乗算合成。窓光の斜めグラデーションと周辺減光をライトレイヤーで焼き込み。"
+}

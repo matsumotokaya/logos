@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1500" viewBox="0 0 2000 1500">
+  <!-- Multiply layer: diagonal window light + gentle vignette. White = no-op. -->
+  <defs>
+    <linearGradient id="sun" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#faf9f7"/>
+      <stop offset="1" stop-color="#e1ded8"/>
+    </linearGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.44" r="0.95">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.72" stop-color="#f2f0ec" stop-opacity="0"/>
+      <stop offset="1" stop-color="#d9d5cf" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+  <rect width="2000" height="1500" fill="url(#sun)"/>
+  <rect width="2000" height="1500" fill="url(#vig)"/>
+</svg>

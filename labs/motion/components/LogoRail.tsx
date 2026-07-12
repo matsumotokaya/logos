@@ -12,9 +12,12 @@ import LogoThumb from "./LogoThumb";
 export default function LogoRail({
   logos,
   selectedId,
+  note = "SVG推奨(PNGは対応実験のみ)。ロゴはこの端末の外に送信されない。",
 }: {
   logos: LabLogo[];
   selectedId: string;
+  /** Privacy/usage note on the right (labs sharing this rail differ here). */
+  note?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,9 +83,7 @@ export default function LogoRail({
           }}
         />
         {error && <p className="text-xs text-red-600">{error}</p>}
-        <p className="ml-auto hidden text-[11px] text-ink-faint md:block">
-          SVG推奨(PNGは対応実験のみ)。ロゴはこの端末の外に送信されない。
-        </p>
+        <p className="ml-auto hidden text-[11px] text-ink-faint md:block">{note}</p>
       </div>
     </section>
   );

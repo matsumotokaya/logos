@@ -1,0 +1,29 @@
+{
+  "format": "logos-2d-template@1",
+  "id": "tote-bag",
+  "name": "Canvas Tote",
+  "nameJa": "キャンバストート",
+  "category": "fabric",
+  "canvas": { "width": 1600, "height": 2000 },
+  "stage": { "src": "stage.svg" },
+  "surface": {
+    "corners": {
+      "tl": [560, 1010],
+      "tr": [1050, 1010],
+      "br": [1062, 1560],
+      "bl": [548, 1560]
+    },
+    "displacement": { "src": "displace.png", "strength": 4 },
+    "logo": {
+      "blend": "multiply",
+      "opacity": 0.92,
+      "placement": { "cx": 0.5, "cy": 0.46, "width": 0.62 },
+      "clearSpace": 0.18,
+      "minWidth": 0.3,
+      "maxWidth": 0.8
+    }
+  },
+  "lighting": [{ "src": "light.svg", "blend": "multiply" }],
+  "impressions": ["クラフト", "日常"],
+  "notesJa": "布プリント想定の乗算+わずかな透け(opacity 0.92)。シワはディスプレイスメントマップで物理的に曲げ、陰影はライトレイヤーで焼き込み。"
+}

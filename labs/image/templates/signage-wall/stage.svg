@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1250" viewBox="0 0 2000 1250">
+  <!-- Stage: dark architectural concrete wall, entrance-lobby mood.
+       Sign surface: tl(620,350) tr(1430,390) br(1430,860) bl(620,900). -->
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="0.14">
+      <stop offset="0" stop-color="#3b3e46"/>
+      <stop offset="0.55" stop-color="#2d3037"/>
+      <stop offset="1" stop-color="#22242a"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#191b1f"/>
+      <stop offset="1" stop-color="#131418"/>
+    </linearGradient>
+    <linearGradient id="floorSheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a4e58" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#4a4e58" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="2000" height="1250" fill="url(#wall)"/>
+
+  <!-- concrete formwork seams + tie holes -->
+  <line x1="470" y1="0" x2="470" y2="1080" stroke="#25272d" stroke-width="4" opacity="0.8"/>
+  <line x1="1560" y1="0" x2="1560" y2="1080" stroke="#1f2126" stroke-width="4" opacity="0.8"/>
+  <line x1="0" y1="212" x2="2000" y2="238" stroke="#26282e" stroke-width="3" opacity="0.6"/>
+  <circle cx="520" cy="280" r="9" fill="#26282e"/>
+  <circle cx="1512" cy="300" r="9" fill="#212329"/>
+  <circle cx="520" cy="960" r="9" fill="#222429"/>
+  <circle cx="1512" cy="972" r="9" fill="#1e2025"/>
+
+  <!-- floor -->
+  <rect y="1080" width="2000" height="170" fill="url(#floor)"/>
+  <rect y="1080" width="2000" height="60" fill="url(#floorSheen)"/>
+  <line x1="0" y1="1080" x2="2000" y2="1080" stroke="#0e0f12" stroke-width="4"/>
+</svg>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1250" viewBox="0 0 2000 1250">
+  <!-- Screen layer: downlight pool centered above the sign. Black = no-op.
+       The ellipse extends past the frame so its rim never shows. -->
+  <defs>
+    <radialGradient id="pool" cx="0.5" cy="0.36" r="0.62">
+      <stop offset="0" stop-color="#7b7d85"/>
+      <stop offset="0.4" stop-color="#43454c"/>
+      <stop offset="0.75" stop-color="#17181b"/>
+      <stop offset="1" stop-color="#000000"/>
+    </radialGradient>
+  </defs>
+  <rect width="2000" height="1250" fill="#000000"/>
+  <ellipse cx="1025" cy="420" rx="1450" ry="1120" fill="url(#pool)"/>
+</svg>

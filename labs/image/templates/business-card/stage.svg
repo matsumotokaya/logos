@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1500" viewBox="0 0 2000 1500">
+  <!-- Stage: two business cards on a warm desk, shot slightly from above.
+       The logo surface is the main card: tl(580,480) tr(1450,455) br(1470,995) bl(610,1030). -->
+  <defs>
+    <radialGradient id="desk" cx="0.42" cy="0.36" r="1.1">
+      <stop offset="0" stop-color="#f0ede8"/>
+      <stop offset="0.6" stop-color="#e4e0d9"/>
+      <stop offset="1" stop-color="#d2cec5"/>
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0.25" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f4f2ee"/>
+    </linearGradient>
+    <linearGradient id="cardBack" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbfaf7"/>
+      <stop offset="1" stop-color="#ebe8e2"/>
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+
+  <rect width="2000" height="1500" fill="url(#desk)"/>
+
+  <!-- second card peeking out top-right, blank -->
+  <g>
+    <polygon points="1000,300 1760,368 1738,720 980,650" fill="#000000" opacity="0.10" filter="url(#soft)" transform="translate(10,26)"/>
+    <polygon points="1000,300 1760,368 1738,720 980,650" fill="url(#cardBack)"/>
+  </g>
+
+  <!-- main card -->
+  <polygon points="580,480 1450,455 1470,995 610,1030" fill="#000000" opacity="0.22" filter="url(#soft)" transform="translate(14,36)"/>
+  <polygon points="580,480 1450,455 1470,995 610,1030" fill="url(#card)"/>
+  <polygon points="580,480 1450,455 1451,464 581,490" fill="#ffffff" opacity="0.9"/>
+</svg>
