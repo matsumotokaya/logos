@@ -1,14 +1,6 @@
-// Thin route wrapper: everything for the lab lives under lab/ so the main
-// app's code, routing and build are untouched. Internal R&D — noindex.
+// Legacy URL: the motion lab moved when the lab constellation was created.
+import { redirect } from "next/navigation";
 
-import type { Metadata } from "next";
-import LabApp from "@/lab/components/LabApp";
-
-export const metadata: Metadata = {
-  title: "Logo Motion Lab",
-  robots: { index: false, follow: false },
-};
-
-export default function LabPage() {
-  return <LabApp />;
+export default function LegacyLabPage() {
+  redirect("/labs/motion");
 }
