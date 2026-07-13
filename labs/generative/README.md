@@ -177,7 +177,12 @@ RECRAFT_API_KEY=(recraft.ai → プロフィール → API)
    - モデルslug `recraftv4_1` は**有効**。ただし **V4.1はイラスト系style(digital_illustration等)を400で拒否** → イラスト系styleは `recraftv3` を自動選択(`engineParams.model` で明示上書き可)
    - `response_format: b64_json` 対応(即時回収OK)・`negative_prompt` 対応。8.2s/$0.035
    - 将来フック: `controls.colors`(パレット条件付け=色保持ダイヤルの強化候補)、`controls.no_text`(E-5の文字抑制候補)
-3. **未解決事項1(ダイヤル実効性)**: weathered-alpine-signage×プリセット3段の実生成比較で**知覚可能な差を確認**(一次クリア)。検証シート(Artifact)を事業側レビュー用に作成済み。生成文字の綴りゆれを2/2件観測("MOUNNTAIN"/"Bueprint")= E-5の優先度を裏付ける実データ。定量化はPhase E2のスコアボードで
+3. **未解決事項1(ダイヤル実効性)**: weathered-alpine-signage×プリセット3段の実生成比較で**知覚可能な差を確認**(一次クリア)。実ロゴ(XTRUSTワードマーク)での再検証も完了し、検証シート(Artifactと `var/generative-lab/dial-verification-sheet-01.html`)を事業側レビュー用に作成済み。定量化はPhase E2のスコアボードで
+4. **ワードマークでの追加確認(2026-07-14)**:
+   - **参照画像の最小サイズ**: Together=高さ256px以上 / Recraft=最小辺256px以上。横長ワードマークが弾かれたため、ラスタライザが短辺256未満を白パディングで補正済み([engine/logo-raster.ts](engine/logo-raster.ts))
+   - **Togetherの連続呼び出しは429**(動的レート制限)。バッチ検証は25秒間隔で回避。UIは手動操作なので当面実害なし
+   - **Recraftのimage_to_image出力は参照画像のアスペクト比に従う**(テンプレートのoutput指定は無効)。ワードマークはバナー状出力になる
+   - **E-5の焦点が明確化**: ロゴ本体の短いワードマーク(6文字)は3プリセット全てで正しく綴られた。脱字するのは**モデルが勝手に発明する周辺文字**(2/2件: "MOUNNTAIN"/"TRST")→ 対策の第一候補は Recraft `controls.no_text` と、FLUX系プロンプトでの周辺文字禁止指示
 
 ### テンプレートの追加手順(コード変更不要)
 

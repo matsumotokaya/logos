@@ -1,0 +1,74 @@
+{
+ "weathered-strict": {
+  "jobId": "job-mrjdlqin-xl18o9",
+  "url": "/api/labs/generative/outputs/gen-mrjdm6ax-fb428021.png",
+  "genMs": 20462,
+  "costUsd": 0.03,
+  "dials": {
+   "shape": 0.9,
+   "color": 0.9,
+   "text": 0.9,
+   "world": 0.25
+  },
+  "params": {
+   "steps": 32,
+   "guidanceScale": 4.3
+  },
+  "w": 1920,
+  "h": 1920
+ },
+ "weathered-balanced": {
+  "jobId": "job-mrjdmpmb-tqtm5a",
+  "url": "/api/labs/generative/outputs/gen-mrjdnl6j-05053507.png",
+  "genMs": 40908,
+  "costUsd": 0.03,
+  "dials": {
+   "shape": 0.75,
+   "color": 0.5,
+   "text": 0.65,
+   "world": 0.65
+  },
+  "params": {
+   "steps": 32,
+   "guidanceScale": 4
+  },
+  "w": 1920,
+  "h": 1920
+ },
+ "weathered-free": {
+  "jobId": "job-mrjdo4im-c76uv0",
+  "url": "/api/labs/generative/outputs/gen-mrjdoop6-ff032e6f.png",
+  "genMs": 26162,
+  "costUsd": 0.03,
+  "dials": {
+   "shape": 0.3,
+   "color": 0.35,
+   "text": 0.4,
+   "world": 0.85
+  },
+  "params": {
+   "steps": 32,
+   "guidanceScale": 3.1
+  },
+  "w": 1920,
+  "h": 1920
+ },
+ "blueprint-balanced": {
+  "jobId": "job-mrjdp80u-ce98og",
+  "url": "/api/labs/generative/outputs/gen-mrjdpet8-1a80d986.png",
+  "genMs": 8800,
+  "costUsd": 0.035,
+  "dials": {
+   "shape": 0.8,
+   "color": 0.1,
+   "text": 0.6,
+   "world": 0.5
+  },
+  "params": {
+   "style": "digital_illustration",
+   "strength": 0.28
+  },
+  "w": 1024,
+  "h": 257
+ }
+}
