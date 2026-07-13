@@ -59,8 +59,9 @@
 
 ```
 labs/
-  README.md          # このファイル(研究所群の全体像・モード分類の正本)
+  README.md          # このファイル(研究所群の全体像・モード分類・共有レイアウトの正本)
   directory.ts       # 研究所カタログの正本(名前・モード・状態・研究範囲)
+  shared/            # 全ラボ共通のページ骨格(LabShell / LabExplainer / FilterChips)
   motion/            # Motion Lab 本体(core / experiments / components)
   workflow/          # Workflow Lab 本体(core / engine / templates / components)
   generative/        # Generative Lab 本体(core / engine / templates / components)
@@ -74,9 +75,21 @@ app/api/labs/workflow/*   # Workflow Lab の合成API(templates / compose / jobs
 app/api/labs/generative/* # Generative Lab の生成API(templates / generate / jobs / outputs)
 ```
 
-ロゴレジストリ(選択ロゴ・アップロード)と研究ノート(星評価)は Motion Lab の `core/logo-store.ts` / `core/notes-store.ts` を全ラボの共有インフラとして使う(選んだロゴがラボ間で引き継がれるのは仕様)。
+## 共有レイアウト構造(全ラボ共通・2026-07-14正本化)
 
-新しいラボを稼働させる手順: `labs/<slug>/` にコードを置き、`app/labs/<slug>/page.tsx` の薄いルートを追加(静的ルートがプレースホルダーより優先される)、[directory.ts](directory.ts) の `status` を `"active"` に変える。
+**全ラボのページは同じ読み方をする: 「上でロゴを選ぶと、下はそのロゴの成果物になる」**。この骨格はラボごとに作らず、`labs/shared/` の共有部品に載せる:
+
+| 部品 | 役割 |
+|---|---|
+| [shared/components/LabShell.tsx](shared/components/LabShell.tsx) | ページ骨格の正本: ヘッダー(名前+スタンス+戻り導線)→ 解説枠 → ロゴレール → `children(logo)`。**ラボ本体は選択ロゴを引数に受け取る関数として実装する** |
+| [shared/components/LabExplainer.tsx](shared/components/LabExplainer.tsx) | 折りたたみ「仕組みを見る」枠+稼働中/未着手バッジ付きモジュールカード(要件書のUI向け要約) |
+| [shared/components/FilterChips.tsx](shared/components/FilterChips.tsx) | カタログ絞り込みのチップ行(すべて+選択肢) |
+
+ロゴレジストリ(選択ロゴ・アップロード)と研究ノート(星評価)は Motion Lab の `core/logo-store.ts` / `core/notes-store.ts` を全ラボの共有インフラとして使う(選んだロゴがラボ間で引き継がれるのは仕様。ストアの置き場は歴史的にmotion配下だが、消費はLabShell経由に統一)。
+
+「そのロゴの成果物」の意味はモードで異なる: 保証モード(Motion/Workflow)は決定論でコストゼロなので**選択ロゴで即時再レンダリング**、探索モード(Generative)は実費が伴うので**そのロゴの生成レコード(レポート)を表示**し、新規生成は明示操作のみ。
+
+新しいラボを稼働させる手順: `labs/<slug>/` にコードを置き(ページはLabShellに載せる)、`app/labs/<slug>/page.tsx` の薄いルートを追加(静的ルートがプレースホルダーより優先される)、[directory.ts](directory.ts) の `status` を `"active"` に変える。
 
 ## 導線
 
