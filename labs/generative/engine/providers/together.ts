@@ -15,10 +15,27 @@ const ENDPOINT = "https://api.together.xyz/v1/images/generations";
 const MODEL = "black-forest-labs/FLUX.2-pro";
 const COST_PER_IMAGE_USD = 0.03;
 
+// 実機確認(2026-07-13): FLUX.2 [pro] は総ピクセル数がこの範囲外だと 400。
+// テンプレートの要求サイズをアスペクト比を保ったままこの範囲に収める。
+const MIN_PIXELS = 3_686_400;
+const MAX_PIXELS = 10_404_496;
+
+function fitToPixelRange(w: number, h: number): { width: number; height: number } {
+  const px = w * h;
+  const scale =
+    px < MIN_PIXELS ? Math.sqrt(MIN_PIXELS / px)
+    : px > MAX_PIXELS ? Math.sqrt(MAX_PIXELS / px)
+    : 1;
+  // Round UP to a multiple of 16 so the min bound survives the rounding.
+  const r16 = (v: number) => Math.ceil((v * scale) / 16) * 16;
+  return { width: r16(w), height: r16(h) };
+}
+
 async function generate(input: ProviderInput): Promise<ProviderOutput> {
   const key = process.env.TOGETHER_API_KEY;
   if (!key) throw new Error("TOGETHER_API_KEY が未設定");
 
+  const size = fitToPixelRange(input.width, input.height);
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: {
@@ -28,11 +45,12 @@ async function generate(input: ProviderInput): Promise<ProviderOutput> {
     body: JSON.stringify({
       model: input.params.customModelId ?? MODEL,
       prompt: input.prompt,
-      ...(input.negativePrompt ? { negative_prompt: input.negativePrompt } : {}),
-      width: input.width,
-      height: input.height,
-      steps: input.params.steps,
-      guidance_scale: input.params.guidanceScale,
+      width: size.width,
+      height: size.height,
+      // 実機確認(2026-07-13): FLUX.2 [pro] は guidance_scale / negative_prompt
+      // を 400 で拒否する(パラメータ非公開のマネージド設定。steps も同系統)。
+      // 形状保持ダイヤルの数値側とネガティブ指定はプロンプト文(core/prompt.ts)
+      // が担い、数値パラメータが必要になったら FLUX.2 [flex] を検討する。
       n: 1,
       reference_images: [
         `data:image/png;base64,${input.logoPng.toString("base64")}`,

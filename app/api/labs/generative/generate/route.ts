@@ -7,6 +7,7 @@
 // metadata only; the image is served from /outputs/<name>.
 
 import { performance } from "node:perf_hooks";
+import sharp from "sharp";
 import { loadExpressionTemplate } from "@/labs/generative/engine/registry";
 import { pickProvider } from "@/labs/generative/engine/providers";
 import { rasterizeReferenceLogo } from "@/labs/generative/engine/logo-raster";
@@ -97,6 +98,11 @@ export async function POST(req: Request) {
     // 即時回収: persist before responding; no external URL survives this call.
     const output = await saveOutput(png);
     const genMs = Math.round(performance.now() - t0);
+    // Providers may adjust the size to model constraints (e.g. FLUX.2's
+    // pixel-count range) — meter what actually came back, not the request.
+    const outMeta = await sharp(png).metadata();
+    const outWidth = outMeta.width ?? width;
+    const outHeight = outMeta.height ?? height;
 
     await appendGenJob({
       ts: new Date().toISOString(),
@@ -112,8 +118,8 @@ export async function POST(req: Request) {
       logoHash,
       logoSentTo: mock ? null : provider.id,
       prompt,
-      outWidth: width,
-      outHeight: height,
+      outWidth,
+      outHeight,
       genMs,
       costUsd,
       retries: 0,
@@ -133,7 +139,7 @@ export async function POST(req: Request) {
       prompt,
       costUsd,
       genMs,
-      output: { url: output.url, width, height },
+      output: { url: output.url, width: outWidth, height: outHeight },
     };
     return Response.json(meta, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {

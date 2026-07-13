@@ -2,10 +2,14 @@
 // 造形展開。image_to_image の strength がダイヤル(形状保持⇄世界観)の実体。
 // API terms: no training on API I/O (契約許可リスト入りの根拠)。
 //
-// Base URL verified 2026-07: https://external.api.recraft.ai/v1 (Bearer).
-// NOTE(実機確認): モデルslugは "recraftv4_1" を第一候補とする(V4.1系がAPI
-// 提供中であることは確認済み。slug表記が違う場合は最初の実呼び出しで
-// /doc/#/ のSwaggerに合わせて修正。フォールバックは "recraftv3")。
+// 実機確認済み(2026-07-13、OpenAPI spec /doc/spec/api.yaml で照合):
+// - モデルslug "recraftv4_1" は有効。ただし V4.1 は写実系のみで、
+//   digital_illustration 等のイラスト系styleは 400("doesn't support style")
+//   → イラスト系styleは recraftv3 に自動フォールバックする(下のマップ)。
+//   テンプレートは engineParams.model で明示上書きも可能。
+// - response_format: b64_json 対応(即時回収に使用)。negative_prompt 対応。
+// - 将来メモ: controls.colors(パレット条件付け)と controls.no_text が
+//   存在する — 色保持ダイヤルとE-5(文字抑制)の実装フックに使える。
 // Recraftの生成URLは約24時間公開で残るため、レスポンス受領後ただちに
 // バイト列へ回収し、以後外部URLは参照しない(基盤要件書の必須要件)。
 
@@ -13,8 +17,18 @@ import type { Provider, ProviderInput, ProviderOutput } from "./types";
 import { expectOk } from "./types";
 
 const ENDPOINT = "https://external.api.recraft.ai/v1/images/imageToImage";
-const MODEL = "recraftv4_1";
+const MODEL_REALISTIC = "recraftv4_1";
+const MODEL_ILLUSTRATION = "recraftv3";
+const ILLUSTRATION_STYLES = new Set([
+  "digital_illustration",
+  "vector_illustration",
+  "icon",
+]);
 const COST_PER_IMAGE_USD = 0.035;
+
+function defaultModelFor(style: string): string {
+  return ILLUSTRATION_STYLES.has(style) ? MODEL_ILLUSTRATION : MODEL_REALISTIC;
+}
 
 async function generate(input: ProviderInput): Promise<ProviderOutput> {
   const key = process.env.RECRAFT_API_KEY;
@@ -26,10 +40,15 @@ async function generate(input: ProviderInput): Promise<ProviderOutput> {
     new Blob([new Uint8Array(input.logoPng)], { type: "image/png" }),
     "logo.png",
   );
+  const style = input.params.style ?? "realistic_image";
   form.set("prompt", input.prompt);
+  if (input.negativePrompt) form.set("negative_prompt", input.negativePrompt);
   form.set("strength", String(input.params.strength ?? 0.5));
-  form.set("style", input.params.style ?? "realistic_image");
-  form.set("model", input.params.customModelId ?? MODEL);
+  form.set("style", style);
+  form.set(
+    "model",
+    input.params.customModelId ?? input.params.model ?? defaultModelFor(style),
+  );
   form.set("n", "1");
   form.set("response_format", "b64_json");
 

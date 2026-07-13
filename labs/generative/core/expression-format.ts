@@ -95,6 +95,11 @@ export type EngineParams = {
   /** recraft: base style id, e.g. "realistic_image" / "digital_illustration". */
   style?: string;
   /**
+   * recraft: model slug override. Default is style-aware (V4.1 for realistic,
+   * V3 for illustration styles — V4.1 rejects them, verified 2026-07-13).
+   */
+  model?: string;
+  /**
    * Future brand-trained models (LoRA / custom): accepted through the whole
    * stack but unused in Phase E1 — the interface requirement from the
    * "ブランド固有学習" section. Do not implement behavior for it yet.
@@ -210,6 +215,7 @@ export function validateExpressionTemplate(
       if (p.strength !== undefined && !num01(p.strength))
         errors.push("engineParams.strength: 0〜1 の数値");
       optStr(p.style, "engineParams.style", errors);
+      optStr(p.model, "engineParams.model", errors);
       optStr(p.customModelId, "engineParams.customModelId", errors);
     }
   }

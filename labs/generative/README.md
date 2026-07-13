@@ -123,7 +123,7 @@ QAゲート層を拡張し、探索モードでは**判定結果をユーザー�
 
 | Phase | 内容 | 状態 |
 |---|---|---|
-| **E1** | 3エンジン統合(抽象化レイヤー拡張)+表現テンプレートのデータ構造+マテリアル変換・様式化の2系統で各3〜5テンプレート。ダイヤルはプリセット3段のみ | ✅ 実装済み(この実験場。Gemini対話層のみE3送り、実APIキーでの実機検証が残タスク) |
+| **E1** | 3エンジン統合(抽象化レイヤー拡張)+表現テンプレートのデータ構造+マテリアル変換・様式化の2系統で各3〜5テンプレート。ダイヤルはプリセット3段のみ | ✅ 実装済み+実機検証済み(2026-07-13、両エンジン成功。Gemini対話層のみE3送り) |
 | **E2** | 逸脱スコアボード(4段スコア+分解表示)+ロゴ領域検出 | 未着手 |
 | **E3** | ダイヤル4軸の詳細UI+ワードマーク対策UX+マルチターンセッション | 未着手 |
 | **E4** | 環境統合・シネマティック系統の追加+ベンチマーク運用の自動化 | 未着手 |
@@ -164,11 +164,20 @@ RECRAFT_API_KEY=(recraft.ai → プロフィール → API)
 
 キー未設定のエンジンは**モックプロバイダ**(サーバー内で決定論的に合成、透かし入り、コスト$0、ロゴはサーバー外に出ない)が代替し、UI・ジョブログの両方で `mock` と明示される。キーを設定すると再起動不要で実エンジンに切り替わる(可用性はリクエスト毎に判定)。
 
-### 実機検証の残項目(キー設定後に最初に確認)
+### 実機検証の結果(2026-07-13 実施・完了)
 
-1. **Together**: `reference_images` に data URI を渡している(ドキュメント上は「画像URLの配列」)。実呼び出しで弾かれる場合は一時URL化が必要 → [engine/providers/together.ts](engine/providers/together.ts)
-2. **Recraft**: モデルslug `recraftv4_1` は要確認(V4.1系のAPI提供は確認済み、表記が違えば Swagger `/doc/#/` に合わせて修正。フォールバックは `recraftv3`)→ [engine/providers/recraft.ts](engine/providers/recraft.ts)
-3. **未解決事項1(ダイヤル4軸の実効性)**: 代表テンプレート(weathered-alpine-signage を想定)でプリセット3段の実生成を並べた検証シートを作り、事業側とレビュー
+両エンジンとも実キーでの生成に成功。判明した仕様(詳細コメントは各プロバイダ実装内):
+
+1. **Together / FLUX.2 [pro]**([engine/providers/together.ts](engine/providers/together.ts)):
+   - `reference_images` の **data URI は受理される**(一時URL化は不要)
+   - `guidance_scale` / `negative_prompt` / `steps` は **400で拒否**(proはマネージド設定)。数値制御が要るなら [flex] を検討。ダイヤルの数値側はプロンプト指示文で機能する(下記シートで確認)
+   - 総ピクセル **3.69MP〜10.4MP 必須**(1024²不可)→ プロバイダがアスペクト比を保って自動スケール
+   - 正常時 26〜49s/$0.03。一時的な5分超のキュー詰まりを1回観測(Node fetchの300s上限で失敗、コスト0で記録済み)
+2. **Recraft**([engine/providers/recraft.ts](engine/providers/recraft.ts)):
+   - モデルslug `recraftv4_1` は**有効**。ただし **V4.1はイラスト系style(digital_illustration等)を400で拒否** → イラスト系styleは `recraftv3` を自動選択(`engineParams.model` で明示上書き可)
+   - `response_format: b64_json` 対応(即時回収OK)・`negative_prompt` 対応。8.2s/$0.035
+   - 将来フック: `controls.colors`(パレット条件付け=色保持ダイヤルの強化候補)、`controls.no_text`(E-5の文字抑制候補)
+3. **未解決事項1(ダイヤル実効性)**: weathered-alpine-signage×プリセット3段の実生成比較で**知覚可能な差を確認**(一次クリア)。検証シート(Artifact)を事業側レビュー用に作成済み。生成文字の綴りゆれを2/2件観測("MOUNNTAIN"/"Bueprint")= E-5の優先度を裏付ける実データ。定量化はPhase E2のスコアボードで
 
 ### テンプレートの追加手順(コード変更不要)
 
