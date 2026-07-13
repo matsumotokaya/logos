@@ -82,7 +82,7 @@ export default function ExpressionCard({
               className="h-full w-full object-cover"
             />
             <span className="absolute right-2 bottom-2 rounded-full bg-ink/60 px-2 py-0.5 text-[10px] text-white">
-              {latest.mock ? "モック" : latest.engineUsed} / 直近の生成
+              {latest.mock ? "モック" : latest.engineUsed} / このロゴの直近生成
             </span>
           </>
         ) : (
@@ -91,7 +91,7 @@ export default function ExpressionCard({
               “{template.prompt.existence}”
             </p>
             <span className="rounded-full border border-hairline px-2.5 py-0.5 text-[10px] text-ink-faint">
-              まだ生成なし — 開いて実行
+              このロゴではまだ生成なし — 開いて実行
             </span>
           </div>
         )}

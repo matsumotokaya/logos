@@ -7,6 +7,7 @@ import type {
   GenerateRequest,
   GenerativeLogo,
   GenJobsSummary,
+  LogoRunsResponse,
 } from "./api-types";
 import type { PresetId } from "./dials";
 
@@ -28,6 +29,33 @@ export async function fetchGenJobsSummary(): Promise<GenJobsSummary> {
   const res = await fetch("/api/labs/generative/jobs");
   if (!res.ok) throw new Error(`集計取得に失敗 (${res.status})`);
   return (await res.json()) as GenJobsSummary;
+}
+
+/**
+ * Same identity as the server's job log: SHA-256 of the exact payload source
+ * (SVG text or PNG data URI), first 16 hex chars. Lets the browser ask
+ * "this logo's runs" without re-uploading the artwork.
+ */
+export async function computeLogoHash(logo: LabLogo): Promise<string | null> {
+  const payload = generativeLogoPayload(logo);
+  if (!payload) return null;
+  const source = payload.kind === "svg" ? payload.svg : payload.dataUri;
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(source),
+  );
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 16);
+}
+
+export async function fetchLogoRuns(logo: LabLogo): Promise<LogoRunsResponse | null> {
+  const hash = await computeLogoHash(logo);
+  if (!hash) return null;
+  const res = await fetch(`/api/labs/generative/jobs?logo=${hash}`);
+  if (!res.ok) throw new Error(`生成レコード取得に失敗 (${res.status})`);
+  return (await res.json()) as LogoRunsResponse;
 }
 
 export async function generate(

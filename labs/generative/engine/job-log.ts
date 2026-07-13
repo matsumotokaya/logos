@@ -17,6 +17,8 @@ import type {
   GenEngineAggregate,
   GenJobsSummary,
   GenTemplateAggregate,
+  LogoRun,
+  LogoRunsResponse,
   RecentGenJob,
 } from "@/labs/generative/core/api-types";
 import { outputUrl } from "./storage";
@@ -67,6 +69,49 @@ export async function appendGenJob(record: GenJobRecord): Promise<void> {
   } catch {
     // Metering must never break generation; dev fs hiccups are acceptable.
   }
+}
+
+/**
+ * All successful runs for one logo, newest first — the data behind the
+ * logo-report view (the page's core: select a logo, see ITS record).
+ */
+export async function listRunsForLogo(logoHash: string): Promise<LogoRunsResponse> {
+  let lines: string[];
+  try {
+    lines = (await readFile(LOG_FILE, "utf8")).split("\n").filter(Boolean);
+  } catch {
+    return { logoHash, runs: [], totalCostUsd: 0 };
+  }
+
+  const runs: LogoRun[] = [];
+  let totalCostUsd = 0;
+  for (const line of lines) {
+    let rec: GenJobRecord;
+    try {
+      rec = JSON.parse(line) as GenJobRecord;
+    } catch {
+      continue;
+    }
+    if (rec.logoHash !== logoHash) continue;
+    totalCostUsd += rec.costUsd;
+    if (!rec.ok || !rec.outputFile) continue;
+    runs.push({
+      jobId: rec.jobId,
+      ts: rec.ts,
+      templateId: rec.templateId,
+      engineUsed: rec.engineUsed,
+      mock: rec.mock,
+      preset: rec.preset,
+      costUsd: rec.costUsd,
+      outputUrl: outputUrl(rec.outputFile),
+      dials: rec.dials,
+      genMs: rec.genMs,
+      outWidth: rec.outWidth,
+      outHeight: rec.outHeight,
+    });
+  }
+  runs.reverse();
+  return { logoHash, runs, totalCostUsd };
 }
 
 export async function summarizeGenJobs(): Promise<GenJobsSummary> {

@@ -147,13 +147,24 @@ labs/generative/
     storage.ts           # 生成物の即時回収先(var/generative-lab/outputs/)
     job-log.ts           # 原価計測+監査ログ(var/generative-lab/jobs.jsonl)
   templates/<id>/        # 表現テンプレート = template.json のみ(アセット不要)
-  components/            # カタログUI(Workflow Lab 同型+ハーネス可視化)
+  components/            # UI(下記「画面構造」参照)
 app/labs/generative/page.tsx     # 薄いルート(noindex)
 app/api/labs/generative/templates # GET: カタログ+エンジン可用性
 app/api/labs/generative/generate  # POST: 生成(メタJSONを返し、画像は自前ストレージ経由)
-app/api/labs/generative/jobs      # GET: 原価・成功率集計(テンプレート別/エンジン別)
+app/api/labs/generative/jobs      # GET: 原価・成功率集計。?logo=<hash16> でそのロゴの全生成レコード
 app/api/labs/generative/outputs/[name] # GET: 生成物の配信(外部URLは一切参照しない)
 ```
+
+### 画面構造(2026-07-14 再設計: ロゴが主語)
+
+ページの主語は**選択中のロゴ**。ロゴを切り替えると、その下の全てが連動する:
+
+1. **LogoRail** — ロゴ選択(全ラボ共有レジストリ)
+2. **LogoReport**([components/LogoReport.tsx](components/LogoReport.tsx)) — **そのロゴの生成レポート**。ダイヤル検証シートと同型: 生成済みテンプレートごとにプリセット3列(厳密/バランス/自由)を並べ、各結果に計器盤(4軸ダイヤルバー+エンジン/実費/秒数/実寸)を付す。未生成プリセットはプレースホルダから直接生成に誘導。同プリセットの過去生成は履歴行へ
+3. **表現テンプレート** — このロゴで次に試すアートディレクション。カードのプレビューは**このロゴの最新生成のみ**(他のロゴの生成物は絶対に混ぜない)
+4. **原価計測パネル** — ラボ全体の集計
+
+ロゴとレコードの紐付けは `logoHash`(送信ペイロードのSHA-256先頭16桁)。ブラウザ側も同一アルゴリズムでハッシュを計算し(`core/client.ts` の `computeLogoHash`)、`jobs?logo=` でそのロゴのレコードだけを取得する。E2の忠実度スコアはこのレポートの計器盤(現在「E2で計測」と予告表示)に載る。
 
 ### APIキー(.env.local)
 

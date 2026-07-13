@@ -86,6 +86,21 @@ export type RecentGenJob = {
   outputUrl: string;
 };
 
+/** One successful run of one logo — the unit of the logo report view. */
+export type LogoRun = RecentGenJob & {
+  dials: Dials;
+  genMs: number;
+  outWidth: number;
+  outHeight: number;
+};
+
+/** GET /api/labs/generative/jobs?logo=<hash16> — that logo's report data. */
+export type LogoRunsResponse = {
+  logoHash: string;
+  runs: LogoRun[];
+  totalCostUsd: number;
+};
+
 /** GET /api/labs/generative/jobs — cost + success-rate view (製品の資産). */
 export type GenJobsSummary = {
   totalJobs: number;
