@@ -39,6 +39,18 @@
 | 3〜4 | 生成AIハーネス(画像+ショートビデオ、逸脱スコアボード付き) | 探索 | **Generative Lab** | 中〜重(無料キャンペーンは原価計算前提) |
 | 5+ | 統合(30秒プロモ・CM・バナー・LP) | 統合 | Campaign Lab(将来) | 最重課金 |
 
+### 課金API(コスト正本)
+
+課金が発生する外部APIの一覧は [cost-sources.ts](cost-sources.ts) が正本で、`/labs` 最上部の**コスト節**に表示される。将来ここを**月次コストダッシュボード**にする(現状は静的表示、ライブ集計は未実装)。
+
+- **Gemini 2.5 Flash Image(Nano Banana / Google AI Studio)** — 本体プレゼン シーン10の写実モックアップ。≈$0.039/枚(目安)。**原価ログ未実装**(ダッシュボード化前に計測追加が必要)
+- **FLUX.2 [pro](Together AI)** — Generative Lab 主エンジン。$0.03/枚(実測)。原価ログ有
+- **Recraft V4.1/V3** — Generative Lab 派生生成機。$0.035/枚(実測)。原価ログ有
+- **Gemini 3 Pro Image(Vertex AI)** — Generative Lab 対話修正層。Phase E3で接続予定(現状 未配線=課金なし)
+- **基盤費**: Supabase(DB/Auth/Storage)は per-call ではなくインフラ月額(現状 無料枠内)
+
+テキストLLM(OpenAI/Anthropic 等)は**未使用**(自動生成コピーは決定論的)。原価ログ有のソースは `var/*/jobs.jsonl` に全ジョブのコストを記録済みで、月次ダッシュボードはこれを集計して構築する。新しい課金APIを足すときは必ず cost-sources.ts に追記する。
+
 ## 現在地と次の一手
 
 - ✅ **Motion Lab**: 全16実験が実装済み(2026-07-12時点)。残タスクは採用判断(星評価・研究ノート)と、採用実験の本体プレゼンへの移植、組み合わせ検証(v2)
