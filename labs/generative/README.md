@@ -144,7 +144,7 @@ labs/generative/
     providers/           # プロバイダ抽象化: together(FLUX.2) / recraft / gemini(E3スタブ) / mock
     registry.ts          # templates/ のスキャン+バリデーション
     logo-raster.ts       # ロゴ→参照PNG(白背景1024px)
-    storage.ts           # 生成物の即時回収先(var/generative-lab/outputs/)
+    storage.ts           # 生成物の即時回収先(R2優先。未設定時のみ var/generative-lab/outputs/)
     job-log.ts           # 原価計測+監査ログ(var/generative-lab/jobs.jsonl)
   templates/<id>/        # 表現テンプレート = template.json のみ(アセット不要)
   components/            # UI(下記「画面構造」参照)
@@ -203,7 +203,7 @@ RECRAFT_API_KEY=(recraft.ai → プロフィール → API)
 ### データ取り扱い(実装済みの担保)
 
 - ロゴが外部に送られるのは**選択テンプレートのエンジン1社のみ**(Together=ZDR既定 / Recraft=学習不使用規定)。モック時はサーバー外に出ない
-- 生成物は受領後ただちに `var/generative-lab/outputs/` へ回収し、以後は自前URLのみを参照(Recraftの約24h公開URL対策)
+- 生成物は受領後ただちに **Cloudflare R2**(`labs/generative/outputs/<name>`)へ回収し、R2未設定の開発環境のみ `var/generative-lab/outputs/` へフォールバックする。以後は自前URL(`/api/labs/generative/outputs/[name]`)のみを参照する(Recraftの約24h公開URL対策)
 - 全ジョブを `var/generative-lab/jobs.jsonl` に記録: 監査(`logoSentTo`+ロゴhash)、原価(`costUsd`、失敗時も実費を計上)、成功率分析(テンプレート・エンジン・プリセット・ダイヤル・**実行プロンプト全文**)。この蓄積がE2スコアボードの土台になる
 
 ## 未解決事項(実装前・実装中に検証し、事業側とreviewする)

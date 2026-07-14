@@ -131,6 +131,8 @@ export type StoredLogo = {
    * treated as editable. Writes are always enforced by RLS server-side too.
    */
   canEdit?: boolean;
+  /** Transient: the current primary candidate, used for candidate-scoped assets. */
+  primaryCandidateId?: string;
   /** Transient: the owning org id, or null when personally owned. */
   ownerOrgId?: string | null;
 };
@@ -265,8 +267,13 @@ export interface BrandRepo {
   listOrders(): Promise<Order[]>;
   placeOrder(itemId: string, qty: number): Promise<Order>;
 
-  /** All cached mockups for a logo (keyed by a stable hash of its master SVG). */
-  getMockups(logoKey: string): Promise<GeneratedMockups>;
-  /** Persist one generated mockup so it is never regenerated for this logo. */
-  saveMockup(logoKey: string, slot: string, image: string): Promise<void>;
+  /** All cached mockups for the current primary candidate of a logo. */
+  getMockups(logoId: string, candidateId?: string | null): Promise<GeneratedMockups>;
+  /** Persist one generated mockup so it is never regenerated for this logo/candidate. */
+  saveMockup(
+    logoId: string,
+    candidateId: string | null | undefined,
+    slot: string,
+    image: string
+  ): Promise<void>;
 }

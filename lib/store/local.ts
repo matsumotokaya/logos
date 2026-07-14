@@ -24,7 +24,7 @@ const KEYS = {
   mockups: "logos.v1.mockups",
 } as const;
 
-// logoKey -> { slot -> image }. Object insertion order doubles as LRU order.
+// logoId -> { slot -> image }. Object insertion order doubles as LRU order.
 type MockupMap = Record<string, GeneratedMockups>;
 
 const DEFAULT_COMPANY: Company = {
@@ -88,6 +88,7 @@ function normalizeLogo(raw: StoredLogo): StoredLogo {
     trademarks: raw.trademarks ?? [],
     activities: raw.activities ?? [],
     tags: raw.tags ?? [],
+    primaryCandidateId: raw.primaryCandidateId ?? raw.id,
   };
 }
 
@@ -152,8 +153,6 @@ export class LocalStorageRepo implements BrandRepo {
     const before = normalizeLogo(logos[idx]);
     const now = new Date().toISOString();
     // Overwrite in place — no version is kept (docs/data-model.md §2.1).
-    // The generated-mockup cache is keyed by SVG content, so replacing the
-    // file naturally stops matching the old cache entries.
     logos[idx] = {
       ...before,
       data,
@@ -164,6 +163,11 @@ export class LocalStorageRepo implements BrandRepo {
       ],
     };
     write(KEYS.logos, logos);
+    const mockups = read<MockupMap>(KEYS.mockups, {});
+    if (id in mockups) {
+      delete mockups[id];
+      write(KEYS.mockups, mockups);
+    }
   }
 
   async deleteLogo(id: string): Promise<void> {
@@ -179,6 +183,11 @@ export class LocalStorageRepo implements BrandRepo {
     if (id in presentations) {
       delete presentations[id];
       write(KEYS.presentations, presentations);
+    }
+    const mockups = read<MockupMap>(KEYS.mockups, {});
+    if (id in mockups) {
+      delete mockups[id];
+      write(KEYS.mockups, mockups);
     }
   }
 
@@ -252,22 +261,23 @@ export class LocalStorageRepo implements BrandRepo {
     return order;
   }
 
-  async getMockups(logoKey: string): Promise<GeneratedMockups> {
+  async getMockups(logoId: string): Promise<GeneratedMockups> {
     const map = read<MockupMap>(KEYS.mockups, {});
-    return map[logoKey] ?? {};
+    return map[logoId] ?? {};
   }
 
   async saveMockup(
-    logoKey: string,
+    logoId: string,
+    _candidateId: string | null | undefined,
     slot: string,
     image: string
   ): Promise<void> {
     if (typeof window === "undefined") return;
     const map = read<MockupMap>(KEYS.mockups, {});
     // Re-insert this logo last so it counts as most-recently-used.
-    const entry = { ...(map[logoKey] ?? {}), [slot]: image };
-    delete map[logoKey];
-    map[logoKey] = entry;
+    const entry = { ...(map[logoId] ?? {}), [slot]: image };
+    delete map[logoId];
+    map[logoId] = entry;
 
     // Images are large; if the quota is hit, evict the least-recently-used
     // logos (oldest keys first) and retry until it fits or only this one is left.

@@ -20,6 +20,7 @@ type State =
       status: "ready";
       logo: LogoData;
       name: string;
+      mockupCandidateId: string | null;
       stored: boolean;
       canEdit: boolean;
       contactEmail: string | null;
@@ -47,6 +48,7 @@ export default function PresentationPage({
             status: "ready",
             logo: analyzeSvg(SAMPLE_SVG, "sample.svg"),
             name: SAMPLE_NAME,
+            mockupCandidateId: null,
             stored: false,
             canEdit: false,
             contactEmail: null,
@@ -66,6 +68,7 @@ export default function PresentationPage({
             status: "ready",
             logo: stored.data,
             name: stored.title,
+            mockupCandidateId: stored.primaryCandidateId ?? null,
             stored: true,
             canEdit: stored.canEdit ?? true,
             contactEmail,
@@ -137,6 +140,8 @@ export default function PresentationPage({
     <Presentation
       logo={state.logo}
       name={state.name}
+      mockupLogoId={id === "sample" ? undefined : id}
+      mockupCandidateId={state.mockupCandidateId ?? undefined}
       onNameChange={(name) => {
         setState({ ...state, name });
         // Renaming a stored logo updates its canonical title everywhere.

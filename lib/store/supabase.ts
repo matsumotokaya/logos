@@ -119,6 +119,7 @@ function rowToStoredLogo(
         at: a.created_at,
       })),
     tags: row.logo_tags.flatMap((lt) => (lt.tags ? [lt.tags.name] : [])),
+    primaryCandidateId: primary.id,
   };
 }
 
@@ -135,6 +136,29 @@ function throwOn(error: { message: string } | null): void {
 }
 
 export class SupabaseRepo implements BrandRepo {
+  private async authToken(): Promise<string> {
+    await this.ensureAuth();
+    const { data, error } = await supabase.auth.getSession();
+    throwOn(error);
+    const token = data.session?.access_token;
+    if (!token) throw new Error("No Supabase access token.");
+    return token;
+  }
+
+  private async mockupRequest(
+    input: string,
+    init?: RequestInit
+  ): Promise<Response> {
+    const token = await this.authToken();
+    return fetch(input, {
+      ...init,
+      headers: {
+        ...(init?.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+
   /** Resolve the current user id, signing in anonymously on first contact. */
   private async ensureAuth(): Promise<string> {
     const id = await ensureSession();
@@ -375,6 +399,22 @@ export class SupabaseRepo implements BrandRepo {
 
   async replaceLogoData(id: string, data: LogoData): Promise<void> {
     await this.ensureAuth();
+    const { data: primary, error: primaryErr } = await supabase
+      .from("logo_candidates")
+      .select("id")
+      .eq("logo_id", id)
+      .eq("is_primary", true)
+      .single();
+    throwOn(primaryErr);
+    if (primary?.id) {
+      const res = await this.mockupRequest(`/api/mockups/${id}/${primary.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error || "Failed to purge mockups.");
+      }
+    }
     const { svg, analysis } = splitLogoData(data);
     const { error } = await supabase
       .from("logo_candidates")
@@ -387,6 +427,20 @@ export class SupabaseRepo implements BrandRepo {
 
   async deleteLogo(id: string): Promise<void> {
     await this.ensureAuth();
+    const { data: candidates, error: candErr } = await supabase
+      .from("logo_candidates")
+      .select("id")
+      .eq("logo_id", id);
+    throwOn(candErr);
+    for (const candidate of candidates ?? []) {
+      const res = await this.mockupRequest(`/api/mockups/${id}/${candidate.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error || "Failed to purge mockups.");
+      }
+    }
     // Children and presentation cascade; child logos' parent_logo_id is
     // cleared by the FK's on delete set null.
     const { error } = await supabase.from("logos").delete().eq("id", id);
@@ -527,35 +581,35 @@ export class SupabaseRepo implements BrandRepo {
   }
 
   // ---------- generated mockups ----------
-  // The app keys mockups by a content hash of the master SVG. Images live in
-  // the public "mockups" Storage bucket under <logoKey>/<slot>.png; the DB
-  // table logo_mockups (candidate-keyed) will take over when candidates get
-  // their own UI. Values returned are public URLs (usable as <img src>).
+  // Candidate-scoped generated mockups now live in R2; the relational index is
+  // public.logo_mockups and the bytes are served through /api/mockups/*.
 
-  async getMockups(logoKey: string): Promise<GeneratedMockups> {
-    await this.ensureAuth();
-    const { data, error } = await supabase.storage.from("mockups").list(logoKey);
-    if (error || !data) return {};
-    const result: GeneratedMockups = {};
-    for (const file of data) {
-      const slot = file.name.replace(/\.[^.]+$/, "");
-      const { data: pub } = supabase.storage
-        .from("mockups")
-        .getPublicUrl(`${logoKey}/${file.name}`);
-      result[slot] = pub.publicUrl;
-    }
-    return result;
+  async getMockups(
+    logoId: string,
+    candidateId?: string | null
+  ): Promise<GeneratedMockups> {
+    if (!candidateId) return {};
+    const res = await this.mockupRequest(`/api/mockups/${logoId}/${candidateId}`);
+    if (!res.ok) return {};
+    return (await res.json()) as GeneratedMockups;
   }
 
-  async saveMockup(logoKey: string, slot: string, image: string): Promise<void> {
-    await this.ensureAuth();
-    const blob = await (await fetch(image)).blob();
-    await supabase.storage
-      .from("mockups")
-      .upload(`${logoKey}/${slot}.png`, blob, {
-        contentType: blob.type || "image/png",
-        upsert: true,
-      });
+  async saveMockup(
+    logoId: string,
+    candidateId: string | null | undefined,
+    slot: string,
+    image: string
+  ): Promise<void> {
+    if (!candidateId) return;
+    const res = await this.mockupRequest(`/api/mockups/${logoId}/${candidateId}/${slot}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error || "Failed to save mockup.");
+    }
   }
 }
 

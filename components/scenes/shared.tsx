@@ -15,6 +15,8 @@ export type SceneProps = {
   logo: LogoData;
   name: string;
   variants: Variants;
+  mockupLogoId?: string;
+  mockupCandidateId?: string;
 };
 
 // ---------------------------------------------------------------------------

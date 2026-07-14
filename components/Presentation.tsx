@@ -30,6 +30,8 @@ import Generated from "@/components/scenes/Generated";
 type Props = {
   logo: LogoData;
   name: string;
+  mockupLogoId?: string;
+  mockupCandidateId?: string;
   onNameChange: (name: string) => void;
   onReset: () => void;
   /** Creator contact address; renders a mailto link in the footer when set. */
@@ -43,6 +45,8 @@ type Props = {
 export default function Presentation({
   logo,
   name,
+  mockupLogoId,
+  mockupCandidateId,
   onNameChange,
   onReset,
   contactEmail,
@@ -59,7 +63,7 @@ export default function Presentation({
     [logo.svg]
   );
 
-  const scene = { logo, name, variants };
+  const scene = { logo, name, variants, mockupLogoId, mockupCandidateId };
   const editable = onSavePresentation !== undefined;
   const editCtx = useMemo(
     () => ({

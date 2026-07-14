@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { rasterizeSvg } from "@/lib/raster";
 import { repo } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
@@ -16,26 +16,19 @@ type SlotState =
   | { status: "done"; image: string }
   | { status: "error"; message: string };
 
-/** Stable per-logo cache key (FNV-1a over the baked master SVG). */
-function logoKeyOf(svg: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < svg.length; i++) {
-    h ^= svg.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return (h >>> 0).toString(36);
-}
-
 const IDLE_SLOTS: Record<SlotId, SlotState> = {
   mug: { status: "idle" },
   tote: { status: "idle" },
   cap: { status: "idle" },
 };
 
-export default function Generated({ logo, name }: SceneProps) {
+export default function Generated({
+  logo,
+  name,
+  mockupLogoId,
+  mockupCandidateId,
+}: SceneProps) {
   const { dict } = useI18n();
-  const key = useMemo(() => logoKeyOf(logo.svg), [logo.svg]);
-
   const [slots, setSlots] = useState<Record<SlotId, SlotState>>(IDLE_SLOTS);
   const [hydrated, setHydrated] = useState(false);
 
@@ -66,7 +59,7 @@ export default function Generated({ logo, name }: SceneProps) {
         }
         setSlot(id, { status: "done", image: data.image });
         // Persist so this paid generation is never repeated for this logo.
-        void repo.saveMockup(key, id, data.image);
+        void repo.saveMockup(mockupLogoId ?? "", mockupCandidateId, id, data.image);
       } catch (e) {
         setSlot(id, {
           status: "error",
@@ -74,7 +67,7 @@ export default function Generated({ logo, name }: SceneProps) {
         });
       }
     },
-    [logo.svg, logo.colors, name, key, dict.gen.failed, setSlot]
+    [logo.svg, logo.colors, name, mockupLogoId, mockupCandidateId, dict.gen.failed, setSlot]
   );
 
   // Load any cached mockups for this logo; uncached slots stay idle (showing a
@@ -82,7 +75,17 @@ export default function Generated({ logo, name }: SceneProps) {
   // synchronously) so switching logos does not flash stale tiles.
   useEffect(() => {
     let alive = true;
-    repo.getMockups(key).then((cached) => {
+    if (!mockupLogoId) {
+      Promise.resolve().then(() => {
+        if (!alive) return;
+        setSlots(IDLE_SLOTS);
+        setHydrated(true);
+      });
+      return () => {
+        alive = false;
+      };
+    }
+    repo.getMockups(mockupLogoId, mockupCandidateId).then((cached) => {
       if (!alive) return;
       setSlots({
         mug: cached.mug ? { status: "done", image: cached.mug } : { status: "idle" },
@@ -94,7 +97,7 @@ export default function Generated({ logo, name }: SceneProps) {
     return () => {
       alive = false;
     };
-  }, [key]);
+  }, [mockupLogoId, mockupCandidateId]);
 
   // No auto-generation: each mockup is a paid Gemini call, so it fires only
   // when the user clicks its "generate" button. Cached results still load

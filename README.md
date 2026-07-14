@@ -96,6 +96,15 @@ GEMINI_API_KEY=（Google AI Studioで発行したキー、課金有効なプロ�
 
 Generative Lab(`/labs/generative`)の実エンジンを使うには `TOGETHER_API_KEY` / `RECRAFT_API_KEY` も設定する(未設定ならモックで全フローが動く)。詳細は [labs/generative/README.md](labs/generative/README.md)。
 
+Cloudflare R2 を使う場合は `.env.local` に以下も設定する。現時点では **Generative Lab の生成画像保存先** と **シーン10 モックアップ(R2 + `logo_mockups`)** がこの設定を使い、Generative Lab のみ未設定時は `var/generative-lab/outputs/` へフォールバックする:
+
+```
+R2_ACCOUNT_ID=（Cloudflare Account ID）
+R2_ACCESS_KEY_ID=（R2 API token の Access Key ID）
+R2_SECRET_ACCESS_KEY=（R2 API token の Secret Access Key）
+R2_BUCKET_NAME=logos-assets
+```
+
 ### Supabase(DB移行)
 
 スキーマの正本は [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql)(アカウント・組織・ロゴ正本・RLS一式)。セットアップ手順:

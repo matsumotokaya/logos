@@ -156,16 +156,16 @@ create table public.logo_mockups (
 
 #### 生成画像の保存 — 現状の実装 vs この計画(2026-07-14 時点の実態)
 
-**上の `logo_mockups` テーブルはまだ未配線**。現状、生成画像は次のように保存されている:
+**`logo_mockups` はシーン10で配線済み**。2026-07-14 時点の生成画像の保存先は次のとおり:
 
 | 生成物 | 現状の保存先 | キー | アカウント/ロゴ行との紐付け |
 |---|---|---|---|
-| シーン10 モックアップ(Gemini) | Supabase Storage バケット `mockups`(`{logoKey}/{slot}.png`)。オフライン時は localStorage | `logoKey` = マスターSVGの内容ハッシュ(FNV-1a) | **なし**。ロゴ内容ハッシュで引くキャッシュで、`logos`/`logo_candidates` 行にもアップロード者アカウントにも紐付いていない |
-| Generative Lab 生成物(FLUX.2/Recraft) | サーバーのローカルディスク `var/generative-lab/outputs/*.png`(`/api/labs/generative/outputs/[name]` で配信) | ランダムファイル名。ジョブログに `logoHash`(ペイロードのSHA-256)を記録 | **なし**。Supabaseにも入っていない |
+| シーン10 モックアップ(Gemini) | **Cloudflare R2**(`logos/<logoId>/candidates/<candidateId>/mockups/<slot>.png`)。ブラウザは `/api/mockups/<logoId>/<candidateId>/<slot>` 経由で参照し、索引は `logo_mockups` | `candidate_id + slot` | **あり**。`logo_mockups` が `logo_candidates` にぶら下がり、そこから `logos` / 組織 / アカウントへ到達する |
+| Generative Lab 生成物(FLUX.2/Recraft) | **Cloudflare R2**(`labs/generative/outputs/<name>`)。R2未設定の開発環境のみローカルディスク `var/generative-lab/outputs/*.png` へフォールバック。配信URLは引き続き `/api/labs/generative/outputs/[name]` | ランダムファイル名。ジョブログに `logoHash`(ペイロードのSHA-256)を記録 | **なし**。まだ `logo_mockups` / `logos` / 組織には紐付いていない |
 
 つまり生成画像は今のところ**コンテンツアドレス方式のキャッシュ**であって、リレーショナルな正本レコードではない(同じロゴ内容なら誰がアップしても同じキャッシュを引く)。
 
-**移行方針(Cloudflare R2 + 正本化)**: 上記2箇所のアセットを R2 に移し、同時にこの `logo_mockups`(候補→ロゴ→組織/アカウント)を配線して、生成画像を**ロゴ正本にぶら下がるデータ**にする。これにより所有者・公開範囲・課金主体がアセットに対して明確になる。マスターSVG(`file_path`)も同じく Storage/R2 を指す設計。
+**現状整理(Cloudflare R2 移行後)**: シーン10の生成画像は `logo_mockups`(候補→ロゴ→組織/アカウント) に配線され、**ロゴ正本にぶら下がるデータ**になった。これにより所有者・公開範囲・課金主体がアセットに対して明確になっている。一方、Generative Lab 側はまだ `logoHash` ベースの独立資産で、`logos` / `logo_candidates` とのリレーションは未配線。マスターSVG(`file_path`)を含む残りの重量アセットも、今後は同じ R2 命名規則に寄せていく。
 
 ### 6.5 logo_presentations(層B)— 新規
 
@@ -291,9 +291,9 @@ logo_* の子テーブルはすべて「SELECT は親ロゴの閲覧権限に準
 
 ## 8. アセットの保存先
 
-**2026-07-11 実装判断(Supabaseスキーマ確定時)**: SVGは数KB程度と小さいため、**マスターSVG・バリエーションはDBに直持ち**(`logo_candidates.svg` / `logo_variants.svg`)とし、**生成モックアップ画像(大きい)だけ Storage**(`logo_mockups.image_path`、バケット `mockups`)に置く。CDN配信ルート(§7)はDBから読んで返せばよく、むしろ単純になる。
+**2026-07-14 実装判断(R2移行時)**: SVGは数KB程度と小さいため、**マスターSVG・バリエーションはDBに直持ち**(`logo_candidates.svg` / `logo_variants.svg`)を維持し、**生成モックアップ画像(大きい)は Cloudflare R2**(`logo_mockups.image_path`)へ置く。CDN/配信ルート(§7)はDBの `image_path` とアプリの中継URL(`/api/mockups/...`)で解決する。
 
-- R2移行(§7 Step B)の際にSVGをR2オブジェクト化するかは、その時点のCDN要件で判断(スキーマ上は svg カラム→パス参照への変更のみ)
+- 将来、SVG自体もR2オブジェクト化するかは、その時点のCDN要件で判断する(スキーマ上は svg カラム→パス参照への変更のみ)
 - 適用済みスキーマの正本は [../supabase/migrations/0001_init.sql](../supabase/migrations/0001_init.sql)
 
 ## 9. サイト構造(ここまでの全設計の統合)
