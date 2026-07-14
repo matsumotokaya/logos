@@ -41,7 +41,7 @@ export default function LogoReport({
     templates.find((e) => e.id === id)?.template;
 
   return (
-    <section className="mx-auto max-w-7xl px-6 pt-6">
+    <section className="mx-auto max-w-6xl px-6 md:px-10 pt-6">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-base font-semibold tracking-tight">
           {logoName} のレポート

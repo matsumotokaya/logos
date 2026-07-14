@@ -23,7 +23,7 @@ export function LabExplainer({
 }) {
   return (
     <div className="border-b border-hairline bg-white">
-      <details className="group mx-auto max-w-7xl px-6 py-3">
+      <details className="group mx-auto max-w-6xl px-6 md:px-10 py-3">
         <summary className="cursor-pointer list-none text-[11px] text-ink-muted marker:content-none">
           <span className="mr-1 inline-block text-ink-faint transition group-open:rotate-90">
             ›

@@ -28,7 +28,7 @@ export default function GenCostPanel({ refreshKey }: { refreshKey: number }) {
   if (!summary || summary.totalJobs === 0) return null;
 
   return (
-    <section className="mx-auto max-w-7xl px-6 pb-10">
+    <section className="mx-auto max-w-6xl px-6 md:px-10 pb-10">
       <div className="rounded-xl border border-hairline bg-white p-4">
         <div className="flex items-baseline gap-2">
           <h3 className="font-mono text-[11px] tracking-widest text-ink-muted uppercase">

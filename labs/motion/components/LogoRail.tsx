@@ -33,7 +33,7 @@ export default function LogoRail({
 
   return (
     <section className="border-b border-hairline bg-paper">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-6 py-4">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-4">
         <span className="mr-1 font-mono text-[11px] tracking-widest text-ink-muted uppercase">
           Logo
         </span>

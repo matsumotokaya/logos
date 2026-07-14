@@ -81,9 +81,12 @@ app/api/labs/generative/* # Generative Lab の生成API(templates / generate / j
 
 | 部品 | 役割 |
 |---|---|
-| [shared/components/LabShell.tsx](shared/components/LabShell.tsx) | ページ骨格の正本: ヘッダー(名前+スタンス+戻り導線)→ 解説枠 → ロゴレール → `children(logo)`。**ラボ本体は選択ロゴを引数に受け取る関数として実装する** |
+| [shared/components/LabHeader.tsx](shared/components/LabHeader.tsx) | 本体(logos)と同じヘッダーフレーム。ただしワードマークは **`labos`**(`lib/config.ts` の `LABS_NAME`)。右側は本体と同じ言語切替+アカウントメニュー。その下のサブバーに現在のラボ名+モードバッジを出し、どのラボにいるか常に分かる。ラボ全体を「プロダクトの labos モード」として見せ、別アプリに見せない |
+| [shared/components/LabShell.tsx](shared/components/LabShell.tsx) | ページ骨格の正本: LabHeader(slugで現在ラボを特定)→ 解説枠 → ロゴレール → `children(logo)`。**ラボ本体は選択ロゴを引数に受け取る関数として実装し、slug だけ渡す**(name/titleJa/mode は [directory.ts](directory.ts) から引く) |
 | [shared/components/LabExplainer.tsx](shared/components/LabExplainer.tsx) | 折りたたみ「仕組みを見る」枠+稼働中/未着手バッジ付きモジュールカード(要件書のUI向け要約) |
 | [shared/components/FilterChips.tsx](shared/components/FilterChips.tsx) | カタログ絞り込みのチップ行(すべて+選択肢) |
+
+コンテンツ幅は全ページ本体と同じ `max-w-6xl px-6 md:px-10` に統一(ラボ索引・各ラボで揃える)。ヘッダーは本体の Landing と同じフルブリード。
 
 ロゴレジストリ(選択ロゴ・アップロード)と研究ノート(星評価)は Motion Lab の `core/logo-store.ts` / `core/notes-store.ts` を全ラボの共有インフラとして使う(選んだロゴがラボ間で引き継がれるのは仕様。ストアの置き場は歴史的にmotion配下だが、消費はLabShell経由に統一)。
 

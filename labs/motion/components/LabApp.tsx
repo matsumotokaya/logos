@@ -46,14 +46,11 @@ export default function LabApp() {
   const openEntry = openId ? getExperiment(openId) : undefined;
 
   return (
-    <LabShell
-      name="Motion Lab"
-      tagline="判断基準は「ロゴが立派に見えるか」。効果の派手さではない"
-    >
+    <LabShell slug="motion">
       {(logo) => (
         <>
           <div className="border-b border-hairline">
-            <div className="mx-auto max-w-7xl space-y-2 px-6 py-3">
+            <div className="mx-auto max-w-6xl space-y-2 px-6 py-3">
               <FilterChips
                 label="カテゴリ"
                 value={category}
@@ -78,7 +75,7 @@ export default function LabApp() {
             </div>
           </div>
 
-          <main className="mx-auto max-w-7xl px-6 py-6">
+          <main className="mx-auto max-w-6xl px-6 md:px-10 py-6">
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {filtered.map((entry) => (
                 <ExperimentCard

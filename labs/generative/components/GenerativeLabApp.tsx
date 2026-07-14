@@ -52,8 +52,7 @@ export default function GenerativeLabApp() {
 
   return (
     <LabShell
-      name="Generative Lab"
-      tagline="探索モード: ロゴを選ぶと、そのロゴの生成レポートがここに育つ"
+      slug="generative"
       explainer={<HarnessNote engines={catalog?.engines ?? []} />}
       logoNote="⚠ 探索モード: 生成時、ロゴは選択テンプレートのエンジン(Together/Recraft — 学習不使用の契約確認済み)へ参照画像として送信される。キー未設定時はモックでサーバー内完結。"
     >
@@ -130,7 +129,7 @@ function GenerativeBody({
     <>
       {/* ① The selected logo's report — the page's deliverable. */}
       {logoRuns === null ? (
-        <p className="mx-auto max-w-7xl px-6 pt-8 text-sm text-ink-muted">
+        <p className="mx-auto max-w-6xl px-6 md:px-10 pt-8 text-sm text-ink-muted">
           {logo.name} のレポートを読み込み中…
         </p>
       ) : (
@@ -144,7 +143,7 @@ function GenerativeBody({
       )}
 
       {/* ② Art directions to try next with THIS logo. */}
-      <section className="mx-auto max-w-7xl px-6 pt-10 pb-6">
+      <section className="mx-auto max-w-6xl px-6 md:px-10 pt-10 pb-6">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h2 className="text-base font-semibold tracking-tight">
             表現テンプレート

@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LABS, MODE_INFO, MODE_ORDER } from "@/labs/directory";
 import { cn } from "@/lib/cn";
+import LabHeader from "@/labs/shared/components/LabHeader";
 
 export const metadata: Metadata = {
   title: "Labs — R&D",
@@ -16,28 +17,9 @@ export const metadata: Metadata = {
 export default function LabsIndexPage() {
   return (
     <div className="min-h-screen flex-1 bg-paper text-ink">
-      <header className="sticky top-0 z-40 border-b border-hairline bg-paper/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3.5">
-          <span className="h-2 w-2 rounded-full bg-accent" />
-          <h1 className="font-display text-sm font-semibold tracking-tight">Labs</h1>
-          <p className="hidden text-[11px] text-ink-muted sm:block">
-            — 表現の研究開発。判断基準は全ラボ共通:「ロゴが立派に見えるか」
-          </p>
-          <Link href="/" className="ml-auto text-xs text-ink-muted transition hover:text-ink">
-            ← 本体へ戻る
-          </Link>
-        </div>
-      </header>
+      <LabHeader />
 
-      <main className="mx-auto max-w-5xl px-6 py-10">
-        <p className="max-w-3xl text-sm leading-relaxed text-ink-muted">
-          プロダクトの最初の体験——アップロードされたロゴが立派に見えること——を作るための研究所群。
-          ラボは技術ジャンルではなく<strong className="font-medium text-ink">「ロゴに触れるか、触れないか」</strong>で分類する:
-          ロゴを1ピクセルも崩さない<strong className="font-medium text-ink">保証モード</strong>がプロダクトの根幹、
-          生成AIにロゴを解釈させる<strong className="font-medium text-ink">探索モード</strong>がその上の可能性の解放。
-          レイヤーはコストと課金の階段でもある(下層は限界費用ゼロで全員に、上層は重課金で)。
-        </p>
-
+      <main className="mx-auto max-w-6xl px-6 py-10 md:px-10">
         {MODE_ORDER.map((mode) => {
           const labs = LABS.filter((lab) => lab.mode === mode);
           if (labs.length === 0) return null;

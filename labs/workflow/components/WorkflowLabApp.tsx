@@ -58,8 +58,7 @@ export default function WorkflowLabApp() {
 
   return (
     <LabShell
-      name="Workflow Lab"
-      tagline="舞台はテンプレート、ロゴは決定論的に合成。生成AIにロゴは触れさせない"
+      slug="workflow"
       explainer={<ArchitectureNote />}
       logoNote="SVG推奨。ロゴは合成のため自サーバーにのみ送信され、外部AI・外部APIには渡らない。"
     >
@@ -67,7 +66,7 @@ export default function WorkflowLabApp() {
         <>
           {usedCategories.length > 1 && (
             <div className="border-b border-hairline">
-              <div className="mx-auto max-w-7xl px-6 py-3">
+              <div className="mx-auto max-w-6xl px-6 md:px-10 py-3">
                 <FilterChips
                   label="カテゴリ"
                   value={category}
@@ -78,7 +77,7 @@ export default function WorkflowLabApp() {
             </div>
           )}
 
-          <main className="mx-auto max-w-7xl px-6 py-6">
+          <main className="mx-auto max-w-6xl px-6 md:px-10 py-6">
             {catalogError ? (
               <p className="py-16 text-center text-sm text-red-600">{catalogError}</p>
             ) : catalog === null ? (
