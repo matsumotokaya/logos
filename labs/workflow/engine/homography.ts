@@ -89,7 +89,7 @@ export function invertMat3(m: Mat3): Mat3 {
 }
 
 /** Bilinear RGBA sample; coordinates outside the source read as transparent. */
-function sampleBilinear(src: RawImage, x: number, y: number, out: [number, number, number, number]) {
+export function sampleBilinear(src: RawImage, x: number, y: number, out: [number, number, number, number]) {
   if (x < 0 || y < 0 || x > src.width - 1 || y > src.height - 1) {
     out[0] = out[1] = out[2] = out[3] = 0;
     return;

@@ -31,6 +31,7 @@ import {
   type Mat3,
   type RawImage,
 } from "./homography";
+import { warpImageUv, type RawImage16 } from "./uvwarp";
 
 export const DEFAULT_WIDTH = 1600;
 export const MAX_WIDTH = 2600;
@@ -56,6 +57,24 @@ async function loadRaw(pipeline: Sharp): Promise<RawImage> {
     .raw()
     .toBuffer({ resolveWithObject: true });
   return { data, width: info.width, height: info.height, channels: info.channels };
+}
+
+/** Load a baked 16-bit uv map (see UvWarpSpec) resized to the output size. */
+async function loadUvMap(file: Buffer, w: number, h: number): Promise<RawImage16> {
+  // sharp collapses to 8-bit unless the pipeline is pinned to rgb16.
+  const { data, info } = await sharp(file)
+    .pipelineColourspace("rgb16")
+    .resize(w, h, { fit: "fill" })
+    .toColourspace("rgb16")
+    .raw({ depth: "ushort" })
+    .toBuffer({ resolveWithObject: true });
+  const bytes = data.byteOffset % 2 === 0 ? data : Buffer.from(data);
+  return {
+    data: new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.length / 2),
+    width: info.width,
+    height: info.height,
+    channels: info.channels,
+  };
 }
 
 /** Rasterize the logo with transparent background at the given pixel width. */
@@ -174,7 +193,9 @@ export async function composeTemplate(
   const H = homographyFromUnitSquare(scaled);
   const surfaceW = (edge(scaled.tl, scaled.tr) + edge(scaled.bl, scaled.br)) / 2;
   const surfaceH = (edge(scaled.tl, scaled.bl) + edge(scaled.tr, scaled.br)) / 2;
-  const uvRatio = surfaceW / surfaceH; // converts U-fractions into V-fractions
+  // Converts U-fractions into V-fractions. Baked surfaces carry their physical
+  // aspect (curved surfaces foreshorten on camera, so px ratios would lie).
+  const uvRatio = template.surface.uvWarp?.aspect ?? surfaceW / surfaceH;
 
   const aspect = await logoAspect(logo); // h/w
   let w = Math.min(
@@ -210,28 +231,46 @@ export async function composeTemplate(
   if (colorMode !== "original") tintRaw(logoRaw, MONO_TINTS[colorMode]);
   const logoMs = performance.now() - tLogo;
 
-  // --- Warp (projection + displacement) ----------------------------------
+  // --- Warp (baked uv field, or projection + displacement) ---------------
   const tWarp = performance.now();
-  let displacement: { image: RawImage; strength: number } | undefined;
-  if (template.surface.displacement) {
-    const d = template.surface.displacement;
-    displacement = {
-      image: await loadRaw(
-        await rasterizeAsset(await readAsset(d.src), isSvgAsset(d.src), outWidth, outHeight),
-      ),
-      strength: d.strength * scale,
-    };
+  let warped: RawImage;
+  if (template.surface.uvWarp) {
+    const uw = template.surface.uvWarp;
+    const uvMap = await loadUvMap(await readAsset(uw.src), outWidth, outHeight);
+    const light = uw.light
+      ? await loadRaw(
+          await rasterizeAsset(await readAsset(uw.light), isSvgAsset(uw.light), outWidth, outHeight),
+        )
+      : undefined;
+    warped = warpImageUv(logoRaw, {
+      outWidth,
+      outHeight,
+      box: { u0: cx - w / 2, v0: cy - h / 2, u1: cx + w / 2, v1: cy + h / 2 },
+      uvMap,
+      light,
+    });
+  } else {
+    let displacement: { image: RawImage; strength: number } | undefined;
+    if (template.surface.displacement) {
+      const d = template.surface.displacement;
+      displacement = {
+        image: await loadRaw(
+          await rasterizeAsset(await readAsset(d.src), isSvgAsset(d.src), outWidth, outHeight),
+        ),
+        strength: d.strength * scale,
+      };
+    }
+    const matrix: Mat3 = homographyFromPoints(
+      [
+        [0, 0],
+        [logoRaw.width, 0],
+        [logoRaw.width, logoRaw.height],
+        [0, logoRaw.height],
+      ],
+      dstQuad,
+    );
+    warped = warpImage(logoRaw, { outWidth, outHeight, matrix, displacement });
   }
-  const matrix: Mat3 = homographyFromPoints(
-    [
-      [0, 0],
-      [logoRaw.width, 0],
-      [logoRaw.width, logoRaw.height],
-      [0, logoRaw.height],
-    ],
-    dstQuad,
-  );
-  const warped = warpImage(logoRaw, { outWidth, outHeight, matrix, displacement });
   applyOpacity(warped, spec.opacity ?? 1);
   const warpMs = performance.now() - tWarp;
 

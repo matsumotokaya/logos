@@ -1,0 +1,70 @@
+{
+  "format": "logos-2d-template@1",
+  "id": "mug-ceramic",
+  "name": "Ceramic Mug",
+  "nameJa": "セラミックマグ",
+  "category": "product",
+  "presentation": {
+    "allowedPlacements": [
+      "merch.primary"
+    ],
+    "defaultMappings": [
+      {
+        "placementId": "merch.primary",
+        "order": 30,
+        "enabled": false
+      }
+    ]
+  },
+  "presentationScene": "merch",
+  "presentationAdopted": false,
+  "presentationOrder": 30,
+  "canvas": {
+    "width": 1600,
+    "height": 1200
+  },
+  "stage": {
+    "src": "stage.png"
+  },
+  "surface": {
+    "corners": {
+      "tl": [
+        513,
+        390
+      ],
+      "tr": [
+        1076,
+        390
+      ],
+      "br": [
+        1076,
+        895
+      ],
+      "bl": [
+        513,
+        895
+      ]
+    },
+    "uvWarp": {
+      "src": "uvmap.png",
+      "aspect": 1.3214635765099925,
+      "light": "light.png"
+    },
+    "logo": {
+      "blend": "over",
+      "placement": {
+        "cx": 0.5,
+        "cy": 0.5,
+        "width": 0.55
+      },
+      "clearSpace": 0.15,
+      "minWidth": 0.25,
+      "maxWidth": 0.85
+    }
+  },
+  "impressions": [
+    "プロダクト",
+    "フォトリアル"
+  ],
+  "notesJa": "Blender焼き込みパイプライン(Phase 2)による3Dテンプレート。舞台・UVワープマップ・陰影マップをCyclesで焼き出し、ロゴはUVフィールド経由で決定論的に合成する。"
+}

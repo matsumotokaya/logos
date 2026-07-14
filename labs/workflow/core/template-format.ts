@@ -41,6 +41,22 @@ export type DisplacementSpec = {
   strength: number;
 };
 
+/**
+ * Curved-surface mapping baked from a 3D scene (Blender pipeline, Phase 2).
+ * When present it replaces the corner homography + displacement for warping;
+ * `corners` stays required as the print region's bounding box (placement UI,
+ * fallbacks). The map is a 16-bit PNG at canvas resolution: R = u·coverage,
+ * G = v·coverage, B = coverage (premultiplied by the render's edge coverage,
+ * so u = R/B). Coverage 0 = the logo never lands there.
+ */
+export type UvWarpSpec = {
+  src: string;
+  /** Physical aspect (width / height) of the printable area in world units. */
+  aspect: number;
+  /** Optional 8-bit shading map multiplied into the logo (white = neutral). */
+  light?: string;
+};
+
 export type ShadowSpec = {
   /** Blur radius in canvas px. */
   blur: number;
@@ -109,6 +125,7 @@ export type Template2D = {
   surface: {
     corners: SurfaceCorners;
     displacement?: DisplacementSpec;
+    uvWarp?: UvWarpSpec;
     logo: LogoSpec;
   };
   /** Composited over the placed logo, in order (baked lighting/shadows). */
@@ -305,6 +322,14 @@ export function validateTemplate(json: unknown, expectedId?: string): Validation
         errors.push("surface.displacement: { src, strength>=0 } が必要");
     }
 
+    if (surface.uvWarp !== undefined) {
+      const u = surface.uvWarp;
+      if (!isRec(u) || !isSafeAssetPath(u.src) || !num(u.aspect) || (u.aspect as number) <= 0)
+        errors.push("surface.uvWarp: { src(相対パス), aspect>0 } が必要");
+      else if (u.light !== undefined && !isSafeAssetPath(u.light))
+        errors.push("surface.uvWarp.light: 相対パスの文字列");
+    }
+
     const logo = surface.logo;
     if (!isRec(logo)) {
       errors.push("surface.logo: オブジェクトが必要");
@@ -354,6 +379,9 @@ export function templateAssetPaths(t: Template2D): string[] {
   return [
     t.stage.src,
     ...(t.surface.displacement ? [t.surface.displacement.src] : []),
+    ...(t.surface.uvWarp
+      ? [t.surface.uvWarp.src, ...(t.surface.uvWarp.light ? [t.surface.uvWarp.light] : [])]
+      : []),
     ...(t.lighting ?? []).map((l) => l.src),
   ];
 }
