@@ -154,6 +154,38 @@ def build_print_surface(ceramic):
     return obj
 
 
+def build_cove(matte, radius=1.3, floor_front=-1.4, curve_start=0.10,
+               wall_top=2.6, half_width=3.2, arc_steps=96):
+    """Seamless studio cove (infinity sweep): one sheet where the floor
+    fillets up into the back wall with a large radius, so no floor/wall seam
+    is ever visible. A bigger radius = a smoother, softer horizon.
+
+    Profile lives in the YZ plane, camera-side (front) to back; extruded
+    along X wide enough to fill the frame.
+    """
+    profile = [(floor_front, 0.0), (curve_start, 0.0)]
+    cy, cz = curve_start, radius  # fillet centre
+    for i in range(1, arc_steps + 1):
+        ang = math.radians(270 + 90 * i / arc_steps)  # floor tangent -> wall
+        profile.append((cy + radius * math.cos(ang), cz + radius * math.sin(ang)))
+    profile.append((curve_start + radius, wall_top))
+
+    bm = bmesh.new()
+    left = [bm.verts.new((-half_width, y, z)) for (y, z) in profile]
+    right = [bm.verts.new((half_width, y, z)) for (y, z) in profile]
+    for a in range(len(profile) - 1):
+        # Winding chosen so the normal faces the camera (-Y / +Z side).
+        f = bm.faces.new((left[a], right[a], right[a + 1], left[a + 1]))
+        f.smooth = True
+    mesh = bpy.data.meshes.new("Cove")
+    bm.to_mesh(mesh)
+    bm.free()
+    obj = bpy.data.objects.new("Cove", mesh)
+    obj.data.materials.append(matte)
+    bpy.context.collection.objects.link(obj)
+    return obj
+
+
 def add_area_light(name, location, target, size, energy):
     light = bpy.data.lights.new(name, "AREA")
     light.size = size
@@ -181,35 +213,27 @@ def main():
     build_mug(ceramic)
     build_print_surface(ceramic)
 
-    # Floor catches the contact shadow; the world is a soft studio white.
-    studio_matte = new_matte_material("StudioWhite", 0.74, roughness=0.6)
-    bpy.ops.mesh.primitive_plane_add(size=6.0, location=(0, 0, 0))
-    floor = bpy.context.active_object
-    floor.name = "Floor"
-    floor.data.materials.append(studio_matte)
-
-    # Seamless sweep: a backdrop wall behind the subject, same matte white.
-    bpy.ops.mesh.primitive_plane_add(
-        size=6.0, location=(0, 0.9, 3.0), rotation=(math.radians(90), 0, 0)
-    )
-    backdrop = bpy.context.active_object
-    backdrop.name = "Backdrop"
-    backdrop.data.materials.append(studio_matte)
+    # Seamless studio cove — a single large-radius filleted sheet, no floor/
+    # wall seam. It catches the contact shadow and is the whole background.
+    # Darker albedo so the floor never clips to pure white (blow-out).
+    studio_matte = new_matte_material("StudioWhite", 0.60, roughness=0.6)
+    build_cove(studio_matte)
 
     world = bpy.data.worlds.new("Studio")
     world.use_nodes = True
     bg = world.node_tree.nodes["Background"]
-    bg.inputs["Color"].default_value = (0.90, 0.905, 0.915, 1.0)
+    bg.inputs["Color"].default_value = (0.85, 0.855, 0.87, 1.0)
     bg.inputs["Strength"].default_value = 0.5
     scene.world = world
 
-    # A soft top light lifts the upper backdrop out of shadow (studio sweep)
-    # without washing out the mug's own key/fill/rim modelling.
+    # Big soft overhead wash evens the whole cove into a gentle top-dark →
+    # bottom-light gradient (kills the stepped look). Separate small key/rim
+    # only model the mug. Everything dialled low so nothing blows out.
     focus = (0.0, 0.0, 0.048)
-    add_area_light("Key", (-0.22, -0.28, 0.30), focus, size=0.5, energy=2.4)
-    add_area_light("Fill", (0.32, -0.22, 0.14), focus, size=0.4, energy=0.7)
-    add_area_light("Rim", (0.06, 0.34, 0.28), focus, size=0.4, energy=1.3)
-    add_area_light("Sweep", (0.0, 0.4, 1.4), (0.0, 0.9, 1.6), size=2.0, energy=8.0)
+    add_area_light("BGWash", (0.0, -0.15, 2.2), (0.0, 0.6, 0.0), size=4.0, energy=2.6)
+    add_area_light("Key", (-0.22, -0.28, 0.30), focus, size=0.5, energy=0.85)
+    add_area_light("Fill", (0.32, -0.22, 0.14), focus, size=0.4, energy=0.30)
+    add_area_light("Rim", (0.06, 0.34, 0.28), focus, size=0.4, energy=0.65)
 
     cam_data = bpy.data.cameras.new("Camera")
     cam_data.lens = 85
