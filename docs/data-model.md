@@ -154,6 +154,19 @@ create table public.logo_mockups (
 );
 ```
 
+#### 生成画像の保存 — 現状の実装 vs この計画(2026-07-14 時点の実態)
+
+**上の `logo_mockups` テーブルはまだ未配線**。現状、生成画像は次のように保存されている:
+
+| 生成物 | 現状の保存先 | キー | アカウント/ロゴ行との紐付け |
+|---|---|---|---|
+| シーン10 モックアップ(Gemini) | Supabase Storage バケット `mockups`(`{logoKey}/{slot}.png`)。オフライン時は localStorage | `logoKey` = マスターSVGの内容ハッシュ(FNV-1a) | **なし**。ロゴ内容ハッシュで引くキャッシュで、`logos`/`logo_candidates` 行にもアップロード者アカウントにも紐付いていない |
+| Generative Lab 生成物(FLUX.2/Recraft) | サーバーのローカルディスク `var/generative-lab/outputs/*.png`(`/api/labs/generative/outputs/[name]` で配信) | ランダムファイル名。ジョブログに `logoHash`(ペイロードのSHA-256)を記録 | **なし**。Supabaseにも入っていない |
+
+つまり生成画像は今のところ**コンテンツアドレス方式のキャッシュ**であって、リレーショナルな正本レコードではない(同じロゴ内容なら誰がアップしても同じキャッシュを引く)。
+
+**移行方針(Cloudflare R2 + 正本化)**: 上記2箇所のアセットを R2 に移し、同時にこの `logo_mockups`(候補→ロゴ→組織/アカウント)を配線して、生成画像を**ロゴ正本にぶら下がるデータ**にする。これにより所有者・公開範囲・課金主体がアセットに対して明確になる。マスターSVG(`file_path`)も同じく Storage/R2 を指す設計。
+
 ### 6.5 logo_presentations(層B)— 新規
 
 ```sql

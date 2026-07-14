@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { rasterizeSvg } from "@/lib/raster";
 import { repo } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
@@ -38,15 +38,6 @@ export default function Generated({ logo, name }: SceneProps) {
 
   const [slots, setSlots] = useState<Record<SlotId, SlotState>>(IDLE_SLOTS);
   const [hydrated, setHydrated] = useState(false);
-
-  const sectionRef = useRef<HTMLElement>(null);
-  // Mirror of `slots` readable from the IntersectionObserver callback.
-  const slotsRef = useRef(slots);
-  useEffect(() => {
-    slotsRef.current = slots;
-  }, [slots]);
-  // Ensures the one-time auto-generation fires only once per logo.
-  const autoStartedRef = useRef(false);
 
   const setSlot = useCallback(
     (id: SlotId, state: SlotState) =>
@@ -86,12 +77,11 @@ export default function Generated({ logo, name }: SceneProps) {
     [logo.svg, logo.colors, name, key, dict.gen.failed, setSlot]
   );
 
-  // Load any cached mockups for this logo; uncached slots stay idle. State is
-  // set from the async callback (never synchronously) so switching logos does
-  // not flash stale tiles before the cache resolves.
+  // Load any cached mockups for this logo; uncached slots stay idle (showing a
+  // manual "generate" button). State is set from the async callback (never
+  // synchronously) so switching logos does not flash stale tiles.
   useEffect(() => {
     let alive = true;
-    autoStartedRef.current = false;
     repo.getMockups(key).then((cached) => {
       if (!alive) return;
       setSlots({
@@ -106,32 +96,12 @@ export default function Generated({ logo, name }: SceneProps) {
     };
   }, [key]);
 
-  // First time the section is scrolled into view, auto-generate whatever is
-  // not already cached — once. This defers the paid API calls until the user
-  // actually reaches the section, and never repeats what's persisted.
-  useEffect(() => {
-    if (!hydrated) return;
-    const section = sectionRef.current;
-    if (!section) return;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting || autoStartedRef.current) return;
-        autoStartedRef.current = true;
-        for (const id of SLOT_IDS) {
-          if (slotsRef.current[id].status === "idle") void generate(id);
-        }
-      },
-      { threshold: 0.2 }
-    );
-    io.observe(section);
-    return () => io.disconnect();
-  }, [hydrated, generate]);
+  // No auto-generation: each mockup is a paid Gemini call, so it fires only
+  // when the user clicks its "generate" button. Cached results still load
+  // above and are never regenerated.
 
   return (
-    <section
-      ref={sectionRef}
-      className="flex min-h-dvh flex-col justify-center bg-paper"
-    >
+    <section className="flex min-h-dvh flex-col justify-center bg-paper">
       <SectionIntro
         n="10"
         title={dict.scenes.generated}
