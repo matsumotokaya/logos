@@ -4,6 +4,15 @@
   "name": "Canvas Tote",
   "nameJa": "キャンバストート",
   "category": "fabric",
+  "presentation": {
+    "allowedPlacements": ["merch.primary"],
+    "defaultMappings": [
+      { "placementId": "merch.primary", "order": 20, "enabled": false }
+    ]
+  },
+  "presentationScene": "merch",
+  "presentationAdopted": false,
+  "presentationOrder": 20,
   "canvas": { "width": 1600, "height": 2000 },
   "stage": { "src": "stage.svg" },
   "surface": {

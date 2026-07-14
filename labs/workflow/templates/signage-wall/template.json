@@ -4,6 +4,15 @@
   "name": "Wall Signage",
   "nameJa": "壁面サイン(ダーク)",
   "category": "signage",
+  "presentation": {
+    "allowedPlacements": ["onsite.primary"],
+    "defaultMappings": [
+      { "placementId": "onsite.primary", "order": 10, "enabled": false }
+    ]
+  },
+  "presentationScene": "onsite",
+  "presentationAdopted": false,
+  "presentationOrder": 10,
   "canvas": { "width": 2000, "height": 1250 },
   "stage": { "src": "stage.svg" },
   "surface": {

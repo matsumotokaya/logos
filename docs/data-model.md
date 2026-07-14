@@ -91,9 +91,10 @@ ACME Holdings(corporate)
 
 ```
 public.logos(アイデンティティ)── parent_logo_id で自己参照ツリー
+  ├── presentation_asset_definitions(どのラボのどの motion / mockup / generated asset を、どのプレゼン section に採用するか)
   ├── logo_candidates(A/B/C案。1つが primary。マスターSVGはここ)
   │     ├── logo_variants(mono_black 等の派生・追加バリエーション)
-  │     └── logo_mockups(生成モックアップのキャッシュ)
+  │     └── logo_mockups(生成済み mockup のキャッシュ。定義カタログを参照)
   ├── logo_presentations(層B: キャッチコピー・ストーリー)
   ├── logo_credits(制作クレジット)
   ├── logo_trademarks(商標情報)
@@ -134,6 +135,51 @@ create unique index logo_candidates_primary_uq
 
 ### 6.4 logo_variants / logo_mockups — 候補配下に変更
 
+ここで1つ見直しが必要になった。`logo_mockups` は「ロゴごとの生成結果キャッシュ」には向いているが、
+**どの mockup が Workflow / Generative / Motion 由来で、どのプレゼン section に採用されているか**
+という「定義」までは持てない。今後の正しいプロセスは:
+
+1. ラボで mockup を作る
+2. その mockup 定義に `allowed_placements` と `default_mappings` を与える
+3. プレゼン本編は「global asset catalog + per-logo layout override」を解決して表示する
+4. `logo_mockups` は必要な定義について、ロゴ候補ごとの生成結果だけを持つ
+
+つまり **definition catalog と asset cache を分ける** 必要がある。
+
+#### 6.4.1 presentation_asset_definitions — 新規(設計見直し)
+
+```sql
+create table public.presentation_asset_definitions (
+  id                   text primary key,           -- "staff-badge" / "tshirt-white" / template id / ...
+  asset_kind           text not null,             -- 'motion' | 'mockup' | 'generated'
+  source_lab           text not null,             -- 'workflow' | 'generative' | 'motion'
+  renderer_kind        text not null,             -- 'builtin' | 'template' | 'generated' | ...
+  title                text not null,
+  note                 text,
+  allowed_placements   jsonb not null default '[]'::jsonb,
+  default_mappings     jsonb not null default '[]'::jsonb,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now()
+);
+```
+
+- ここが「どのラボ成果物を本編に出すか」の正本
+- `allowed_placements` が「この asset をどのプレゼン配置へ差し込めるか」、`default_mappings` が「初期状態ではどこに何番で採用するか」を表す。これにより **利用者向けの後編集UI** でも同じ asset catalog をそのまま使える
+- 現在の実装では一部をコード/`template.json` のメタデータで代用しているが、DB移行後はこのテーブルに寄せるのが自然
+- Workflow Lab の file template は `template.json` の `presentation.allowedPlacements` / `presentation.defaultMappings` を正本にし、旧 `presentationScene` / `presentationAdopted` / `presentationOrder` は後方互換フィールドとして残す
+- 現行プレゼンにハードコードされていた `Social` / `Badge` / `T-shirt` も、この定義カタログ上では通常の asset と同列に扱う
+
+#### 6.4.2 logo_mockups — 役割の見直し
+
+```sql
+alter table public.logo_mockups
+  add column mockup_definition_id text references public.presentation_asset_definitions(id);
+```
+
+- `slot` は現状 `"mug" / "tote" / "cap"` のような簡易キーだが、将来は `mockup_definition_id` を正本にして、`slot` は後方互換用または廃止対象と考える
+- これで「この画像はどの mockup 定義の生成結果か」を候補ごとに辿れる
+- 決定論的な Workflow template は毎回再合成可能なので必ずしも `logo_mockups` に保存しない。一方、**有料生成(APIコスト発生)** の結果は引き続きここへキャッシュする
+
 ```sql
 create table public.logo_variants (
   id           uuid primary key default gen_random_uuid(),
@@ -148,6 +194,7 @@ create table public.logo_variants (
 create table public.logo_mockups (
   candidate_id uuid not null references public.logo_candidates(id) on delete cascade,
   slot         text not null,                  -- "mug" / "tote" / "cap" ...
+  mockup_definition_id text,                  -- 将来はこれを正本キーにする
   image_path   text not null,
   created_at   timestamptz not null default now(),
   primary key (candidate_id, slot)
@@ -160,7 +207,7 @@ create table public.logo_mockups (
 
 | 生成物 | 現状の保存先 | キー | アカウント/ロゴ行との紐付け |
 |---|---|---|---|
-| シーン10 モックアップ(Gemini) | **Cloudflare R2**(`logos/<logoId>/candidates/<candidateId>/mockups/<slot>.png`)。ブラウザは `/api/mockups/<logoId>/<candidateId>/<slot>` 経由で参照し、索引は `logo_mockups` | `candidate_id + slot` | **あり**。`logo_mockups` が `logo_candidates` にぶら下がり、そこから `logos` / 組織 / アカウントへ到達する |
+| シーン10 モックアップ(Gemini) | **Cloudflare R2**(`logos/<logoId>/candidates/<candidateId>/mockups/<slot>.png`)。ブラウザは `/api/mockups/<logoId>/<candidateId>/<slot>` 経由で参照し、索引は `logo_mockups` | `candidate_id + slot` (将来は `candidate_id + mockup_definition_id`) | **あり**。`logo_mockups` が `logo_candidates` にぶら下がり、そこから `logos` / 組織 / アカウントへ到達する |
 | Generative Lab 生成物(FLUX.2/Recraft) | **Cloudflare R2**(`labs/generative/outputs/<name>`)。R2未設定の開発環境のみローカルディスク `var/generative-lab/outputs/*.png` へフォールバック。配信URLは引き続き `/api/labs/generative/outputs/[name]` | ランダムファイル名。ジョブログに `logoHash`(ペイロードのSHA-256)を記録 | **なし**。まだ `logo_mockups` / `logos` / 組織には紐付いていない |
 
 つまり生成画像は今のところ**コンテンツアドレス方式のキャッシュ**であって、リレーショナルな正本レコードではない(同じロゴ内容なら誰がアップしても同じキャッシュを引く)。
@@ -175,11 +222,15 @@ create table public.logo_presentations (
   catchphrase text,                            -- キャッチコピー(Splash等に表示)
   story       text,                            -- ストーリー(Markdown想定)
   scene_texts jsonb not null default '{}',     -- シーンごとの文言オーバーライド
+  layout      jsonb not null default '{"version":1,"mappings":[]}', -- 資産配置の上書き
   updated_at  timestamptz not null default now()
 );
 ```
 
 - ロゴと 1:1(候補とは独立 — 案が違っても語りは1つ)。未編集でも自動生成コピーでプレゼンが成立する
+- `layout` は **asset definition catalog に対する per-logo の mapping override**。ここに「このロゴは splash に motion A、merch に黒Tシャツ、generated に mug+tote を使う」といった選択状態を持つ
+- `layout.mappings` は `assetId + placementId` ごとの override。つまり同じ asset が将来複数 placement に対応しても、配置ごとに有効/無効・順序を別々に持てる
+- 初期状態では `layout.mappings = []` とし、グローバル定義カタログ側の `default_mappings` がそのまま効く。利用者が順序変更・無効化・差し替えを行った asset だけをここへ保存する
 - 公開範囲はロゴ本体の `visibility` に従う
 
 ### 6.6 logo_credits — 新規

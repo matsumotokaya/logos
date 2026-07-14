@@ -37,15 +37,12 @@ export type ComposeResult = {
   metrics: ComposeMetrics;
 };
 
-export async function composeToUrl(
+export async function composePayloadToUrl(
   templateId: string,
-  logo: LabLogo,
+  payload: ComposeLogo,
   options: ComposeOptions = {},
   signal?: AbortSignal,
 ): Promise<ComposeResult> {
-  const payload = logoPayload(logo);
-  if (!payload) throw new Error("このロゴは合成に使えない");
-
   const res = await fetch("/api/labs/workflow/compose", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -62,4 +59,15 @@ export async function composeToUrl(
   ) as ComposeMetrics;
   const url = URL.createObjectURL(await res.blob());
   return { url, metrics };
+}
+
+export async function composeToUrl(
+  templateId: string,
+  logo: LabLogo,
+  options: ComposeOptions = {},
+  signal?: AbortSignal,
+): Promise<ComposeResult> {
+  const payload = logoPayload(logo);
+  if (!payload) throw new Error("このロゴは合成に使えない");
+  return composePayloadToUrl(templateId, payload, options, signal);
 }

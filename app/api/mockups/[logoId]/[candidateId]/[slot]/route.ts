@@ -58,6 +58,7 @@ export async function POST(
     const { error } = await supabase.from("logo_mockups").upsert({
       candidate_id: candidateId,
       slot,
+      mockup_definition_id: slot,
       image_path: objectKey,
     });
     if (error) throw error;
@@ -72,4 +73,3 @@ export async function POST(
     return Response.json({ error: message }, { status });
   }
 }
-

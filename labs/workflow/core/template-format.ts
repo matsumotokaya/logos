@@ -8,6 +8,16 @@
 //
 // Isomorphic module: types + validation only, no fs / no sharp.
 
+import {
+  isPresentationPlacementId,
+  type PresentationAssetMappingSpec,
+  type PresentationPlacementId,
+} from "@/lib/presentation-schema";
+import {
+  PRESENTATION_SCENES,
+  type PresentationScene,
+} from "@/lib/presentation-scenes";
+
 export const TEMPLATE_FORMAT = "logos-2d-template@1";
 
 /** A point in template canvas coordinates (px in the design space). */
@@ -69,6 +79,11 @@ export type LightingLayer = {
   opacity?: number;
 };
 
+export type TemplatePresentationSpec = {
+  allowedPlacements?: PresentationPlacementId[];
+  defaultMappings?: PresentationAssetMappingSpec[];
+};
+
 export type Template2D = {
   format: typeof TEMPLATE_FORMAT;
   /** Must equal the template's directory name. */
@@ -76,6 +91,17 @@ export type Template2D = {
   name: string;
   nameJa: string;
   category: TemplateCategory;
+  /**
+   * Future-proof placement binding for the presentation composer. A template
+   * can declare multiple allowed placements and default selections.
+   */
+  presentation?: TemplatePresentationSpec;
+  /** Which presentation section this template is meant to ship into. */
+  presentationScene?: PresentationScene;
+  /** Whether this template is adopted into the live presentation. */
+  presentationAdopted?: boolean;
+  /** Order inside that presentation section (lower first). */
+  presentationOrder?: number;
   /** Design space; every output resolution scales from this. */
   canvas: { width: number; height: number };
   /** The stage artwork (SVG recommended — resolution independent). */
@@ -175,6 +201,84 @@ export function validateTemplate(json: unknown, expectedId?: string): Validation
   if (!str(json.nameJa)) errors.push("nameJa: 文字列が必要");
   if (!CATEGORIES.includes(json.category as TemplateCategory))
     errors.push(`category: ${CATEGORIES.join("/")} のいずれかが必要`);
+  if (json.presentation !== undefined) {
+    if (!isRec(json.presentation)) {
+      errors.push("presentation: オブジェクトが必要");
+    } else {
+      if (
+        json.presentation.allowedPlacements !== undefined &&
+        (!Array.isArray(json.presentation.allowedPlacements) ||
+          !json.presentation.allowedPlacements.every(isPresentationPlacementId))
+      ) {
+        errors.push("presentation.allowedPlacements: 有効な placementId の配列");
+      }
+      if (json.presentation.defaultMappings !== undefined) {
+        if (!Array.isArray(json.presentation.defaultMappings)) {
+          errors.push("presentation.defaultMappings: 配列が必要");
+        } else {
+          const allowedPlacements = Array.isArray(json.presentation.allowedPlacements)
+            ? json.presentation.allowedPlacements.filter(isPresentationPlacementId)
+            : null;
+          json.presentation.defaultMappings.forEach((mapping, index) => {
+            if (!isRec(mapping)) {
+              errors.push(`presentation.defaultMappings[${index}]: オブジェクトが必要`);
+              return;
+            }
+            if (!isPresentationPlacementId(mapping.placementId)) {
+              errors.push(
+                `presentation.defaultMappings[${index}].placementId: 有効な placementId が必要`,
+              );
+            } else if (
+              allowedPlacements &&
+              !allowedPlacements.includes(mapping.placementId)
+            ) {
+              errors.push(
+                `presentation.defaultMappings[${index}].placementId: allowedPlacements に含まれていない`,
+              );
+            }
+            if (!num(mapping.order) || (mapping.order as number) < 0) {
+              errors.push(
+                `presentation.defaultMappings[${index}].order: 0以上の数値`,
+              );
+            }
+            if (typeof mapping.enabled !== "boolean") {
+              errors.push(
+                `presentation.defaultMappings[${index}].enabled: boolean`,
+              );
+            }
+            if (
+              mapping.params !== undefined &&
+              (!isRec(mapping.params) || Array.isArray(mapping.params))
+            ) {
+              errors.push(
+                `presentation.defaultMappings[${index}].params: オブジェクト`,
+              );
+            }
+          });
+        }
+      }
+    }
+  }
+  if (
+    json.presentationAdopted !== undefined &&
+    typeof json.presentationAdopted !== "boolean"
+  ) {
+    errors.push("presentationAdopted: boolean");
+  }
+  if (
+    json.presentationScene !== undefined &&
+    !PRESENTATION_SCENES.includes(json.presentationScene as PresentationScene)
+  ) {
+    errors.push(
+      `presentationScene: ${PRESENTATION_SCENES.join("/")} のいずれか`,
+    );
+  }
+  if (
+    json.presentationOrder !== undefined &&
+    (!num(json.presentationOrder) || (json.presentationOrder as number) < 0)
+  ) {
+    errors.push("presentationOrder: 0以上の数値");
+  }
 
   if (!isRec(json.canvas) || !num(json.canvas.width) || !num(json.canvas.height) ||
       (json.canvas.width as number) <= 0 || (json.canvas.height as number) <= 0)

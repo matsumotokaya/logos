@@ -28,13 +28,24 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | パス | 内容 |
 |---|---|
 | `/` | ロゴ投稿UI(メイン導線)+ ギャラリー(「あなたのロゴ」+ 全ユーザーの公開ロゴの図鑑)。カードから各プレゼンへ |
-| `/p/[id]` | 生成されたブランドプレゼンテーション(共有可能な固有URL)。**所有者のみ**ヘッダーの「編集」でキャッチコピー・ストーリー・各シーンのリード文をその場で書き換えられる(空にすると自動生成コピーに戻る)。`/p/sample` はサンプル(編集不可) |
+| `/p/[id]` | 生成されたブランドプレゼンテーション(共有可能な固有URL)。**所有者のみ**ヘッダーの「編集」でキャッチコピー・ストーリー・各シーンのリード文に加え、**どの motion / mockup / generated asset を各プレゼン配置に採用するか**をその場で切り替えられる。`/p/sample` はサンプル(編集不可) |
 | `/brand` | **Brand Manager**(旧称 Admin)。導入企業が**自社のブランド資産**(ロゴ・物品在庫・組織メンバー・公開ハンドル)を管理するハブ。プラットフォーム運営側の管理画面ではなく、そのブランドを持つ組織のための画面 |
-| `/brand/logos/[id]` | ロゴ情報ページ(正本の編集: 正式名称・ロゴ形式・役割・親子関係・公開範囲・公開スラッグ・コンタクト表示・タグ・制作クレジット・商標情報・マスターファイル差し替え・**組織への所有移管**・作業履歴) |
+| `/brand/logos/[id]` | ロゴ情報ページ(正本の編集: 正式名称・ロゴ形式・役割・親子関係・公開範囲・公開スラッグ・コンタクト表示・タグ・制作クレジット・商標情報・マスターファイル差し替え・**組織への所有移管**・作業履歴)。あわせて**このロゴで現在どのプレゼン asset が採用されているか**も確認できる |
 | `/[handle]/[slug]` | バニティURL。組織ハンドル+ロゴスラッグを正規パーマリンク `/p/[id]` に解決(公開ロゴのみ) |
-| `/labs` | **研究所インデックス**(noindex)。表現R&Dのラボ群を**保証モード/探索モード/統合(将来枠)**で分類: 稼働中の [Motion Lab](labs/motion/README.md)(`/labs/motion`)・[Workflow Lab](labs/workflow/README.md)(`/labs/workflow`、旧称 Image Lab)・[Generative Lab](labs/generative/README.md)(`/labs/generative`、探索モード)と、将来枠の Campaign Lab。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow` へリダイレクト |
+| `/labs` | **研究所インデックス**(noindex)。表現R&Dのラボ群を**保証モード/探索モード/統合(将来枠)**で分類: 稼働中の [Motion Lab](labs/motion/README.md)(`/labs/motion`)・[Workflow Lab](labs/workflow/README.md)(`/labs/workflow`、旧称 Image Lab)・[Generative Lab](labs/generative/README.md)(`/labs/generative`、探索モード)と、将来枠の Campaign Lab。**各ラボは「プレゼン本編に入る section asset を設計・検証し、採用候補を作る場」**として位置づける。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow` へリダイレクト |
 
 URL体系の設計意図(所有者を含まない壊れないパーマリンク等)は [docs/account-design.md](docs/account-design.md) を参照。
+
+## プレゼン構成モデル
+
+このプロダクトでは、プレゼンテーション本編を**固定実装の寄せ集め**としてではなく、**presentation asset catalog から組み立てるドキュメント**として扱う。
+
+- 各 motion / mockup / generated asset は「どの presentation placement に入れられるか」を持つ
+- 各ロゴは「その placement に何を採用するか」という **per-logo の layout** を持つ
+- ラボは、その asset を設計・検証し、**本編採用候補**として仕上げるための場である
+- 将来的には利用者自身がこの catalog から構成を選び、プレゼンを後編集できる。現行実装もその前提で設計している
+
+現時点での presentation placement は `splash.hero` / `social.primary` / `onsite.primary` / `merch.primary` / `generated.tile`。このうち特にラボとの接続が強いのは後半の mockup / generated 系 section で、現在は **07 Social / 08 On-site / 09 Merchandise / 10 Generated** が asset catalog から描画される。
 
 ## 生成されるプレゼンテーション(`/p/[id]`)
 
@@ -50,12 +61,21 @@ SVGをアップロードすると、以下が1本のガイドラインドキュ�
 | 04 | Logo usage | 配色パターングリッド(白地/ブランドカラー地/黒地/白抜き) |
 | 05 | App icon | iOS風アイコンと配色バリエーション |
 | 06 | Web | ブラウザクローム内ファビコン + 48/32/16pxサイズランプ |
-| 07 | Social | 認証バッジ付きプロフィールカードのモックアップ |
-| 08 | On-site | ラニヤード付き社員証モックアップ |
-| 09 | Merchandise | Tシャツへのmultiply合成(コードベースの精密配置) |
-| 10 | Generated | Gemini API(Nano Banana)によるマグカップ/トート/キャップの写実モックアップ生成。**手動生成**——各タイルの「生成」ボタンで1枚ずつ(APIコストが発生するため自動生成はしない)。生成済みはロゴ単位でキャッシュされ再生成されない |
+| 07 | Social | Social placement に採用された asset 群。既定では認証バッジ付きプロフィールカードのモックアップ |
+| 08 | On-site | On-site placement に採用された asset 群。既定ではラニヤード付き社員証モックアップ |
+| 09 | Merchandise | Merchandise placement に採用された asset 群。既定ではTシャツへのmultiply合成(コードベースの精密配置)。Workflow Lab で作った名刺・トート等もここへ採用可能 |
+| 10 | Generated | Generated placement に採用された asset 群。既定では Gemini API(Nano Banana)によるマグカップ/トート/キャップの写実モックアップ生成。**手動生成**——各タイルの「生成」ボタンで1枚ずつ(APIコストが発生するため自動生成はしない)。生成済みはロゴ単位でキャッシュされ再生成されない |
 
 ロゴが手元になくても、ランディングの「サンプルを見る」からサンプルプレゼンを確認できる。
+
+### 所有者によるプレゼン編集
+
+所有者は `/p/[id]` のヘッダー「編集」から、以下の2層をその場で編集できる。
+
+- **文言層**: キャッチコピー・ストーリー・各シーンのリード文
+- **構成層**: 各 presentation placement にどの asset を採用するか、またその表示順
+
+Brand Manager の `/brand/logos/[id]` では、このロゴの**現在の採用 asset 一覧**を確認でき、そこから本編編集へ移動できる。
 
 ## 多言語対応
 
@@ -66,6 +86,8 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 > **名称について**: 以前は「Admin(管理コンソール)」だったが、"Admin" だと**プラットフォーム運営側の管理画面**なのか**導入企業側の管理画面**なのか曖昧だった。この画面は後者——**導入企業が自社のブランド資産を管理する**場——なので **Brand Manager** に改称した(2026-07-14。ルートも `/admin` → `/brand`、UIラベルとi18nキー `header.brandManager` も更新済み)。
 
 白ベースのビジネスSaaS風ダッシュボード。KPI(登録ロゴ数・在庫アイテム数・要発注アイテム数・入荷待ち発注)、会社情報編集、**組織メンバーの招待・ロール管理(オーナー/管理者/編集者/購買担当/閲覧のみ)**、**公開URLハンドルの設定**、登録ロゴの一覧・役割設定・削除、ロゴアイテムの在庫管理と発注(ダミーデータ)を表示する。ビジネスモデル(フェーズ3の物販事業)を体現する画面。メール招待は相手がそのメールで登録した瞬間に自動でメンバー化される(SMTP不要)。組織ロール名の「管理者(admin)」はこの画面名とは別物(組織メンバーの権限)。
+
+各ロゴの詳細(`/brand/logos/[id]`)では、正本編集だけでなく**そのロゴのプレゼン構成の現在値**も確認する。つまり Brand Manager は「ロゴファイルを持つ場所」だけでなく、**そのロゴがどんなブランドドキュメントとして出力されるか**を見るハブでもある。
 
 ## アーキテクチャ
 
@@ -78,8 +100,17 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
   - [lib/raster.ts](lib/raster.ts) — SVG→PNGラスタライズ(生成AIへの入力用)
 - UIコピーは [lib/i18n/](lib/i18n/) で5言語対応(en/ja/ko/zh-Hant/zh-Hans)
 - シーンは [components/scenes/](components/scenes/) にプラグイン式で追加できる([Reveal](components/scenes/Reveal.tsx) / [shared](components/scenes/shared.tsx) を共通部品として利用)
+- プレゼン後半の mockup / generated 系 section は **presentation asset catalog** から解決して描画する。各 asset は placement 互換性と default mapping を持ち、ロゴごとの採用状態は `logo_presentations.layout` に保存される
 - 写実モックアップ生成は [app/api/generate/route.ts](app/api/generate/route.ts) が Gemini API を呼び出すサーバーサイドルート(APIキーを隠すため)
 - データ永続化は [lib/store/](lib/store/) の `BrandRepo` インターフェースで抽象化。現在は localStorage 実装([lib/store/local.ts](lib/store/local.ts))だが、実DB(Supabase等)への移行はこのインターフェースを実装するだけで済む
+
+### presentation asset catalog の現時点の実装
+
+- **概念上の正本**: `presentation_asset_definitions` テーブル + `logo_presentations.layout`
+- **現時点の定義ソース**: built-in asset のコード定義 + Workflow Lab の `template.json`
+- **取得API**: `/api/presentation-assets`
+
+つまり `0006_presentation_assets.sql` により **DBの受け皿は完成している** が、global asset definition の管理UI/同期はまだこれからである。現段階では **ロゴごとの layout 保存はDBに乗り、asset definition 自体は code/template 側から供給される**。
 
 ## 開発
 
@@ -109,7 +140,7 @@ R2_BUCKET_NAME=logos-assets
 
 スキーマの正本は [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql)(アカウント・組織・ロゴ正本・RLS一式)。セットアップ手順:
 
-1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0005、いずれも冪等・再実行可)
+1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0006、いずれも冪等・再実行可)
 2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(ゲスト投稿の前提)
 3. `.env.local` に以下を追加:
 

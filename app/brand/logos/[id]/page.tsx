@@ -4,7 +4,7 @@
 // Edits formal info (layer A: name, type, role, tree, visibility, credits,
 // trademarks) and discovery tags (layer C), and shows the work history.
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ACTIVITY_LABELS,
@@ -14,10 +14,12 @@ import {
   TRADEMARK_STATUS_LABELS,
   TRADEMARK_TYPE_LABELS,
   VISIBILITY_LABELS,
+  emptyPresentation,
   repo,
   type CreditRole,
   type LogoCredit,
   type LogoPatch,
+  type LogoPresentation,
   type LogoRole,
   type LogoTrademark,
   type LogoType,
@@ -26,6 +28,14 @@ import {
   type TrademarkStatus,
   type TrademarkType,
 } from "@/lib/store";
+import {
+  fetchPresentationCatalog,
+  type PresentationCatalogResponse,
+} from "@/lib/presentation-catalog";
+import {
+  getPresentationPlacement,
+  resolvePresentationAssets,
+} from "@/lib/presentation-schema";
 import { analyzeSvg, svgToDataUri } from "@/lib/svg";
 import {
   hasSupabase,
@@ -94,6 +104,11 @@ export default function LogoInfoPage({
   const [tmDraft, setTmDraft] = useState<TrademarkDraft[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
+  const [presentation, setPresentation] = useState<LogoPresentation>(emptyPresentation());
+  const [assetCatalog, setAssetCatalog] = useState<PresentationCatalogResponse>({
+    definitions: [],
+    brokenItems: [],
+  });
   // Orgs the viewer can transfer this logo into (owner/admin roles).
   const [adminOrgs, setAdminOrgs] = useState<Organization[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -101,17 +116,21 @@ export default function LogoInfoPage({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [l, all, orgs] = await Promise.all([
+      const [l, all, orgs, pres, catalog] = await Promise.all([
         repo.getLogo(id),
         repo.listLogos(),
         hasSupabase
           ? listMyOrgs().then((os) => os.filter((o) => o.myRole === "owner" || o.myRole === "admin"))
           : Promise.resolve([]),
+        repo.getPresentation(id).catch(() => emptyPresentation()),
+        fetchPresentationCatalog().catch(() => ({ definitions: [], brokenItems: [] })),
       ]);
       if (cancelled) return;
       setLogo(l);
       setAllLogos(all);
       setAdminOrgs(orgs);
+      setPresentation(pres);
+      setAssetCatalog(catalog);
       if (l) {
         setTitleDraft(l.title);
         setSlugDraft(l.slug ?? "");
@@ -132,6 +151,10 @@ export default function LogoInfoPage({
     await transferLogoToOrg(id, orgId);
     setLogo(await repo.getLogo(id));
   };
+
+  const presentationMappings = useMemo(() => {
+    return resolvePresentationAssets(assetCatalog.definitions, presentation.layout);
+  }, [assetCatalog.definitions, presentation.layout]);
 
   // Persist a patch and refresh the record (activities, updatedAt) without
   // clobbering in-progress credit/trademark drafts.
@@ -381,6 +404,43 @@ export default function LogoInfoPage({
                 制作クレジットに連絡先（メールアドレス）があるときに表示されます。
               </span>
             </div>
+          </div>
+        </Card>
+
+        <Card
+          title="プレゼン構成"
+          note="このロゴに対して、どの lab asset がどの presentation placement に採用されているか"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <p className="max-w-2xl text-sm leading-relaxed text-pretty text-gray-500">
+              Splash / Social / On-site / Merchandise / Generated に入る asset は、プレゼン本編の編集モードで切り替えられます。ここでは現在の採用状態を確認します。
+            </p>
+            <a
+              href={`/p/${logo.id}`}
+              className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 transition hover:border-gray-900 hover:text-gray-900"
+            >
+              プレゼンで編集 →
+            </a>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            {Object.entries(
+              presentationMappings.reduce<Record<string, string[]>>((acc, entry) => {
+                const label = getPresentationPlacement(entry.mapping.placementId).label;
+                acc[label] ??= [];
+                acc[label].push(entry.definition.title);
+                return acc;
+              }, {}),
+            ).map(([placement, titles]) => (
+              <div key={placement} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="font-mono text-[11px] uppercase text-gray-500">{placement}</p>
+                <p className="mt-1 text-sm text-gray-900">{titles.join(" / ")}</p>
+              </div>
+            ))}
+            {presentationMappings.length === 0 && (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-500">
+                まだ採用 asset がありません。プレゼン本編の編集モードで placement ごとの採用を決めてください。
+              </div>
+            )}
           </div>
         </Card>
 

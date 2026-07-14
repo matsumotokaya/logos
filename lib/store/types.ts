@@ -6,6 +6,11 @@
 // docs/data-model.md (layer A: master file + formal info, layer C: tags).
 
 import type { LogoData } from "@/lib/svg";
+import {
+  emptyPresentationLayout,
+  normalizePresentationLayout,
+  type PresentationLayout,
+} from "@/lib/presentation-schema";
 
 export type LogoRole = "brand" | "corporate" | "service" | "subsidiary" | "other";
 
@@ -194,6 +199,12 @@ export type LogoPresentation = {
   catchphrase: string; // shown on the Splash cover
   story: string; // shown in the Identity section body
   sceneTexts: Record<string, SceneTextOverride>;
+  /**
+   * Per-logo presentation composition overrides. Definitions live in the
+   * global presentation asset catalog; this layer stores only the logo's
+   * chosen mappings / order / enablement changes.
+   */
+  layout: PresentationLayout;
   updatedAt: string; // ISO 8601
 };
 
@@ -202,7 +213,21 @@ export function emptyPresentation(): LogoPresentation {
     catchphrase: "",
     story: "",
     sceneTexts: {},
+    layout: emptyPresentationLayout(),
     updatedAt: new Date().toISOString(),
+  };
+}
+
+export function normalizePresentation(
+  raw: Partial<LogoPresentation> | null | undefined,
+): LogoPresentation {
+  const base = emptyPresentation();
+  return {
+    catchphrase: raw?.catchphrase ?? base.catchphrase,
+    story: raw?.story ?? base.story,
+    sceneTexts: raw?.sceneTexts ?? base.sceneTexts,
+    layout: normalizePresentationLayout(raw?.layout ?? base.layout),
+    updatedAt: raw?.updatedAt ?? base.updatedAt,
   };
 }
 
@@ -239,9 +264,11 @@ export type Order = {
 };
 
 /**
- * Cached photoreal mockups for one logo, keyed by scene slot ("mug", "tote",
- * "cap", …). Values are image data URLs. Generating these calls a paid API,
- * so results are persisted and reused instead of regenerated on every visit.
+ * Cached mockup outputs for one logo candidate, keyed by the mockup
+ * definition id ("mug", "tote", "cap", … today; future Workflow /
+ * Generative definitions can extend this). Values are image data URLs.
+ * Paid generations are persisted and reused instead of regenerated on every
+ * visit.
  */
 export type GeneratedMockups = Record<string, string>;
 
@@ -273,7 +300,7 @@ export interface BrandRepo {
   saveMockup(
     logoId: string,
     candidateId: string | null | undefined,
-    slot: string,
+    mockupId: string,
     image: string
   ): Promise<void>;
 }

@@ -11,6 +11,7 @@ import {
   type LogoActivityAction,
   type LogoPatch,
   type LogoPresentation,
+  normalizePresentation,
   type Order,
   type StoredLogo,
 } from "./types";
@@ -24,7 +25,7 @@ const KEYS = {
   mockups: "logos.v1.mockups",
 } as const;
 
-// logoId -> { slot -> image }. Object insertion order doubles as LRU order.
+// logoId -> { mockupId -> image }. Object insertion order doubles as LRU order.
 type MockupMap = Record<string, GeneratedMockups>;
 
 const DEFAULT_COMPANY: Company = {
@@ -193,7 +194,7 @@ export class LocalStorageRepo implements BrandRepo {
 
   async getPresentation(logoId: string): Promise<LogoPresentation> {
     const map = read<Record<string, LogoPresentation>>(KEYS.presentations, {});
-    return map[logoId] ?? emptyPresentation();
+    return normalizePresentation(map[logoId] ?? emptyPresentation());
   }
 
   async savePresentation(
@@ -202,7 +203,7 @@ export class LocalStorageRepo implements BrandRepo {
   ): Promise<void> {
     const map = read<Record<string, LogoPresentation>>(KEYS.presentations, {});
     const now = new Date().toISOString();
-    map[logoId] = { ...presentation, updatedAt: now };
+    map[logoId] = { ...normalizePresentation(presentation), updatedAt: now };
     write(KEYS.presentations, map);
 
     // Record the edit in the logo's work history.
@@ -269,13 +270,13 @@ export class LocalStorageRepo implements BrandRepo {
   async saveMockup(
     logoId: string,
     _candidateId: string | null | undefined,
-    slot: string,
+    mockupId: string,
     image: string
   ): Promise<void> {
     if (typeof window === "undefined") return;
     const map = read<MockupMap>(KEYS.mockups, {});
     // Re-insert this logo last so it counts as most-recently-used.
-    const entry = { ...(map[logoId] ?? {}), [slot]: image };
+    const entry = { ...(map[logoId] ?? {}), [mockupId]: image };
     delete map[logoId];
     map[logoId] = entry;
 

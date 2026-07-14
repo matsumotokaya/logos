@@ -3,6 +3,7 @@
 import { createContext, useContext } from "react";
 import type { LogoData } from "@/lib/svg";
 import { cn } from "@/lib/cn";
+import type { PresentationLayout } from "@/lib/presentation-schema";
 
 export type Variants = {
   /** Logo repainted in off-white (#F4F4F2), for dark surfaces. */
@@ -30,13 +31,17 @@ export type PresentationTextPatch =
   | { story: string }
   | { sceneLead: { slug: string; lead: string } };
 
+export type PresentationPatch =
+  | PresentationTextPatch
+  | { layout: PresentationLayout };
+
 type PresentationEditCtx = {
   editing: boolean;
   catchphrase: string;
   story: string;
   /** Lead overrides keyed by scene slug; absent = auto copy. */
   sceneLeads: Record<string, string | undefined>;
-  save: (patch: PresentationTextPatch) => void;
+  save: (patch: PresentationPatch) => void;
 };
 
 const PresentationEditContext = createContext<PresentationEditCtx>({

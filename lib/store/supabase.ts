@@ -14,6 +14,7 @@ import {
   type LogoActivityAction,
   type LogoPatch,
   type LogoPresentation,
+  normalizePresentation,
   type Order,
   type StoredLogo,
 } from "./types";
@@ -453,17 +454,18 @@ export class SupabaseRepo implements BrandRepo {
     await this.ensureAuth();
     const { data, error } = await supabase
       .from("logo_presentations")
-      .select("catchphrase, story, scene_texts, updated_at")
+      .select("catchphrase, story, scene_texts, layout, updated_at")
       .eq("logo_id", logoId)
       .maybeSingle();
     throwOn(error);
     if (!data) return emptyPresentation();
-    return {
+    return normalizePresentation({
       catchphrase: data.catchphrase,
       story: data.story,
       sceneTexts: data.scene_texts ?? {},
+      layout: data.layout ?? emptyPresentation().layout,
       updatedAt: data.updated_at,
-    };
+    });
   }
 
   async savePresentation(
@@ -471,11 +473,13 @@ export class SupabaseRepo implements BrandRepo {
     presentation: LogoPresentation
   ): Promise<void> {
     await this.ensureAuth();
+    const normalized = normalizePresentation(presentation);
     const { error } = await supabase.from("logo_presentations").upsert({
       logo_id: logoId,
-      catchphrase: presentation.catchphrase,
-      story: presentation.story,
-      scene_texts: presentation.sceneTexts,
+      catchphrase: normalized.catchphrase,
+      story: normalized.story,
+      scene_texts: normalized.sceneTexts,
+      layout: normalized.layout,
       updated_at: new Date().toISOString(),
     });
     throwOn(error);
@@ -597,11 +601,11 @@ export class SupabaseRepo implements BrandRepo {
   async saveMockup(
     logoId: string,
     candidateId: string | null | undefined,
-    slot: string,
+    mockupId: string,
     image: string
   ): Promise<void> {
     if (!candidateId) return;
-    const res = await this.mockupRequest(`/api/mockups/${logoId}/${candidateId}/${slot}`, {
+    const res = await this.mockupRequest(`/api/mockups/${logoId}/${candidateId}/${mockupId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image }),

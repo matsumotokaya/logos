@@ -4,6 +4,15 @@
   "name": "Business Card",
   "nameJa": "名刺(デスク平置き)",
   "category": "print",
+  "presentation": {
+    "allowedPlacements": ["merch.primary"],
+    "defaultMappings": [
+      { "placementId": "merch.primary", "order": 10, "enabled": false }
+    ]
+  },
+  "presentationScene": "merch",
+  "presentationAdopted": false,
+  "presentationOrder": 10,
   "canvas": { "width": 2000, "height": 1500 },
   "stage": { "src": "stage.svg" },
   "surface": {

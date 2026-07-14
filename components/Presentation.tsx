@@ -1,17 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { recolorSvg, type LogoData } from "@/lib/svg";
 import { SERVICE_NAME } from "@/lib/config";
-import type { LogoPresentation } from "@/lib/store";
+import { emptyPresentation, type LogoPresentation } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
+import {
+  fetchPresentationCatalog,
+  type PresentationCatalogResponse,
+} from "@/lib/presentation-catalog";
+import { resolvePresentationAssets } from "@/lib/presentation-schema";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import Account from "@/components/Account";
 import MainNav from "@/components/MainNav";
+import PresentationLayoutEditor from "@/components/presentation/PresentationLayoutEditor";
+import MockupScene from "@/components/scenes/MockupScene";
 import {
   PresentationEditProvider,
-  type PresentationTextPatch,
+  type PresentationPatch,
   type Variants,
 } from "@/components/scenes/shared";
 import Splash from "@/components/scenes/Splash";
@@ -22,10 +29,6 @@ import Palette from "@/components/scenes/Palette";
 import UsageGrid from "@/components/scenes/UsageGrid";
 import AppIcons from "@/components/scenes/AppIcons";
 import Browser from "@/components/scenes/Browser";
-import Social from "@/components/scenes/Social";
-import Badge from "@/components/scenes/Badge";
-import Merch from "@/components/scenes/Merch";
-import Generated from "@/components/scenes/Generated";
 
 type Props = {
   logo: LogoData;
@@ -36,10 +39,10 @@ type Props = {
   onReset: () => void;
   /** Creator contact address; renders a mailto link in the footer when set. */
   contactEmail?: string | null;
-  /** Layer B editorial content; null renders the auto-generated copy only. */
+  /** Editorial copy + per-logo presentation layout overrides. */
   presentation?: LogoPresentation | null;
-  /** Present when the viewer may edit layer B in place (stored logos only). */
-  onSavePresentation?: (patch: PresentationTextPatch) => void;
+  /** Present when the viewer may edit presentation copy/layout in place. */
+  onSavePresentation?: (patch: PresentationPatch) => void;
 };
 
 export default function Presentation({
@@ -55,6 +58,7 @@ export default function Presentation({
 }: Props) {
   const { dict, format } = useI18n();
   const [editing, setEditing] = useState(false);
+  const [assetCatalog, setAssetCatalog] = useState<PresentationCatalogResponse | null>(null);
   const variants = useMemo<Variants>(
     () => ({
       white: recolorSvg(logo.svg, "#F4F4F2"),
@@ -79,6 +83,38 @@ export default function Presentation({
       save: onSavePresentation ?? (() => {}),
     }),
     [editable, editing, presentation, onSavePresentation]
+  );
+
+  useEffect(() => {
+    let alive = true;
+    fetchPresentationCatalog()
+      .then((catalog) => {
+        if (alive) setAssetCatalog(catalog);
+      })
+      .catch(() => {
+        if (alive) {
+          setAssetCatalog({ definitions: [], brokenItems: [] });
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const mockupEntries = useMemo(() => {
+    return resolvePresentationAssets(
+      assetCatalog?.definitions ?? [],
+      presentation?.layout ?? emptyPresentation().layout,
+    );
+  }, [assetCatalog?.definitions, presentation?.layout]);
+
+  const assetDefinitions = assetCatalog?.definitions ?? [];
+
+  const socialEntries = mockupEntries.filter((entry) => entry.placement.scene === "social");
+  const onsiteEntries = mockupEntries.filter((entry) => entry.placement.scene === "onsite");
+  const merchEntries = mockupEntries.filter((entry) => entry.placement.scene === "merch");
+  const generatedEntries = mockupEntries.filter(
+    (entry) => entry.placement.scene === "generated",
   );
 
   return (
@@ -129,6 +165,13 @@ export default function Presentation({
       </header>
 
       <PresentationEditProvider value={editCtx}>
+      {editable && editing && (
+        <PresentationLayoutEditor
+          definitions={assetDefinitions}
+          layout={presentation?.layout ?? emptyPresentation().layout}
+          onSaveLayout={(layout) => onSavePresentation?.({ layout })}
+        />
+      )}
       <Splash {...scene} />
       <Contents />
       {/* Anchor wrappers for the table of contents; offset for the sticky header. */}
@@ -151,16 +194,44 @@ export default function Presentation({
         <Browser {...scene} />
       </div>
       <div id="s07" className="scroll-mt-16">
-        <Social {...scene} />
+        <MockupScene
+          n="07"
+          title={dict.scenes.social}
+          lead={dict.sections.social.lead}
+          slug="social"
+          scene={scene}
+          entries={socialEntries}
+        />
       </div>
       <div id="s08" className="scroll-mt-16">
-        <Badge {...scene} />
+        <MockupScene
+          n="08"
+          title={dict.scenes.onsite}
+          lead={dict.sections.onsite.lead}
+          slug="onsite"
+          scene={scene}
+          entries={onsiteEntries}
+        />
       </div>
       <div id="s09" className="scroll-mt-16">
-        <Merch {...scene} />
+        <MockupScene
+          n="09"
+          title={dict.scenes.merch}
+          lead={dict.sections.merch.lead}
+          slug="merch"
+          scene={scene}
+          entries={merchEntries}
+        />
       </div>
       <div id="s10" className="scroll-mt-16">
-        <Generated {...scene} />
+        <MockupScene
+          n="10"
+          title={dict.scenes.generated}
+          lead={dict.sections.generated.lead}
+          slug="generated"
+          scene={scene}
+          entries={generatedEntries}
+        />
       </div>
       </PresentationEditProvider>
 

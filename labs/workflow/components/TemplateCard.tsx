@@ -5,6 +5,7 @@
 // Invalid templates stay visible with their validation errors (the format's
 // feedback loop for designers).
 
+import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
 import type { LabLogo } from "@/labs/motion/core/experiment-api";
@@ -15,6 +16,7 @@ import {
 } from "@/labs/motion/core/notes-store";
 import { CATEGORY_LABELS } from "@/labs/workflow/core/template-format";
 import type { CatalogEntryDto, ComposeMetrics } from "@/labs/workflow/core/pipeline";
+import { getWorkflowPresentationScene } from "@/labs/workflow/core/presentation-placement";
 import { composeToUrl } from "@/labs/workflow/core/client";
 import { BLEND_EXPLAIN } from "@/labs/workflow/core/tech-notes";
 
@@ -25,12 +27,10 @@ const PREVIEW_WIDTH = 720;
 export default function TemplateCard({
   entry,
   logo,
-  onOpen,
   onComposed,
 }: {
   entry: CatalogEntryDto;
   logo: LabLogo | null;
-  onOpen: (id: string) => void;
   onComposed: () => void;
 }) {
   const { id, template, errors } = entry;
@@ -89,16 +89,15 @@ export default function TemplateCard({
     ? template.canvas.width / template.canvas.height
     : 16 / 10;
 
-  return (
+  const content = (
     <article
       className={cn(
-        "flex flex-col overflow-hidden rounded-xl border border-hairline bg-white transition",
-        !broken && "cursor-pointer hover:border-ink-faint hover:shadow-sm",
+        "flex flex-col gap-4 rounded-[28px] border border-hairline bg-white p-3 md:p-4",
+        !broken && "transition group-hover:border-ink-faint group-hover:shadow-sm",
       )}
-      onClick={() => !broken && onOpen(id)}
     >
       <div
-        className="relative border-b border-hairline bg-paper"
+        className="relative overflow-hidden rounded-[20px] border border-hairline bg-paper"
         style={{ aspectRatio: aspect }}
       >
         {broken ? (
@@ -143,22 +142,39 @@ export default function TemplateCard({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <div className="flex items-baseline gap-2">
-          <span className="font-mono text-[11px] text-ink-faint">{id}</span>
-          <h3 className="text-sm font-semibold tracking-tight">
-            {template?.nameJa ?? id}
-          </h3>
-          {note?.rating ? (
-            <span className="ml-auto text-[11px] text-accent">
-              {"★".repeat(note.rating)}
-            </span>
-          ) : null}
+      <div className="flex flex-1 flex-col gap-3 px-1 pb-1">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[11px] text-ink-faint">{id}</p>
+            <h3 className="mt-1 text-base font-semibold text-balance">
+              {template?.nameJa ?? id}
+            </h3>
+            {template?.notesJa && (
+              <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-pretty text-ink-muted">
+                {template.notesJa}
+              </p>
+            )}
+          </div>
+          <div className="shrink-0 text-right">
+            {note?.rating ? (
+              <span className="block text-[11px] text-accent">
+                {"★".repeat(note.rating)}
+              </span>
+            ) : null}
+            {template && (
+              <span className="mt-2 block text-xs text-accent">
+                詳細を見る →
+              </span>
+            )}
+          </div>
         </div>
         {template && (
           <div className="flex flex-wrap gap-1.5 text-[10px] text-ink-muted">
             <span className="rounded-full bg-ink/5 px-2 py-0.5">
               {CATEGORY_LABELS[template.category]}
+            </span>
+            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-accent">
+              {getWorkflowPresentationScene(template)}
             </span>
             <span
               className="rounded-full border border-hairline px-2 py-0.5 font-mono"
@@ -169,7 +185,7 @@ export default function TemplateCard({
             {template.surface.displacement && (
               <span
                 className="rounded-full border border-hairline px-2 py-0.5 font-mono"
-                title={`ディスプレイスメント: RGBマップで面のシワ・凹凸を再現(強度${template.surface.displacement.strength}px)。詳細はカードを開いて「技術解説」参照`}
+                title={`ディスプレイスメント: RGBマップで面のシワ・凹凸を再現(強度${template.surface.displacement.strength}px)。詳細ページの「技術解説」を参照`}
               >
                 displace
               </span>
@@ -191,5 +207,18 @@ export default function TemplateCard({
         )}
       </div>
     </article>
+  );
+
+  if (broken) {
+    return content;
+  }
+
+  return (
+    <Link
+      href={`/labs/workflow/${id}`}
+      className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+    >
+      {content}
+    </Link>
   );
 }

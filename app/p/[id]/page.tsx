@@ -11,7 +11,7 @@ import { SAMPLE_SVG, SAMPLE_NAME } from "@/lib/sample";
 import { emptyPresentation, repo, type LogoPresentation } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
 import Presentation from "@/components/Presentation";
-import type { PresentationTextPatch } from "@/components/scenes/shared";
+import type { PresentationPatch } from "@/components/scenes/shared";
 
 type State =
   | { status: "loading" }
@@ -89,10 +89,12 @@ export default function PresentationPage({
 
   // Apply one in-place edit (blur) to layer B and persist it. No-op saves
   // (blur without change) are skipped so the work history stays clean.
-  const handleSavePresentation = async (patch: PresentationTextPatch) => {
+  const handleSavePresentation = async (patch: PresentationPatch) => {
     const base = pres ?? emptyPresentation();
     let next: LogoPresentation;
-    if ("sceneLead" in patch) {
+    if ("layout" in patch) {
+      next = { ...base, layout: patch.layout };
+    } else if ("sceneLead" in patch) {
       const { slug, lead } = patch.sceneLead;
       const sceneTexts = { ...base.sceneTexts };
       if (lead) sceneTexts[slug] = { ...sceneTexts[slug], lead };
@@ -104,7 +106,8 @@ export default function PresentationPage({
     if (
       next.catchphrase === base.catchphrase &&
       next.story === base.story &&
-      JSON.stringify(next.sceneTexts) === JSON.stringify(base.sceneTexts)
+      JSON.stringify(next.sceneTexts) === JSON.stringify(base.sceneTexts) &&
+      JSON.stringify(next.layout) === JSON.stringify(base.layout)
     ) {
       return;
     }
