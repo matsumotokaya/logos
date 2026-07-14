@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import Gallery from "@/components/Gallery";
 import Account from "@/components/Account";
+import MainNav from "@/components/MainNav";
 
 type Props = {
   onLogo: (logo: LogoData, suggestedName: string) => Promise<void>;
@@ -103,9 +104,10 @@ export default function Landing({ onLogo }: Props) {
           {SERVICE_NAME}
           <span className="align-super text-[0.55em]">®</span>
         </p>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2 sm:gap-3">
           <LanguageSwitcher />
           <Account />
+          <MainNav />
         </div>
       </header>
 

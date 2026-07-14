@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import Account from "@/components/Account";
+import MainNav from "@/components/MainNav";
 import {
   PresentationEditProvider,
   type PresentationTextPatch,
@@ -88,9 +89,10 @@ export default function Presentation({
             {dict.doc.brandGuidelines} — {name}
           </p>
         </div>
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-3">
           <LanguageSwitcher />
           <Account />
+          <MainNav />
           {editable && (
             <button
               type="button"

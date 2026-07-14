@@ -84,29 +84,21 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
     };
   }, [menuOpen]);
 
-  // localStorage mode (no auth): keep Brand Manager/labs reachable as plain links.
+  // localStorage mode (no auth): an avatar-only menu. No email/logout, but the
+  // internal Labs entrance and My page stay reachable here.
   if (!enabled) {
     return (
-      <span className="flex items-center gap-4">
-        <Link
-          href="/brand"
-          className={cn(
-            "font-mono text-xs uppercase transition-colors",
-            tone === "dark" ? "text-ink-muted hover:text-ink" : "text-white/70 hover:text-white"
-          )}
-        >
-          {dict.header.brandManager}
-        </Link>
-        <Link
-          href="/labs"
-          className={cn(
-            "font-mono text-xs uppercase transition-colors",
-            tone === "dark" ? "text-ink-muted hover:text-ink" : "text-white/70 hover:text-white"
-          )}
-        >
-          {dict.header.labs}
-        </Link>
-      </span>
+      <div ref={menuRef} className="relative">
+        <AvatarButton
+          initial="•"
+          tone={tone}
+          open={menuOpen}
+          onClick={() => setMenuOpen((o) => !o)}
+        />
+        {menuOpen && (
+          <AccountMenu onNavigate={() => setMenuOpen(false)} labs={dict.header.labs} myPage={dict.header.myPage} />
+        )}
+      </div>
     );
   }
 
@@ -167,75 +159,24 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
         <span aria-hidden="true" className={cn("inline-block h-4 w-16 animate-pulse rounded", tone === "dark" ? "bg-hairline" : "bg-white/20")} />
       ) : isSignedIn ? (
         <div ref={menuRef} className="relative">
-          <button
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
+          <AvatarButton
+            initial={(user?.email?.[0] ?? "•").toUpperCase()}
+            tone={tone}
+            open={menuOpen}
             onClick={() => setMenuOpen((o) => !o)}
-            className={cn(
-              "flex items-center gap-2 rounded-full py-0.5 pr-2 pl-0.5 transition-colors",
-              tone === "dark" ? "hover:bg-ink/5" : "hover:bg-white/10"
-            )}
-          >
-            <span
-              aria-hidden="true"
-              className="flex size-7 items-center justify-center rounded-full bg-accent font-mono text-xs font-semibold text-white"
-            >
-              {(user?.email?.[0] ?? "•").toUpperCase()}
-            </span>
-            <span className={cn("hidden max-w-36 truncate text-xs sm:inline", tone === "dark" ? "text-ink-muted" : "text-white/80")}>
-              {user?.email}
-            </span>
-            <svg
-              viewBox="0 0 12 12"
-              aria-hidden="true"
-              className={cn(
-                "size-2.5 transition-transform",
-                menuOpen && "rotate-180",
-                tone === "dark" ? "text-ink-faint" : "text-white/50"
-              )}
-            >
-              <path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-
+          />
           {menuOpen && (
-            <div
-              role="menu"
-              className="absolute top-full right-0 z-50 mt-2 w-60 overflow-hidden rounded-xl border border-hairline bg-paper py-1.5 shadow-lg"
-            >
-              <p className="truncate border-b border-hairline px-4 pt-1.5 pb-2.5 font-mono text-xs text-ink-muted">
-                {user?.email}
-              </p>
-              <Link
-                role="menuitem"
-                href="/brand"
-                onClick={() => setMenuOpen(false)}
-                className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
-              >
-                {dict.header.brandManager}
-              </Link>
-              <Link
-                role="menuitem"
-                href="/labs"
-                onClick={() => setMenuOpen(false)}
-                className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
-              >
-                {dict.header.labs}
-              </Link>
-              <div aria-hidden="true" className="my-1.5 h-px bg-hairline" />
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  void signOut();
-                }}
-                className="block w-full px-4 py-2 text-left text-sm text-ink-muted transition-colors hover:bg-ink/5 hover:text-ink"
-              >
-                {dict.auth.signOut}
-              </button>
-            </div>
+            <AccountMenu
+              email={user?.email}
+              labs={dict.header.labs}
+              myPage={dict.header.myPage}
+              signOutLabel={dict.auth.signOut}
+              onNavigate={() => setMenuOpen(false)}
+              onSignOut={() => {
+                setMenuOpen(false);
+                void signOut();
+              }}
+            />
           )}
         </div>
       ) : (
@@ -364,5 +305,99 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
         </div>
       </dialog>
     </>
+  );
+}
+
+// Avatar trigger: icon only (the identity affordance). No email beside it —
+// the email lives inside the opened menu.
+function AvatarButton({
+  initial,
+  tone,
+  open,
+  onClick,
+}: {
+  initial: string;
+  tone: "dark" | "light";
+  open: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-haspopup="menu"
+      aria-expanded={open}
+      aria-label="Account"
+      onClick={onClick}
+      className={cn(
+        "flex size-8 items-center justify-center rounded-full bg-accent font-mono text-xs font-semibold text-white transition-transform hover:scale-105",
+        open && "ring-2 ring-accent/40 ring-offset-2 ring-offset-paper",
+        tone === "light" && "ring-offset-transparent",
+      )}
+    >
+      {initial}
+    </button>
+  );
+}
+
+// The account menu: identity (email) + account actions. Labs is the internal
+// entrance — it belongs here (staff-only), NOT in the public hamburger.
+function AccountMenu({
+  email,
+  labs,
+  myPage,
+  signOutLabel,
+  onNavigate,
+  onSignOut,
+}: {
+  email?: string | null;
+  labs: string;
+  myPage: string;
+  signOutLabel?: string;
+  onNavigate: () => void;
+  onSignOut?: () => void;
+}) {
+  return (
+    <div
+      role="menu"
+      className="absolute top-full right-0 z-50 mt-2 w-60 overflow-hidden rounded-xl border border-hairline bg-paper py-1.5 shadow-lg"
+    >
+      {email && (
+        <p className="truncate border-b border-hairline px-4 pt-1.5 pb-2.5 font-mono text-xs text-ink-muted">
+          {email}
+        </p>
+      )}
+      <Link
+        role="menuitem"
+        href="/"
+        onClick={onNavigate}
+        className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
+      >
+        {myPage}
+      </Link>
+      <Link
+        role="menuitem"
+        href="/labs"
+        onClick={onNavigate}
+        className="flex items-center gap-2 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
+      >
+        {labs}
+        <span className="rounded-full border border-hairline px-1.5 py-0.5 text-[9px] text-ink-faint">
+          社内
+        </span>
+      </Link>
+      {onSignOut && (
+        <>
+          <div aria-hidden="true" className="my-1.5 h-px bg-hairline" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onSignOut}
+            className="block w-full px-4 py-2 text-left text-sm text-ink-muted transition-colors hover:bg-ink/5 hover:text-ink"
+          >
+            {signOutLabel}
+          </button>
+        </>
+      )}
+    </div>
   );
 }

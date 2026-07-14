@@ -5,6 +5,8 @@ export type Dict = {
   header: {
     brandManager: string;
     labs: string;
+    home: string;
+    myPage: string;
     newLogo: string;
     brandName: string;
     language: string;
@@ -129,6 +131,8 @@ const en: Dict = {
   header: {
     brandManager: "Brand Manager",
     labs: "Labs",
+    home: "Home",
+    myPage: "My page",
     newLogo: "New logo",
     brandName: "Brand name",
     language: "Language",
@@ -270,6 +274,8 @@ const ja: Dict = {
   header: {
     brandManager: "Brand Manager",
     labs: "ラボ",
+    home: "ホーム",
+    myPage: "マイページ",
     newLogo: "新しいロゴ",
     brandName: "ブランド名",
     language: "言語",
@@ -411,6 +417,8 @@ const ko: Dict = {
   header: {
     brandManager: "Brand Manager",
     labs: "랩",
+    home: "홈",
+    myPage: "마이페이지",
     newLogo: "새 로고",
     brandName: "브랜드명",
     language: "언어",
@@ -552,6 +560,8 @@ const zhHant: Dict = {
   header: {
     brandManager: "Brand Manager",
     labs: "實驗室",
+    home: "首頁",
+    myPage: "我的頁面",
     newLogo: "新標誌",
     brandName: "品牌名稱",
     language: "語言",
@@ -692,6 +702,8 @@ const zhHans: Dict = {
   header: {
     brandManager: "Brand Manager",
     labs: "实验室",
+    home: "首页",
+    myPage: "我的页面",
     newLogo: "新标志",
     brandName: "品牌名称",
     language: "语言",
@@ -829,11 +841,11 @@ const zhHans: Dict = {
 };
 
 export const LOCALES = [
-  { code: "en", label: "English", htmlLang: "en" },
-  { code: "ja", label: "日本語", htmlLang: "ja" },
-  { code: "ko", label: "한국어", htmlLang: "ko" },
-  { code: "zh-Hant", label: "繁體中文", htmlLang: "zh-Hant" },
-  { code: "zh-Hans", label: "简体中文", htmlLang: "zh-Hans" },
+  { code: "en", label: "English", short: "EN", htmlLang: "en" },
+  { code: "ja", label: "日本語", short: "JA", htmlLang: "ja" },
+  { code: "ko", label: "한국어", short: "KO", htmlLang: "ko" },
+  { code: "zh-Hant", label: "繁體中文", short: "繁", htmlLang: "zh-Hant" },
+  { code: "zh-Hans", label: "简体中文", short: "简", htmlLang: "zh-Hans" },
 ] as const;
 
 export type Locale = (typeof LOCALES)[number]["code"];

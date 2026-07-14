@@ -14,6 +14,7 @@ import { LABS_NAME } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import Account from "@/components/Account";
+import MainNav from "@/components/MainNav";
 import { MODE_INFO, type LabMode } from "@/labs/directory";
 
 export const LAB_CONTENT_WIDTH = "max-w-6xl";
@@ -31,9 +32,10 @@ export default function LabHeader({
           {LABS_NAME}
           <span className="align-super text-[0.55em]">®</span>
         </Link>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2 sm:gap-3">
           <LanguageSwitcher />
           <Account />
+          <MainNav />
         </div>
       </header>
 
