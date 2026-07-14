@@ -50,6 +50,12 @@ export default function WorkflowTemplateInspector({
 
   const techNotes = useMemo(() => templateTechNotes(template), [template]);
 
+  // Keep the latest callback without making it a compose dependency — the
+  // parent passes a fresh closure each render, and depending on it here would
+  // loop: compose → onComposed → parent re-render → new closure → compose.
+  const onComposedRef = useRef(onComposed);
+  onComposedRef.current = onComposed;
+
   useEffect(() => {
     const controller = new AbortController();
     const options: ComposeOptions = {
@@ -69,7 +75,7 @@ export default function WorkflowTemplateInspector({
           setUrl(result.url);
           setMetrics(result.metrics);
           setBusy(false);
-          onComposed();
+          onComposedRef.current();
         })
         .catch((e: unknown) => {
           if (controller.signal.aborted) return;
@@ -81,7 +87,7 @@ export default function WorkflowTemplateInspector({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [template.id, logo, width, logoScale, offsetU, offsetV, colorMode, onComposed]);
+  }, [template.id, logo, width, logoScale, offsetU, offsetV, colorMode]);
 
   useEffect(
     () => () => {

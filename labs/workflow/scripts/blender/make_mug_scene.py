@@ -199,14 +199,17 @@ def main():
     world = bpy.data.worlds.new("Studio")
     world.use_nodes = True
     bg = world.node_tree.nodes["Background"]
-    bg.inputs["Color"].default_value = (0.88, 0.885, 0.90, 1.0)
-    bg.inputs["Strength"].default_value = 0.4
+    bg.inputs["Color"].default_value = (0.90, 0.905, 0.915, 1.0)
+    bg.inputs["Strength"].default_value = 0.5
     scene.world = world
 
+    # A soft top light lifts the upper backdrop out of shadow (studio sweep)
+    # without washing out the mug's own key/fill/rim modelling.
     focus = (0.0, 0.0, 0.048)
-    add_area_light("Key", (-0.22, -0.28, 0.30), focus, size=0.5, energy=1.5)
-    add_area_light("Fill", (0.32, -0.22, 0.14), focus, size=0.4, energy=0.55)
-    add_area_light("Rim", (0.06, 0.34, 0.28), focus, size=0.4, energy=1.1)
+    add_area_light("Key", (-0.22, -0.28, 0.30), focus, size=0.5, energy=2.4)
+    add_area_light("Fill", (0.32, -0.22, 0.14), focus, size=0.4, energy=0.7)
+    add_area_light("Rim", (0.06, 0.34, 0.28), focus, size=0.4, energy=1.3)
+    add_area_light("Sweep", (0.0, 0.4, 1.4), (0.0, 0.9, 1.6), size=2.0, energy=8.0)
 
     cam_data = bpy.data.cameras.new("Camera")
     cam_data.lens = 85

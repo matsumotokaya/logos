@@ -55,11 +55,11 @@
       "placement": {
         "cx": 0.5,
         "cy": 0.5,
-        "width": 0.55
+        "width": 0.88
       },
-      "clearSpace": 0.15,
+      "clearSpace": 0.12,
       "minWidth": 0.25,
-      "maxWidth": 0.85
+      "maxWidth": 0.92
     }
   },
   "impressions": [

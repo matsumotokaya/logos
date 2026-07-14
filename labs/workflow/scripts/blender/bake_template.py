@@ -233,10 +233,10 @@ def main():
             "uvWarp": {"src": "uvmap.png", "aspect": float(aspect), "light": "light.png"},
             "logo": {
                 "blend": "over",
-                "placement": {"cx": 0.5, "cy": 0.5, "width": 0.55},
-                "clearSpace": 0.15,
+                "placement": {"cx": 0.5, "cy": 0.5, "width": 0.88},
+                "clearSpace": 0.12,
                 "minWidth": 0.25,
-                "maxWidth": 0.85,
+                "maxWidth": 0.92,
             },
         },
         "impressions": ["プロダクト", "フォトリアル"],
