@@ -18,11 +18,14 @@
 #     beauty pass and only drives the uv / light passes.
 
 import math
+import os
 import sys
 
 import bmesh
 import bpy
-from mathutils import Vector
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from studio import add_area_light, add_camera, save_scene, setup_studio  # noqa: E402
 
 
 def parse_args():
@@ -35,11 +38,6 @@ def parse_args():
     return out
 
 
-def look_at(obj, target):
-    d = Vector(target) - obj.location
-    obj.rotation_euler = d.to_track_quat("-Z", "Y").to_euler()
-
-
 def new_ceramic_material():
     mat = bpy.data.materials.new("Ceramic")
     mat.use_nodes = True
@@ -48,15 +46,6 @@ def new_ceramic_material():
     bsdf.inputs["Roughness"].default_value = 0.14
     if "Coat Weight" in bsdf.inputs:
         bsdf.inputs["Coat Weight"].default_value = 0.35
-    return mat
-
-
-def new_matte_material(name, value, roughness=0.6):
-    mat = bpy.data.materials.new(name)
-    mat.use_nodes = True
-    bsdf = mat.node_tree.nodes["Principled BSDF"]
-    bsdf.inputs["Base Color"].default_value = (value, value, value, 1.0)
-    bsdf.inputs["Roughness"].default_value = roughness
     return mat
 
 
@@ -154,101 +143,22 @@ def build_print_surface(ceramic):
     return obj
 
 
-def build_cove(matte, radius=1.3, floor_front=-1.4, curve_start=0.10,
-               wall_top=2.6, half_width=3.2, arc_steps=96):
-    """Seamless studio cove (infinity sweep): one sheet where the floor
-    fillets up into the back wall with a large radius, so no floor/wall seam
-    is ever visible. A bigger radius = a smoother, softer horizon.
-
-    Profile lives in the YZ plane, camera-side (front) to back; extruded
-    along X wide enough to fill the frame.
-    """
-    profile = [(floor_front, 0.0), (curve_start, 0.0)]
-    cy, cz = curve_start, radius  # fillet centre
-    for i in range(1, arc_steps + 1):
-        ang = math.radians(270 + 90 * i / arc_steps)  # floor tangent -> wall
-        profile.append((cy + radius * math.cos(ang), cz + radius * math.sin(ang)))
-    profile.append((curve_start + radius, wall_top))
-
-    bm = bmesh.new()
-    left = [bm.verts.new((-half_width, y, z)) for (y, z) in profile]
-    right = [bm.verts.new((half_width, y, z)) for (y, z) in profile]
-    for a in range(len(profile) - 1):
-        # Winding chosen so the normal faces the camera (-Y / +Z side).
-        f = bm.faces.new((left[a], right[a], right[a + 1], left[a + 1]))
-        f.smooth = True
-    mesh = bpy.data.meshes.new("Cove")
-    bm.to_mesh(mesh)
-    bm.free()
-    obj = bpy.data.objects.new("Cove", mesh)
-    obj.data.materials.append(matte)
-    bpy.context.collection.objects.link(obj)
-    return obj
-
-
-def add_area_light(name, location, target, size, energy):
-    light = bpy.data.lights.new(name, "AREA")
-    light.size = size
-    light.energy = energy
-    obj = bpy.data.objects.new(name, light)
-    obj.location = location
-    bpy.context.collection.objects.link(obj)
-    look_at(obj, target)
-    return obj
-
-
 def main():
     out_path = parse_args()
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    scene = bpy.context.scene
-
-    scene.render.engine = "CYCLES"
-    scene.cycles.samples = 128
-    scene.cycles.use_denoising = True
-    scene.render.resolution_x = 1600
-    scene.render.resolution_y = 1200
-    scene.view_settings.view_transform = "Standard"
+    scene = setup_studio()
 
     ceramic = new_ceramic_material()
     build_mug(ceramic)
     build_print_surface(ceramic)
 
-    # Seamless studio cove — a single large-radius filleted sheet, no floor/
-    # wall seam. It catches the contact shadow and is the whole background.
-    # Darker albedo so the floor never clips to pure white (blow-out).
-    studio_matte = new_matte_material("StudioWhite", 0.60, roughness=0.6)
-    build_cove(studio_matte)
-
-    world = bpy.data.worlds.new("Studio")
-    world.use_nodes = True
-    bg = world.node_tree.nodes["Background"]
-    bg.inputs["Color"].default_value = (0.85, 0.855, 0.87, 1.0)
-    bg.inputs["Strength"].default_value = 0.5
-    scene.world = world
-
-    # Big soft overhead wash evens the whole cove into a gentle top-dark →
-    # bottom-light gradient (kills the stepped look). Separate small key/rim
-    # only model the mug. Everything dialled low so nothing blows out.
+    # Small key/fill/rim model the mug only; the room comes from studio.py.
     focus = (0.0, 0.0, 0.048)
-    add_area_light("BGWash", (0.0, -0.15, 2.2), (0.0, 0.6, 0.0), size=4.0, energy=2.6)
     add_area_light("Key", (-0.22, -0.28, 0.30), focus, size=0.5, energy=0.85)
     add_area_light("Fill", (0.32, -0.22, 0.14), focus, size=0.4, energy=0.30)
     add_area_light("Rim", (0.06, 0.34, 0.28), focus, size=0.4, energy=0.65)
 
-    cam_data = bpy.data.cameras.new("Camera")
-    cam_data.lens = 85
-    cam = bpy.data.objects.new("Camera", cam_data)
-    cam.location = (0.01, -0.46, 0.14)
-    bpy.context.collection.objects.link(cam)
-    look_at(cam, focus)
-    scene.camera = cam
-
-    import os
-
-    abs_out = os.path.abspath(out_path)
-    os.makedirs(os.path.dirname(abs_out), exist_ok=True)
-    bpy.ops.wm.save_as_mainfile(filepath=abs_out)
-    print(f"saved scene: {abs_out}")
+    add_camera(scene, (0.01, -0.46, 0.14), focus, lens=85)
+    save_scene(out_path)
 
 
 main()

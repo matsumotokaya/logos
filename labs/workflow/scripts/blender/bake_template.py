@@ -33,7 +33,7 @@ import numpy as np
 
 def parse_args():
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
-    args = {"name": "Ceramic Mug", "name_ja": "セラミックマグ", "samples": None}
+    args = {"name": "Ceramic Mug", "name_ja": "セラミックマグ", "samples": None, "order": 30}
     it = iter(argv)
     for a in it:
         if a == "--out":
@@ -46,6 +46,8 @@ def parse_args():
             args["name_ja"] = next(it)
         elif a == "--samples":
             args["samples"] = int(next(it))
+        elif a == "--order":
+            args["order"] = int(next(it))
     if "out" not in args or "id" not in args:
         raise SystemExit("bake_template: --out and --id are required")
     return args
@@ -165,8 +167,12 @@ def main():
     render_to(scene, os.path.join(out_dir, "stage.png"), "PNG")
 
     # --- Pass 2: light (PrintSurface as white diffuse, scene untouched) -----
+    # Convention: a material named "PrintLight" in the scene overrides the
+    # plain white diffuse — e.g. white + canvas-weave bump so the printed
+    # logo inherits the fabric texture, not just its large-scale shading.
     ps.hide_render = False
-    ps_original = swap_materials(ps, make_white_diffuse_material())
+    light_mat = bpy.data.materials.get("PrintLight") or make_white_diffuse_material()
+    ps_original = swap_materials(ps, light_mat)
     render_to(scene, os.path.join(out_dir, "light.png"), "PNG")
 
     # --- Pass 3: uv field (emission only, transparent film, no denoise) -----
@@ -215,12 +221,12 @@ def main():
         "presentation": {
             "allowedPlacements": ["merch.primary"],
             "defaultMappings": [
-                {"placementId": "merch.primary", "order": 30, "enabled": False}
+                {"placementId": "merch.primary", "order": args["order"], "enabled": False}
             ],
         },
         "presentationScene": "merch",
         "presentationAdopted": False,
-        "presentationOrder": 30,
+        "presentationOrder": args["order"],
         "canvas": {"width": w, "height": h},
         "stage": {"src": "stage.png"},
         "surface": {

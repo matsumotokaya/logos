@@ -1,0 +1,70 @@
+{
+  "format": "logos-2d-template@1",
+  "id": "tote-canvas",
+  "name": "Canvas Tote 3D",
+  "nameJa": "キャンバストート(3D)",
+  "category": "product",
+  "presentation": {
+    "allowedPlacements": [
+      "merch.primary"
+    ],
+    "defaultMappings": [
+      {
+        "placementId": "merch.primary",
+        "order": 31,
+        "enabled": false
+      }
+    ]
+  },
+  "presentationScene": "merch",
+  "presentationAdopted": false,
+  "presentationOrder": 31,
+  "canvas": {
+    "width": 1600,
+    "height": 1200
+  },
+  "stage": {
+    "src": "stage.png"
+  },
+  "surface": {
+    "corners": {
+      "tl": [
+        549,
+        468
+      ],
+      "tr": [
+        1048,
+        468
+      ],
+      "br": [
+        1048,
+        967
+      ],
+      "bl": [
+        549,
+        967
+      ]
+    },
+    "uvWarp": {
+      "src": "uvmap.png",
+      "aspect": 1.0,
+      "light": "light.png"
+    },
+    "logo": {
+      "blend": "over",
+      "placement": {
+        "cx": 0.5,
+        "cy": 0.5,
+        "width": 0.88
+      },
+      "clearSpace": 0.12,
+      "minWidth": 0.25,
+      "maxWidth": 0.92
+    }
+  },
+  "impressions": [
+    "プロダクト",
+    "フォトリアル"
+  ],
+  "notesJa": "Blender焼き込みパイプライン(Phase 2)による3Dテンプレート。舞台・UVワープマップ・陰影マップをCyclesで焼き出し、ロゴはUVフィールド経由で決定論的に合成する。"
+}

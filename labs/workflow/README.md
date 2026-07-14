@@ -107,7 +107,7 @@
 - **Figmaインジェスト**: 命名規約付きFigmaファイルからAPI経由で平面系テンプレート(名刺・OGP・スライド・サイネージ等)を自動生成する制作効率化ツール
 - **PSDインジェスト**: スマートオブジェクト付きPSDを `template.json` に変換(スマートオブジェクトの変形行列=四隅座標、乗算レイヤー=ライティングレイヤーと概念が対応)。市販モックアップ資産の活用はライセンス確認が前提
 - **人間ワーカー工程**: 合成ジョブに人間の作業ステップ(Photoshopでの最終レタッチ等)を挟み、成果物をQAゲート(Layer 4)でロゴ忠実度検証して採用する。「保証モード=決定論のみ」ではなく**「保証モード=出力のロゴ不変が検証されるもの」**への拡張
-- **ランタイムBlenderワーカー**: オーダーごとの3Dレンダリング(ターンテーブル動画・任意アングル等)。焼き込みで実現できない出力が必要になるまで着手しない
+- **ランタイムBlenderワーカー**: オーダーごとの3Dレンダリング。焼き込みでは原理的に不可能な表現(ロゴ自体の立体化=エンボス/刻印/立体切り文字、ロゴ色に反応するライティング、任意アングル・ターンテーブル動画)に**圧倒的な差別化があるなら積極的に検討する**(2026-07-15ユーザー方針)。同期レスポンスは求めず、**有料会員向けのキュー+バッチ処理(数日待ちの「仕上がり品」)**のような提供形態も含めて柔軟に設計する。ラボは探索の場であり「焼き込みで済むから不要」と早期に切らない
 
 ## 未解決事項(実装前にプロトタイプで検証)
 
@@ -133,7 +133,8 @@ labs/workflow/
   templates/<id>/        # テンプレート = template.json + アセット(舞台SVG等)
   engine/uvwarp.ts       # UVワープ合成(Blender焼き込みテンプレート用・Phase 2)
   scripts/               # アセット生成スクリプト(ディスプレイスメントマップ等)
-  scripts/blender/       # Phase 2: 原盤シーン生成 + 焼き出し(make_mug_scene.py / bake_template.py)
+  scripts/blender/       # Phase 2: studio.py(共有スタジオ=cove/ウォッシュ光/カメラ補助)+
+                         #   make_mug_scene.py / make_tote_scene.py(原盤)+ bake_template.py(焼き出し)
   components/            # カタログUI(Motion Lab 同型)
 app/labs/workflow/page.tsx       # 薄いルート(noindex)
 app/api/labs/workflow/templates  # GET: カタログ(バリデーション結果込み)
@@ -157,7 +158,9 @@ app/api/labs/workflow/jobs       # GET: 原価集計
   --out labs/workflow/templates/mug-ceramic --id mug-ceramic
 ```
 
-**シーン規約**(bake_template.py が要求): 印刷面は `PrintSurface` という名前のメッシュ(実面から0.4mm浮かせたデカールシェル)で、UVを0..1に張り、カスタムプロパティ `logos_print_aspect`(印刷面の物理的な幅/高さ)を持つ。それ以外のオブジェクトはすべて舞台として扱われる。
+**シーン規約**(bake_template.py が要求): 印刷面は `PrintSurface` という名前のメッシュ(実面から0.4mm浮かせたデカールシェル)で、UVを0..1に張り、カスタムプロパティ `logos_print_aspect`(印刷面の物理的な幅/高さ)を持つ。それ以外のオブジェクトはすべて舞台として扱われる。オプションで **`PrintLight` という名前のマテリアル**をシーンに置くと、light パスの白ディフューズの代わりに使われる——布の織り目バンプ等を持つ白マテリアルにすれば、**印刷されたロゴがその素材の質感(織り目の陰影)を継承する**(tote-canvas で使用)。スタジオ(cove・ウォッシュ光・カメラ/ライト補助)は [scripts/blender/studio.py](scripts/blender/studio.py) の共有モジュールに正本化されており、全シーンスクリプトが同じ「部屋」で撮る。
+
+**2つ目の実証: tote-canvas(2026-07-15)**: 布のドレープを3Dディスプレイスメントで作り、**PrintSurface シェルに同じ変位フィールドを共有させることで、焼いたUVマップがロゴをシワの中まで曲げる**。あわせて PrintLight でキャンバス織り目がロゴに乗る。「素材感・曲面・ドレープの上への印刷」という Blender ならではの領域の型がこれで揃った。
 
 **焼き出される3パス**: `stage.png`(PrintSurface非表示のビューティ)/ `uvmap.png`(16-bit PNG。R=u・G=v・B=カバレッジのプリマルチプライドUVフィールド)/ `light.png`(PrintSurfaceを白ディフューズにした陰影マップ。ロゴに乗算される)。エンジン側は `surface.uvWarp` があるとホモグラフィの代わりにUVフィールド経由でロゴを逆写像する([engine/uvwarp.ts](engine/uvwarp.ts))。曲面(円筒等)の回り込み・遠近圧縮・実シーンの陰影が決定論のまま得られる。
 
