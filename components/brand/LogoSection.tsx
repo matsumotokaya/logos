@@ -70,7 +70,7 @@ export default function LogoSection({ logos, onChangeRole, onDelete }: Props) {
             </select>
             <div className="flex items-center gap-4">
               <Link
-                href={`/admin/logos/${logo.id}`}
+                href={`/brand/logos/${logo.id}`}
                 className="text-xs font-medium text-gray-900 underline underline-offset-2"
               >
                 ロゴ情報

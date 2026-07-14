@@ -153,8 +153,8 @@ export default function LogoInfoPage({
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#F7F7F8] text-[#111827]">
         <p className="text-sm text-gray-500">ロゴが見つかりません。</p>
-        <Link href="/admin" className="text-sm underline underline-offset-2">
-          管理コンソールへ戻る
+        <Link href="/brand" className="text-sm underline underline-offset-2">
+          Brand Manager へ戻る
         </Link>
       </div>
     );
@@ -164,8 +164,8 @@ export default function LogoInfoPage({
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#F7F7F8] text-[#111827]">
         <p className="text-sm text-gray-500">このロゴを管理する権限がありません。</p>
-        <Link href="/admin" className="text-sm underline underline-offset-2">
-          管理コンソールへ戻る
+        <Link href="/brand" className="text-sm underline underline-offset-2">
+          Brand Manager へ戻る
         </Link>
       </div>
     );
@@ -244,8 +244,8 @@ export default function LogoInfoPage({
     <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
       <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
         <header className="flex items-center justify-between">
-          <Link href="/admin" className="text-sm text-gray-500 hover:text-gray-900">
-            ← 管理コンソール
+          <Link href="/brand" className="text-sm text-gray-500 hover:text-gray-900">
+            ← Brand Manager
           </Link>
           <a href={`/p/${logo.id}`} className="text-sm text-gray-500 hover:text-gray-900">
             プレゼンを見る →

@@ -2,8 +2,8 @@
 
 // Account control for the app headers: a "Sign in" affordance for guests that
 // opens an auth dialog (Google → Apple → Figma → email), and for signed-in
-// users an avatar menu (admin console / labs / sign out). In localStorage
-// mode (no auth) the admin and labs links render as plain links.
+// users an avatar menu (Brand Manager / labs / sign out). In localStorage
+// mode (no auth) the Brand Manager and labs links render as plain links.
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -84,18 +84,18 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
     };
   }, [menuOpen]);
 
-  // localStorage mode (no auth): keep admin/labs reachable as plain links.
+  // localStorage mode (no auth): keep Brand Manager/labs reachable as plain links.
   if (!enabled) {
     return (
       <span className="flex items-center gap-4">
         <Link
-          href="/admin"
+          href="/brand"
           className={cn(
             "font-mono text-xs uppercase transition-colors",
             tone === "dark" ? "text-ink-muted hover:text-ink" : "text-white/70 hover:text-white"
           )}
         >
-          {dict.header.admin}
+          {dict.header.brandManager}
         </Link>
         <Link
           href="/labs"
@@ -209,11 +209,11 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
               </p>
               <Link
                 role="menuitem"
-                href="/admin"
+                href="/brand"
                 onClick={() => setMenuOpen(false)}
                 className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
               >
-                {dict.header.admin}
+                {dict.header.brandManager}
               </Link>
               <Link
                 role="menuitem"

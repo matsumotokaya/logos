@@ -249,7 +249,7 @@ $$;
 | 2 | Supabaseプロジェクト作成 + 上記スキーマ適用 + Anonymous Sign-in 有効化 | ユーザー作業: プロジェクト作成 |
 | 3 | `SupabaseRepo` 実装(logos / mockups / company→organizations) + Storage(SVG・モックアップ画像) | RLSは最初から有効 |
 | 4 | 匿名→本登録の昇格フロー(サインアップUI) | user_id不変でデータ移行不要 |
-| 5 | 組織・メンバー招待・ロールUI、移管機能 | `/admin` を組織スコープに |
+| 5 | 組織・メンバー招待・ロールUI、移管機能 | `/brand` を組織スコープに |
 | 6 | visibility制御UI + 公開ギャラリー・Contactボタン | ロゴ図鑑の入口 |
 | 7 | 層2バニティURL(`/[handle]/[slug]`) | handle予約は Step 2 のスキーマで確保済み |
 
@@ -264,5 +264,5 @@ $$;
 
 - 組織の課金モデルとプラン境界(SaaS課金の単位 = 組織で確定してよいか)
 - Contactボタンの実装形態(mailto / フォーム / 通知)
-- handle の予約語・命名規則の詳細(`/admin` `/p` 等との衝突回避)
+- handle の予約語・命名規則の詳細(`/brand` `/p` 等との衝突回避)
 - 匿名ユーザーの保持期間(未登録のままのロゴをいつまで残すか)

@@ -3,7 +3,7 @@
 
 export type Dict = {
   header: {
-    admin: string;
+    brandManager: string;
     labs: string;
     newLogo: string;
     brandName: string;
@@ -127,7 +127,7 @@ export type Dict = {
 
 const en: Dict = {
   header: {
-    admin: "Admin",
+    brandManager: "Brand Manager",
     labs: "Labs",
     newLogo: "New logo",
     brandName: "Brand name",
@@ -268,7 +268,7 @@ const en: Dict = {
 
 const ja: Dict = {
   header: {
-    admin: "管理",
+    brandManager: "Brand Manager",
     labs: "ラボ",
     newLogo: "新しいロゴ",
     brandName: "ブランド名",
@@ -409,7 +409,7 @@ const ja: Dict = {
 
 const ko: Dict = {
   header: {
-    admin: "관리",
+    brandManager: "Brand Manager",
     labs: "랩",
     newLogo: "새 로고",
     brandName: "브랜드명",
@@ -550,7 +550,7 @@ const ko: Dict = {
 
 const zhHant: Dict = {
   header: {
-    admin: "管理",
+    brandManager: "Brand Manager",
     labs: "實驗室",
     newLogo: "新標誌",
     brandName: "品牌名稱",
@@ -690,7 +690,7 @@ const zhHant: Dict = {
 
 const zhHans: Dict = {
   header: {
-    admin: "管理",
+    brandManager: "Brand Manager",
     labs: "实验室",
     newLogo: "新标志",
     brandName: "品牌名称",

@@ -1,6 +1,8 @@
 "use client";
 
-// Admin console: company profile, logo registry, and merch inventory/ordering.
+// Brand Manager: the business tenant's hub for its brand assets — company
+// profile, logo registry, and merch inventory/ordering. NOT a platform-operator
+// console; it belongs to the org whose brand it manages.
 // The repo is localStorage-backed, so all data access happens client-side.
 
 import Link from "next/link";
@@ -15,11 +17,11 @@ import {
 } from "@/lib/store";
 import { SERVICE_NAME } from "@/lib/config";
 import { hasSupabase, listMyOrgs, type Organization } from "@/lib/org";
-import CompanyCard from "@/components/admin/CompanyCard";
-import LogoSection from "@/components/admin/LogoSection";
-import OrgSection from "@/components/admin/OrgSection";
-import HandleCard from "@/components/admin/HandleCard";
-import InventorySection from "@/components/admin/InventorySection";
+import CompanyCard from "@/components/brand/CompanyCard";
+import LogoSection from "@/components/brand/LogoSection";
+import OrgSection from "@/components/brand/OrgSection";
+import HandleCard from "@/components/brand/HandleCard";
+import InventorySection from "@/components/brand/InventorySection";
 
 const yen = new Intl.NumberFormat("ja-JP");
 
@@ -103,7 +105,7 @@ export default function AdminPage() {
         <header className="flex items-center justify-between">
           <h1 className="text-balance text-lg font-semibold">
             {SERVICE_NAME}®{" "}
-            <span className="text-xs font-normal text-gray-500">管理コンソール</span>
+            <span className="text-xs font-normal text-gray-500">Brand Manager</span>
           </h1>
           <Link href="/" className="text-sm text-gray-500 hover:text-gray-900">
             サイトを見る →
