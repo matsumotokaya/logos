@@ -1,39 +1,67 @@
 # Neon sign — the first RUNTIME-Blender spike (not a baked template).
 #
 # Proves the "logo becomes an object" tier: the logo's own vector paths turn
-# into glowing neon tubes on a dark brick wall, and the tube colors bleed
-# onto the wall through real global illumination. None of this is possible
-# in the bake pipeline (the logo shapes the 3D geometry and the lighting),
-# and none of it involves generative AI — SVG -> curves -> emission tubes ->
-# Cycles is fully deterministic, so logo fidelity stays guaranteed.
+# into glowing neon tubes floating in front of a neutral wall, lit only by the
+# tubes plus a faint environment, wrapped in thin volumetric fog and shot on a
+# shallow-DoF long-ish lens. None of this is possible in the bake pipeline (the
+# logo shapes the 3D geometry and the lighting), and none of it involves
+# generative AI — SVG -> curves -> emission tubes -> Cycles is fully
+# deterministic, so logo fidelity stays guaranteed.
 #
 # Per-order economics: this renders per logo (minutes, not milliseconds) —
 # the premium queue/batch tier explored in the workflow README's candidate
 # list, not the free instant tier.
 #
+# The look was tuned interactively (2026-07-16) against the XTRUST wordmark:
+# neutral wall with fine natural relief (NOT cloudy albedo), a bounded fog box
+# (a WORLD volume extinguishes the HDRI — see note in setup_world), an HDRI for
+# subtle non-uniform ambience, thin 80%-radius tubes, extra glow, and an unreal
+# f/0.1 aperture so the background dissolves. MCP/Blender-GUI is only the tuning
+# cockpit; reproduction for any other logo is this headless CLI alone.
+#
 # Usage:
 #   /Applications/Blender.app/Contents/MacOS/Blender -b \
 #     -P labs/workflow/scripts/blender/neon_sign.py -- \
 #     --svg /path/to/logo.svg --out /path/to/render.png \
-#     [--width 1600] [--height 1200] [--samples 160]
+#     [--width 1600] [--height 1200] [--samples 150] [--hdri /path/to/env.hdr]
 
 import colorsys
 import math
+import os
 import sys
 
 import bmesh
 import bpy
 
-SIGN_WIDTH = 1.2       # world meters on the wall
-TUBE_RADIUS = 0.0065   # ~13 mm neon tube
+# ---- sign geometry ----
+SIGN_WIDTH = 2.4        # target world width on the wall (wide wordmark reference)
+SIGN_HEIGHT_MAX = 1.2   # cap so square/tall marks don't blow past the frame
+TUBE_RADIUS = 0.0052    # ~10 mm neon tube (thinned to 80% during tuning)
 SIGN_CENTER_Z = 1.55
-STANDOFF = 0.05        # tubes float this far off the wall
+STANDOFF = 0.05         # tubes float this far off... nothing now; the wall is set back
+WALL_GAP = 0.35         # background wall sits this far behind the sign plane
 WARM_WHITE = (1.0, 0.72, 0.42)
+NEON_STRENGTH = 6.5     # emission; also the scene's main light (glow lands on wall)
+
+# ---- camera (front, slightly from below, shallow DoF) ----
+LENS = 50.0
+FSTOP = 0.1             # unreal on purpose — the lens is what changes the whole read
+CAM_DIR = (0.0, -0.989, -0.146)  # unit dir sign->camera: front, tilted down to look up
+FILL_W = 0.68           # fraction of frame width the sign fills (drives camera distance)
+FILL_H = 0.58
+
+# ---- world / atmosphere ----
+HDRI_URL = "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/empty_warehouse_01_1k.hdr"
+HDRI_FILE = "empty_warehouse_01_1k.hdr"
+HDRI_STRENGTH = 0.22    # moody: fluctuation visible, neon still the star
+HDRI_ROT_Z = 120.0      # degrees
+FOG_DENSITY = 0.045
+FOG_ANISO = 0.3
 
 
 def parse_args():
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
-    args = {"width": 1600, "height": 1200, "samples": 160}
+    args = {"width": 1600, "height": 1200, "samples": 150, "hdri": None}
     it = iter(argv)
     for a in it:
         if a == "--svg":
@@ -46,6 +74,8 @@ def parse_args():
             args["height"] = int(next(it))
         elif a == "--samples":
             args["samples"] = int(next(it))
+        elif a == "--hdri":
+            args["hdri"] = next(it)
     if "svg" not in args or "out" not in args:
         raise SystemExit("neon_sign: --svg and --out are required")
     return args
@@ -62,7 +92,7 @@ def neon_color(base_rgb):
     return (r2, g2, b2)
 
 
-def emission_material(name, rgb, strength=3.1):
+def emission_material(name, rgb, strength=NEON_STRENGTH):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nt = mat.node_tree
@@ -77,7 +107,7 @@ def emission_material(name, rgb, strength=3.1):
 
 def import_logo_tubes(svg_path):
     """SVG -> curve objects -> neon tubes, normalized to SIGN_WIDTH and
-    mounted on the wall plane (XZ, facing the camera at -Y)."""
+    mounted on the sign plane (XZ, facing the camera at -Y)."""
     try:
         bpy.ops.preferences.addon_enable(module="io_curve_svg")
     except Exception:
@@ -117,8 +147,8 @@ def import_logo_tubes(svg_path):
         raise SystemExit("neon_sign: imported curves contain no points")
     w = max(xs) - min(xs)
     h = max(ys) - min(ys)
-    # Fit by width, but never taller than 0.8 m (mark-only logos are square).
-    scale = min(SIGN_WIDTH / max(w, 1e-6), 0.8 / max(h, 1e-6))
+    # Fit by width, but never taller than SIGN_HEIGHT_MAX (mark-only logos are square).
+    scale = min(SIGN_WIDTH / max(w, 1e-6), SIGN_HEIGHT_MAX / max(h, 1e-6))
     cx, cy = (max(xs) + min(xs)) / 2, (max(ys) + min(ys)) / 2
 
     for obj in curves:
@@ -195,30 +225,181 @@ def outline_to_tube(curve_obj):
     return tube
 
 
-def brick_material():
-    mat = bpy.data.materials.new("DarkBrick")
+def neutral_wall_material():
+    """A plain neutral wall. No bitmaps, no cloudy albedo — just fine, natural
+    normal relief so the surface has micro-complexity that reads as a soft
+    shading fluctuation (breaks the mechanical CG flatness) even under the
+    heavy f/0.1 blur. Base color stays uniform on purpose."""
+    mat = bpy.data.materials.new("NeutralWall")
     mat.use_nodes = True
     nt = mat.node_tree
-    bsdf = nt.nodes["Principled BSDF"]
-    brick = nt.nodes.new("ShaderNodeTexBrick")
-    brick.inputs["Scale"].default_value = 2.4
-    brick.inputs["Color1"].default_value = (0.052, 0.045, 0.048, 1)
-    brick.inputs["Color2"].default_value = (0.072, 0.060, 0.058, 1)
-    brick.inputs["Mortar"].default_value = (0.030, 0.030, 0.032, 1)
-    brick.inputs["Mortar Size"].default_value = 0.012
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    nt.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+    bsdf.inputs["Base Color"].default_value = (0.54, 0.53, 0.52, 1.0)
+    bsdf.inputs["Roughness"].default_value = 0.86
+    if "Specular IOR Level" in bsdf.inputs:
+        bsdf.inputs["Specular IOR Level"].default_value = 0.25
+
     coord = nt.nodes.new("ShaderNodeTexCoord")
-    mapping = nt.nodes.new("ShaderNodeMapping")
-    nt.links.new(coord.outputs["Object"], mapping.inputs["Vector"])
-    nt.links.new(mapping.outputs["Vector"], brick.inputs["Vector"])
-    nt.links.new(brick.outputs["Color"], bsdf.inputs["Base Color"])
-    bsdf.inputs["Roughness"].default_value = 0.72
-    noise = nt.nodes.new("ShaderNodeTexNoise")
-    noise.inputs["Scale"].default_value = 90.0
+    # mid-scale organic undulation (relief, not albedo) + a finer grain on top
+    n_mid = nt.nodes.new("ShaderNodeTexNoise")
+    n_mid.inputs["Scale"].default_value = 5.0
+    n_mid.inputs["Detail"].default_value = 8.0
+    n_mid.inputs["Roughness"].default_value = 0.55
+    n_fine = nt.nodes.new("ShaderNodeTexNoise")
+    n_fine.inputs["Scale"].default_value = 32.0
+    n_fine.inputs["Detail"].default_value = 6.0
+    mix = nt.nodes.new("ShaderNodeMixRGB")
+    mix.inputs["Fac"].default_value = 0.4
+    nt.links.new(coord.outputs["Object"], n_mid.inputs["Vector"])
+    nt.links.new(coord.outputs["Object"], n_fine.inputs["Vector"])
+    nt.links.new(n_mid.outputs["Fac"], mix.inputs["Color1"])
+    nt.links.new(n_fine.outputs["Fac"], mix.inputs["Color2"])
     bump = nt.nodes.new("ShaderNodeBump")
-    bump.inputs["Strength"].default_value = 0.25
-    nt.links.new(noise.outputs["Fac"], bump.inputs["Height"])
+    bump.inputs["Strength"].default_value = 0.35
+    bump.inputs["Distance"].default_value = 0.03
+    nt.links.new(mix.outputs["Color"], bump.inputs["Height"])
     nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    # barely-there roughness variation for micro-realism
+    mr = nt.nodes.new("ShaderNodeMapRange")
+    mr.inputs["To Min"].default_value = 0.82
+    mr.inputs["To Max"].default_value = 0.9
+    nt.links.new(n_mid.outputs["Fac"], mr.inputs["Value"])
+    nt.links.new(mr.outputs["Result"], bsdf.inputs["Roughness"])
     return mat
+
+
+def add_fog_box():
+    """Bounded volumetric fog around the whole shot (camera sits inside it).
+    A WORLD volume would fill infinite space and extinguish ALL environment
+    light before it reaches any surface — that is why the HDRI must light the
+    scene through a *bounded* medium, not a world volume."""
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, -2.0, 1.5))
+    fog = bpy.context.active_object
+    fog.name = "FogVolume"
+    fog.scale = (12.0, 9.0, 8.0)
+    fog.display_type = "WIRE"
+    mat = bpy.data.materials.new("Fog")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    vs = nt.nodes.new("ShaderNodeVolumeScatter")
+    vs.inputs["Color"].default_value = (1, 1, 1, 1)
+    vs.inputs["Density"].default_value = FOG_DENSITY
+    vs.inputs["Anisotropy"].default_value = FOG_ANISO
+    nt.links.new(vs.outputs["Volume"], out.inputs["Volume"])  # volume only -> box invisible
+    fog.data.materials.append(mat)
+    return fog
+
+
+def ensure_hdri(args):
+    """Return a local path to the environment HDRI, downloading the CC0
+    Poly Haven asset into the gitignored var/ cache on first run. Returns
+    None if unavailable (the world then falls back to a flat dim ambient)."""
+    if args.get("hdri") and os.path.exists(args["hdri"]):
+        return args["hdri"]
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    cache_dir = os.path.normpath(
+        os.path.join(script_dir, "..", "..", "..", "..", "var", "workflow-lab", "hdri")
+    )
+    os.makedirs(cache_dir, exist_ok=True)
+    dst = os.path.join(cache_dir, HDRI_FILE)
+    if not os.path.exists(dst):
+        try:
+            import urllib.request
+
+            urllib.request.urlretrieve(HDRI_URL, dst)
+        except Exception as e:
+            print(f"neon_sign: HDRI download failed ({e}); using flat ambient")
+            return None
+    return dst
+
+
+def setup_world(scene, hdri_path):
+    world = bpy.data.worlds.new("Night")
+    world.use_nodes = True
+    nt = world.node_tree
+    bg = nt.nodes["Background"]
+    bg.inputs["Strength"].default_value = HDRI_STRENGTH
+    if hdri_path:
+        env = nt.nodes.new("ShaderNodeTexEnvironment")
+        env.image = bpy.data.images.load(hdri_path, check_existing=True)
+        for cs in ("Linear Rec.709", "Linear"):
+            try:
+                env.image.colorspace_settings.name = cs
+                break
+            except Exception:
+                continue
+        env.image.reload()
+        coord = nt.nodes.new("ShaderNodeTexCoord")
+        mapping = nt.nodes.new("ShaderNodeMapping")
+        mapping.inputs["Rotation"].default_value = (0.0, 0.0, math.radians(HDRI_ROT_Z))
+        nt.links.new(coord.outputs["Generated"], mapping.inputs["Vector"])
+        nt.links.new(mapping.outputs["Vector"], env.inputs["Vector"])
+        nt.links.new(env.outputs["Color"], bg.inputs["Color"])
+    else:
+        bg.inputs["Color"].default_value = (0.10, 0.11, 0.14, 1.0)
+    scene.world = world
+    return world
+
+
+def sign_bounds(tubes):
+    """World-space AABB of the sign, measured from the tube curves' spline
+    points. (A curve object's bound_box is wildly inflated/unreliable — it does
+    not tightly bound the actual outline — so measure the points directly, the
+    same way import_logo_tubes measures for normalization.)"""
+    from mathutils import Vector
+
+    xs, ys, zs = [], [], []
+    for t in tubes:
+        mw = t.matrix_world
+        for spline in t.data.splines:
+            pts = spline.bezier_points if len(spline.bezier_points) else spline.points
+            for p in pts:
+                co = p.co
+                wp = mw @ (co.to_3d() if len(co) == 4 else co)
+                xs.append(wp.x)
+                ys.append(wp.y)
+                zs.append(wp.z)
+    if not xs:
+        raise SystemExit("neon_sign: tubes contain no points to frame")
+    return Vector((min(xs), min(ys), min(zs))), Vector((max(xs), max(ys), max(zs)))
+
+
+def frame_camera(scene, tubes):
+    """Place the camera front-and-slightly-below, pulled back to fit the
+    measured sign at FILL_W/FILL_H. Works for any logo aspect (wordmark or
+    square mark) without re-tuning."""
+    from mathutils import Vector
+
+    mn, mx = sign_bounds(tubes)
+    center = (mn + mx) / 2
+    sw = max(mx.x - mn.x, 1e-4)
+    sh = max(mx.z - mn.z, 1e-4)
+
+    cam_data = bpy.data.cameras.new("Camera")
+    cam_data.lens = LENS
+    sensor = cam_data.sensor_width  # 36 mm, AUTO-fit to the wider (horizontal) dim
+    aspect = scene.render.resolution_y / scene.render.resolution_x
+    hfov = 2 * math.atan((sensor / 2) / LENS)
+    vfov = 2 * math.atan((sensor * aspect / 2) / LENS)
+    dist_w = (sw / 2 / FILL_W) / math.tan(hfov / 2)
+    dist_h = (sh / 2 / FILL_H) / math.tan(vfov / 2)
+    dist = max(dist_w, dist_h, 1.5)
+
+    cam = bpy.data.objects.new("Camera", cam_data)
+    scene.collection.objects.link(cam)
+    cam.location = center + Vector(CAM_DIR) * dist
+    cam.rotation_euler = (center - cam.location).to_track_quat("-Z", "Y").to_euler()
+    cam_data.dof.use_dof = True
+    cam_data.dof.focus_distance = (center - cam.location).length
+    cam_data.dof.aperture_fstop = FSTOP
+    cam_data.dof.aperture_blades = 6
+    scene.camera = cam
+    return cam
 
 
 def build_scene(args):
@@ -232,36 +413,20 @@ def build_scene(args):
     scene.view_settings.view_transform = "Filmic"  # neon needs highlight rolloff
     scene.view_settings.look = "Medium High Contrast"
 
-    # Wall
-    bpy.ops.mesh.primitive_plane_add(size=8.0, location=(0, 0.0, 1.8),
+    # Neutral wall, set back behind the sign so f/0.1 dissolves it.
+    bpy.ops.mesh.primitive_plane_add(size=8.0, location=(0, -STANDOFF + WALL_GAP, 1.8),
                                      rotation=(math.radians(90), 0, 0))
     wall = bpy.context.active_object
     wall.name = "Wall"
-    wall.data.materials.append(brick_material())
+    wall.data.materials.append(neutral_wall_material())
 
-    # Near-dark ambience: the tubes are the light source.
-    world = bpy.data.worlds.new("Night")
-    world.use_nodes = True
-    bg = world.node_tree.nodes["Background"]
-    bg.inputs["Color"].default_value = (0.05, 0.07, 0.11, 1.0)
-    bg.inputs["Strength"].default_value = 0.06
-    scene.world = world
+    setup_world(scene, ensure_hdri(args))
+    add_fog_box()
 
     tubes = import_logo_tubes(args["svg"])
+    frame_camera(scene, tubes)
 
-    # Camera: slightly off-axis and below, looking up — storefront feel.
-    cam_data = bpy.data.cameras.new("Camera")
-    cam_data.lens = 50
-    cam = bpy.data.objects.new("Camera", cam_data)
-    cam.location = (0.5, -2.5, 1.30)
-    bpy.context.collection.objects.link(cam)
-    from mathutils import Vector
-
-    d = Vector((0.0, -STANDOFF, SIGN_CENTER_Z)) - cam.location
-    cam.rotation_euler = d.to_track_quat("-Z", "Y").to_euler()
-    scene.camera = cam
-
-    # Compositor bloom — the halo around the tubes.
+    # Compositor glow — the halo around the tubes.
     scene.use_nodes = True
     tree = scene.node_tree
     tree.nodes.clear()
@@ -269,9 +434,9 @@ def build_scene(args):
     glare = tree.nodes.new("CompositorNodeGlare")
     glare.glare_type = "FOG_GLOW"
     glare.quality = "HIGH"
-    glare.threshold = 0.85
-    glare.size = 4       # halo — too big blooms the tube into a solid disc
-    glare.mix = -0.3
+    glare.threshold = 0.0   # everything above black blooms -> generous glow
+    glare.size = 6
+    glare.mix = 0.0
     comp = tree.nodes.new("CompositorNodeComposite")
     tree.links.new(rl.outputs["Image"], glare.inputs["Image"])
     tree.links.new(glare.outputs["Image"], comp.inputs["Image"])
