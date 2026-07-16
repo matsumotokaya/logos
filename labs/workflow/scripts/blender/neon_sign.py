@@ -49,6 +49,7 @@ FSTOP = 0.1             # unreal on purpose — the lens is what changes the who
 CAM_DIR = (0.0, -0.989, -0.146)  # unit dir sign->camera: front, tilted down to look up
 FILL_W = 0.68           # fraction of frame width the sign fills (drives camera distance)
 FILL_H = 0.58
+OUTPUT_ASPECT = 4 / 3   # workflow-neon-sign-v1 presentation contract
 
 # ---- world / atmosphere ----
 HDRI_URL = "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/empty_warehouse_01_1k.hdr"
@@ -61,7 +62,13 @@ FOG_ANISO = 0.3
 
 def parse_args():
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
-    args = {"width": 1600, "height": 1200, "samples": 150, "hdri": None}
+    args = {
+        "width": 1600,
+        "height": 1200,
+        "samples": 150,
+        "hdri": None,
+        "color_mode": "logo",
+    }
     it = iter(argv)
     for a in it:
         if a == "--svg":
@@ -76,8 +83,17 @@ def parse_args():
             args["samples"] = int(next(it))
         elif a == "--hdri":
             args["hdri"] = next(it)
+        elif a == "--color-mode":
+            args["color_mode"] = next(it)
     if "svg" not in args or "out" not in args:
         raise SystemExit("neon_sign: --svg and --out are required")
+    if args["width"] <= 0 or args["height"] <= 0:
+        raise SystemExit("neon_sign: --width and --height must be positive")
+    if not math.isclose(args["width"] / args["height"], OUTPUT_ASPECT,
+                        rel_tol=0.0, abs_tol=1e-6):
+        raise SystemExit("neon_sign: workflow-neon-sign-v1 output must be 4:3")
+    if args["color_mode"] not in ("logo", "warm-white"):
+        raise SystemExit("neon_sign: --color-mode must be logo or warm-white")
     return args
 
 
@@ -105,7 +121,7 @@ def emission_material(name, rgb, strength=NEON_STRENGTH):
     return mat
 
 
-def import_logo_tubes(svg_path):
+def import_logo_tubes(svg_path, color_mode="logo"):
     """SVG -> curve objects -> neon tubes, normalized to SIGN_WIDTH and
     mounted on the sign plane (XZ, facing the camera at -Y)."""
     try:
@@ -168,7 +184,7 @@ def import_logo_tubes(svg_path):
     mats = {}
     tubes = []
     for obj in curves:
-        rgb = neon_color(fills[obj.name])
+        rgb = WARM_WHITE if color_mode == "warm-white" else neon_color(fills[obj.name])
         tube = outline_to_tube(obj)
         if tube is None:
             continue
@@ -347,25 +363,31 @@ def setup_world(scene, hdri_path):
 
 
 def sign_bounds(tubes):
-    """World-space AABB of the sign, measured from the tube curves' spline
-    points. (A curve object's bound_box is wildly inflated/unreliable — it does
-    not tightly bound the actual outline — so measure the points directly, the
-    same way import_logo_tubes measures for normalization.)"""
+    """World-space AABB of the evaluated, beveled tube geometry.
+
+    Spline control points are not the visible curve bounds: Bezier handles can
+    push the rendered outline far away from their control points. Framing from
+    those points put some logos well above the image center. Evaluating each
+    curve to a mesh measures the geometry Cycles actually renders.
+    """
     from mathutils import Vector
 
     xs, ys, zs = [], [], []
-    for t in tubes:
-        mw = t.matrix_world
-        for spline in t.data.splines:
-            pts = spline.bezier_points if len(spline.bezier_points) else spline.points
-            for p in pts:
-                co = p.co
-                wp = mw @ (co.to_3d() if len(co) == 4 else co)
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    for tube in tubes:
+        evaluated = tube.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+        try:
+            mw = evaluated.matrix_world
+            for vertex in mesh.vertices:
+                wp = mw @ vertex.co
                 xs.append(wp.x)
                 ys.append(wp.y)
                 zs.append(wp.z)
+        finally:
+            evaluated.to_mesh_clear()
     if not xs:
-        raise SystemExit("neon_sign: tubes contain no points to frame")
+        raise SystemExit("neon_sign: tubes contain no evaluated geometry to frame")
     return Vector((min(xs), min(ys), min(zs))), Vector((max(xs), max(ys), max(zs)))
 
 
@@ -399,6 +421,12 @@ def frame_camera(scene, tubes):
     cam_data.dof.aperture_fstop = FSTOP
     cam_data.dof.aperture_blades = 6
     scene.camera = cam
+    print(
+        "neon_sign framing: "
+        f"output={scene.render.resolution_x}x{scene.render.resolution_y} "
+        f"bounds=({mn.x:.4f},{mn.z:.4f})-({mx.x:.4f},{mx.z:.4f}) "
+        f"center=({center.x:.4f},{center.z:.4f}) distance={dist:.4f}"
+    )
     return cam
 
 
@@ -423,7 +451,7 @@ def build_scene(args):
     setup_world(scene, ensure_hdri(args))
     add_fog_box()
 
-    tubes = import_logo_tubes(args["svg"])
+    tubes = import_logo_tubes(args["svg"], args["color_mode"])
     frame_camera(scene, tubes)
 
     # Compositor glow — the halo around the tubes.

@@ -40,7 +40,7 @@ data-model.md の既存設計でほぼ表現できる。**新パラダイムと�
   1. **Labs のロゴ取得を entity 化**: 完了。Lab専用upload registryを廃止し、canonical candidateを選ぶ
   2. **ネオンをasset definitionとして登録**: 完了。`workflow-neon-sign-v1`をdraft runtime assetとして登録
   3. **ランタイムBlender実行**: 暫定手動運用。queue・実行ロジックはあるが、永続ワーカーは未配備
-  4. **R2保存 + `logo_mockups`配線**: 実行ロジックと表示を実装済み。実データでの運用はmigration適用後に開始する
+  4. **R2保存 + `logo_mockups`配線**: 実装・実データ検証済み。`0007_asset_lifecycle.sql`は2026-07-16にlive projectへ適用済み
   5. **Labs UIの処理状態と依頼handoff**: 完了。IDコピーと任意のRun作成に対応
   6. **Generative LabのlogoHash → logos配線**: 未完。同じ統合の残タスク(data-model.md §6.4.1)
 
@@ -81,12 +81,39 @@ Logo IDから所有アカウント/組織はリレーションで解決できる
 
 ### エージェント側の作業
 
-1. IDから`logos`と指定された`logo_candidates`を解決し、CandidateがLogoに所属することを確認する
-2. trustedなローカル接続経由で`logo_candidates.svg`を取得し、作業用`master.svg`へ書き出す
-3. asset定義のスクリプトをヘッドレス実行する。ネオンv1は `Blender -b -P labs/workflow/scripts/blender/neon_sign.py -- --svg <master.svg> --out <render.png>`
-4. 成果物を [runtime-worker.ts](../labs/workflow/engine/runtime-worker.ts) と [mockups.ts](../lib/mockups.ts) の規約に従ってR2へ保存し、`logo_mockups`を指定Candidateとasset定義へupsertする
-5. Run IDがある場合は`logo_asset_runs`を`running`から`succeeded`または`failed`へ更新する。Run IDがない場合は成果物登録だけでよい
-6. Lab詳細を再表示し、対象ロゴに成果物と処理状態が表示されることを確認する
+標準実行は [run-runtime-asset.mjs](../labs/workflow/scripts/run-runtime-asset.mjs)を使う。個別のSQL・R2操作を手入力しない。
+
+```bash
+node --env-file=.env.local labs/workflow/scripts/run-runtime-asset.mjs \
+  --logo-id <Logo ID> \
+  --candidate-id <Candidate ID> \
+  --asset-id workflow-neon-sign-v1 \
+  [--run-id <Run ID>] \
+  [--color-mode <logo|warm-white>]
+```
+
+このoperator CLIが次を一括で行う:
+
+1. `.env.local`のSupabase URLからproject refを決定し、asset lifecycle schemaと定義の存在を確認する
+2. IDから`logos`と指定された`logo_candidates`を解決し、CandidateがLogoに所属することを確認する
+3. trustedなManagement API接続で`logo_candidates.svg`を取得し、`var/workflow-lab/runtime/<logo>/<candidate>/<asset>/master.svg`へ書き出す
+4. ネオンv1を1600×1200・150 samplesでヘッドレス実行する
+5. PNGが4:3で、明るいアートワーク境界の中心が画面中心からX/Y各6%以内かを検査する。不合格ならR2/DBへ公開しない
+6. R2へ正規object keyで保存し、読み戻したSHA-256がローカルPNGと一致することを確認する
+7. `logo_mockups`を指定Candidateとasset定義へupsertする。Run IDがある場合は`logo_asset_runs`も`running`から`succeeded`または`failed`へ更新する
+8. Lab詳細を再表示し、対象ロゴに成果物と`processed`状態が表示されることを確認する
+
+低サンプルでフレーミングだけを試す場合は`--samples 1 --no-publish`を付ける。`--no-publish`は`render-preview-<samples>.png`へ出力し、R2/DBとローカルの`render.png`を変更しない。低サンプル成果物を公開してはならない。
+
+### 2026-07-16初回運用で判明した注意点
+
+- **接続先の取り違え**: MCP connectorはセッション開始時の設定を保持するため、`.mcp.json`を直しても現在のセッションには反映されない。最初にMCPのproject URLと`.env.local`の`NEXT_PUBLIC_SUPABASE_URL`が同じproject refか確認する。違う場合は新しいセッションへ移るか、operator CLIが使う許可済みManagement API接続を使う
+- **migration前提**: 初回は`logo_asset_runs`と`logo_mockups.asset_run_id`がなく、`0007_asset_lifecycle.sql`の適用が必要だった。operator CLIは不足時に公開前で停止する
+- **フレーミングの実装不備**: v1はBezierの制御点を境界としていたため、WatchMeロゴの実レンダー明部中心がY=0.324まで上へずれた。2026-07-16修正後はベベル済みの実ジオメトリ境界を使い、同ロゴでX=0.502/Y=0.501を確認した
+- **Web表示ではなかった**: PNG自体は当初から1600×1200の4:3で、Webも4:3 + `object-cover`だった。ずれは元PNGに存在した。今後はWebの見た目だけでなく保存PNGを直接検査する
+- **Runなし成果物**: Run IDなしでも`logo_mockups`行があれば処理済み。UIは成果物を優先して`processed`と表示し、Run IDは`未作成（手動登録）`とする
+- **実測時間**: Blender 4.4.1・M-series CPU・1600×1200・150 samplesで6分28秒。UI見積もりは約7分へ更新した
+- **完了条件**: Blender終了だけでは不十分。4:3、中央配置、目視、R2読み戻しchecksum、DB行、Lab表示まで確認して完了とする
 
 ### IDと認証の境界
 

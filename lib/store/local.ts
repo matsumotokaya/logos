@@ -4,11 +4,15 @@
 import type { LogoData } from "@/lib/svg";
 import {
   emptyPresentation,
+  emptyAssetRegistry,
+  type BrandEntity,
+  type BrandEntityDraft,
   type BrandRepo,
   type AssetRun,
   type Company,
   type GeneratedMockups,
   type InventoryItem,
+  type LogoAssetRegistry,
   type LogoActivityAction,
   type LogoPatch,
   type LogoPresentation,
@@ -24,10 +28,12 @@ const KEYS = {
   inventory: "logos.v1.inventory",
   orders: "logos.v1.orders",
   mockups: "logos.v1.mockups",
+  assetRegistries: "logos.v1.assetRegistries",
 } as const;
 
 // logoId -> { mockupId -> image }. Object insertion order doubles as LRU order.
 type MockupMap = Record<string, GeneratedMockups>;
+type AssetRegistryMap = Record<string, LogoAssetRegistry>;
 
 const DEFAULT_COMPANY: Company = {
   name: "",
@@ -191,6 +197,47 @@ export class LocalStorageRepo implements BrandRepo {
       delete mockups[id];
       write(KEYS.mockups, mockups);
     }
+  }
+
+  async getAssetRegistry(logoId: string): Promise<LogoAssetRegistry> {
+    const logo = await this.getLogo(logoId);
+    if (!logo) return emptyAssetRegistry();
+    const registries = read<AssetRegistryMap>(KEYS.assetRegistries, {});
+    const saved = registries[logoId] ?? emptyAssetRegistry();
+    return {
+      subject: saved.subject,
+      lockups: [
+        {
+          id: `${logo.primaryCandidateId ?? logo.id}:primary`,
+          candidateId: logo.primaryCandidateId ?? logo.id,
+          kind: "primary",
+          label: "Primary",
+          isPrimary: true,
+          sortOrder: 0,
+          variants: [],
+        },
+      ],
+    };
+  }
+
+  async saveAssetSubject(
+    logoId: string,
+    subject: BrandEntityDraft | null
+  ): Promise<BrandEntity | null> {
+    const logo = await this.getLogo(logoId);
+    if (!logo) return null;
+    const registries = read<AssetRegistryMap>(KEYS.assetRegistries, {});
+    const current = registries[logoId] ?? emptyAssetRegistry();
+    const nextSubject = subject
+      ? {
+          id: current.subject?.id ?? newId(),
+          ...subject,
+        }
+      : null;
+    registries[logoId] = { ...current, subject: nextSubject };
+    write(KEYS.assetRegistries, registries);
+    await this.updateLogo(logoId, {});
+    return nextSubject;
   }
 
   async getPresentation(logoId: string): Promise<LogoPresentation> {

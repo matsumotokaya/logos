@@ -7,15 +7,21 @@ import { ensureSession, supabase } from "@/lib/supabase/client";
 import type { LogoData } from "@/lib/svg";
 import {
   emptyPresentation,
+  emptyAssetRegistry,
   type AssetRun,
   type AssetRunStatus,
+  type BrandEntity,
+  type BrandEntityDraft,
   type BrandRepo,
   type Company,
   type GeneratedMockups,
   type InventoryItem,
   type LogoActivityAction,
+  type LogoAssetRegistry,
+  type LogoLockup,
   type LogoPatch,
   type LogoPresentation,
+  type LogoVariantAsset,
   normalizePresentation,
   type Order,
   type StoredLogo,
@@ -56,6 +62,35 @@ type LogoRow = {
   }[];
   logo_activities: { id: string; action: string; created_at: string }[];
   logo_tags: { tags: { name: string } | null }[];
+};
+
+type BrandEntityRow = {
+  id: string;
+  name: string;
+  entity_type: string;
+  website: string;
+  industry: string;
+  location: string;
+  description: string;
+};
+
+type LogoLockupRow = {
+  id: string;
+  candidate_id: string;
+  kind: string;
+  label: string;
+  is_primary: boolean;
+  sort_order: number;
+};
+
+type LogoVariantRow = {
+  id: string;
+  lockup_id: string;
+  kind: string;
+  source: string;
+  colorway: string;
+  label: string;
+  sort_order: number;
 };
 
 const LOGO_SELECT = `
@@ -123,6 +158,29 @@ function rowToStoredLogo(
       })),
     tags: row.logo_tags.flatMap((lt) => (lt.tags ? [lt.tags.name] : [])),
     primaryCandidateId: primary.id,
+  };
+}
+
+function mapBrandEntity(row: BrandEntityRow): BrandEntity {
+  return {
+    id: row.id,
+    name: row.name,
+    entityType: row.entity_type as BrandEntity["entityType"],
+    website: row.website,
+    industry: row.industry,
+    location: row.location,
+    description: row.description,
+  };
+}
+
+function mapLogoVariant(row: LogoVariantRow): LogoVariantAsset {
+  return {
+    id: row.id,
+    kind: row.kind,
+    source: row.source as LogoVariantAsset["source"],
+    colorway: row.colorway as LogoVariantAsset["colorway"],
+    label: row.label,
+    sortOrder: row.sort_order,
   };
 }
 
@@ -496,6 +554,154 @@ export class SupabaseRepo implements BrandRepo {
     // cleared by the FK's on delete set null.
     const { error } = await supabase.from("logos").delete().eq("id", id);
     throwOn(error);
+  }
+
+  async getAssetRegistry(logoId: string): Promise<LogoAssetRegistry> {
+    await this.ensureAuth();
+    const { data: logoRow, error: logoErr } = await supabase
+      .from("logos")
+      .select("subject_entity_id")
+      .eq("id", logoId)
+      .maybeSingle();
+    throwOn(logoErr);
+    if (!logoRow) return emptyAssetRegistry();
+
+    const subjectId = (logoRow.subject_entity_id as string | null) ?? null;
+    const [subjectResult, candidatesResult] = await Promise.all([
+      subjectId
+        ? supabase
+            .from("brand_entities")
+            .select("id, name, entity_type, website, industry, location, description")
+            .eq("id", subjectId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      supabase.from("logo_candidates").select("id").eq("logo_id", logoId),
+    ]);
+    throwOn(subjectResult.error);
+    throwOn(candidatesResult.error);
+
+    const candidateIds = (candidatesResult.data ?? []).map((row) => row.id as string);
+    if (candidateIds.length === 0) {
+      return {
+        subject: subjectResult.data
+          ? mapBrandEntity(subjectResult.data as BrandEntityRow)
+          : null,
+        lockups: [],
+      };
+    }
+
+    const { data: lockupRows, error: lockupErr } = await supabase
+      .from("logo_lockups")
+      .select("id, candidate_id, kind, label, is_primary, sort_order")
+      .in("candidate_id", candidateIds)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    throwOn(lockupErr);
+
+    const lockupIds = (lockupRows ?? []).map((row) => row.id as string);
+    const variantRows =
+      lockupIds.length > 0
+        ? await supabase
+            .from("logo_variants")
+            .select("id, lockup_id, kind, source, colorway, label, sort_order")
+            .in("lockup_id", lockupIds)
+            .order("sort_order", { ascending: true })
+            .order("created_at", { ascending: true })
+        : { data: [], error: null };
+    throwOn(variantRows.error);
+
+    const variantsByLockup = new Map<string, LogoVariantAsset[]>();
+    for (const row of (variantRows.data ?? []) as unknown as LogoVariantRow[]) {
+      const current = variantsByLockup.get(row.lockup_id) ?? [];
+      current.push(mapLogoVariant(row));
+      variantsByLockup.set(row.lockup_id, current);
+    }
+
+    return {
+      subject: subjectResult.data
+        ? mapBrandEntity(subjectResult.data as BrandEntityRow)
+        : null,
+      lockups: ((lockupRows ?? []) as unknown as LogoLockupRow[]).map(
+        (row): LogoLockup => ({
+          id: row.id,
+          candidateId: row.candidate_id,
+          kind: row.kind as LogoLockup["kind"],
+          label: row.label,
+          isPrimary: row.is_primary,
+          sortOrder: row.sort_order,
+          variants: variantsByLockup.get(row.id) ?? [],
+        })
+      ),
+    };
+  }
+
+  async saveAssetSubject(
+    logoId: string,
+    subject: BrandEntityDraft | null
+  ): Promise<BrandEntity | null> {
+    const uid = await this.ensureAuth();
+    const { data: logoRow, error: logoErr } = await supabase
+      .from("logos")
+      .select("subject_entity_id")
+      .eq("id", logoId)
+      .maybeSingle();
+    throwOn(logoErr);
+    if (!logoRow) return null;
+
+    const currentSubjectId = (logoRow.subject_entity_id as string | null) ?? null;
+    const now = new Date().toISOString();
+    if (!subject) {
+      throwOn(
+        (
+          await supabase
+            .from("logos")
+            .update({ subject_entity_id: null, updated_at: now, updated_by: uid })
+            .eq("id", logoId)
+        ).error
+      );
+      await this.logActivity(logoId, "info_updated");
+      return null;
+    }
+
+    const row = {
+      name: subject.name,
+      entity_type: subject.entityType,
+      website: subject.website,
+      industry: subject.industry,
+      location: subject.location,
+      description: subject.description,
+      updated_at: now,
+    };
+    const { data: saved, error: saveErr } = currentSubjectId
+      ? await supabase
+          .from("brand_entities")
+          .update(row)
+          .eq("id", currentSubjectId)
+          .select("id, name, entity_type, website, industry, location, description")
+          .single()
+      : await supabase
+          .from("brand_entities")
+          .insert({ ...row, created_by: uid })
+          .select("id, name, entity_type, website, industry, location, description")
+          .single();
+    throwOn(saveErr);
+
+    if (!currentSubjectId) {
+      throwOn(
+        (
+          await supabase
+            .from("logos")
+            .update({
+              subject_entity_id: saved!.id,
+              updated_at: now,
+              updated_by: uid,
+            })
+            .eq("id", logoId)
+        ).error
+      );
+    }
+    await this.logActivity(logoId, "info_updated");
+    return mapBrandEntity(saved as BrandEntityRow);
   }
 
   // ---------- presentation (layer B) ----------

@@ -1,7 +1,7 @@
 "use client";
 
 // The hamburger — user-facing navigation across the product. Home and (later)
-// Gallery live here; Brand Manager is reached from here too. This is the
+// Gallery live here; Assets and Brand Manager are reached from here too. This is the
 // public wayfinding menu; account actions and the internal Labs entrance live
 // in the avatar menu instead (see Account.tsx).
 
@@ -32,6 +32,7 @@ export default function MainNav({ tone = "dark" }: { tone?: "dark" | "light" }) 
   const items: { href: string; label: string }[] = [
     { href: "/", label: dict.header.home },
     // Gallery gets its own route later; for now Home carries the gallery.
+    { href: "/assets", label: dict.header.assets },
     { href: "/brand", label: dict.header.brandManager },
   ];
 

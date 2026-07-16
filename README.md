@@ -31,7 +31,9 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | `/` | ロゴ投稿UI(メイン導線)+ ギャラリー(「あなたのロゴ」+ 全ユーザーの公開ロゴの図鑑)。カードから各プレゼンへ |
 | `/p/[id]` | 生成されたブランドプレゼンテーション(共有可能な固有URL)。**所有者のみ**ヘッダーの「編集」でキャッチコピー・ストーリー・各シーンのリード文に加え、**どの motion / mockup / generated asset を各プレゼン配置に採用するか**をその場で切り替えられる。`/p/sample` はサンプル(編集不可) |
 | `/brand` | **Brand Manager**(旧称 Admin)。導入企業が**自社のブランド資産**(ロゴ・物品在庫・組織メンバー・公開ハンドル)を管理するハブ。プラットフォーム運営側の管理画面ではなく、そのブランドを持つ組織のための画面 |
-| `/brand/logos/[id]` | ロゴ情報ページ(正本の編集: 正式名称・ロゴ形式・役割・親子関係・公開範囲・公開スラッグ・コンタクト表示・タグ・制作クレジット・商標情報・マスターファイル差し替え・**組織への所有移管**・作業履歴)。あわせて**このロゴで現在どのプレゼン asset が採用されているか**も確認できる |
+| `/assets` | アセットライブラリ。自分/所属組織が管理するロゴアセットを一覧し、各アセット詳細へ入る |
+| `/assets/[id]` | アセット詳細ページ。現時点ではロゴ正本の編集(正式名称・主体entity・ロゴ形式・役割・親子関係・公開範囲・公開スラッグ・コンタクト表示・タグ・制作クレジット・商標情報・マスターファイル差し替え・**組織への所有移管**・作業履歴)。あわせて**このロゴで現在どのプレゼン asset が採用されているか**、candidate配下のlockup / colorway階層も確認できる。旧 `/brand/logos/[id]` は同じ画面を指す互換URL |
+| `/settings` | 設定ページ。現時点ではユーザー情報表示・プロフィール編集枠・退会導線のプレースホルダー |
 | `/[handle]/[slug]` | バニティURL。組織ハンドル+ロゴスラッグを正規パーマリンク `/p/[id]` に解決(公開ロゴのみ) |
 | `/labs` | **研究所インデックス**(noindex)。表現R&Dのラボ群を**保証モード/探索モード/統合(将来枠)**で分類: 稼働中の [Motion Lab](labs/motion/README.md)(`/labs/motion`)・[Workflow Lab](labs/workflow/README.md)(`/labs/workflow`、旧称 Image Lab)・[Generative Lab](labs/generative/README.md)(`/labs/generative`、探索モード)と、将来枠の Campaign Lab。**各ラボは「プレゼン本編に入る section asset を設計・検証し、採用候補を作る場」**として位置づける。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow` へリダイレクト |
 
@@ -77,7 +79,7 @@ SVGをアップロードすると、以下が1本のガイドラインドキュ�
 - **文言層**: キャッチコピー・ストーリー・各シーンのリード文
 - **構成層**: 各 presentation placement にどの asset を採用するか、またその表示順
 
-Brand Manager の `/brand/logos/[id]` では、このロゴの**現在の採用 asset 一覧**を確認でき、そこから本編編集へ移動できる。
+アセット詳細ページ `/assets/[id]` では、このロゴの**現在の採用 asset 一覧**を確認でき、そこから本編編集へ移動できる。
 
 ## 多言語対応
 
@@ -87,9 +89,9 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 
 > **名称について**: 以前は「Admin(管理コンソール)」だったが、"Admin" だと**プラットフォーム運営側の管理画面**なのか**導入企業側の管理画面**なのか曖昧だった。この画面は後者——**導入企業が自社のブランド資産を管理する**場——なので **Brand Manager** に改称した(2026-07-14。ルートも `/admin` → `/brand`、UIラベルとi18nキー `header.brandManager` も更新済み)。
 
-白ベースのビジネスSaaS風ダッシュボード。KPI(登録ロゴ数・在庫アイテム数・要発注アイテム数・入荷待ち発注)、会社情報編集、**組織メンバーの招待・ロール管理(オーナー/管理者/編集者/購買担当/閲覧のみ)**、**公開URLハンドルの設定**、登録ロゴの一覧・役割設定・削除、ロゴアイテムの在庫管理と発注(ダミーデータ)を表示する。ビジネスモデル(フェーズ3の物販事業)を体現する画面。メール招待は相手がそのメールで登録した瞬間に自動でメンバー化される(SMTP不要)。組織ロール名の「管理者(admin)」はこの画面名とは別物(組織メンバーの権限)。
+白ベースのビジネスSaaS風ダッシュボード。KPI(登録アセット数・在庫アイテム数・要発注アイテム数・入荷待ち発注)、会社情報編集、**組織メンバーの招待・ロール管理(オーナー/管理者/編集者/購買担当/閲覧のみ)**、**公開URLハンドルの設定**、登録アセットの一覧・役割設定・削除、ロゴアイテムの在庫管理と発注(ダミーデータ)を表示する。ビジネスモデル(フェーズ3の物販事業)を体現する画面。メール招待は相手がそのメールで登録した瞬間に自動でメンバー化される(SMTP不要)。組織ロール名の「管理者(admin)」はこの画面名とは別物(組織メンバーの権限)。
 
-各ロゴの詳細(`/brand/logos/[id]`)では、正本編集だけでなく**そのロゴのプレゼン構成の現在値**も確認する。つまり Brand Manager は「ロゴファイルを持つ場所」だけでなく、**そのロゴがどんなブランドドキュメントとして出力されるか**を見るハブでもある。
+各アセットの詳細(`/assets/[id]`、旧 `/brand/logos/[id]`)では、正本編集だけでなく**そのロゴのプレゼン構成の現在値**も確認する。つまり Brand Manager は「ロゴファイルを持つ場所」だけでなく、**そのロゴがどんなブランドドキュメントとして出力されるか**を見るハブでもある。
 
 ## アーキテクチャ
 
@@ -112,7 +114,7 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 - **現時点の定義ソース**: built-in asset のコード定義 + Workflow Lab の `template.json`
 - **取得API**: `/api/presentation-assets`
 
-`0006_presentation_assets.sql` が定義とlayoutの基礎、`0007_asset_lifecycle.sql` が成熟度・不変version・実行状態を追加する。global asset definition の管理UI/同期はまだこれからで、現段階では **ロゴごとのlayoutとruntime成果物はDB、asset definition自体はcode/template側から供給**される。
+`0006_presentation_assets.sql` が定義とlayoutの基礎、`0007_asset_lifecycle.sql` が成熟度・不変version・実行状態を追加する。`0008_asset_registry.sql` はアセット詳細領域の基礎として、ロゴが表す実世界のブランド主体、lockup / colorway 階層、将来の移管・購入問い合わせを追加する。global asset definition の管理UI/同期はまだこれからで、現段階では **ロゴごとのlayoutとruntime成果物はDB、asset definition自体はcode/template側から供給**される。
 
 ### ランタイムBlender assetの暫定手動運用
 
@@ -127,6 +129,17 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 `Logo ID`はロゴをグローバルに一意に特定するため、アカウントIDを別途渡す必要はない。`Candidate ID`は今回使う正確なmaster SVG、`Asset Definition ID`とversionは実行するレシピを固定する。Run IDは暫定手動運用では任意であり、将来のキュー/ワーカー自動化で必須にする。
 
 IDは対象を識別する情報であり、認証情報ではない。認証はprivateなSVGの取得やR2/DBへの書き込み権限を確認するためだけに使う。手動期間はエージェントがこのworkspaceの既存接続設定を使い、依頼文にはSupabase JWT/service role、R2キー、`.env.local`の内容を**含めない**。接続権限がなければ、エージェントは不足している接続または権限を報告し、秘密情報をチャットへ貼るよう求めない。
+
+エージェントが使う標準コマンドは [run-runtime-asset.mjs](labs/workflow/scripts/run-runtime-asset.mjs)。ID照合、private SVG取得、Blender、4:3/中央配置QA、R2保存と読み戻し検証、`logo_mockups`登録を1回で行う。
+
+```bash
+node --env-file=.env.local labs/workflow/scripts/run-runtime-asset.mjs \
+  --logo-id <Logo ID> \
+  --candidate-id <Candidate ID> \
+  --asset-id workflow-neon-sign-v1
+```
+
+詳細な事前確認、`--run-id`、低サンプル検証用`--no-publish`、合格条件は [暫定手動運用の正本](docs/logo-entity-lab-integration.md#5-ランタイムassetの暫定手動運用)を参照。
 
 ## 開発
 
@@ -156,7 +169,7 @@ R2_BUCKET_NAME=logos-assets
 
 スキーマの正本は [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql)(アカウント・組織・ロゴ正本・RLS一式)。セットアップ手順:
 
-1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0007、いずれも冪等・再実行可)
+1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0008、いずれも冪等・再実行可)
 2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(ゲスト投稿の前提)
 3. `.env.local` に以下を追加:
 
@@ -185,7 +198,7 @@ Vercelにデプロイする場合は同じ環境変数を Settings → Environme
 
 ## 残タスク・既知の課題(検証Findingsより)
 
-- **作業履歴の集約**: ロゴ情報ページはセレクト変更のたびに「情報更新」が1行記録され、履歴がすぐ長くなる。連続する同種操作をまとめる集約(例: 一定時間内の同種更新を1行に)をSupabase移行時に検討する
+- **作業履歴の集約**: アセット詳細ページはセレクト変更のたびに「情報更新」が1行記録され、履歴がすぐ長くなる。連続する同種操作をまとめる集約(例: 一定時間内の同種更新を1行に)をSupabase移行時に検討する
 - **公開範囲変更のadmin限定**: UIでは組織ロゴのvisibility変更を管理者以上に制限したが、RLSは行単位のため列単位の強制はサーバー側では未実装(0001_init.sqlにも注記)
 - **プレゼン編集にUndoがない**: blur即保存のため取り消し手段は「自動生成コピーへの復帰」のみ。本格運用では編集の取り消しを検討
 - **OAuth(Google/Apple/Figma)は要プロバイダ設定**: ボタンは配線済みだがSupabase側で各プロバイダを有効化するまで点灯しない

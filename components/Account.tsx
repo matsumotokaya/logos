@@ -2,7 +2,7 @@
 
 // Account control for the app headers: a "Sign in" affordance for guests that
 // opens an auth dialog (Google → Apple → Figma → email), and for signed-in
-// users an avatar menu (Brand Manager / labs / sign out). In localStorage
+// users an avatar menu (Assets / settings / labs / sign out). In localStorage
 // mode (no auth) the Brand Manager and labs links render as plain links.
 
 import { useEffect, useRef, useState } from "react";
@@ -85,7 +85,7 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
   }, [menuOpen]);
 
   // localStorage mode (no auth): an avatar-only menu. No email/logout, but the
-  // internal Labs entrance and My page stay reachable here.
+  // internal Labs entrance, Assets, and Settings stay reachable here.
   if (!enabled) {
     return (
       <div ref={menuRef} className="relative">
@@ -96,7 +96,12 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
           onClick={() => setMenuOpen((o) => !o)}
         />
         {menuOpen && (
-          <AccountMenu onNavigate={() => setMenuOpen(false)} labs={dict.header.labs} myPage={dict.header.myPage} />
+          <AccountMenu
+            onNavigate={() => setMenuOpen(false)}
+            labs={dict.header.labs}
+            assets={dict.header.assets}
+            settings={dict.header.settings}
+          />
         )}
       </div>
     );
@@ -169,7 +174,8 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
             <AccountMenu
               email={user?.email}
               labs={dict.header.labs}
-              myPage={dict.header.myPage}
+              assets={dict.header.assets}
+              settings={dict.header.settings}
               signOutLabel={dict.auth.signOut}
               onNavigate={() => setMenuOpen(false)}
               onSignOut={() => {
@@ -344,14 +350,16 @@ function AvatarButton({
 function AccountMenu({
   email,
   labs,
-  myPage,
+  assets,
+  settings,
   signOutLabel,
   onNavigate,
   onSignOut,
 }: {
   email?: string | null;
   labs: string;
-  myPage: string;
+  assets: string;
+  settings: string;
   signOutLabel?: string;
   onNavigate: () => void;
   onSignOut?: () => void;
@@ -368,11 +376,19 @@ function AccountMenu({
       )}
       <Link
         role="menuitem"
-        href="/"
+        href="/assets"
         onClick={onNavigate}
         className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
       >
-        {myPage}
+        {assets}
+      </Link>
+      <Link
+        role="menuitem"
+        href="/settings"
+        onClick={onNavigate}
+        className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
+      >
+        {settings}
       </Link>
       <Link
         role="menuitem"

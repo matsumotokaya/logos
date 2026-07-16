@@ -1,6 +1,6 @@
 "use client";
 
-// Registered logo grid: role assignment, presentation link, deletion.
+// Registered asset grid: role assignment, presentation link, deletion.
 
 import Link from "next/link";
 import { LOGO_ROLE_LABELS, type LogoRole, type StoredLogo } from "@/lib/store";
@@ -23,7 +23,7 @@ export default function LogoSection({ logos, onChangeRole, onDelete }: Props) {
     return (
       <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
         <p className="text-pretty text-sm text-gray-500">
-          ロゴがまだありません。トップページからSVGをアップロードすると、ここに表示されます。
+          アセットがまだありません。トップページからSVGをアップロードすると、ここに表示されます。
         </p>
         <Link
           href="/"
@@ -70,10 +70,10 @@ export default function LogoSection({ logos, onChangeRole, onDelete }: Props) {
             </select>
             <div className="flex items-center gap-4">
               <Link
-                href={`/brand/logos/${logo.id}`}
+                href={`/assets/${logo.id}`}
                 className="text-xs font-medium text-gray-900 underline underline-offset-2"
               >
-                ロゴ情報
+                アセット詳細
               </Link>
               <a
                 href={`/p/${logo.id}`}

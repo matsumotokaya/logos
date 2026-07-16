@@ -80,6 +80,7 @@ async function executeRuntimeAssetRunWithClient({
   const outputPath = path.join(dir, "render.png");
   try {
     await writeFile(svgPath, candidate.svg, "utf8");
+    const colorMode = run.params?.colorMode === "warm-white" ? "warm-white" : "logo";
     await execFileAsync(await blenderExecutable(), [
       "-b",
       "-P",
@@ -91,6 +92,8 @@ async function executeRuntimeAssetRunWithClient({
       outputPath,
       "--samples",
       process.env.BLENDER_SAMPLES?.trim() || "150",
+      "--color-mode",
+      colorMode,
     ], { maxBuffer: 8 * 1024 * 1024 });
 
     const png = await readFile(outputPath);

@@ -196,7 +196,7 @@ export const RUNTIME_PRESENTATION_MOCKUPS: RuntimePresentationMockup[] = [
     runtime: {
       worker: "blender",
       script: "labs/workflow/scripts/blender/neon_sign.py",
-      estimatedSeconds: 180,
+      estimatedSeconds: 390,
     },
     title: "ネオンサイン",
     scene: "onsite",

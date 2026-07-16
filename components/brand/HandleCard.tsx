@@ -88,7 +88,7 @@ export default function HandleCard({ org }: { org: Organization }) {
 
       <p className="text-pretty text-xs text-gray-400">
         公開(public)のロゴにスラッグを設定すると /ハンドル/スラッグ
-        でプレゼンを共有できます。スラッグはロゴ情報ページで設定します。
+        でプレゼンを共有できます。スラッグはアセット詳細ページで設定します。
       </p>
     </div>
   );

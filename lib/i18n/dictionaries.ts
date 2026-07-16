@@ -6,7 +6,8 @@ export type Dict = {
     brandManager: string;
     labs: string;
     home: string;
-    myPage: string;
+    assets: string;
+    settings: string;
     newLogo: string;
     brandName: string;
     language: string;
@@ -132,7 +133,8 @@ const en: Dict = {
     brandManager: "Brand Manager",
     labs: "Labs",
     home: "Home",
-    myPage: "My page",
+    assets: "Assets",
+    settings: "Settings",
     newLogo: "New logo",
     brandName: "Brand name",
     language: "Language",
@@ -275,7 +277,8 @@ const ja: Dict = {
     brandManager: "Brand Manager",
     labs: "ラボ",
     home: "ホーム",
-    myPage: "マイページ",
+    assets: "アセット",
+    settings: "設定",
     newLogo: "新しいロゴ",
     brandName: "ブランド名",
     language: "言語",
@@ -418,7 +421,8 @@ const ko: Dict = {
     brandManager: "Brand Manager",
     labs: "랩",
     home: "홈",
-    myPage: "마이페이지",
+    assets: "에셋",
+    settings: "설정",
     newLogo: "새 로고",
     brandName: "브랜드명",
     language: "언어",
@@ -561,7 +565,8 @@ const zhHant: Dict = {
     brandManager: "Brand Manager",
     labs: "實驗室",
     home: "首頁",
-    myPage: "我的頁面",
+    assets: "資產",
+    settings: "設定",
     newLogo: "新標誌",
     brandName: "品牌名稱",
     language: "語言",
@@ -703,7 +708,8 @@ const zhHans: Dict = {
     brandManager: "Brand Manager",
     labs: "实验室",
     home: "首页",
-    myPage: "我的页面",
+    assets: "资产",
+    settings: "设置",
     newLogo: "新标志",
     brandName: "品牌名称",
     language: "语言",

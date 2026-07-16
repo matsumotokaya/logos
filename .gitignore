@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+/.codex/
 
 # image lab job log (cost metering, runtime data)
 /var/

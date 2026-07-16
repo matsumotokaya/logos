@@ -1,16 +1,19 @@
 {
   "mcpServers": {
-    "supabase": {
+    "supabase_logos": {
       "command": "npx",
       "args": [
         "-y",
         "@supabase/mcp-server-supabase@latest",
-        "--read-only",
         "--project-ref=xhbdfzceyfrxsmaixkne"
       ],
       "env": {
         "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN_LOGOS}"
       }
+    },
+    "blender": {
+      "command": "/Users/kaya.matsumoto/.local/bin/uvx",
+      "args": ["blender-mcp"]
     }
   }
 }

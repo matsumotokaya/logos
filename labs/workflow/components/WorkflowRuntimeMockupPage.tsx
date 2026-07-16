@@ -100,7 +100,7 @@ export default function WorkflowRuntimeMockupPage({
                   <div className="mt-6 border-t border-hairline pt-5">
                     <p className="text-sm font-medium text-ink">Headless reproduction</p>
                     <code className="mt-3 block max-w-full overflow-x-auto bg-ink px-4 py-3 font-mono text-xs leading-relaxed whitespace-nowrap text-white">
-                      {`Blender -b -P ${mockup.runtime.script} -- --svg <master.svg> --out <render.png>`}
+                      {`Blender -b -P ${mockup.runtime.script} -- --svg <master.svg> --out <render.png> --color-mode <logo|warm-white>`}
                     </code>
                   </div>
                 </div>

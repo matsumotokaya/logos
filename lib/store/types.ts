@@ -290,6 +290,90 @@ export type AssetRun = {
   finishedAt: string | null;
 };
 
+export type BrandEntityType = "company" | "brand" | "product" | "service" | "other";
+
+export const BRAND_ENTITY_TYPE_LABELS: Record<BrandEntityType, string> = {
+  company: "会社",
+  brand: "ブランド",
+  product: "製品",
+  service: "サービス",
+  other: "その他",
+};
+
+export type BrandEntity = {
+  id: string;
+  name: string;
+  entityType: BrandEntityType;
+  website: string;
+  industry: string;
+  location: string;
+  description: string;
+};
+
+export type BrandEntityDraft = Omit<BrandEntity, "id">;
+
+export type LogoLockupKind =
+  | "primary"
+  | "horizontal"
+  | "vertical"
+  | "symbol"
+  | "wordmark"
+  | "custom";
+
+export const LOGO_LOCKUP_KIND_LABELS: Record<LogoLockupKind, string> = {
+  primary: "Primary",
+  horizontal: "Horizontal",
+  vertical: "Vertical",
+  symbol: "Symbol",
+  wordmark: "Wordmark",
+  custom: "Custom",
+};
+
+export type LogoVariantColorway =
+  | "original"
+  | "full_color"
+  | "black"
+  | "white"
+  | "reversed"
+  | "custom";
+
+export const LOGO_VARIANT_COLORWAY_LABELS: Record<LogoVariantColorway, string> = {
+  original: "Original",
+  full_color: "Full color",
+  black: "Black",
+  white: "White",
+  reversed: "Reversed",
+  custom: "Custom",
+};
+
+export type LogoVariantAsset = {
+  id: string;
+  kind: string;
+  source: "derived" | "uploaded";
+  colorway: LogoVariantColorway;
+  label: string;
+  sortOrder: number;
+};
+
+export type LogoLockup = {
+  id: string;
+  candidateId: string;
+  kind: LogoLockupKind;
+  label: string;
+  isPrimary: boolean;
+  sortOrder: number;
+  variants: LogoVariantAsset[];
+};
+
+export type LogoAssetRegistry = {
+  subject: BrandEntity | null;
+  lockups: LogoLockup[];
+};
+
+export function emptyAssetRegistry(): LogoAssetRegistry {
+  return { subject: null, lockups: [] };
+}
+
 export interface BrandRepo {
   getCompany(): Promise<Company>;
   saveCompany(company: Company): Promise<void>;
@@ -303,6 +387,14 @@ export interface BrandRepo {
   /** Overwrite the master file in place (no version kept), logging the update. */
   replaceLogoData(id: string, data: LogoData): Promise<void>;
   deleteLogo(id: string): Promise<void>;
+
+  /** Candidate -> lockup -> colorway registry for the asset detail surface. */
+  getAssetRegistry(logoId: string): Promise<LogoAssetRegistry>;
+  /** Create, update, attach, or detach the real-world subject of a logo asset. */
+  saveAssetSubject(
+    logoId: string,
+    subject: BrandEntityDraft | null
+  ): Promise<BrandEntity | null>;
 
   /** Layer B editorial content; returns an empty presentation when unedited. */
   getPresentation(logoId: string): Promise<LogoPresentation>;

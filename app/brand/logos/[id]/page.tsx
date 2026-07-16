@@ -1,6 +1,6 @@
 "use client";
 
-// Logo info page: the canonical record of one logo (docs/data-model.md §5).
+// Asset detail page: the canonical record of one logo (docs/data-model.md §5).
 // Edits formal info (layer A: name, type, role, tree, visibility, credits,
 // trademarks) and discovery tags (layer C), and shows the work history.
 
@@ -8,15 +8,22 @@ import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ACTIVITY_LABELS,
+  BRAND_ENTITY_TYPE_LABELS,
   CREDIT_ROLE_LABELS,
+  LOGO_LOCKUP_KIND_LABELS,
   LOGO_ROLE_LABELS,
   LOGO_TYPE_LABELS,
+  LOGO_VARIANT_COLORWAY_LABELS,
   TRADEMARK_STATUS_LABELS,
   TRADEMARK_TYPE_LABELS,
   VISIBILITY_LABELS,
+  emptyAssetRegistry,
   emptyPresentation,
   repo,
+  type BrandEntityDraft,
+  type BrandEntityType,
   type CreditRole,
+  type LogoAssetRegistry,
   type LogoCredit,
   type LogoPatch,
   type LogoPresentation,
@@ -44,9 +51,35 @@ import {
   transferLogoToOrg,
   type Organization,
 } from "@/lib/org";
+import AppHeader from "@/components/AppHeader";
 
 // Nice classes are edited as free text ("9, 35, 42") and parsed on save.
 type TrademarkDraft = Omit<LogoTrademark, "niceClasses"> & { niceClasses: string };
+type SubjectDraft = BrandEntityDraft;
+
+function emptySubjectDraft(name = ""): SubjectDraft {
+  return {
+    name,
+    entityType: "company",
+    website: "",
+    industry: "",
+    location: "",
+    description: "",
+  };
+}
+
+function subjectToDraft(subject: LogoAssetRegistry["subject"], fallbackName: string): SubjectDraft {
+  return subject
+    ? {
+        name: subject.name,
+        entityType: subject.entityType,
+        website: subject.website,
+        industry: subject.industry,
+        location: subject.location,
+        description: subject.description,
+      }
+    : emptySubjectDraft(fallbackName);
+}
 
 function toTrademarkDraft(t: LogoTrademark): TrademarkDraft {
   return { ...t, niceClasses: t.niceClasses.join(", ") };
@@ -105,6 +138,11 @@ export default function LogoInfoPage({
   const [tagInput, setTagInput] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
   const [presentation, setPresentation] = useState<LogoPresentation>(emptyPresentation());
+  const [assetRegistry, setAssetRegistry] =
+    useState<LogoAssetRegistry>(emptyAssetRegistry());
+  const [subjectDraft, setSubjectDraft] = useState<SubjectDraft>(emptySubjectDraft());
+  const [subjectSaving, setSubjectSaving] = useState(false);
+  const [subjectError, setSubjectError] = useState<string | null>(null);
   const [assetCatalog, setAssetCatalog] = useState<PresentationCatalogResponse>({
     definitions: [],
     brokenItems: [],
@@ -116,13 +154,14 @@ export default function LogoInfoPage({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [l, all, orgs, pres, catalog] = await Promise.all([
+      const [l, all, orgs, pres, registry, catalog] = await Promise.all([
         repo.getLogo(id),
         repo.listLogos(),
         hasSupabase
           ? listMyOrgs().then((os) => os.filter((o) => o.myRole === "owner" || o.myRole === "admin"))
           : Promise.resolve([]),
         repo.getPresentation(id).catch(() => emptyPresentation()),
+        repo.getAssetRegistry(id).catch(() => emptyAssetRegistry()),
         fetchPresentationCatalog().catch(() => ({ definitions: [], brokenItems: [] })),
       ]);
       if (cancelled) return;
@@ -130,12 +169,14 @@ export default function LogoInfoPage({
       setAllLogos(all);
       setAdminOrgs(orgs);
       setPresentation(pres);
+      setAssetRegistry(registry);
       setAssetCatalog(catalog);
       if (l) {
         setTitleDraft(l.title);
         setSlugDraft(l.slug ?? "");
         setCreditsDraft(l.credits);
         setTmDraft(l.trademarks.map(toTrademarkDraft));
+        setSubjectDraft(subjectToDraft(registry.subject, l.title));
       }
       setLoaded(true);
     })();
@@ -166,30 +207,57 @@ export default function LogoInfoPage({
 
   if (!loaded) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#F7F7F8] text-[#111827]">
-        <p className="text-sm text-gray-500">読み込み中…</p>
+      <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
+        <AppHeader
+          section="Asset Detail"
+          links={[
+            { href: "/assets", label: "Assets" },
+            { href: "/brand", label: "Brand Manager" },
+          ]}
+        />
+        <div className="flex min-h-[60dvh] items-center justify-center">
+          <p className="text-sm text-gray-500">読み込み中…</p>
+        </div>
       </div>
     );
   }
 
   if (!logo) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#F7F7F8] text-[#111827]">
-        <p className="text-sm text-gray-500">ロゴが見つかりません。</p>
-        <Link href="/brand" className="text-sm underline underline-offset-2">
-          Brand Manager へ戻る
-        </Link>
+      <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
+        <AppHeader
+          section="Asset Detail"
+          links={[
+            { href: "/assets", label: "Assets" },
+            { href: "/brand", label: "Brand Manager" },
+          ]}
+        />
+        <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-4">
+          <p className="text-sm text-gray-500">ロゴが見つかりません。</p>
+          <Link href="/assets" className="text-sm underline underline-offset-2">
+            Assets へ戻る
+          </Link>
+        </div>
       </div>
     );
   }
 
   if (logo.canEdit === false) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#F7F7F8] text-[#111827]">
-        <p className="text-sm text-gray-500">このロゴを管理する権限がありません。</p>
-        <Link href="/brand" className="text-sm underline underline-offset-2">
-          Brand Manager へ戻る
-        </Link>
+      <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
+        <AppHeader
+          section="Asset Detail"
+          links={[
+            { href: "/assets", label: "Assets" },
+            { href: "/brand", label: "Brand Manager" },
+          ]}
+        />
+        <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-4">
+          <p className="text-sm text-gray-500">このロゴを管理する権限がありません。</p>
+          <Link href="/assets" className="text-sm underline underline-offset-2">
+            Assets へ戻る
+          </Link>
+        </div>
       </div>
     );
   }
@@ -263,20 +331,66 @@ export default function LogoInfoPage({
     void patch({ trademarks: tmDraft.map(fromTrademarkDraft) });
   };
 
+  const saveSubject = async () => {
+    const name = subjectDraft.name.trim();
+    if (!name) {
+      setSubjectError("主体名を入力してください。");
+      return;
+    }
+    setSubjectSaving(true);
+    setSubjectError(null);
+    try {
+      await repo.saveAssetSubject(id, { ...subjectDraft, name });
+      const registry = await repo.getAssetRegistry(id);
+      setAssetRegistry(registry);
+      setSubjectDraft(subjectToDraft(registry.subject, logo.title));
+      setLogo(await repo.getLogo(id));
+    } catch (e) {
+      setSubjectError(e instanceof Error ? e.message : "保存に失敗しました。");
+    } finally {
+      setSubjectSaving(false);
+    }
+  };
+
+  const detachSubject = async () => {
+    setSubjectSaving(true);
+    setSubjectError(null);
+    try {
+      await repo.saveAssetSubject(id, null);
+      const registry = await repo.getAssetRegistry(id);
+      setAssetRegistry(registry);
+      setSubjectDraft(subjectToDraft(null, logo.title));
+      setLogo(await repo.getLogo(id));
+    } catch (e) {
+      setSubjectError(e instanceof Error ? e.message : "解除に失敗しました。");
+    } finally {
+      setSubjectSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
+      <AppHeader
+        section="Asset Detail"
+        links={[
+          { href: "/assets", label: "Assets" },
+          { href: "/brand", label: "Brand Manager" },
+          { href: `/p/${logo.id}`, label: "プレゼンを見る" },
+        ]}
+      />
+
       <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
-        <header className="flex items-center justify-between">
-          <Link href="/brand" className="text-sm text-gray-500 hover:text-gray-900">
-            ← Brand Manager
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <Link href="/assets" className="text-sm text-gray-500 hover:text-gray-900">
+            ← Assets
           </Link>
           <a href={`/p/${logo.id}`} className="text-sm text-gray-500 hover:text-gray-900">
             プレゼンを見る →
           </a>
-        </header>
+        </div>
 
         <div>
-          <p className="text-xs text-gray-500">ロゴ情報（正本）</p>
+          <p className="text-xs text-gray-500">アセット詳細（ロゴ正本）</p>
           <h1 className="mt-1 text-balance text-2xl font-semibold">{logo.title}</h1>
           <p className="mt-1 text-xs text-gray-500 tabular-nums">
             登録 {formatDateTime(logo.createdAt)} ・ 最終更新 {formatDateTime(logo.updatedAt)}
@@ -441,6 +555,178 @@ export default function LogoInfoPage({
                 まだ採用 asset がありません。プレゼン本編の編集モードで placement ごとの採用を決めてください。
               </div>
             )}
+          </div>
+        </Card>
+
+        <Card
+          title="アセット構造"
+          note="0008 asset registry の読み取りビューです。主体 entity、candidate 配下の lockup、各lockupのcolorwayを確認します。"
+        >
+          <div className="flex flex-col gap-5">
+            <div>
+              <p className={labelCls}>主体 entity</p>
+              <div className="mt-2 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1">
+                  <span className={labelCls}>名称</span>
+                  <input
+                    value={subjectDraft.name}
+                    onChange={(e) =>
+                      setSubjectDraft((d) => ({ ...d, name: e.target.value }))
+                    }
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className={labelCls}>種別</span>
+                  <select
+                    value={subjectDraft.entityType}
+                    onChange={(e) =>
+                      setSubjectDraft((d) => ({
+                        ...d,
+                        entityType: e.target.value as BrandEntityType,
+                      }))
+                    }
+                    className={inputCls}
+                  >
+                    {(
+                      Object.entries(BRAND_ENTITY_TYPE_LABELS) as [
+                        BrandEntityType,
+                        string,
+                      ][]
+                    ).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className={labelCls}>Website</span>
+                  <input
+                    value={subjectDraft.website}
+                    onChange={(e) =>
+                      setSubjectDraft((d) => ({ ...d, website: e.target.value }))
+                    }
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className={labelCls}>Industry</span>
+                  <input
+                    value={subjectDraft.industry}
+                    onChange={(e) =>
+                      setSubjectDraft((d) => ({ ...d, industry: e.target.value }))
+                    }
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 sm:col-span-2">
+                  <span className={labelCls}>Location</span>
+                  <input
+                    value={subjectDraft.location}
+                    onChange={(e) =>
+                      setSubjectDraft((d) => ({ ...d, location: e.target.value }))
+                    }
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 sm:col-span-2">
+                  <span className={labelCls}>説明</span>
+                  <textarea
+                    value={subjectDraft.description}
+                    onChange={(e) =>
+                      setSubjectDraft((d) => ({
+                        ...d,
+                        description: e.target.value,
+                      }))
+                    }
+                    rows={3}
+                    className={inputCls}
+                  />
+                </label>
+                <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+                  <button
+                    type="button"
+                    disabled={subjectSaving}
+                    onClick={() => void saveSubject()}
+                    className="rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                  >
+                    {subjectSaving ? "保存中…" : "主体を保存"}
+                  </button>
+                  {assetRegistry.subject && (
+                    <button
+                      type="button"
+                      disabled={subjectSaving}
+                      onClick={() => void detachSubject()}
+                      className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:border-gray-900 disabled:cursor-not-allowed disabled:text-gray-400"
+                    >
+                      紐づけ解除
+                    </button>
+                  )}
+                  {subjectError && (
+                    <p aria-live="polite" className="text-sm text-red-600">
+                      {subjectError}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {assetRegistry.subject && (
+                <p className="mt-2 font-mono text-[11px] text-gray-400">
+                  entity {assetRegistry.subject.id}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <p className={labelCls}>Lockups / colorways</p>
+              <div className="mt-2 grid grid-cols-1 gap-3">
+                {assetRegistry.lockups.map((lockup) => (
+                  <div
+                    key={lockup.id}
+                    className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900">
+                        {lockup.label || LOGO_LOCKUP_KIND_LABELS[lockup.kind]}
+                      </p>
+                      <span className="rounded-full border border-gray-300 bg-white px-2 py-0.5 text-[11px] text-gray-500">
+                        {LOGO_LOCKUP_KIND_LABELS[lockup.kind]}
+                      </span>
+                      {lockup.isPrimary && (
+                        <span className="rounded-full bg-gray-900 px-2 py-0.5 text-[11px] text-white">
+                          primary
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 font-mono text-[11px] text-gray-400">
+                      candidate {lockup.candidateId}
+                    </p>
+                    {lockup.variants.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {lockup.variants.map((variant) => (
+                          <span
+                            key={variant.id}
+                            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700"
+                          >
+                            {variant.label || variant.kind} /{" "}
+                            {LOGO_VARIANT_COLORWAY_LABELS[variant.colorway]}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs text-gray-500">
+                        追加colorwayは未登録です。現在はcandidateのmaster SVGがこのlockupのoriginalです。
+                      </p>
+                    )}
+                  </div>
+                ))}
+                {assetRegistry.lockups.length === 0 && (
+                  <p className="rounded-lg border border-dashed border-gray-300 bg-white p-3 text-sm text-gray-500">
+                    lockupがありません。migration後に作成されたcandidateには自動でprimary lockupが作られます。
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </Card>
 

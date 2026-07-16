@@ -22,6 +22,7 @@ import LogoSection from "@/components/brand/LogoSection";
 import OrgSection from "@/components/brand/OrgSection";
 import HandleCard from "@/components/brand/HandleCard";
 import InventorySection from "@/components/brand/InventorySection";
+import AppHeader from "@/components/AppHeader";
 
 const yen = new Intl.NumberFormat("ja-JP");
 
@@ -100,22 +101,34 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
+      <AppHeader
+        section="Brand Manager"
+        links={[
+          { href: "/assets", label: "Assets" },
+          { href: "/", label: "サイトを見る" },
+        ]}
+      />
+
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-8">
-        {/* Top bar */}
-        <header className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-balance text-lg font-semibold">
             {SERVICE_NAME}®{" "}
             <span className="text-xs font-normal text-gray-500">Brand Manager</span>
           </h1>
-          <Link href="/" className="text-sm text-gray-500 hover:text-gray-900">
-            サイトを見る →
-          </Link>
-        </header>
+          <nav className="flex items-center gap-4" aria-label="Brand Manager navigation">
+            <Link href="/assets" className="text-sm text-gray-500 hover:text-gray-900">
+              Assets →
+            </Link>
+            <Link href="/" className="text-sm text-gray-500 hover:text-gray-900">
+              サイトを見る →
+            </Link>
+          </nav>
+        </div>
 
         {/* KPI row */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-xs text-gray-500">登録ロゴ数</p>
+            <p className="text-xs text-gray-500">登録アセット数</p>
             <p className="mt-1 text-3xl font-semibold tabular-nums">{logos.length}</p>
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-5">
@@ -187,9 +200,9 @@ export default function AdminPage() {
         {/* Logos */}
         <section className="flex flex-col gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">登録ロゴ</h2>
+            <h2 className="text-sm font-semibold text-gray-900">登録アセット</h2>
             <p className="text-pretty text-xs text-gray-500">
-              アップロード済みのロゴの役割設定と管理を行います。
+              アップロード済みのロゴアセットの役割設定と管理を行います。
             </p>
           </div>
           <LogoSection

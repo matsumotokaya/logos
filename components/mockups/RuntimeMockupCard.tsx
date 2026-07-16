@@ -122,6 +122,8 @@ export default function RuntimeMockupCard({
   };
 
   const currentRun = "run" in state ? state.run : null;
+  const hasManualOutput = state.status === "done" && !currentRun;
+  const requestStatus = currentRun?.status ?? (hasManualOutput ? "processed" : "unprocessed");
   const canCreateRequest = Boolean(scene.mockupCandidateId) && !queueBusy;
   const canCopyRequest = Boolean(
     requestDetails && scene.mockupLogoId && scene.mockupCandidateId,
@@ -141,6 +143,7 @@ export default function RuntimeMockupCard({
           assetId,
           label,
           requestDetails,
+          hasManualOutput,
         }),
       );
       setCopyFeedback("依頼情報をコピーしました。");
@@ -219,12 +222,10 @@ export default function RuntimeMockupCard({
             </dd>
             <dt className="text-ink-muted">Run ID</dt>
             <dd className="min-w-0 break-all font-mono text-xs text-ink">
-              {currentRun?.id ?? "依頼未作成"}
+              {currentRun?.id ?? (hasManualOutput ? "未作成（手動登録）" : "依頼未作成")}
             </dd>
             <dt className="text-ink-muted">Status</dt>
-            <dd className="font-mono text-xs text-ink">
-              {currentRun?.status ?? "unprocessed"}
-            </dd>
+            <dd className="font-mono text-xs text-ink">{requestStatus}</dd>
           </dl>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -293,6 +294,7 @@ function formatRenderRequest({
   assetId,
   label,
   requestDetails,
+  hasManualOutput,
 }: {
   run: AssetRun | null;
   logoName: string;
@@ -301,17 +303,18 @@ function formatRenderRequest({
   assetId: string;
   label: string;
   requestDetails: RuntimeRequestDetails;
+  hasManualOutput: boolean;
 }) {
   return [
     `${label} レンダー依頼`,
-    `Run ID: ${run?.id ?? "未作成（手動依頼）"}`,
+    `Run ID: ${run?.id ?? (hasManualOutput ? "未作成（手動登録）" : "未作成（手動依頼）")}`,
     `Logo: ${logoName}`,
     `Logo ID: ${logoId}`,
     `Candidate ID: ${candidateId}`,
     `Asset Definition ID: ${assetId}`,
     `Asset Family: ${requestDetails.familyId}`,
     `Version: ${requestDetails.version}`,
-    `Status: ${run?.status ?? "unprocessed"}`,
+    `Status: ${run?.status ?? (hasManualOutput ? "processed" : "unprocessed")}`,
     `Params: ${JSON.stringify(run?.params ?? requestDetails.params ?? {})}`,
     `Page: /labs/workflow/${assetId}`,
   ].join("\n");
