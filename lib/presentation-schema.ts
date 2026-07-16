@@ -2,6 +2,15 @@ import type { PresentationScene } from "@/lib/presentation-scenes";
 
 export type PresentationSourceLab = "motion" | "workflow" | "generative";
 export type PresentationAssetKind = "motion" | "mockup" | "generated";
+export type PresentationAssetReleaseStage = "draft" | "production";
+
+export const PRESENTATION_ASSET_RELEASE_LABELS: Record<
+  PresentationAssetReleaseStage,
+  string
+> = {
+  draft: "Draft",
+  production: "Production",
+};
 
 export type PresentationPlacementId =
   | "splash.hero"
@@ -88,13 +97,18 @@ export function emptyPresentationLayout(): PresentationLayout {
 
 export type PresentationAssetDefinitionCommon = {
   id: string;
+  familyId: string;
+  version: number;
+  releaseStage: PresentationAssetReleaseStage;
   assetKind: PresentationAssetKind;
   sourceLab: PresentationSourceLab;
+  rendererKind: string;
   title: string;
   notesJa: string;
   impressions?: string[];
   allowedPlacements: PresentationPlacementId[];
   defaultMappings?: PresentationAssetMappingSpec[];
+  config?: Record<string, unknown>;
 };
 
 export type ResolvedPresentationAsset<T> = {
@@ -106,10 +120,13 @@ export type ResolvedPresentationAsset<T> = {
 export function resolvePresentationAssets<
   T extends PresentationAssetDefinitionCommon,
 >(definitions: T[], layout: PresentationLayout): ResolvedPresentationAsset<T>[] {
-  const byId = new Map<string, T>(definitions.map((definition) => [definition.id, definition]));
+  const productionDefinitions = definitions.filter(isProductionAssetDefinition);
+  const byId = new Map<string, T>(
+    productionDefinitions.map((definition) => [definition.id, definition]),
+  );
   const resolved = new Map<string, PresentationAssetMapping>();
 
-  for (const definition of definitions) {
+  for (const definition of productionDefinitions) {
     for (const mapping of definition.defaultMappings ?? []) {
       if (!definition.allowedPlacements.includes(mapping.placementId)) continue;
       resolved.set(presentationMappingKey(definition.id, mapping.placementId), {
@@ -153,13 +170,14 @@ export function buildPlacementCatalog<T extends PresentationAssetDefinitionCommo
   definitions: T[],
   layout: PresentationLayout,
 ): PresentationPlacementCatalogEntry<T>[] {
-  const selected = resolvePresentationAssets(definitions, layout);
+  const productionDefinitions = definitions.filter(isProductionAssetDefinition);
+  const selected = resolvePresentationAssets(productionDefinitions, layout);
   return PRESENTATION_PLACEMENT_ORDER.map((placementId) => {
     const placement = getPresentationPlacement(placementId);
     return {
       placement,
       selected: selected.filter((entry) => entry.placement.id === placement.id),
-      available: definitions.filter((definition) =>
+      available: productionDefinitions.filter((definition) =>
         definition.allowedPlacements.includes(placement.id),
       ),
     };
@@ -169,10 +187,13 @@ export function buildPlacementCatalog<T extends PresentationAssetDefinitionCommo
 export function buildEditablePresentationLayout<
   T extends PresentationAssetDefinitionCommon,
 >(definitions: T[], layout: PresentationLayout): PresentationLayout {
-  const byId = new Map<string, T>(definitions.map((definition) => [definition.id, definition]));
+  const productionDefinitions = definitions.filter(isProductionAssetDefinition);
+  const byId = new Map<string, T>(
+    productionDefinitions.map((definition) => [definition.id, definition]),
+  );
   const explicit = new Map<string, PresentationAssetMapping>();
 
-  definitions.forEach((definition, definitionIndex) => {
+  productionDefinitions.forEach((definition, definitionIndex) => {
     definition.allowedPlacements.forEach((placementId, placementIndex) => {
       const defaultMapping = definition.defaultMappings?.find(
         (mapping) => mapping.placementId === placementId,
@@ -203,6 +224,12 @@ export function buildEditablePresentationLayout<
     version: 1,
     mappings: [...explicit.values()],
   });
+}
+
+export function isProductionAssetDefinition<
+  T extends PresentationAssetDefinitionCommon,
+>(definition: T): definition is T & { releaseStage: "production" } {
+  return definition.releaseStage === "production";
 }
 
 export function presentationMappingKey(assetId: string, placementId: PresentationPlacementId) {

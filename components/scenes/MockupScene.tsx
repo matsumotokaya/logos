@@ -9,6 +9,7 @@ import { SectionIntro, type SceneProps } from "@/components/scenes/shared";
 import BuiltinMockupArt from "@/components/mockups/BuiltinMockupArt";
 import WorkflowTemplateArt from "@/components/mockups/WorkflowTemplateArt";
 import GeneratedMockupCard from "@/components/mockups/GeneratedMockupCard";
+import RuntimeMockupCard from "@/components/mockups/RuntimeMockupCard";
 
 export default function MockupScene({
   n,
@@ -32,7 +33,20 @@ export default function MockupScene({
         <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
           {entries.map(({ definition, mapping, placement }) => (
             <article key={`${definition.id}:${placement.id}`}>
-              {definition.kind === "builtin" ? (
+              {definition.kind === "runtime" ? (
+                <>
+                  <RuntimeMockupCard
+                    scene={scene}
+                    assetId={definition.id}
+                    label={definition.title}
+                  />
+                  <Caption
+                    entry={definition}
+                    mappingOrder={mapping.order}
+                    placementLabel={placement.label}
+                  />
+                </>
+              ) : definition.kind === "builtin" ? (
                 definition.builtinKind === "generated-mug" ||
                 definition.builtinKind === "generated-tote" ||
                 definition.builtinKind === "generated-cap" ? (

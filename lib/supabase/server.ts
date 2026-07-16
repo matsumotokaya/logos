@@ -1,6 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-function requireEnv(name: "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_ANON_KEY"): string {
+function requireEnv(
+  name: "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is not set.`);
   return value;
@@ -50,4 +52,3 @@ export async function requireAccessToken(req: Request): Promise<string> {
   if (error || !data.user) throw new Error("Unauthorized");
   return token;
 }
-

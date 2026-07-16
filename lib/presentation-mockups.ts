@@ -41,14 +41,28 @@ export type TemplatePresentationMockup = PresentationMockupCommon & {
   template: Template2D;
 };
 
+export type RuntimePresentationMockup = PresentationMockupCommon & {
+  kind: "runtime";
+  runtime: {
+    worker: "blender";
+    script: string;
+    estimatedSeconds: number;
+  };
+};
+
 export type PresentationMockupDefinition =
   | BuiltinPresentationMockup
-  | TemplatePresentationMockup;
+  | TemplatePresentationMockup
+  | RuntimePresentationMockup;
 
 export const BUILTIN_PRESENTATION_MOCKUPS: BuiltinPresentationMockup[] = [
   {
     id: "social-card",
+    familyId: "social-card",
+    version: 1,
+    releaseStage: "production",
     assetKind: "mockup",
+    rendererKind: "builtin",
     kind: "builtin",
     builtinKind: "social-card",
     title: "プロフィールカード",
@@ -65,7 +79,11 @@ export const BUILTIN_PRESENTATION_MOCKUPS: BuiltinPresentationMockup[] = [
   },
   {
     id: "staff-badge",
+    familyId: "staff-badge",
+    version: 1,
+    releaseStage: "production",
     assetKind: "mockup",
+    rendererKind: "builtin",
     kind: "builtin",
     builtinKind: "staff-badge",
     title: "社員証",
@@ -82,7 +100,11 @@ export const BUILTIN_PRESENTATION_MOCKUPS: BuiltinPresentationMockup[] = [
   },
   {
     id: "tshirt-white",
+    familyId: "tshirt-white",
+    version: 1,
+    releaseStage: "production",
     assetKind: "mockup",
+    rendererKind: "builtin",
     kind: "builtin",
     builtinKind: "tshirt",
     title: "Tシャツ",
@@ -99,7 +121,11 @@ export const BUILTIN_PRESENTATION_MOCKUPS: BuiltinPresentationMockup[] = [
   },
   {
     id: "mug",
+    familyId: "mug",
+    version: 1,
+    releaseStage: "production",
     assetKind: "generated",
+    rendererKind: "generated",
     kind: "builtin",
     builtinKind: "generated-mug",
     title: "マグカップ",
@@ -116,7 +142,11 @@ export const BUILTIN_PRESENTATION_MOCKUPS: BuiltinPresentationMockup[] = [
   },
   {
     id: "tote",
+    familyId: "tote",
+    version: 1,
+    releaseStage: "production",
     assetKind: "generated",
+    rendererKind: "generated",
     kind: "builtin",
     builtinKind: "generated-tote",
     title: "トートバッグ",
@@ -133,7 +163,11 @@ export const BUILTIN_PRESENTATION_MOCKUPS: BuiltinPresentationMockup[] = [
   },
   {
     id: "cap",
+    familyId: "cap",
+    version: 1,
+    releaseStage: "production",
     assetKind: "generated",
+    rendererKind: "generated",
     kind: "builtin",
     builtinKind: "generated-cap",
     title: "キャップ",
@@ -150,6 +184,49 @@ export const BUILTIN_PRESENTATION_MOCKUPS: BuiltinPresentationMockup[] = [
   },
 ];
 
+export const RUNTIME_PRESENTATION_MOCKUPS: RuntimePresentationMockup[] = [
+  {
+    id: "workflow-neon-sign-v1",
+    familyId: "workflow-neon-sign",
+    version: 1,
+    releaseStage: "draft",
+    assetKind: "mockup",
+    kind: "runtime",
+    rendererKind: "runtime-blender",
+    runtime: {
+      worker: "blender",
+      script: "labs/workflow/scripts/blender/neon_sign.py",
+      estimatedSeconds: 180,
+    },
+    title: "ネオンサイン",
+    scene: "onsite",
+    templateCategory: "signage",
+    category: "サイネージ",
+    sourceLab: "workflow",
+    allowedPlacements: ["onsite.primary"],
+    defaultMappings: [],
+    config: {
+      parameters: {
+        colorMode: {
+          type: "string",
+          enum: ["logo", "warm-white"],
+          default: "logo",
+        },
+      },
+    },
+    notesJa:
+      "SVGパスを発光チューブ形状へ変換し、ロゴごとにBlenderでレンダーするランタイム候補。現在は品質検証中のためプレゼン選択肢には出さない。",
+    impressions: ["ネオン", "立体", "夜景"],
+    presentationAdopted: false,
+    presentationOrder: 5,
+  },
+];
+
+export const CODE_PRESENTATION_MOCKUPS: PresentationMockupDefinition[] = [
+  ...BUILTIN_PRESENTATION_MOCKUPS,
+  ...RUNTIME_PRESENTATION_MOCKUPS,
+];
+
 export function getBuiltinPresentationMockup(id: string) {
   return BUILTIN_PRESENTATION_MOCKUPS.find((entry) => entry.id === id);
 }
@@ -162,10 +239,14 @@ export function templateToPresentationMockup(
   const defaultMappings = getWorkflowDefaultMappings(template);
   return {
     id: template.id,
+    familyId: template.familyId ?? template.id,
+    version: template.version ?? 1,
+    releaseStage: template.releaseStage ?? "draft",
     kind: "template",
     template,
     title: template.nameJa,
     assetKind: "mockup",
+    rendererKind: template.surface.uvWarp ? "template-uv" : "template-2d",
     scene,
     templateCategory: template.category,
     category: CATEGORY_LABELS[template.category],

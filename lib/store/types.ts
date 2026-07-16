@@ -272,6 +272,24 @@ export type Order = {
  */
 export type GeneratedMockups = Record<string, string>;
 
+export type AssetRunStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "canceled";
+
+export type AssetRun = {
+  id: string;
+  assetDefinitionId: string;
+  status: AssetRunStatus;
+  params: Record<string, unknown>;
+  errorMessage: string | null;
+  queuedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
 export interface BrandRepo {
   getCompany(): Promise<Company>;
   saveCompany(company: Company): Promise<void>;
@@ -303,4 +321,17 @@ export interface BrandRepo {
     mockupId: string,
     image: string
   ): Promise<void>;
+
+  /** Latest execution state for one candidate and immutable asset version. */
+  getLatestAssetRun(
+    candidateId: string,
+    assetDefinitionId: string
+  ): Promise<AssetRun | null>;
+
+  /** Queue a candidate-scoped render without waiting for the worker. */
+  queueAssetRun(
+    candidateId: string,
+    assetDefinitionId: string,
+    params?: Record<string, unknown>
+  ): Promise<AssetRun>;
 }

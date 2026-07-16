@@ -4,7 +4,10 @@ import Link from "next/link";
 import LabShell from "@/labs/shared/components/LabShell";
 import type { BuiltinPresentationMockup } from "@/lib/presentation-mockups";
 import { useI18n } from "@/lib/i18n";
-import { getPresentationPlacement } from "@/lib/presentation-schema";
+import {
+  getPresentationPlacement,
+  PRESENTATION_ASSET_RELEASE_LABELS,
+} from "@/lib/presentation-schema";
 import { SectionIntro } from "@/components/scenes/shared";
 import BuiltinMockupArt from "@/components/mockups/BuiltinMockupArt";
 import ArchitectureNote from "./ArchitectureNote";
@@ -49,7 +52,10 @@ export default function WorkflowBuiltinMockupPage({
                     {mockup.category}
                   </span>
                   <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] text-accent">
-                    {mockup.presentationAdopted ? "本編採用" : "ラボのみ"}
+                    {PRESENTATION_ASSET_RELEASE_LABELS[mockup.releaseStage]}
+                  </span>
+                  <span className="rounded-full border border-hairline px-2 py-0.5 font-mono text-[11px] text-ink-muted">
+                    v{mockup.version}
                   </span>
                   {mockup.defaultMappings?.map((mapping) => (
                     <span

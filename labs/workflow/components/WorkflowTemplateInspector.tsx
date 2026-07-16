@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { cn } from "@/lib/cn";
 import type { LabLogo } from "@/labs/motion/core/experiment-api";
 import { getNote, setNote } from "@/labs/motion/core/notes-store";
@@ -50,11 +58,7 @@ export default function WorkflowTemplateInspector({
 
   const techNotes = useMemo(() => templateTechNotes(template), [template]);
 
-  // Keep the latest callback without making it a compose dependency — the
-  // parent passes a fresh closure each render, and depending on it here would
-  // loop: compose → onComposed → parent re-render → new closure → compose.
-  const onComposedRef = useRef(onComposed);
-  onComposedRef.current = onComposed;
+  const notifyComposed = useEffectEvent(onComposed);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -75,7 +79,7 @@ export default function WorkflowTemplateInspector({
           setUrl(result.url);
           setMetrics(result.metrics);
           setBusy(false);
-          onComposedRef.current();
+          notifyComposed();
         })
         .catch((e: unknown) => {
           if (controller.signal.aborted) return;

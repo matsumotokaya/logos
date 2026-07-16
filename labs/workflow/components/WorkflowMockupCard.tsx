@@ -4,8 +4,12 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import BuiltinMockupArt from "@/components/mockups/BuiltinMockupArt";
 import WorkflowTemplateArt from "@/components/mockups/WorkflowTemplateArt";
+import RuntimeMockupCard from "@/components/mockups/RuntimeMockupCard";
 import { cn } from "@/lib/cn";
-import { getPresentationPlacement } from "@/lib/presentation-schema";
+import {
+  getPresentationPlacement,
+  PRESENTATION_ASSET_RELEASE_LABELS,
+} from "@/lib/presentation-schema";
 import type { LabLogo } from "@/labs/motion/core/experiment-api";
 import {
   getNotesSnapshot,
@@ -51,7 +55,13 @@ export default function WorkflowMockupCard({
         "transition group-hover:border-ink-faint group-hover:shadow-sm",
       )}
     >
-      {definition.kind === "builtin" ? (
+      {definition.kind === "runtime" ? (
+        <RuntimeMockupCard
+          scene={scene}
+          assetId={definition.id}
+          label={definition.title}
+        />
+      ) : definition.kind === "builtin" ? (
         <BuiltinMockupArt
           kind={definition.builtinKind}
           scene={scene}
@@ -92,12 +102,15 @@ export default function WorkflowMockupCard({
           <span
             className={cn(
               "rounded-full px-2 py-0.5",
-              definition.presentationAdopted
+              definition.releaseStage === "production"
                 ? "bg-accent/10 text-accent"
                 : "border border-dashed border-ink-faint text-ink-faint",
             )}
           >
-            {definition.presentationAdopted ? "本編採用" : "ラボのみ"}
+            {PRESENTATION_ASSET_RELEASE_LABELS[definition.releaseStage]}
+          </span>
+          <span className="rounded-full border border-hairline px-2 py-0.5 font-mono">
+            v{definition.version}
           </span>
           {definition.defaultMappings?.map((mapping) => (
             <span

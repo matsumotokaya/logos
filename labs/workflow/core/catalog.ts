@@ -1,5 +1,5 @@
 import {
-  BUILTIN_PRESENTATION_MOCKUPS,
+  CODE_PRESENTATION_MOCKUPS,
   type PresentationMockupDefinition,
   templateToPresentationMockup,
 } from "@/lib/presentation-mockups";
@@ -16,7 +16,7 @@ export type WorkflowCatalogItem = {
 };
 
 export function buildWorkflowCatalog(catalog: CatalogEntryDto[]): WorkflowCatalogItem[] {
-  const builtinItems: WorkflowCatalogItem[] = BUILTIN_PRESENTATION_MOCKUPS.filter(
+  const codeItems: WorkflowCatalogItem[] = CODE_PRESENTATION_MOCKUPS.filter(
     (entry) => entry.sourceLab === "workflow",
   ).map((entry) => ({
     id: entry.id,
@@ -38,7 +38,7 @@ export function buildWorkflowCatalog(catalog: CatalogEntryDto[]): WorkflowCatalo
         },
   );
 
-  return [...builtinItems, ...templateItems];
+  return [...codeItems, ...templateItems];
 }
 
 export function filterWorkflowCatalogByScene(

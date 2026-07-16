@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { Template2D } from "@/labs/workflow/core/template-format";
-import { BUILTIN_PRESENTATION_MOCKUPS } from "@/lib/presentation-mockups";
+import {
+  CODE_PRESENTATION_MOCKUPS,
+  type BuiltinPresentationMockup,
+} from "@/lib/presentation-mockups";
 import WorkflowTemplatePage from "@/labs/workflow/components/WorkflowTemplatePage";
 import WorkflowBuiltinMockupPage from "@/labs/workflow/components/WorkflowBuiltinMockupPage";
+import WorkflowRuntimeMockupPage from "@/labs/workflow/components/WorkflowRuntimeMockupPage";
 import { listTemplates, loadTemplate } from "@/labs/workflow/engine/registry";
 
 export const metadata: Metadata = {
@@ -14,7 +18,7 @@ export const metadata: Metadata = {
 export async function generateStaticParams() {
   const templates = await listTemplates();
   return [
-    ...BUILTIN_PRESENTATION_MOCKUPS.filter((entry) => entry.sourceLab === "workflow").map(
+    ...CODE_PRESENTATION_MOCKUPS.filter((entry) => entry.sourceLab === "workflow").map(
       (entry) => ({ templateId: entry.id }),
     ),
     ...templates
@@ -31,11 +35,18 @@ export default async function WorkflowTemplateDetailPage({
   params: Promise<{ templateId: string }>;
 }) {
   const { templateId } = await params;
-  const builtin = BUILTIN_PRESENTATION_MOCKUPS.find(
+  const codeDefinition = CODE_PRESENTATION_MOCKUPS.find(
     (entry) => entry.sourceLab === "workflow" && entry.id === templateId,
   );
-  if (builtin) {
-    return <WorkflowBuiltinMockupPage mockup={builtin} />;
+  if (codeDefinition?.kind === "runtime") {
+    return <WorkflowRuntimeMockupPage mockup={codeDefinition} />;
+  }
+  if (codeDefinition?.kind === "builtin") {
+    return (
+      <WorkflowBuiltinMockupPage
+        mockup={codeDefinition as BuiltinPresentationMockup}
+      />
+    );
   }
   let template: Template2D;
 

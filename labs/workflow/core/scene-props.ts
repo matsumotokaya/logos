@@ -23,5 +23,7 @@ export function scenePropsFromLabLogo(logo: LabLogo): SceneProps {
     },
     name: logo.name,
     variants,
+    mockupLogoId: logo.canonical ? logo.id : undefined,
+    mockupCandidateId: logo.candidateId,
   };
 }

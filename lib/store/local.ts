@@ -5,6 +5,7 @@ import type { LogoData } from "@/lib/svg";
 import {
   emptyPresentation,
   type BrandRepo,
+  type AssetRun,
   type Company,
   type GeneratedMockups,
   type InventoryItem,
@@ -294,5 +295,13 @@ export class LocalStorageRepo implements BrandRepo {
         evict += 1;
       }
     }
+  }
+
+  async getLatestAssetRun(): Promise<AssetRun | null> {
+    return null;
+  }
+
+  async queueAssetRun(): Promise<AssetRun> {
+    throw new Error("ランタイムレンダーにはSupabase接続が必要です。");
   }
 }

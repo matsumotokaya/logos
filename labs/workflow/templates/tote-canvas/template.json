@@ -1,6 +1,9 @@
 {
   "format": "logos-2d-template@1",
   "id": "tote-canvas",
+  "familyId": "tote-canvas",
+  "version": 1,
+  "releaseStage": "draft",
   "name": "Canvas Tote 3D",
   "nameJa": "キャンバストート(3D)",
   "category": "product",

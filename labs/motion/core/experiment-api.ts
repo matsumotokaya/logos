@@ -17,6 +17,10 @@ export type LabLogo = {
   kind: LogoKind;
   /** True for the bundled test logos (cannot be deleted). */
   builtin?: boolean;
+  /** Canonical logos record rather than a bundled Lab fixture. */
+  canonical?: boolean;
+  /** Current primary candidate used by candidate-scoped asset runs. */
+  candidateId?: string;
   /** Baked SVG markup (viewBox normalized, computed paint written as attributes). */
   svg?: string;
   /** Data URI for raster logos. */

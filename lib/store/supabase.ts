@@ -7,6 +7,8 @@ import { ensureSession, supabase } from "@/lib/supabase/client";
 import type { LogoData } from "@/lib/svg";
 import {
   emptyPresentation,
+  type AssetRun,
+  type AssetRunStatus,
   type BrandRepo,
   type Company,
   type GeneratedMockups,
@@ -165,6 +167,54 @@ export class SupabaseRepo implements BrandRepo {
     const id = await ensureSession();
     if (!id) throw new Error("No Supabase session.");
     return id;
+  }
+
+  async getLatestAssetRun(
+    candidateId: string,
+    assetDefinitionId: string
+  ): Promise<AssetRun | null> {
+    await this.ensureAuth();
+    const { data, error } = await supabase
+      .from("logo_asset_runs")
+      .select(
+        "id, asset_definition_id, status, params, error_message, queued_at, started_at, finished_at"
+      )
+      .eq("candidate_id", candidateId)
+      .eq("asset_definition_id", assetDefinitionId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    throwOn(error);
+    if (!data) return null;
+    return {
+      id: data.id as string,
+      assetDefinitionId: data.asset_definition_id as string,
+      status: data.status as AssetRunStatus,
+      params: (data.params ?? {}) as Record<string, unknown>,
+      errorMessage: (data.error_message as string | null) ?? null,
+      queuedAt: data.queued_at as string,
+      startedAt: (data.started_at as string | null) ?? null,
+      finishedAt: (data.finished_at as string | null) ?? null,
+    };
+  }
+
+  async queueAssetRun(
+    candidateId: string,
+    assetDefinitionId: string,
+    params: Record<string, unknown> = {}
+  ): Promise<AssetRun> {
+    const res = await this.mockupRequest("/api/labs/workflow/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ candidateId, assetDefinitionId, params }),
+    });
+    const body = (await res.json().catch(() => null)) as
+      | { run?: AssetRun; error?: string }
+      | null;
+    if (!res.ok || !body?.run) {
+      throw new Error(body?.error || "レンダーをキューへ登録できませんでした。");
+    }
+    return body.run;
   }
 
   /**

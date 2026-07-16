@@ -1,9 +1,10 @@
 import type { CatalogEntryDto } from "@/labs/workflow/core/pipeline";
 import {
-  BUILTIN_PRESENTATION_MOCKUPS,
+  CODE_PRESENTATION_MOCKUPS,
   type PresentationMockupDefinition,
   templateToPresentationMockup,
 } from "@/lib/presentation-mockups";
+import { isProductionAssetDefinition } from "@/lib/presentation-schema";
 
 export type BrokenPresentationCatalogItem = {
   id: string;
@@ -19,7 +20,9 @@ export function buildPresentationCatalog(
   workflowCatalog: CatalogEntryDto[],
 ): PresentationCatalogResponse {
   return {
-    definitions: buildPresentationDefinitions(workflowCatalog),
+    definitions: buildPresentationDefinitions(workflowCatalog).filter(
+      isProductionAssetDefinition,
+    ),
     brokenItems: workflowCatalog
       .filter((entry) => !entry.template || entry.errors.length > 0)
       .map((entry) => ({
@@ -35,7 +38,7 @@ export function buildPresentationDefinitions(
   const workflowDefinitions = workflowCatalog
     .filter((entry) => entry.template && entry.errors.length === 0)
     .map((entry) => templateToPresentationMockup(entry.template!));
-  return [...BUILTIN_PRESENTATION_MOCKUPS, ...workflowDefinitions];
+  return [...CODE_PRESENTATION_MOCKUPS, ...workflowDefinitions];
 }
 
 export async function fetchPresentationCatalog() {

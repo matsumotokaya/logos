@@ -1,6 +1,9 @@
 {
   "format": "logos-2d-template@1",
   "id": "business-card",
+  "familyId": "business-card",
+  "version": 1,
+  "releaseStage": "draft",
   "name": "Business Card",
   "nameJa": "名刺(デスク平置き)",
   "category": "print",

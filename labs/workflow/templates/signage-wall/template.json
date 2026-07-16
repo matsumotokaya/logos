@@ -1,6 +1,9 @@
 {
   "format": "logos-2d-template@1",
   "id": "signage-wall",
+  "familyId": "signage-wall",
+  "version": 1,
+  "releaseStage": "draft",
   "name": "Wall Signage",
   "nameJa": "壁面サイン(ダーク)",
   "category": "signage",

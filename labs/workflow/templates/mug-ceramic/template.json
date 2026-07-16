@@ -1,6 +1,9 @@
 {
   "format": "logos-2d-template@1",
   "id": "mug-ceramic",
+  "familyId": "mug-ceramic",
+  "version": 1,
+  "releaseStage": "draft",
   "name": "Ceramic Mug",
   "nameJa": "セラミックマグ",
   "category": "product",

@@ -1,6 +1,6 @@
 # ロゴデータモデルとコンテンツ構造
 
-最終更新: 2026-07-10
+最終更新: 2026-07-16
 ステータス: **設計合意フェーズ**
 前提: アカウント・権限・URL設計は [account-design.md](account-design.md)(2層URL、組織ロール、匿名→本登録昇格)。本書はその上に載る**ロゴそのもののデータ設計**を定める。
 
@@ -90,11 +90,12 @@ ACME Holdings(corporate)
 ### 6.1 エンティティ図
 
 ```
+presentation_asset_definitions(Labsにある全asset。draft / productionと不変versionを持つ)
 public.logos(アイデンティティ)── parent_logo_id で自己参照ツリー
-  ├── presentation_asset_definitions(どのラボのどの motion / mockup / generated asset を、どのプレゼン section に採用するか)
   ├── logo_candidates(A/B/C案。1つが primary。マスターSVGはここ)
   │     ├── logo_variants(mono_black 等の派生・追加バリエーション)
-  │     └── logo_mockups(生成済み mockup のキャッシュ。定義カタログを参照)
+  │     ├── logo_asset_runs(asset定義versionごとの実行状態・履歴)
+  │     └── logo_mockups(成功した現在成果物の索引。定義・runを参照)
   ├── logo_presentations(層B: キャッチコピー・ストーリー)
   ├── logo_credits(制作クレジット)
   ├── logo_trademarks(商標情報)
@@ -146,11 +147,21 @@ create unique index logo_candidates_primary_uq
 
 つまり **definition catalog と asset cache を分ける** 必要がある。
 
-#### 6.4.1 presentation_asset_definitions — 新規(設計見直し)
+#### 6.4.1 presentation_asset_definitions — Labsを正本とする全assetカタログ
+
+**Labsにあるものとpresentation assetは別集合ではない。** すべて同じ定義カタログに入り、提供側が決める成熟度で表示先を分ける。
+
+- `draft`: Labには表示する。未完成・検証中であり、利用者向けプレゼン編集UIの選択肢には出さない
+- `production`: Labにも表示し、プレゼン編集UIの選択肢にも出す
+
+この成熟度は、利用者が決める表示オン/オフとは別物。productionになったassetについて、利用者はロゴごと・placementごとに `logo_presentations.layout.mappings[].enabled / order / params` を変更する。
 
 ```sql
 create table public.presentation_asset_definitions (
-  id                   text primary key,           -- "staff-badge" / "tshirt-white" / template id / ...
+  id                   text primary key,           -- versionを特定する不変ID
+  family_id            text not null,              -- versionを束ねる安定キー
+  definition_version   integer not null default 1,
+  release_stage        text not null default 'draft', -- 'draft' | 'production'
   asset_kind           text not null,             -- 'motion' | 'mockup' | 'generated'
   source_lab           text not null,             -- 'workflow' | 'generative' | 'motion'
   renderer_kind        text not null,             -- 'builtin' | 'template' | 'generated' | ...
@@ -158,16 +169,24 @@ create table public.presentation_asset_definitions (
   note                 text,
   allowed_placements   jsonb not null default '[]'::jsonb,
   default_mappings     jsonb not null default '[]'::jsonb,
+  config               jsonb not null default '{}'::jsonb,
+  released_at          timestamptz,
   created_at           timestamptz not null default now(),
-  updated_at           timestamptz not null default now()
+  updated_at           timestamptz not null default now(),
+  unique (family_id, definition_version)
 );
 ```
 
-- ここが「どのラボ成果物を本編に出すか」の正本
-- `allowed_placements` が「この asset をどのプレゼン配置へ差し込めるか」、`default_mappings` が「初期状態ではどこに何番で採用するか」を表す。これにより **利用者向けの後編集UI** でも同じ asset catalog をそのまま使える
+- ここがLabの全成果物と、そのうちどれを本編候補に出せるかの正本
+- `release_stage` は運営・制作者側のリリース判定。presentation resolverは必ず `production` だけを受け付け、draft IDがlayoutに残っていても表示しない
+- `id` は定義versionを特定する。新しい版は同じ `family_id` と増加した `definition_version` を持つ別行にし、既存プレゼンが暗黙に新しい挙動へ変わるのを防ぐ
+- `allowed_placements` が「productionになった場合にどのプレゼン配置へ差し込めるか」、`default_mappings` が「初期状態ではどこに何番で有効にするか」を表す。draftも昇格前にplacement互換性を検証できる
+- `config.parameters` はassetが提供する設定項目と既定値を持つ。黒/白、素材、比率など利用者が選んだ値はlayout mappingの `params` に保存する
 - 現在の実装では一部をコード/`template.json` のメタデータで代用しているが、DB移行後はこのテーブルに寄せるのが自然
 - Workflow Lab の file template は `template.json` の `presentation.allowedPlacements` / `presentation.defaultMappings` を正本にし、旧 `presentationScene` / `presentationAdopted` / `presentationOrder` は後方互換フィールドとして残す
 - 現行プレゼンにハードコードされていた `Social` / `Badge` / `T-shirt` も、この定義カタログ上では通常の asset と同列に扱う
+
+ネオンは新しい「expression」テーブルには分けず、`asset_kind='mockup' / renderer_kind='runtime-blender' / release_stage='draft'` のasset定義とする。つまりデータ上は将来のpresentation assetそのものだが、productionへ昇格するまでは利用者の選択肢に入らない。
 
 #### 6.4.2 logo_mockups — 役割の見直し
 
@@ -194,12 +213,44 @@ create table public.logo_variants (
 create table public.logo_mockups (
   candidate_id uuid not null references public.logo_candidates(id) on delete cascade,
   slot         text not null,                  -- "mug" / "tote" / "cap" ...
-  mockup_definition_id text,                  -- 将来はこれを正本キーにする
+  mockup_definition_id text references public.presentation_asset_definitions(id),
+  asset_run_id uuid references public.logo_asset_runs(id),
   image_path   text not null,
+  params       jsonb not null default '{}',    -- この成果物に解決済みの色・素材等
   created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
   primary key (candidate_id, slot)
 );
 ```
+
+#### 6.4.3 logo_asset_runs — candidate × asset versionの処理状態
+
+`logo_mockups` の行の有無だけでは、未処理・待機中・実行中・失敗・再実行を区別できない。実行プロセスを独立エンティティとして記録する。
+
+```sql
+create table public.logo_asset_runs (
+  id                  uuid primary key default gen_random_uuid(),
+  candidate_id        uuid not null references public.logo_candidates(id) on delete cascade,
+  asset_definition_id text not null references public.presentation_asset_definitions(id),
+  status              text not null default 'queued',
+  params              jsonb not null default '{}',
+  output_path         text,
+  error_message       text,
+  triggered_by        uuid references public.users(user_id),
+  queued_at           timestamptz not null default now(),
+  started_at          timestamptz,
+  finished_at         timestamptz,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
+);
+-- status: 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled'
+```
+
+- 未実行: 該当candidate × definitionのrunがない
+- 処理中: 最新runが `queued / running`
+- 処理済み: 最新runが `succeeded`。成功時にR2へ保存し、`logo_mockups`を現在成果物としてupsertする
+- 失敗: 最新runが `failed`。過去の成功成果物は消さず、再実行可能
+- versionが変われば別definition IDなので、新版は同じロゴでも未処理から始まる
 
 #### 生成画像の保存 — 現状の実装 vs この計画(2026-07-14 時点の実態)
 
@@ -230,6 +281,8 @@ create table public.logo_presentations (
 - ロゴと 1:1(候補とは独立 — 案が違っても語りは1つ)。未編集でも自動生成コピーでプレゼンが成立する
 - `layout` は **asset definition catalog に対する per-logo の mapping override**。ここに「このロゴは splash に motion A、merch に黒Tシャツ、generated に mug+tote を使う」といった選択状態を持つ
 - `layout.mappings` は `assetId + placementId` ごとの override。つまり同じ asset が将来複数 placement に対応しても、配置ごとに有効/無効・順序を別々に持てる
+- layoutが参照できるのは `release_stage='production'` の具体的なdefinition versionだけ。draftはLabに存在してもプレゼンには解決されない
+- `layout.mappings[].params` に表示ごとの設定値を持つ。例: `{ "colorMode": "mono-black" }`。許可される項目・既定値はasset定義の `config.parameters` が正本
 - 初期状態では `layout.mappings = []` とし、グローバル定義カタログ側の `default_mappings` がそのまま効く。利用者が順序変更・無効化・差し替えを行った asset だけをここへ保存する
 - 公開範囲はロゴ本体の `visibility` に従う
 

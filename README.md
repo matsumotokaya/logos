@@ -17,7 +17,7 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | [PRODUCT.md](PRODUCT.md) | 事業構想・3層のプロダクト構想・収益モデル・差別化戦略 |
 | [docs/account-design.md](docs/account-design.md) | アカウント・権限・URL体系・RLS方針(Supabase設計) |
 | [docs/data-model.md](docs/data-model.md) | ロゴの正本(canonical record)・3層分離・CDN URL・サイト構造 |
-| [docs/logo-entity-lab-integration.md](docs/logo-entity-lab-integration.md) | Labs↔ロゴ正本エンティティ統合の要件・現行スキーマとのギャップ・次セッション引き継ぎ(要件確定/実装は次回) |
+| [docs/logo-entity-lab-integration.md](docs/logo-entity-lab-integration.md) | Labs↔ロゴ正本エンティティ統合の要件・実装状況・ランタイムassetの暫定手動運用と次セッション引き継ぎ |
 | [labs/README.md](labs/README.md) | **研究所群の入り口**: モード分類(保証/探索/統合)・体験レイヤー=課金の階段・ラボ一覧と現在地・ラボ追加手順 |
 | [labs/motion/README.md](labs/motion/README.md) | Motion Lab: 16実験カタログ・美的原則・使用技術とLottie比較 |
 | [AGENTS.md](AGENTS.md) | AIエージェント向けの開発上の注意(CLAUDE.md はこれを参照するだけ) |
@@ -41,9 +41,10 @@ URL体系の設計意図(所有者を含まない壊れないパーマリンク�
 
 このプロダクトでは、プレゼンテーション本編を**固定実装の寄せ集め**としてではなく、**presentation asset catalog から組み立てるドキュメント**として扱う。
 
-- 各 motion / mockup / generated asset は「どの presentation placement に入れられるか」を持つ
-- 各ロゴは「その placement に何を採用するか」という **per-logo の layout** を持つ
-- ラボは、その asset を設計・検証し、**本編採用候補**として仕上げるための場である
+- 各 motion / mockup / generated asset はLabs共通カタログに入り、提供側の成熟度 `draft / production` と「どの presentation placement に入れられるか」を持つ
+- `draft` はLabだけ、`production` はLabと利用者向けプレゼン編集UIに表示する
+- 各ロゴはproduction assetについて「その placement に何を表示するか」という **per-logo の layout**(`enabled / order / params`)を持つ
+- ラボは未完成・完成済みを含む全assetを置き、productionへ昇格できる品質かを判断する場である
 - 将来的には利用者自身がこの catalog から構成を選び、プレゼンを後編集できる。現行実装もその前提で設計している
 
 現時点での presentation placement は `splash.hero` / `social.primary` / `onsite.primary` / `merch.primary` / `generated.tile`。このうち特にラボとの接続が強いのは後半の mockup / generated 系 section で、現在は **07 Social / 08 On-site / 09 Merchandise / 10 Generated** が asset catalog から描画される。
@@ -103,15 +104,29 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 - シーンは [components/scenes/](components/scenes/) にプラグイン式で追加できる([Reveal](components/scenes/Reveal.tsx) / [shared](components/scenes/shared.tsx) を共通部品として利用)
 - プレゼン後半の mockup / generated 系 section は **presentation asset catalog** から解決して描画する。各 asset は placement 互換性と default mapping を持ち、ロゴごとの採用状態は `logo_presentations.layout` に保存される
 - 写実モックアップ生成は [app/api/generate/route.ts](app/api/generate/route.ts) が Gemini API を呼び出すサーバーサイドルート(APIキーを隠すため)
-- データ永続化は [lib/store/](lib/store/) の `BrandRepo` インターフェースで抽象化。現在は localStorage 実装([lib/store/local.ts](lib/store/local.ts))だが、実DB(Supabase等)への移行はこのインターフェースを実装するだけで済む
+- データ永続化は [lib/store/](lib/store/) の `BrandRepo` インターフェースで抽象化。Supabase環境変数があればRLS付き実DB、なければ [localStorage実装](lib/store/local.ts)へ切り替わる。Labsのロゴピッカーも同じ正本repoを使う
 
 ### presentation asset catalog の現時点の実装
 
-- **概念上の正本**: `presentation_asset_definitions` テーブル + `logo_presentations.layout`
+- **概念上の正本**: `presentation_asset_definitions`(全assetの`draft / production`とversion) + `logo_presentations.layout`(利用者ごとのオン/オフ・順序・設定値) + `logo_asset_runs`(candidateごとの処理状態)
 - **現時点の定義ソース**: built-in asset のコード定義 + Workflow Lab の `template.json`
 - **取得API**: `/api/presentation-assets`
 
-つまり `0006_presentation_assets.sql` により **DBの受け皿は完成している** が、global asset definition の管理UI/同期はまだこれからである。現段階では **ロゴごとの layout 保存はDBに乗り、asset definition 自体は code/template 側から供給される**。
+`0006_presentation_assets.sql` が定義とlayoutの基礎、`0007_asset_lifecycle.sql` が成熟度・不変version・実行状態を追加する。global asset definition の管理UI/同期はまだこれからで、現段階では **ロゴごとのlayoutとruntime成果物はDB、asset definition自体はcode/template側から供給**される。
+
+### ランタイムBlender assetの暫定手動運用
+
+永続ワーカーを作る前は、Workflow Labの依頼情報を**新しいローカルエージェントセッションへ貼り付けて手動実行する**。新しいセッションは、最初に [Labs↔ロゴ正本エンティティ統合](docs/logo-entity-lab-integration.md#5-ランタイムassetの暫定手動運用)を読むこと。
+
+利用者側の手順:
+
+1. `/labs/workflow/workflow-neon-sign-v1` を開き、bundled test logoではなく対象の正本ロゴを選ぶ
+2. `依頼情報をコピー`を押す。処理履歴が必要な場合だけ、先に`レンダー依頼を作成`してRun IDを発行する
+3. コピーした全文を新しいエージェントセッションへ貼り、「このruntime assetを実行し、結果を登録して表示まで確認してください」と依頼する
+
+`Logo ID`はロゴをグローバルに一意に特定するため、アカウントIDを別途渡す必要はない。`Candidate ID`は今回使う正確なmaster SVG、`Asset Definition ID`とversionは実行するレシピを固定する。Run IDは暫定手動運用では任意であり、将来のキュー/ワーカー自動化で必須にする。
+
+IDは対象を識別する情報であり、認証情報ではない。認証はprivateなSVGの取得やR2/DBへの書き込み権限を確認するためだけに使う。手動期間はエージェントがこのworkspaceの既存接続設定を使い、依頼文にはSupabase JWT/service role、R2キー、`.env.local`の内容を**含めない**。接続権限がなければ、エージェントは不足している接続または権限を報告し、秘密情報をチャットへ貼るよう求めない。
 
 ## 開発
 
@@ -141,7 +156,7 @@ R2_BUCKET_NAME=logos-assets
 
 スキーマの正本は [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql)(アカウント・組織・ロゴ正本・RLS一式)。セットアップ手順:
 
-1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0006、いずれも冪等・再実行可)
+1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0007、いずれも冪等・再実行可)
 2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(ゲスト投稿の前提)
 3. `.env.local` に以下を追加:
 

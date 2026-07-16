@@ -7,7 +7,10 @@ import {
   getWorkflowPresentationScene,
   WORKFLOW_SCENE_NUMBER,
 } from "@/labs/workflow/core/presentation-placement";
-import { getPresentationPlacement } from "@/lib/presentation-schema";
+import {
+  getPresentationPlacement,
+  PRESENTATION_ASSET_RELEASE_LABELS,
+} from "@/lib/presentation-schema";
 import { templateToPresentationMockup } from "@/lib/presentation-mockups";
 import { useI18n } from "@/lib/i18n";
 import { SectionIntro } from "@/components/scenes/shared";
@@ -57,12 +60,15 @@ export default function WorkflowTemplatePage({
                   </span>
                   <span
                     className={
-                      definition.presentationAdopted
+                      definition.releaseStage === "production"
                         ? "rounded-full bg-accent/10 px-2 py-0.5 text-[11px] text-accent"
                         : "rounded-full border border-dashed border-ink-faint px-2 py-0.5 text-[11px] text-ink-faint"
                     }
                   >
-                    {definition.presentationAdopted ? "本編採用" : "ラボのみ"}
+                    {PRESENTATION_ASSET_RELEASE_LABELS[definition.releaseStage]}
+                  </span>
+                  <span className="rounded-full border border-hairline px-2 py-0.5 font-mono text-[11px] text-ink-muted">
+                    v{definition.version}
                   </span>
                   {definition.defaultMappings?.map((mapping) => (
                     <span
@@ -74,9 +80,9 @@ export default function WorkflowTemplatePage({
                   ))}
                 </div>
                 <p className="max-w-3xl text-sm leading-relaxed text-pretty text-ink-muted">
-                  このテンプレートはプレゼンテーション本編の
+                  このassetは将来プレゼンテーション本編の
                   <strong className="font-medium text-ink"> {sceneTitle(scene, dict)} </strong>
-                  セクションに、そのまま取り込む前提で設計する。ここでは選択中のロゴで最終形に近い状態を確認し、配置・色処理・技術要件・採用判断を詰める。
+                  セクションに取り込める前提で設計する。Draftの間はLabだけで検証し、Productionへの昇格後に利用者のオン/オフ・順序・設定値の選択肢へ加わる。
                 </p>
               </div>
               <div className="px-6 pb-12 md:px-12 md:pb-16">

@@ -6,7 +6,7 @@
 import { useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import type { LabLogo } from "@/labs/motion/core/experiment-api";
-import { addLogoFile, removeLogo, selectLogo } from "@/labs/motion/core/logo-store";
+import { addLogoFile, selectLogo } from "@/labs/motion/core/logo-store";
 import LogoThumb from "./LogoThumb";
 
 export default function LogoRail({
@@ -38,11 +38,12 @@ export default function LogoRail({
           Logo
         </span>
         {logos.map((logo) => (
-          <div key={logo.id} className="group relative">
+          <div key={logo.id} className="shrink-0">
             <button
               type="button"
               onClick={() => selectLogo(logo.id)}
               title={logo.name}
+              aria-label={`${logo.name}を選択`}
               className={cn(
                 "flex h-14 w-20 items-center justify-center rounded-lg border bg-white p-2 transition",
                 logo.id === selectedId
@@ -52,30 +53,20 @@ export default function LogoRail({
             >
               <LogoThumb logo={logo} />
             </button>
-            {!logo.builtin && (
-              <button
-                type="button"
-                aria-label={`${logo.name} を削除`}
-                onClick={() => removeLogo(logo.id)}
-                className="absolute -top-1.5 -right-1.5 hidden h-5 w-5 items-center justify-center rounded-full border border-hairline bg-white text-[10px] text-ink-muted group-hover:flex hover:text-ink"
-              >
-                ×
-              </button>
-            )}
           </div>
         ))}
         <button
           type="button"
           disabled={busy}
           onClick={() => inputRef.current?.click()}
-          className="flex h-14 w-20 items-center justify-center rounded-lg border border-dashed border-ink-faint text-xs text-ink-muted transition hover:border-accent hover:text-accent disabled:opacity-50"
+          className="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg border border-dashed border-ink-faint text-xs text-ink-muted transition hover:border-accent hover:text-accent disabled:opacity-50"
         >
           {busy ? "解析中…" : "+ 追加"}
         </button>
         <input
           ref={inputRef}
           type="file"
-          accept=".svg,.png,image/svg+xml,image/png"
+          accept=".svg,image/svg+xml"
           className="hidden"
           onChange={(e) => {
             void handleFiles(e.target.files);

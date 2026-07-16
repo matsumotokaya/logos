@@ -11,6 +11,7 @@
 import {
   isPresentationPlacementId,
   type PresentationAssetMappingSpec,
+  type PresentationAssetReleaseStage,
   type PresentationPlacementId,
 } from "@/lib/presentation-schema";
 import {
@@ -104,6 +105,12 @@ export type Template2D = {
   format: typeof TEMPLATE_FORMAT;
   /** Must equal the template's directory name. */
   id: string;
+  /** Stable key shared by multiple immutable versions of the same asset. */
+  familyId?: string;
+  /** Immutable version within familyId. Legacy templates default to 1. */
+  version?: number;
+  /** Operator maturity gate. Draft remains visible in Labs only. */
+  releaseStage?: PresentationAssetReleaseStage;
   name: string;
   nameJa: string;
   category: TemplateCategory;
@@ -146,6 +153,7 @@ export const CATEGORY_LABELS: Record<TemplateCategory, string> = {
 const BLEND_MODES: BlendMode[] = ["over", "multiply", "screen", "overlay", "soft-light"];
 const COLOR_MODES: LogoColorMode[] = ["original", "mono-dark", "mono-light"];
 const CATEGORIES: TemplateCategory[] = ["print", "fabric", "signage", "screen", "product"];
+const RELEASE_STAGES: PresentationAssetReleaseStage[] = ["draft", "production"];
 
 /** Result of validating one template.json (plus whatever the server adds). */
 export type ValidationResult =
@@ -214,6 +222,20 @@ export function validateTemplate(json: unknown, expectedId?: string): Validation
   if (!str(json.id)) errors.push("id: 文字列が必要");
   else if (expectedId && json.id !== expectedId)
     errors.push(`id: ディレクトリ名 "${expectedId}" と一致していない("${json.id}")`);
+  if (json.familyId !== undefined && !str(json.familyId))
+    errors.push("familyId: 空でない文字列が必要");
+  if (
+    json.version !== undefined &&
+    (!Number.isInteger(json.version) || (json.version as number) < 1)
+  ) {
+    errors.push("version: 1以上の整数が必要");
+  }
+  if (
+    json.releaseStage !== undefined &&
+    !RELEASE_STAGES.includes(json.releaseStage as PresentationAssetReleaseStage)
+  ) {
+    errors.push(`releaseStage: ${RELEASE_STAGES.join("/")} のいずれか`);
+  }
   if (!str(json.name)) errors.push("name: 文字列が必要");
   if (!str(json.nameJa)) errors.push("nameJa: 文字列が必要");
   if (!CATEGORIES.includes(json.category as TemplateCategory))

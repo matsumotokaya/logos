@@ -1,4 +1,4 @@
-export const MOCKUP_SLOT_RE = /^(mug|tote|cap)$/;
+export const MOCKUP_SLOT_RE = /^[a-z0-9][a-z0-9-]{0,79}$/;
 
 export function mockupObjectKey(
   logoId: string,
@@ -7,4 +7,3 @@ export function mockupObjectKey(
 ): string {
   return `logos/${logoId}/candidates/${candidateId}/mockups/${slot}.png`;
 }
-

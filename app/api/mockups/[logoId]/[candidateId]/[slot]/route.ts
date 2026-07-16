@@ -29,7 +29,8 @@ export async function GET(
   return new Response(new Uint8Array(png), {
     headers: {
       "Content-Type": "image/png",
-      "Cache-Control": "private, max-age=31536000, immutable",
+      // Runtime assets can be rerendered into the same canonical slot.
+      "Cache-Control": "private, no-cache",
     },
   });
 }

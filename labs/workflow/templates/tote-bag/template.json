@@ -1,6 +1,9 @@
 {
   "format": "logos-2d-template@1",
   "id": "tote-bag",
+  "familyId": "tote-bag",
+  "version": 1,
+  "releaseStage": "draft",
   "name": "Canvas Tote",
   "nameJa": "キャンバストート",
   "category": "fabric",
