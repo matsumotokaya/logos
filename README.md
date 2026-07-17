@@ -175,7 +175,7 @@ MOCKUP_URL_SECRET=（ランダム文字列。openssl rand -base64 32 等で生�
 
 スキーマの正本は [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql)(アカウント・組織・ロゴ正本・RLS一式)。セットアップ手順:
 
-1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0010、いずれも冪等・再実行可)
+1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0011、いずれも冪等・再実行可)
 2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(ゲスト投稿の前提)
 3. `.env.local` に以下を追加:
 
@@ -205,7 +205,7 @@ Vercelにデプロイする場合は同じ環境変数を Settings → Environme
 ## 残タスク・既知の課題(検証Findingsより)
 
 - **作業履歴の集約**: アセット詳細ページはセレクト変更のたびに「情報更新」が1行記録され、履歴がすぐ長くなる。連続する同種操作をまとめる集約(例: 一定時間内の同種更新を1行に)をSupabase移行時に検討する
-- **公開範囲変更のadmin限定**: UIでは組織ロゴのvisibility変更を管理者以上に制限したが、RLSは行単位のため列単位の強制はサーバー側では未実装(0001_init.sqlにも注記)
+- **公開範囲変更のadmin限定**: `0011_visibility_admin_enforcement.sql` のトリガーでサーバー側でも強制済み(2026-07-17解消)
 - **プレゼン編集にUndoがない**: blur即保存のため取り消し手段は「自動生成コピーへの復帰」のみ。本格運用では編集の取り消しを検討
 - **OAuth(Google/Apple/Figma)は要プロバイダ設定**: ボタンは配線済みだがSupabase側で各プロバイダを有効化するまで点灯しない
 - **図鑑の検索・タグ絞り込みは未実装**: 公開ロゴは新着順48件のグリッド表示のみ。タグはデータとして保存済み

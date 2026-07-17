@@ -357,8 +357,8 @@ create policy logos_insert on public.logos for insert to authenticated with chec
 drop policy if exists logos_update on public.logos;
 create policy logos_update on public.logos for update
   using (can_edit_logo(id));
-  -- NOTE: visibility changes being admin-only is enforced in the app for now
-  -- (column-level RLS would need a separate mechanism). Recorded in README.
+  -- NOTE: visibility changes being admin-only is enforced server-side by the
+  -- trigger in 0011_visibility_admin_enforcement.sql (RLS is row-level only).
 drop policy if exists logos_delete on public.logos;
 create policy logos_delete on public.logos for delete using (can_admin_logo(id));
 

@@ -42,7 +42,7 @@
 - [x] **`/api/generate` クォータの並列競合修正** — count→insertの順だと並列リクエストが全て通過できたため、insert→自分の行を含めてcountの順に変更(2026-07-17)
 - [ ] **本格的なレート制限**: プロセス内リミッタはサーバーレスではインスタンス単位でしか効かない。本番デプロイ時に Vercel WAF または Upstash Ratelimit を導入する(M6のVercel整備と同時でよい)
 - [ ] Supabase RLS 監査: `get_advisors`(security)を実行し全指摘を解消 — **2026-07-17時点でMCPトークン(`SUPABASE_ACCESS_TOKEN_LOGOS`)未設定のため実行不可。トークン設定後のセッションで実施**
-- [ ] 既知課題の解消: 組織ロゴ visibility 変更の admin 限定をサーバー側(RPC or trigger)で強制
+- [x] 既知課題の解消: 組織ロゴ visibility 変更の admin 限定をトリガーで強制 — 2026-07-17実装(`0011_visibility_admin_enforcement.sql`)。**要: 本番適用**
 - [ ] APIリクエストボディの入力バリデーション(サイズ上限・型検証。特に base64 画像とSVG)
 - [x] SVGサニタイズの確認 — 2026-07-17対応。`analyzeSvg` の `on*` 属性除去がルート要素のみだったのを**全要素**に拡大し、`javascript:` href も除去。唯一のインライン展開箇所(labs `LogoThumb` の `dangerouslySetInnerHTML`)を `<img>`+data URI に変更(クライアントがSupabaseへ直接書けるため、保存済みSVGは未サニタイズの可能性を常に想定し、インライン展開は今後も禁止)。主要画面は元々 `<img>` 経由で安全
 - [ ] R2 バケットのアクセス制御・CORS 確認
