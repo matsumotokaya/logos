@@ -7,8 +7,12 @@ import { composeTemplate } from "@/labs/workflow/engine/compose";
 import { appendJob, hashLogoSource } from "@/labs/workflow/engine/job-log";
 import { loadTemplate } from "@/labs/workflow/engine/registry";
 import type { ComposeLogo, ComposeRequest } from "@/labs/workflow/core/pipeline";
+import { clientKey, rateLimit } from "@/lib/rate-limit";
 
 const COLOR_MODES = ["original", "mono-dark", "mono-light"];
+// Public (presentations render through this) and CPU-heavy, so cap bursts
+// per client. A presentation view composes at most a handful of templates.
+const RATE_LIMIT_PER_MINUTE = 60;
 const MAX_LOGO_BYTES = 3 * 1024 * 1024;
 
 function parseLogo(raw: unknown): ComposeLogo {
@@ -30,6 +34,9 @@ const clampNum = (v: unknown, lo: number, hi: number, fallback: number) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(Math.max(v, lo), hi) : fallback;
 
 export async function POST(req: Request) {
+  if (!rateLimit(`compose:${clientKey(req)}`, RATE_LIMIT_PER_MINUTE, 60_000)) {
+    return Response.json({ error: "Too many requests." }, { status: 429 });
+  }
   const t0 = performance.now();
   let body: ComposeRequest;
   let logo: ComposeLogo;

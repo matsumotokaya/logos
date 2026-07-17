@@ -38,8 +38,9 @@
   - [x] `/api/labs/workflow/compose`・`/api/labs/workflow/runs` はプレゼン本編が使うため**ゲート対象外**(runsは認証済み。composeは下記の残課題)
   - [x] `/api/presentation-assets`: 公開カタログ(テンプレメタデータのみ)として公開のままで問題なし
 - [ ] **残課題: `GET /api/mockups/.../[slot]`(画像配信)が認証なし** — `<img src>` がAuthorizationヘッダーを送れないための構造。非公開ロゴのモックアップ画像がID知識だけで取得可能。署名付きURL(R2 presigned / 期限付きトークン)への移行を設計する
-- [ ] **残課題: `/api/labs/workflow/compose` は認証なし+CPU重(sharp合成)** — 公開プレゼンの描画に必要なため開放中。レート制限の最優先対象
-- [ ] レート制限の導入(最低限 `/api/generate` と compose。Upstash Ratelimit か Vercel WAF)
+- [x] **`/api/labs/workflow/compose` のバースト制限** — 2026-07-17実装。IP単位60回/分のプロセス内リミッタ(`lib/rate-limit.ts`)。公開プレゼンの描画に必要なため認証は課さない
+- [x] **`/api/generate` クォータの並列競合修正** — count→insertの順だと並列リクエストが全て通過できたため、insert→自分の行を含めてcountの順に変更(2026-07-17)
+- [ ] **本格的なレート制限**: プロセス内リミッタはサーバーレスではインスタンス単位でしか効かない。本番デプロイ時に Vercel WAF または Upstash Ratelimit を導入する(M6のVercel整備と同時でよい)
 - [ ] Supabase RLS 監査: `get_advisors`(security)を実行し全指摘を解消 — **2026-07-17時点でMCPトークン(`SUPABASE_ACCESS_TOKEN_LOGOS`)未設定のため実行不可。トークン設定後のセッションで実施**
 - [ ] 既知課題の解消: 組織ロゴ visibility 変更の admin 限定をサーバー側(RPC or trigger)で強制
 - [ ] APIリクエストボディの入力バリデーション(サイズ上限・型検証。特に base64 画像とSVG)

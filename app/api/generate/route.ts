@@ -116,9 +116,20 @@ export async function POST(req: Request) {
       ? body.primaryHex
       : "#000000";
 
-  // Quota runs under the caller's own RLS: count attempts in the last 24h,
-  // then record this attempt before the paid provider call.
+  // Quota runs under the caller's own RLS. Record the attempt FIRST, then
+  // count the last 24h including our own row: with count-then-insert,
+  // parallel requests could all pass the check before any row landed and
+  // blow past the cap in one burst.
   const supabase = createServerSupabaseForToken(user.token);
+  const { error: quotaError } = await supabase
+    .from("generation_events")
+    .insert({ target });
+  if (quotaError) {
+    return NextResponse.json(
+      { error: "Quota check failed. Apply migration 0010_generation_quota.sql." },
+      { status: 500 }
+    );
+  }
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count, error: countError } = await supabase
     .from("generation_events")
@@ -126,23 +137,14 @@ export async function POST(req: Request) {
     .gte("created_at", since);
   if (countError) {
     return NextResponse.json(
-      { error: "Quota check failed. Apply migration 0010_generation_quota.sql." },
+      { error: "Quota check failed." },
       { status: 500 }
     );
   }
-  if ((count ?? 0) >= DAILY_LIMIT) {
+  if ((count ?? 0) > DAILY_LIMIT) {
     return NextResponse.json(
       { error: "Daily generation limit reached." },
       { status: 429 }
-    );
-  }
-  const { error: quotaError } = await supabase
-    .from("generation_events")
-    .insert({ target });
-  if (quotaError) {
-    return NextResponse.json(
-      { error: "Failed to record generation attempt." },
-      { status: 500 }
     );
   }
 
