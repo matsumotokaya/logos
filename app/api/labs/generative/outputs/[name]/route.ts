@@ -3,11 +3,13 @@
 // immediately after generation and never stored.
 
 import { readOutput } from "@/labs/generative/engine/storage";
+import { labsDisabledResponse, labsEnabled } from "@/lib/labs-access";
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ name: string }> },
 ) {
+  if (!labsEnabled()) return labsDisabledResponse();
   const { name } = await params;
   try {
     const png = await readOutput(name);

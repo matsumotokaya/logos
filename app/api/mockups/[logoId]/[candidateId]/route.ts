@@ -47,22 +47,21 @@ export async function DELETE(
     const { logoId, candidateId } = await params;
     const supabase = createServerSupabaseForToken(token);
 
-    const { data, error } = await supabase
+    // Delete DB rows first: mockups_write RLS authorizes the caller, and only
+    // the rows it actually deleted get their R2 objects removed. Reversed
+    // order would let a non-editor destroy storage for rows RLS then refuses
+    // to delete.
+    const { data: deleted, error: deleteError } = await supabase
       .from("logo_mockups")
-      .select("slot, image_path")
-      .eq("candidate_id", candidateId);
-    if (error) throw error;
+      .delete()
+      .eq("candidate_id", candidateId)
+      .select("slot, image_path");
+    if (deleteError) throw deleteError;
 
-    for (const row of data ?? []) {
+    for (const row of deleted ?? []) {
       const key = row.image_path || mockupObjectKey(logoId, candidateId, row.slot);
       await deleteR2Object(key);
     }
-
-    const { error: deleteError } = await supabase
-      .from("logo_mockups")
-      .delete()
-      .eq("candidate_id", candidateId);
-    if (deleteError) throw deleteError;
 
     return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

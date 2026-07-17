@@ -5,8 +5,14 @@ import {
   requireAccessToken,
 } from "@/lib/supabase/server";
 
+// Generous cap for one mockup image; anything beyond it is abuse.
+const MAX_IMAGE_DATA_URL_LENGTH = 12_000_000;
+
 function parseDataUrlImage(image: unknown): Uint8Array {
   if (typeof image !== "string") throw new Error("image is required.");
+  if (image.length > MAX_IMAGE_DATA_URL_LENGTH) {
+    throw new Error("image is too large.");
+  }
   const match = /^data:(image\/png|image\/jpeg|image\/webp);base64,(.+)$/.exec(image);
   if (!match) throw new Error("image must be a base64 data URL.");
   return Buffer.from(match[2], "base64");
@@ -48,14 +54,21 @@ export async function POST(
     const bytes = parseDataUrlImage(body.image);
     const objectKey = mockupObjectKey(logoId, candidateId, slot);
 
-    await putR2Object(
-      objectKey,
-      bytes,
-      "image/png",
-      "private, max-age=31536000, immutable",
-    );
-
+    // Authorize before touching storage: the candidate must belong to the
+    // logo in the URL (so the R2 key cannot be forged for another logo) and
+    // the upsert must pass the mockups_write RLS policy. Only then write R2;
+    // a failed R2 write leaves a row pointing at the previous object, which
+    // a regeneration repairs.
     const supabase = createServerSupabaseForToken(token);
+    const { data: candidate, error: candidateError } = await supabase
+      .from("logo_candidates")
+      .select("id")
+      .eq("id", candidateId)
+      .eq("logo_id", logoId)
+      .maybeSingle();
+    if (candidateError) throw candidateError;
+    if (!candidate) throw new Error("Unauthorized");
+
     const { error } = await supabase.from("logo_mockups").upsert({
       candidate_id: candidateId,
       slot,
@@ -63,6 +76,13 @@ export async function POST(
       image_path: objectKey,
     });
     if (error) throw error;
+
+    await putR2Object(
+      objectKey,
+      bytes,
+      "image/png",
+      "private, max-age=31536000, immutable",
+    );
 
     return Response.json(
       { url: `/api/mockups/${logoId}/${candidateId}/${slot}` },

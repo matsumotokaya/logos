@@ -32,12 +32,15 @@
 公開した瞬間に事故る穴を塞ぐ。機能追加より先。
 
 - [x] `/api/generate` に認証必須化+ユーザー単位の生成クォータ(コスト踏み台防止)— 2026-07-17実装。登録ユーザーのみ・24時間で `GENERATION_DAILY_LIMIT`(既定20)回。**要: `0010_generation_quota.sql` の本番適用**
-- [ ] 全APIルート(12本)の認証・認可監査: 誰が呼べるべきかを一覧化し、ガードを実装
-  - [ ] `/api/mockups/*`(書き込み系の所有者チェック)
-  - [ ] `/api/labs/*`(本番では運営限定 or 無効化)
-  - [ ] `/api/presentation-assets`(公開でよいか確認)
-- [ ] レート制限の導入(最低限 `/api/generate`。Upstash Ratelimit か Vercel WAF)
-- [ ] Supabase RLS 監査: `get_advisors`(security)を実行し全指摘を解消
+- [x] 全APIルート(12本)の認証・認可監査 — 2026-07-17実施。結果:
+  - [x] `/api/mockups/.../[slot]` POST・`/api/mockups/...` DELETE: **R2書き込み/削除がRLS認可より先に走る脆弱性を修正**(DB操作をRLSで認可→成功後にR2副作用の順へ。POSTはcandidate↔logoの対応チェックとサイズ上限も追加)
+  - [x] `/api/labs/*` のlab専用6本(generative全4本+workflow jobs/templates): 本番では `LABS_ENABLED=1` を設定しない限り404(`lib/labs-access.ts`)。`/labs` ページ群も同じゲート(`app/labs/layout.tsx`)
+  - [x] `/api/labs/workflow/compose`・`/api/labs/workflow/runs` はプレゼン本編が使うため**ゲート対象外**(runsは認証済み。composeは下記の残課題)
+  - [x] `/api/presentation-assets`: 公開カタログ(テンプレメタデータのみ)として公開のままで問題なし
+- [ ] **残課題: `GET /api/mockups/.../[slot]`(画像配信)が認証なし** — `<img src>` がAuthorizationヘッダーを送れないための構造。非公開ロゴのモックアップ画像がID知識だけで取得可能。署名付きURL(R2 presigned / 期限付きトークン)への移行を設計する
+- [ ] **残課題: `/api/labs/workflow/compose` は認証なし+CPU重(sharp合成)** — 公開プレゼンの描画に必要なため開放中。レート制限の最優先対象
+- [ ] レート制限の導入(最低限 `/api/generate` と compose。Upstash Ratelimit か Vercel WAF)
+- [ ] Supabase RLS 監査: `get_advisors`(security)を実行し全指摘を解消 — **2026-07-17時点でMCPトークン(`SUPABASE_ACCESS_TOKEN_LOGOS`)未設定のため実行不可。トークン設定後のセッションで実施**
 - [ ] 既知課題の解消: 組織ロゴ visibility 変更の admin 限定をサーバー側(RPC or trigger)で強制
 - [ ] APIリクエストボディの入力バリデーション(サイズ上限・型検証。特に base64 画像とSVG)
 - [ ] SVGサニタイズの確認(アップロードSVGの `<script>`/外部参照の無害化。公開ページで他人のSVGを表示するため XSS 経路になる)
