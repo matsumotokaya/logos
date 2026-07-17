@@ -1,4 +1,5 @@
 import { mockupObjectKey, MOCKUP_SLOT_RE } from "@/lib/mockups";
+import { mockupImageUrl } from "@/lib/mockup-sign";
 import { deleteR2Object } from "@/lib/r2";
 import {
   createServerSupabaseForToken,
@@ -23,10 +24,7 @@ export async function GET(
     const mockups = Object.fromEntries(
       (data ?? [])
         .filter((row) => MOCKUP_SLOT_RE.test(row.slot))
-        .map((row) => [
-          row.slot,
-          `/api/mockups/${logoId}/${candidateId}/${row.slot}`,
-        ]),
+        .map((row) => [row.slot, mockupImageUrl(logoId, candidateId, row.slot)]),
     );
     return Response.json(mockups, {
       headers: { "Cache-Control": "no-store" },

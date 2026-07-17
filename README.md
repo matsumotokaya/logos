@@ -166,7 +166,10 @@ R2_ACCOUNT_ID=（Cloudflare Account ID）
 R2_ACCESS_KEY_ID=（R2 API token の Access Key ID）
 R2_SECRET_ACCESS_KEY=（R2 API token の Secret Access Key）
 R2_BUCKET_NAME=logos-assets
+MOCKUP_URL_SECRET=（ランダム文字列。openssl rand -base64 32 等で生成）
 ```
+
+`MOCKUP_URL_SECRET` はモックアップ画像URLの署名鍵。**非公開ロゴ**のモックアップ画像は、認証済みAPIが発行する期限付き署名URL経由でのみ取得できる(`<img>` がAuthorizationヘッダーを送れないため)。未設定の場合、公開/unlistedロゴの画像は従来どおり表示されるが、非公開ロゴのモックアップ画像は404になる。
 
 ### Supabase(DB移行)
 

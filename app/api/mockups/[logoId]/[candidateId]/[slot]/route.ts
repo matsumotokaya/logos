@@ -1,6 +1,8 @@
 import { mockupObjectKey, MOCKUP_SLOT_RE } from "@/lib/mockups";
+import { mockupImageUrl, verifyMockupSignature } from "@/lib/mockup-sign";
 import { getR2Object, putR2Object } from "@/lib/r2";
 import {
+  createServerSupabase,
   createServerSupabaseForToken,
   requireAccessToken,
 } from "@/lib/supabase/server";
@@ -19,12 +21,35 @@ function parseDataUrlImage(image: unknown): Uint8Array {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ logoId: string; candidateId: string; slot: string }> },
 ) {
   const { logoId, candidateId, slot } = await params;
   if (!MOCKUP_SLOT_RE.test(slot)) {
     return Response.json({ error: "Unknown mockup slot." }, { status: 400 });
+  }
+
+  // <img> cannot send Authorization, so access control works in two tiers:
+  // a valid HMAC signature (minted by the authenticated list/save APIs), or
+  // anonymous RLS visibility of the candidate (public/unlisted logos).
+  const query = new URL(req.url).searchParams;
+  const signed = verifyMockupSignature(
+    logoId,
+    candidateId,
+    slot,
+    query.get("exp"),
+    query.get("sig"),
+  );
+  if (!signed) {
+    const { data: visible } = await createServerSupabase()
+      .from("logo_candidates")
+      .select("id")
+      .eq("id", candidateId)
+      .eq("logo_id", logoId)
+      .maybeSingle();
+    if (!visible) {
+      return Response.json({ error: "Mockup not found." }, { status: 404 });
+    }
   }
 
   const png = await getR2Object(mockupObjectKey(logoId, candidateId, slot));
@@ -85,7 +110,7 @@ export async function POST(
     );
 
     return Response.json(
-      { url: `/api/mockups/${logoId}/${candidateId}/${slot}` },
+      { url: mockupImageUrl(logoId, candidateId, slot) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

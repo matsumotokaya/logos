@@ -37,10 +37,7 @@
   - [x] `/api/labs/*` のlab専用6本(generative全4本+workflow jobs/templates): 本番では `LABS_ENABLED=1` を設定しない限り404(`lib/labs-access.ts`)。`/labs` ページ群も同じゲート(`app/labs/layout.tsx`)
   - [x] `/api/labs/workflow/compose`・`/api/labs/workflow/runs` はプレゼン本編が使うため**ゲート対象外**(runsは認証済み。composeは下記の残課題)
   - [x] `/api/presentation-assets`: 公開カタログ(テンプレメタデータのみ)として公開のままで問題なし
-- [ ] **残課題: `GET /api/mockups/.../[slot]`(画像配信)が認証なし** — `<img src>` がAuthorizationヘッダーを送れないための構造。非公開ロゴのモックアップ画像がID知識だけで取得可能。実装方針(検討済み):
-  1. 認証済みの一覧API(`GET /api/mockups/[logoId]/[candidateId]`)が、素のパスの代わりに**短命の署名付きクエリ`?sig=<HMAC(logoId,candidateId,slot,exp)>&exp=...`付きURL**を返す(サーバー側シークレット1つで実装可、R2 presignedより移行が小さい)
-  2. `[slot]` GET は署名を検証。公開ロゴは署名なしでも許可(anonクライアントで可視性確認)し、非公開ロゴは有効な署名を必須にする
-  3. 画像URLの有効期限は表示セッションより十分長く(例: 1時間)。`<img>` はそのまま使える
+- [x] **`GET /api/mockups/.../[slot]`(画像配信)の保護** — 2026-07-17実装(`lib/mockup-sign.ts`)。認証済みの一覧/保存APIがHMAC署名付きの期限1時間URLを発行し、画像GETは「有効な署名」または「anonクライアントでのRLS可視性(公開/unlistedロゴ)」のどちらかを要求。署名鍵は環境変数 `MOCKUP_URL_SECRET`(**未設定だと非公開ロゴの画像は404**=fail-closed。**Vercel本番の環境変数に設定必須**)
 - [x] **`/api/labs/workflow/compose` のバースト制限** — 2026-07-17実装。IP単位60回/分のプロセス内リミッタ(`lib/rate-limit.ts`)。公開プレゼンの描画に必要なため認証は課さない
 - [x] **`/api/generate` クォータの並列競合修正** — count→insertの順だと並列リクエストが全て通過できたため、insert→自分の行を含めてcountの順に変更(2026-07-17)
 - [ ] **本格的なレート制限**: プロセス内リミッタはサーバーレスではインスタンス単位でしか効かない。本番デプロイ時に Vercel WAF または Upstash Ratelimit を導入する(M6のVercel整備と同時でよい)
