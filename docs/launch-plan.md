@@ -37,16 +37,19 @@
   - [x] `/api/labs/*` のlab専用6本(generative全4本+workflow jobs/templates): 本番では `LABS_ENABLED=1` を設定しない限り404(`lib/labs-access.ts`)。`/labs` ページ群も同じゲート(`app/labs/layout.tsx`)
   - [x] `/api/labs/workflow/compose`・`/api/labs/workflow/runs` はプレゼン本編が使うため**ゲート対象外**(runsは認証済み。composeは下記の残課題)
   - [x] `/api/presentation-assets`: 公開カタログ(テンプレメタデータのみ)として公開のままで問題なし
-- [ ] **残課題: `GET /api/mockups/.../[slot]`(画像配信)が認証なし** — `<img src>` がAuthorizationヘッダーを送れないための構造。非公開ロゴのモックアップ画像がID知識だけで取得可能。署名付きURL(R2 presigned / 期限付きトークン)への移行を設計する
+- [ ] **残課題: `GET /api/mockups/.../[slot]`(画像配信)が認証なし** — `<img src>` がAuthorizationヘッダーを送れないための構造。非公開ロゴのモックアップ画像がID知識だけで取得可能。実装方針(検討済み):
+  1. 認証済みの一覧API(`GET /api/mockups/[logoId]/[candidateId]`)が、素のパスの代わりに**短命の署名付きクエリ`?sig=<HMAC(logoId,candidateId,slot,exp)>&exp=...`付きURL**を返す(サーバー側シークレット1つで実装可、R2 presignedより移行が小さい)
+  2. `[slot]` GET は署名を検証。公開ロゴは署名なしでも許可(anonクライアントで可視性確認)し、非公開ロゴは有効な署名を必須にする
+  3. 画像URLの有効期限は表示セッションより十分長く(例: 1時間)。`<img>` はそのまま使える
 - [x] **`/api/labs/workflow/compose` のバースト制限** — 2026-07-17実装。IP単位60回/分のプロセス内リミッタ(`lib/rate-limit.ts`)。公開プレゼンの描画に必要なため認証は課さない
 - [x] **`/api/generate` クォータの並列競合修正** — count→insertの順だと並列リクエストが全て通過できたため、insert→自分の行を含めてcountの順に変更(2026-07-17)
 - [ ] **本格的なレート制限**: プロセス内リミッタはサーバーレスではインスタンス単位でしか効かない。本番デプロイ時に Vercel WAF または Upstash Ratelimit を導入する(M6のVercel整備と同時でよい)
 - [ ] Supabase RLS 監査: `get_advisors`(security)を実行し全指摘を解消 — **2026-07-17時点でMCPトークン(`SUPABASE_ACCESS_TOKEN_LOGOS`)未設定のため実行不可。トークン設定後のセッションで実施**
 - [ ] 既知課題の解消: 組織ロゴ visibility 変更の admin 限定をサーバー側(RPC or trigger)で強制
 - [ ] APIリクエストボディの入力バリデーション(サイズ上限・型検証。特に base64 画像とSVG)
-- [ ] SVGサニタイズの確認(アップロードSVGの `<script>`/外部参照の無害化。公開ページで他人のSVGを表示するため XSS 経路になる)
+- [x] SVGサニタイズの確認 — 2026-07-17対応。`analyzeSvg` の `on*` 属性除去がルート要素のみだったのを**全要素**に拡大し、`javascript:` href も除去。唯一のインライン展開箇所(labs `LogoThumb` の `dangerouslySetInnerHTML`)を `<img>`+data URI に変更(クライアントがSupabaseへ直接書けるため、保存済みSVGは未サニタイズの可能性を常に想定し、インライン展開は今後も禁止)。主要画面は元々 `<img>` 経由で安全
 - [ ] R2 バケットのアクセス制御・CORS 確認
-- [ ] `npm audit` と依存更新、`.env.local`/シークレットの棚卸し(リポジトリ混入チェック)
+- [x] `npm audit` とシークレット棚卸し — 2026-07-17実施。`.env` 系はgit追跡・履歴ともに混入なし(`.gitignore` の `.env*` が有効)。audit指摘はNext.js同梱postcss(8.4.31)のmoderate 1件のみで、最新canary含む全Nextが該当=上流修正待ち。ビルド時CSS文字列化の問題でユーザー入力CSSは扱わないため影響は低い。**Nextのバージョンアップ時に再確認**
 
 ## M2 — 会員ライフサイクルの完成
 

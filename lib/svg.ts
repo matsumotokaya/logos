@@ -41,11 +41,25 @@ export function analyzeSvg(source: string, fileName?: string): LogoData {
     throw new Error("This file could not be parsed as SVG.");
   }
 
-  // Safety: strip active content before mounting.
+  // Safety: strip active content before mounting. Event handlers and
+  // javascript: URLs must go on EVERY element, not just the root — the
+  // normalized markup is persisted and may be rendered inline later.
   doc.querySelectorAll("script, foreignObject").forEach((el) => el.remove());
-  Array.from(doc.documentElement.attributes).forEach((attr) => {
-    if (attr.name.startsWith("on")) doc.documentElement.removeAttribute(attr.name);
-  });
+  const stripActiveAttrs = (el: Element) => {
+    for (const attr of Array.from(el.attributes)) {
+      const attrName = attr.name.toLowerCase();
+      if (attrName.startsWith("on")) {
+        el.removeAttribute(attr.name);
+      } else if (
+        (attrName === "href" || attrName === "xlink:href") &&
+        attr.value.trim().toLowerCase().startsWith("javascript:")
+      ) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  };
+  stripActiveAttrs(doc.documentElement);
+  doc.documentElement.querySelectorAll("*").forEach(stripActiveAttrs);
 
   const host = document.createElement("div");
   host.style.cssText =
