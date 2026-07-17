@@ -4,6 +4,8 @@ import { useState } from "react";
 import { isDark } from "@/lib/color";
 import { svgToDataUri } from "@/lib/svg";
 import { rasterizeSvg } from "@/lib/raster";
+import { useAuth } from "@/lib/auth";
+import { generationErrorMessage, requestGeneration } from "@/lib/generate-client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import Reveal from "./Reveal";
@@ -22,6 +24,7 @@ type PlateState =
 
 export default function Identity({ logo, name, variants }: SceneProps) {
   const { dict, format } = useI18n();
+  const { isSignedIn } = useAuth();
   const { story, save } = usePresentationEdit();
   const [plate, setPlate] = useState<PlateState>({ status: "idle" });
 
@@ -32,28 +35,26 @@ export default function Identity({ logo, name, variants }: SceneProps) {
   const ratio = (logo.viewBox.h / logo.viewBox.w).toFixed(2);
 
   const generate = async () => {
+    // Generation is a paid call gated to registered users server-side;
+    // short-circuit here so guests get the message without an API call.
+    if (!isSignedIn) {
+      setPlate({ status: "error", message: dict.gen.signInRequired });
+      return;
+    }
     setPlate({ status: "loading" });
     try {
       const png = await rasterizeSvg(logo.svg, 1024, "#FFFFFF");
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          target: "wall",
-          imageBase64: png.split(",")[1],
-          brandName: name,
-          primaryHex: primary,
-        }),
+      const image = await requestGeneration({
+        target: "wall",
+        imageBase64: png.split(",")[1],
+        brandName: name,
+        primaryHex: primary,
       });
-      const data = await res.json();
-      if (!res.ok || !data.image) {
-        throw new Error(data.error || dict.gen.failed);
-      }
-      setPlate({ status: "done", image: data.image });
+      setPlate({ status: "done", image });
     } catch (e) {
       setPlate({
         status: "error",
-        message: e instanceof Error ? e.message : dict.gen.failed,
+        message: generationErrorMessage(e, dict.gen),
       });
     }
   };

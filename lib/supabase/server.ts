@@ -41,7 +41,14 @@ export function createServerSupabaseForToken(accessToken: string): SupabaseClien
   );
 }
 
-export async function requireAccessToken(req: Request): Promise<string> {
+export type VerifiedUser = {
+  token: string;
+  id: string;
+  /** Guests (and unconfirmed email signups) stay anonymous — see lib/auth. */
+  isAnonymous: boolean;
+};
+
+export async function requireUser(req: Request): Promise<VerifiedUser> {
   const auth = req.headers.get("authorization");
   if (!auth?.startsWith("Bearer ")) throw new Error("Unauthorized");
   const token = auth.slice("Bearer ".length).trim();
@@ -50,5 +57,13 @@ export async function requireAccessToken(req: Request): Promise<string> {
   const supabase = createServerSupabase();
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) throw new Error("Unauthorized");
-  return token;
+  return {
+    token,
+    id: data.user.id,
+    isAnonymous: data.user.is_anonymous ?? false,
+  };
+}
+
+export async function requireAccessToken(req: Request): Promise<string> {
+  return (await requireUser(req)).token;
 }

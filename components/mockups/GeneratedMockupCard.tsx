@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { rasterizeSvg } from "@/lib/raster";
 import { repo } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import { generationErrorMessage, requestGeneration } from "@/lib/generate-client";
 import { useI18n } from "@/lib/i18n";
 import type { SceneProps } from "@/components/scenes/shared";
 
@@ -24,42 +26,42 @@ export default function GeneratedMockupCard({
   onComposed?: () => void;
 }) {
   const { dict } = useI18n();
+  const { isSignedIn } = useAuth();
   const [state, setState] = useState<SlotState>({ status: "loading" });
 
   const generate = useCallback(async () => {
+    // Generation is a paid call gated to registered users server-side;
+    // short-circuit here so guests get the message without an API call.
+    if (!isSignedIn) {
+      setState({ status: "error", message: dict.gen.signInRequired });
+      return;
+    }
     setState({ status: "loading" });
     try {
       const png = await rasterizeSvg(scene.logo.svg, 1024, "#FFFFFF");
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          target: mockupId,
-          imageBase64: png.split(",")[1],
-          brandName: scene.name,
-          primaryHex: scene.logo.colors[0].hex,
-        }),
+      const image = await requestGeneration({
+        target: mockupId,
+        imageBase64: png.split(",")[1],
+        brandName: scene.name,
+        primaryHex: scene.logo.colors[0].hex,
       });
-      const data = await res.json();
-      if (!res.ok || !data.image) {
-        throw new Error(data.error || dict.gen.failed);
-      }
-      setState({ status: "done", image: data.image });
+      setState({ status: "done", image });
       await repo.saveMockup(
         scene.mockupLogoId ?? "",
         scene.mockupCandidateId,
         mockupId,
-        data.image,
+        image,
       );
       onComposed?.();
     } catch (e) {
       setState({
         status: "error",
-        message: e instanceof Error ? e.message : dict.gen.failed,
+        message: generationErrorMessage(e, dict.gen),
       });
     }
   }, [
-    dict.gen.failed,
+    dict.gen,
+    isSignedIn,
     mockupId,
     onComposed,
     scene.logo.colors,

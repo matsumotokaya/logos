@@ -1,10 +1,26 @@
 import { NextResponse } from "next/server";
 import { luminance } from "@/lib/color";
+import {
+  createServerSupabaseForToken,
+  requireUser,
+  type VerifiedUser,
+} from "@/lib/supabase/server";
 
 // Image generation can take a while on the model side.
 export const maxDuration = 60;
 
 const MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+
+// Each call is a paid provider request, so generation is restricted to
+// registered (non-anonymous) users and capped per rolling 24h window.
+const DAILY_LIMIT = Math.max(
+  1,
+  Number(process.env.GENERATION_DAILY_LIMIT) || 20
+);
+// The client rasterizes logos at 1024px; anything far beyond that is abuse.
+const MAX_IMAGE_BASE64_LENGTH = 4_000_000;
+const MAX_BRAND_NAME_LENGTH = 120;
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 // {surface} is filled with a product color chosen to contrast the logo ink.
 const SCENE_PROMPTS: Record<string, string> = {
@@ -58,6 +74,22 @@ export async function POST(req: Request) {
     );
   }
 
+  let user: VerifiedUser;
+  try {
+    user = await requireUser(req);
+  } catch {
+    return NextResponse.json(
+      { error: "Sign in to generate mockups." },
+      { status: 401 }
+    );
+  }
+  if (user.isAnonymous) {
+    return NextResponse.json(
+      { error: "Create an account to generate mockups." },
+      { status: 403 }
+    );
+  }
+
   let body: GenerateBody;
   try {
     body = await req.json();
@@ -65,12 +97,53 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { target, imageBase64, brandName, primaryHex } = body;
+  const { target, imageBase64 } = body;
   if (!target || !(target in SCENE_PROMPTS)) {
     return NextResponse.json({ error: "Unknown generation target." }, { status: 400 });
   }
-  if (!imageBase64) {
+  if (typeof imageBase64 !== "string" || !imageBase64) {
     return NextResponse.json({ error: "Missing logo image." }, { status: 400 });
+  }
+  if (imageBase64.length > MAX_IMAGE_BASE64_LENGTH) {
+    return NextResponse.json({ error: "Logo image is too large." }, { status: 413 });
+  }
+  const brandName =
+    typeof body.brandName === "string"
+      ? body.brandName.slice(0, MAX_BRAND_NAME_LENGTH)
+      : "";
+  const primaryHex =
+    typeof body.primaryHex === "string" && HEX_RE.test(body.primaryHex)
+      ? body.primaryHex
+      : "#000000";
+
+  // Quota runs under the caller's own RLS: count attempts in the last 24h,
+  // then record this attempt before the paid provider call.
+  const supabase = createServerSupabaseForToken(user.token);
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count, error: countError } = await supabase
+    .from("generation_events")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", since);
+  if (countError) {
+    return NextResponse.json(
+      { error: "Quota check failed. Apply migration 0010_generation_quota.sql." },
+      { status: 500 }
+    );
+  }
+  if ((count ?? 0) >= DAILY_LIMIT) {
+    return NextResponse.json(
+      { error: "Daily generation limit reached." },
+      { status: 429 }
+    );
+  }
+  const { error: quotaError } = await supabase
+    .from("generation_events")
+    .insert({ target });
+  if (quotaError) {
+    return NextResponse.json(
+      { error: "Failed to record generation attempt." },
+      { status: 500 }
+    );
   }
 
   const res = await fetch(

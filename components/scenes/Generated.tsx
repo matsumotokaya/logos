@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { rasterizeSvg } from "@/lib/raster";
 import { repo } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import { generationErrorMessage, requestGeneration } from "@/lib/generate-client";
 import { useI18n } from "@/lib/i18n";
 import Reveal from "./Reveal";
 import { SectionIntro, type SceneProps } from "./shared";
@@ -29,6 +31,7 @@ export default function Generated({
   mockupCandidateId,
 }: SceneProps) {
   const { dict } = useI18n();
+  const { isSignedIn } = useAuth();
   const [slots, setSlots] = useState<Record<SlotId, SlotState>>(IDLE_SLOTS);
   const [hydrated, setHydrated] = useState(false);
 
@@ -40,34 +43,32 @@ export default function Generated({
 
   const generate = useCallback(
     async (id: SlotId) => {
+      // Generation is a paid call gated to registered users server-side;
+      // short-circuit here so guests get the message without an API call.
+      if (!isSignedIn) {
+        setSlot(id, { status: "error", message: dict.gen.signInRequired });
+        return;
+      }
       setSlot(id, { status: "loading" });
       try {
         const png = await rasterizeSvg(logo.svg, 1024, "#FFFFFF");
-        const res = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            target: id,
-            imageBase64: png.split(",")[1],
-            brandName: name,
-            primaryHex: logo.colors[0].hex,
-          }),
+        const image = await requestGeneration({
+          target: id,
+          imageBase64: png.split(",")[1],
+          brandName: name,
+          primaryHex: logo.colors[0].hex,
         });
-        const data = await res.json();
-        if (!res.ok || !data.image) {
-          throw new Error(data.error || dict.gen.failed);
-        }
-        setSlot(id, { status: "done", image: data.image });
+        setSlot(id, { status: "done", image });
         // Persist so this paid generation is never repeated for this logo.
-        void repo.saveMockup(mockupLogoId ?? "", mockupCandidateId, id, data.image);
+        void repo.saveMockup(mockupLogoId ?? "", mockupCandidateId, id, image);
       } catch (e) {
         setSlot(id, {
           status: "error",
-          message: e instanceof Error ? e.message : dict.gen.failed,
+          message: generationErrorMessage(e, dict.gen),
         });
       }
     },
-    [logo.svg, logo.colors, name, mockupLogoId, mockupCandidateId, dict.gen.failed, setSlot]
+    [isSignedIn, logo.svg, logo.colors, name, mockupLogoId, mockupCandidateId, dict.gen, setSlot]
   );
 
   // Load any cached mockups for this logo; uncached slots stay idle (showing a

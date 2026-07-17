@@ -95,6 +95,8 @@ export type Dict = {
     generating: string;
     retry: string;
     failed: string;
+    signInRequired: string;
+    quotaReached: string;
   };
   // Per-section editorial copy. Spec-like labels (HEX, RGB, px sizes,
   // variant captions) intentionally stay in English mono across locales,
@@ -221,6 +223,8 @@ const en: Dict = {
     generating: "Generating…",
     retry: "Retry",
     failed: "Generation failed.",
+    signInRequired: "Create a free account to generate mockups.",
+    quotaReached: "Daily generation limit reached. Try again tomorrow.",
   },
   sections: {
     construction: {
@@ -365,6 +369,8 @@ const ja: Dict = {
     generating: "生成中…",
     retry: "再試行",
     failed: "生成に失敗しました。",
+    signInRequired: "モックアップ生成には無料アカウント登録が必要です。",
+    quotaReached: "本日の生成回数の上限に達しました。明日また試してください。",
   },
   sections: {
     construction: {
@@ -509,6 +515,8 @@ const ko: Dict = {
     generating: "생성 중…",
     retry: "다시 시도",
     failed: "생성에 실패했습니다.",
+    signInRequired: "목업을 생성하려면 무료 계정 등록이 필요합니다.",
+    quotaReached: "오늘의 생성 한도에 도달했습니다. 내일 다시 시도해 주세요.",
   },
   sections: {
     construction: {
@@ -652,6 +660,8 @@ const zhHant: Dict = {
     generating: "生成中…",
     retry: "重試",
     failed: "生成失敗。",
+    signInRequired: "生成模擬圖需要註冊免費帳號。",
+    quotaReached: "已達今日生成次數上限,請明天再試。",
   },
   sections: {
     construction: {
@@ -795,6 +805,8 @@ const zhHans: Dict = {
     generating: "生成中…",
     retry: "重试",
     failed: "生成失败。",
+    signInRequired: "生成模拟图需要注册免费账号。",
+    quotaReached: "已达今日生成次数上限,请明天再试。",
   },
   sections: {
     construction: {

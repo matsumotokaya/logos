@@ -18,6 +18,7 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | [docs/account-design.md](docs/account-design.md) | アカウント・権限・URL体系・RLS方針(Supabase設計) |
 | [docs/data-model.md](docs/data-model.md) | ロゴの正本(canonical record)・3層分離・CDN URL・サイト構造 |
 | [docs/logo-entity-lab-integration.md](docs/logo-entity-lab-integration.md) | Labs↔ロゴ正本エンティティ統合の要件・実装状況・ランタイムassetの暫定手動運用と次セッション引き継ぎ |
+| [docs/launch-plan.md](docs/launch-plan.md) | ベータローンチ準備のマイルストーン(セキュリティ・会員・法務・課金・品質・運用)と進捗チェックリスト |
 | [labs/README.md](labs/README.md) | **研究所群の入り口**: モード分類(保証/探索/統合)・体験レイヤー=課金の階段・ラボ一覧と現在地・ラボ追加手順 |
 | [labs/motion/README.md](labs/motion/README.md) | Motion Lab: 16実験カタログ・美的原則・使用技術とLottie比較 |
 | [AGENTS.md](AGENTS.md) | AIエージェント向けの開発上の注意(CLAUDE.md はこれを参照するだけ) |
@@ -154,6 +155,8 @@ npm run dev   # http://localhost:3000
 GEMINI_API_KEY=（Google AI Studioで発行したキー、課金有効なプロジェクトのもの）
 ```
 
+生成APIは**登録ユーザー(非匿名)専用**で、ユーザーごとに直近24時間の回数上限がある(既定20回、`GENERATION_DAILY_LIMIT` で変更可)。クォータは `0010_generation_quota.sql` の `generation_events` に記録されるため、Supabase設定([下記](#supabasedb移行))とマイグレーション適用が前提。localStorageモードでは生成は使えない。
+
 Generative Lab(`/labs/generative`)の実エンジンを使うには `TOGETHER_API_KEY` / `RECRAFT_API_KEY` も設定する(未設定ならモックで全フローが動く)。詳細は [labs/generative/README.md](labs/generative/README.md)。
 
 Cloudflare R2 を使う場合は `.env.local` に以下も設定する。現時点では **Generative Lab の生成画像保存先** と **シーン10 モックアップ(R2 + `logo_mockups`)** がこの設定を使い、Generative Lab のみ未設定時は `var/generative-lab/outputs/` へフォールバックする:
@@ -169,7 +172,7 @@ R2_BUCKET_NAME=logos-assets
 
 スキーマの正本は [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql)(アカウント・組織・ロゴ正本・RLS一式)。セットアップ手順:
 
-1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0008、いずれも冪等・再実行可)
+1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0010、いずれも冪等・再実行可)
 2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(ゲスト投稿の前提)
 3. `.env.local` に以下を追加:
 
