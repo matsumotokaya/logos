@@ -32,7 +32,7 @@
 
 ### Runtime assetの暫定手動運用
 
-永続ワーカー導入前の正本手順は [Labs↔ロゴ正本エンティティ統合 §5](../../docs/logo-entity-lab-integration.md#5-ランタイムassetの暫定手動運用)。ネオンv1では `/labs/workflow/workflow-neon-sign-v1` で正本ロゴを選び、`依頼情報をコピー`した全文を新しいローカルエージェントセッションへ渡す。
+永続ワーカー導入前の正本手順は [Labs↔ロゴ正本エンティティ統合 §4](../../docs/logo-entity-lab-integration.md#4-ランタイムassetの暫定手動運用)。ネオンv1では `/labs/workflow/workflow-neon-sign-v1` で正本ロゴを選び、`依頼情報をコピー`した全文を新しいローカルエージェントセッションへ渡す。
 
 - Logo IDは対象ロゴを一意に特定し、Candidate IDは今回のmaster SVGを固定する。アカウントIDは別途不要
 - Run IDは任意。`レンダー依頼を作成`は状態をDBで追跡したい場合だけ使う

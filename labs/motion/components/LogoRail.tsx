@@ -12,7 +12,7 @@ import LogoThumb from "./LogoThumb";
 export default function LogoRail({
   logos,
   selectedId,
-  note = "SVG推奨(PNGは対応実験のみ)。ロゴはこの端末の外に送信されない。",
+  note = "追加したSVGはアカウントの正本ロゴとして保存され、実験の描画はブラウザ内で行われます。",
 }: {
   logos: LabLogo[];
   selectedId: string;

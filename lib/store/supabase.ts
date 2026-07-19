@@ -17,6 +17,7 @@ import {
   type GeneratedMockups,
   type InventoryItem,
   type LogoActivityAction,
+  type LogoAccessRole,
   type LogoAssetRegistry,
   type LogoLockup,
   type LogoPatch,
@@ -93,6 +94,12 @@ type LogoVariantRow = {
   sort_order: number;
 };
 
+type EffectiveLogoGrant = {
+  role: LogoAccessRole;
+  canEditDetails: boolean;
+  canEditPresentation: boolean;
+};
+
 const LOGO_SELECT = `
   id, title, role, logo_type, parent_logo_id, visibility, owner_user_id, owner_org_id, allow_contact, slug, created_at, updated_at,
   logo_candidates ( id, is_primary, svg, analysis ),
@@ -104,21 +111,31 @@ const LOGO_SELECT = `
 
 // Roles that may edit an org's logos.
 const EDIT_ROLES = new Set(["owner", "admin", "editor"]);
+const ADMIN_ROLES = new Set(["owner", "admin"]);
 
 function rowToStoredLogo(
   row: LogoRow,
   currentUserId: string | null,
-  orgRoles: Map<string, string>
+  orgRoles: Map<string, string>,
+  logoGrants: Map<string, EffectiveLogoGrant>,
 ): StoredLogo | null {
   const primary =
     row.logo_candidates.find((c) => c.is_primary) ?? row.logo_candidates[0];
   if (!primary) return null; // defensive: a logo without a master file
   const data = { ...(primary.analysis ?? {}), svg: primary.svg } as LogoData;
   // UI gate only — writes are also enforced by RLS server-side.
-  const canEdit =
+  const canAdmin =
     (row.owner_user_id !== null && row.owner_user_id === currentUserId) ||
     (row.owner_org_id !== null &&
-      EDIT_ROLES.has(orgRoles.get(row.owner_org_id) ?? ""));
+      ADMIN_ROLES.has(orgRoles.get(row.owner_org_id) ?? ""));
+  const grant = logoGrants.get(row.id);
+  const canEdit =
+    canAdmin ||
+    (row.owner_org_id !== null &&
+      EDIT_ROLES.has(orgRoles.get(row.owner_org_id) ?? "")) ||
+    Boolean(grant?.canEditDetails);
+  const canEditPresentation =
+    canEdit || Boolean(grant?.canEditPresentation);
   return {
     id: row.id,
     title: row.title,
@@ -132,6 +149,9 @@ function rowToStoredLogo(
     allowContact: row.allow_contact,
     slug: row.slug,
     canEdit,
+    canEditPresentation,
+    canAdmin,
+    accessRole: grant?.role ?? null,
     ownerOrgId: row.owner_org_id,
     credits: row.logo_credits.map((c) => ({
       id: c.id,
@@ -309,6 +329,60 @@ export class SupabaseRepo implements BrandRepo {
     return new Map((data ?? []).map((m) => [m.org_id as string, m.role as string]));
   }
 
+  /** Effective logo-scoped grants for me, including grants to my orgs. */
+  private async myLogoGrants(
+    uid: string,
+    orgRoles: Map<string, string>,
+  ): Promise<Map<string, EffectiveLogoGrant>> {
+    const orgIds = [...orgRoles.keys()];
+    const filter =
+      `grantee_user_id.eq.${uid}` +
+      (orgIds.length ? `,grantee_org_id.in.(${orgIds.join(",")})` : "");
+    const { data, error } = await supabase
+      .from("logo_access_grants")
+      .select("logo_id, grantee_user_id, grantee_org_id, role")
+      .or(filter);
+    // Keep owned-logo flows available during a migration-first deployment.
+    if (error?.code === "42P01" || error?.code === "PGRST205") return new Map();
+    throwOn(error);
+
+    const priority: Record<LogoAccessRole, number> = {
+      viewer: 0,
+      editor: 1,
+      manager: 2,
+    };
+    const grants = new Map<string, EffectiveLogoGrant>();
+    for (const row of data ?? []) {
+      const role = row.role as LogoAccessRole;
+      const isDirect = row.grantee_user_id === uid;
+      const orgRole = row.grantee_org_id
+        ? orgRoles.get(row.grantee_org_id as string)
+        : null;
+      const granteeCanEdit = isDirect || EDIT_ROLES.has(orgRole ?? "");
+      const canEditDetails = role === "manager" && granteeCanEdit;
+      const canEditPresentation = role !== "viewer" && granteeCanEdit;
+      const current = grants.get(row.logo_id as string);
+      if (!current || priority[role] > priority[current.role]) {
+        grants.set(row.logo_id as string, {
+          role,
+          canEditDetails,
+          canEditPresentation,
+        });
+      } else if (
+        (canEditDetails && !current.canEditDetails) ||
+        (canEditPresentation && !current.canEditPresentation)
+      ) {
+        grants.set(row.logo_id as string, {
+          ...current,
+          canEditDetails: current.canEditDetails || canEditDetails,
+          canEditPresentation:
+            current.canEditPresentation || canEditPresentation,
+        });
+      }
+    }
+    return grants;
+  }
+
   private async logActivity(
     logoId: string,
     action: LogoActivityAction
@@ -352,14 +426,17 @@ export class SupabaseRepo implements BrandRepo {
   async listLogos(): Promise<StoredLogo[]> {
     const uid = await this.ensureAuth();
     const roles = await this.myOrgRoles();
+    const grants = await this.myLogoGrants(uid, roles);
     // My logos: owned by me personally, or owned by an org I belong to. RLS also
     // grants SELECT on every unlisted/public logo (for permalinks and the future
     // public directory), so without this filter the personal gallery and admin
     // would show other people's logos.
     const orgIds = [...roles.keys()];
+    const grantIds = [...grants.keys()];
     const orFilter =
       `owner_user_id.eq.${uid}` +
-      (orgIds.length ? `,owner_org_id.in.(${orgIds.join(",")})` : "");
+      (orgIds.length ? `,owner_org_id.in.(${orgIds.join(",")})` : "") +
+      (grantIds.length ? `,id.in.(${grantIds.join(",")})` : "");
     const { data, error } = await supabase
       .from("logos")
       .select(LOGO_SELECT)
@@ -367,7 +444,7 @@ export class SupabaseRepo implements BrandRepo {
       .order("created_at", { ascending: false });
     throwOn(error);
     return (data as unknown as LogoRow[]).flatMap((row) => {
-      const logo = rowToStoredLogo(row, uid, roles);
+      const logo = rowToStoredLogo(row, uid, roles, grants);
       return logo ? [logo] : [];
     });
   }
@@ -377,6 +454,7 @@ export class SupabaseRepo implements BrandRepo {
     // regardless of owner. RLS grants SELECT on public logos to everyone.
     const uid = await this.ensureAuth();
     const roles = await this.myOrgRoles();
+    const grants = await this.myLogoGrants(uid, roles);
     const { data, error } = await supabase
       .from("logos")
       .select(LOGO_SELECT)
@@ -385,7 +463,7 @@ export class SupabaseRepo implements BrandRepo {
       .limit(48);
     throwOn(error);
     return (data as unknown as LogoRow[]).flatMap((row) => {
-      const logo = rowToStoredLogo(row, uid, roles);
+      const logo = rowToStoredLogo(row, uid, roles, grants);
       return logo ? [logo] : [];
     });
   }
@@ -393,13 +471,16 @@ export class SupabaseRepo implements BrandRepo {
   async getLogo(id: string): Promise<StoredLogo | null> {
     const uid = await this.ensureAuth();
     const roles = await this.myOrgRoles();
+    const grants = await this.myLogoGrants(uid, roles);
     const { data, error } = await supabase
       .from("logos")
       .select(LOGO_SELECT)
       .eq("id", id)
       .maybeSingle();
     throwOn(error);
-    return data ? rowToStoredLogo(data as unknown as LogoRow, uid, roles) : null;
+    return data
+      ? rowToStoredLogo(data as unknown as LogoRow, uid, roles, grants)
+      : null;
   }
 
   async saveLogo(logo: StoredLogo): Promise<void> {
@@ -485,7 +566,13 @@ export class SupabaseRepo implements BrandRepo {
       }
     }
     if (patch.tags !== undefined) {
-      const names = patch.tags.map((t) => t.trim()).filter(Boolean);
+      const normalizedNames = patch.tags
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      if (normalizedNames.some((name) => name.length > 48)) {
+        throw new Error("タグは48文字以内で入力してください。");
+      }
+      const names = [...new Set(normalizedNames)];
       throwOn((await supabase.from("logo_tags").delete().eq("logo_id", id)).error);
       if (names.length > 0) {
         const { data: tagRows, error: tagErr } = await supabase

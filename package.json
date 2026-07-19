@@ -6,14 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "campaign": "NODE_OPTIONS=--conditions=react-server tsx labs/campaign/scripts/generate.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.3",
     "@aws-sdk/client-s3": "^3.1086.0",
+    "@base-ui/react": "^1.6.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@supabase/supabase-js": "^2.110.2",
     "@types/three": "^0.180.0",
+    "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
     "gsap": "^3.15.0",
     "lottie-web": "^5.13.0",
@@ -21,9 +25,11 @@
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "server-only": "^0.0.1",
     "sharp": "^0.35.3",
     "tailwind-merge": "^3.6.0",
-    "three": "^0.180.0"
+    "three": "^0.180.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -33,6 +39,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
+    "tsx": "^4.23.1",
     "typescript": "^5"
   }
 }

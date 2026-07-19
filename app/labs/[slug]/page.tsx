@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LABS, getLab } from "@/labs/directory";
+import LabHeader from "@/labs/shared/components/LabHeader";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -28,18 +29,7 @@ export default async function PlannedLabPage({
 
   return (
     <div className="min-h-screen flex-1 bg-paper text-ink">
-      <header className="sticky top-0 z-40 border-b border-hairline bg-paper/90 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-6 py-3.5">
-          <span className="h-2 w-2 rounded-full border border-ink-faint" />
-          <h1 className="font-display text-sm font-semibold tracking-tight">{lab.name}</h1>
-          <span className="rounded-full border border-dashed border-ink-faint px-2 py-0.5 text-[10px] text-ink-muted">
-            準備中
-          </span>
-          <Link href="/labs" className="ml-auto text-xs text-ink-muted transition hover:text-ink">
-            ← Labs
-          </Link>
-        </div>
-      </header>
+      <LabHeader current={{ name: lab.name, titleJa: lab.titleJa, mode: lab.mode }} />
 
       <main className="mx-auto max-w-3xl px-6 py-10">
         <p className="font-mono text-[11px] tracking-widest text-ink-faint uppercase">

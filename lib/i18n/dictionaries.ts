@@ -7,7 +7,7 @@ export type Dict = {
     labs: string;
     home: string;
     assets: string;
-    settings: string;
+    account: string;
     newLogo: string;
     brandName: string;
     language: string;
@@ -45,6 +45,7 @@ export type Dict = {
     subtitle: string;
     signInTitle: string;
     signInSubtitle: string;
+    failed: string;
     sentTitle: string;
     continueWith: string; // {provider}
     or: string;
@@ -136,12 +137,12 @@ const en: Dict = {
     labs: "Labs",
     home: "Home",
     assets: "Assets",
-    settings: "Settings",
+    account: "Account",
     newLogo: "New logo",
     brandName: "Brand name",
     language: "Language",
     edit: "Edit",
-    editDone: "Done",
+    editDone: "Save",
   },
   footer: {
     generatedWith: "Generated with {service}",
@@ -175,6 +176,7 @@ const en: Dict = {
     subtitle: "Create an account to keep your logos, edit them later and share them. Everything you have already made carries over.",
     signInTitle: "Welcome back",
     signInSubtitle: "Sign in to your account to manage your logos.",
+    failed: "Authentication failed",
     sentTitle: "Check your email",
     continueWith: "Continue with {provider}",
     or: "or",
@@ -282,12 +284,12 @@ const ja: Dict = {
     labs: "ラボ",
     home: "ホーム",
     assets: "アセット",
-    settings: "設定",
+    account: "アカウント",
     newLogo: "新しいロゴ",
     brandName: "ブランド名",
     language: "言語",
     edit: "編集",
-    editDone: "完了",
+    editDone: "保存",
   },
   footer: {
     generatedWith: "{service} で生成",
@@ -321,6 +323,7 @@ const ja: Dict = {
     subtitle: "アカウントを作成すると、ロゴを保存して後から編集・共有できます。ここまで作成した内容はそのまま引き継がれます。",
     signInTitle: "おかえりなさい",
     signInSubtitle: "アカウントにログインしてロゴを管理します。",
+    failed: "認証に失敗しました",
     sentTitle: "確認メールを送信しました",
     continueWith: "{provider} で続ける",
     or: "または",
@@ -428,12 +431,12 @@ const ko: Dict = {
     labs: "랩",
     home: "홈",
     assets: "에셋",
-    settings: "설정",
+    account: "계정",
     newLogo: "새 로고",
     brandName: "브랜드명",
     language: "언어",
     edit: "편집",
-    editDone: "완료",
+    editDone: "저장",
   },
   footer: {
     generatedWith: "{service}(으)로 생성",
@@ -467,6 +470,7 @@ const ko: Dict = {
     subtitle: "계정을 만들면 로고를 저장하고 나중에 편집·공유할 수 있습니다. 지금까지 만든 내용은 그대로 이어집니다.",
     signInTitle: "다시 오신 것을 환영합니다",
     signInSubtitle: "계정에 로그인하여 로고를 관리하세요.",
+    failed: "인증에 실패했습니다",
     sentTitle: "확인 메일을 보냈습니다",
     continueWith: "{provider}(으)로 계속하기",
     or: "또는",
@@ -574,12 +578,12 @@ const zhHant: Dict = {
     labs: "實驗室",
     home: "首頁",
     assets: "資產",
-    settings: "設定",
+    account: "帳號",
     newLogo: "新標誌",
     brandName: "品牌名稱",
     language: "語言",
     edit: "編輯",
-    editDone: "完成",
+    editDone: "儲存",
   },
   footer: {
     generatedWith: "由 {service} 生成",
@@ -612,6 +616,7 @@ const zhHant: Dict = {
     subtitle: "建立帳號即可保存標誌、日後編輯與分享。您目前建立的內容都會保留。",
     signInTitle: "歡迎回來",
     signInSubtitle: "登入帳號以管理您的標誌。",
+    failed: "驗證失敗",
     sentTitle: "確認信已寄出",
     continueWith: "使用 {provider} 繼續",
     or: "或",
@@ -719,12 +724,12 @@ const zhHans: Dict = {
     labs: "实验室",
     home: "首页",
     assets: "资产",
-    settings: "设置",
+    account: "账号",
     newLogo: "新标志",
     brandName: "品牌名称",
     language: "语言",
     edit: "编辑",
-    editDone: "完成",
+    editDone: "保存",
   },
   footer: {
     generatedWith: "由 {service} 生成",
@@ -757,6 +762,7 @@ const zhHans: Dict = {
     subtitle: "创建账号即可保存标志、稍后编辑与分享。您目前创建的内容都会保留。",
     signInTitle: "欢迎回来",
     signInSubtitle: "登录账号以管理您的标志。",
+    failed: "身份验证失败",
     sentTitle: "确认邮件已发送",
     continueWith: "使用 {provider} 继续",
     or: "或",

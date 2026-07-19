@@ -1,8 +1,8 @@
 # ロゴデータモデルとコンテンツ構造
 
-最終更新: 2026-07-16
-ステータス: **設計合意フェーズ**
-前提: アカウント・権限・URL設計は [account-design.md](account-design.md)(2層URL、組織ロール、匿名→本登録昇格)。本書はその上に載る**ロゴそのもののデータ設計**を定める。
+最終更新: 2026-07-18
+ステータス: **主要スキーマ・正本編集・プレゼン編集を実装済み。候補比較UIと汎用CDNは未実装**
+前提: アカウント・権限・URL設計は [account-design.md](account-design.md) を正本とする。本書はその上に載る**ロゴそのもののデータ設計**を定める。
 
 ## 位置づけ: 権威ある正本(canonical record)
 
@@ -22,7 +22,7 @@
 
 - アップロード直後は A に仮の名前(例: "Black logo" — ファイル名由来)だけが入った状態。投稿者はまずプレゼン(B)を眺め、気に入ったら B を編集し、正式情報は A で整える
 - プレゼン(B)を消しても・書き換えても、正本(A)は影響を受けない。逆も同じ
-- ブックマークは匿名ユーザーでも可能(匿名でも user_id を持つ設計のため)。本登録に昇格してもそのまま残る
+- ブックマークのスキーマとRLSは登録ユーザー向けに用意済み。閲覧・一覧UIは未実装
 
 ## 2. ロゴの構造化
 
@@ -41,6 +41,8 @@ logo(アイデンティティ: 名前・商標・クレジット・プレゼン�
 - 単色派生(variants)と生成モックアップ(mockups)は候補ごとに持つ(デザインが違えば派生も違うため)
 - **ファイル置換時は該当候補の derived variants を再生成し、生成モックアップのキャッシュを無効化**する
 - 採用が決まったら候補を primary に切り替え、他を削除(または残して比較記録に)
+
+現行UIはアップロード時のprimary候補作成と、そのprimaryファイルの差し替えまで対応する。候補B/Cの追加、primary切替、比較タブは設計済みだが未実装。
 
 ### 2.2 ロゴ間の関係(コーポレート / ブランド / サービス / 子会社)
 
@@ -62,7 +64,7 @@ ACME Holdings(corporate)
 
 投稿者=制作者とは限らない(制作社に発注したロゴを担当者がアップする等)。また「この制作社にコンタクトしたい」ニーズがあるため、クレジットは**サービス外の人・会社も登録できる**独立テーブルにする。
 
-- **logo_credits**: 制作者情報。role(designer / studio / art_director …)+ 名前 + 連絡先。サービス内ユーザーなら user_id で紐づけ(Behance的コンタクトの宛先候補)。**アップロード時に投稿者が制作者として自動登録**され、あとから正しい制作社に書き換え・追加できる
+- **logo_credits**: 制作者情報。role(designer / studio / art_director …)+ 名前 + 連絡先。サービス内ユーザーなら user_id で紐づけ(Behance的コンタクトの宛先候補)。現行アップロードでは自動登録せず、アセット詳細で正しい制作者を入力する
 - **logo_activities**: 作業履歴(append-only)。作成・ファイル更新・情報編集・公開範囲変更・候補追加・移管などを「誰が・いつ・何を」で記録。「制作者と更新者がわかる」の実体。UI上は「最終更新: ○○さん」+履歴一覧
 - `logos.created_by`(投稿者・不変)は account-design.md の設計のまま。表示用に `updated_by` を持つ
 
@@ -80,12 +82,14 @@ ACME Holdings(corporate)
 | 画面 | モード | 編集できるもの | 権限 |
 |---|---|---|---|
 | `/p/[id]` プレゼンページ | 閲覧モード(デフォルト) | —(候補があればタブで比較閲覧) | visibility に従う |
-| `/p/[id]` プレゼンページ | **編集モード**(編集権限者にトグル表示) | キャッチコピー、ストーリー、シーン文言(層B) | editor 以上 |
-| `/assets/[id]` アセット詳細ページ | — | 正式名称、主体entity、ロゴ形式、役割、親子関係、候補管理(追加・primary切替・ファイル置換)、lockup / colorway、制作クレジット、商標情報、タグ(層A・C) | editor 以上(公開範囲のみ admin 以上) |
+| `/p/[id]` プレゼンページ | **編集モード**(編集権限者にトグル表示) | キャッチコピー、ストーリー、シーン文言、採用assetと順序(層B) | 所有者、組織editor以上、共有`manager`/`editor` |
+| `/assets/[id]` アセット詳細ページ | — | 正式名称、主体entity、ロゴ形式、役割、親子関係、primaryファイル置換、lockup / colorway、制作クレジット、商標情報、タグ(層A・C) | 所有者、組織editor以上、共有`manager`。公開範囲・移管・削除・再共有は所有主体側admin以上 |
 
 プレゼン編集は「その場で書き換えるブログ」体験にする(別画面のフォームに飛ばさない)。
 
-## 6. スキーマ(account-design.md §7 への追加・変更)
+## 6. スキーマ構造
+
+この節のSQLは構造を説明するための要約であり、適用スキーマの正本は [../supabase/migrations/](../supabase/migrations/) とする。
 
 ### 6.1 エンティティ図
 
@@ -100,11 +104,13 @@ public.logos(アイデンティティ)── parent_logo_id で自己参照ツ�
   ├── logo_credits(制作クレジット)
   ├── logo_trademarks(商標情報)
   ├── logo_activities(作業履歴)
+  ├── logo_access_grants(所有権を移さない外部ユーザー/組織への共有アクセス)
+  ├── logo_access_invites(未登録ユーザーへの期限付きメール共有)
   ├── logo_tags ── tags(層C)
   └── bookmarks(層C)
 ```
 
-### 6.2 logos — 変更
+### 6.2 logos
 
 [account-design.md §7](account-design.md) の `logos` から **`svg` / `analysis` を logo_candidates へ移動**し、以下を追加:
 
@@ -116,7 +122,7 @@ alter table public.logos
 -- role の語彙: 'brand' | 'corporate' | 'service' | 'subsidiary' | 'other'
 ```
 
-### 6.3 logo_candidates — 新規
+### 6.3 logo_candidates
 
 ```sql
 create table public.logo_candidates (
@@ -124,7 +130,7 @@ create table public.logo_candidates (
   logo_id    text not null references public.logos(id) on delete cascade,
   label      text not null default 'A',        -- 'A' | 'B' | 'C' | 任意名
   is_primary boolean not null default false,
-  file_path  text not null,                    -- マスターSVG(Storage/R2)
+  svg        text not null,                    -- マスターSVG。現行はDBに直持ち
   analysis   jsonb,                            -- 色・パス解析結果(LogoData相当)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -182,7 +188,7 @@ create table public.presentation_asset_definitions (
 - `id` は定義versionを特定する。新しい版は同じ `family_id` と増加した `definition_version` を持つ別行にし、既存プレゼンが暗黙に新しい挙動へ変わるのを防ぐ
 - `allowed_placements` が「productionになった場合にどのプレゼン配置へ差し込めるか」、`default_mappings` が「初期状態ではどこに何番で有効にするか」を表す。draftも昇格前にplacement互換性を検証できる
 - `config.parameters` はassetが提供する設定項目と既定値を持つ。黒/白、素材、比率など利用者が選んだ値はlayout mappingの `params` に保存する
-- 現在の実装では一部をコード/`template.json` のメタデータで代用しているが、DB移行後はこのテーブルに寄せるのが自然
+- 現在は一部の定義をコード/`template.json`から供給している。DBカタログとの同期経路は未実装
 - Workflow Lab の file template は `template.json` の `presentation.allowedPlacements` / `presentation.defaultMappings` を正本にし、旧 `presentationScene` / `presentationAdopted` / `presentationOrder` は後方互換フィールドとして残す
 - 現行プレゼンにハードコードされていた `Social` / `Badge` / `T-shirt` も、この定義カタログ上では通常の asset と同列に扱う
 
@@ -205,7 +211,7 @@ create table public.logo_variants (
   candidate_id uuid not null references public.logo_candidates(id) on delete cascade,
   kind         text not null,                  -- 'mono_black' | 'mono_white' | 'symbol' | 'horizontal' | ...
   source       text not null default 'derived',-- 'derived'(自動) | 'uploaded'(投稿者が追加)
-  file_path    text not null,
+  svg          text not null,
   created_at   timestamptz not null default now(),
   unique (candidate_id, kind)
 );
@@ -252,9 +258,9 @@ create table public.logo_asset_runs (
 - 失敗: 最新runが `failed`。過去の成功成果物は消さず、再実行可能
 - versionが変われば別definition IDなので、新版は同じロゴでも未処理から始まる
 
-#### 生成画像の保存 — 現状の実装 vs この計画(2026-07-14 時点の実態)
+#### 生成画像の保存
 
-**`logo_mockups` はシーン10で配線済み**。2026-07-14 時点の生成画像の保存先は次のとおり:
+**`logo_mockups` はシーン10で配線済み**。現行の生成画像の保存先は次のとおり:
 
 | 生成物 | 現状の保存先 | キー | アカウント/ロゴ行との紐付け |
 |---|---|---|---|
@@ -263,9 +269,9 @@ create table public.logo_asset_runs (
 
 つまり生成画像は今のところ**コンテンツアドレス方式のキャッシュ**であって、リレーショナルな正本レコードではない(同じロゴ内容なら誰がアップしても同じキャッシュを引く)。
 
-**現状整理(Cloudflare R2 移行後)**: シーン10の生成画像は `logo_mockups`(候補→ロゴ→組織/アカウント) に配線され、**ロゴ正本にぶら下がるデータ**になった。これにより所有者・公開範囲・課金主体がアセットに対して明確になっている。一方、Generative Lab 側はまだ `logoHash` ベースの独立資産で、`logos` / `logo_candidates` とのリレーションは未配線。マスターSVG(`file_path`)を含む残りの重量アセットも、今後は同じ R2 命名規則に寄せていく。
+シーン10の生成画像は`logo_mockups`(候補→ロゴ→組織/アカウント)に配線され、所有者・公開範囲・課金主体が明確になっている。一方、Generative Labはまだ`logoHash`ベースの独立資産で、`logos`/`logo_candidates`とのリレーションは未配線。
 
-### 6.5 logo_presentations(層B)— 新規
+### 6.5 logo_presentations(層B)
 
 ```sql
 create table public.logo_presentations (
@@ -286,7 +292,7 @@ create table public.logo_presentations (
 - 初期状態では `layout.mappings = []` とし、グローバル定義カタログ側の `default_mappings` がそのまま効く。利用者が順序変更・無効化・差し替えを行った asset だけをここへ保存する
 - 公開範囲はロゴ本体の `visibility` に従う
 
-### 6.6 logo_credits — 新規
+### 6.6 logo_credits
 
 ```sql
 create table public.logo_credits (
@@ -301,7 +307,7 @@ create table public.logo_credits (
 );
 ```
 
-### 6.7 logo_trademarks — 新規
+### 6.7 logo_trademarks
 
 ```sql
 create table public.logo_trademarks (
@@ -320,7 +326,7 @@ create table public.logo_trademarks (
 );
 ```
 
-### 6.8 logo_activities — 新規
+### 6.8 logo_activities
 
 ```sql
 create table public.logo_activities (
@@ -336,7 +342,7 @@ create table public.logo_activities (
 
 append-only(UPDATE/DELETE不可のRLS)。書き込みはアプリ操作に伴い自動。
 
-### 6.9 tags / logo_tags / bookmarks(層C)— 新規
+### 6.9 tags / logo_tags / bookmarks(層C)
 
 ```sql
 create table public.tags (
@@ -363,9 +369,9 @@ create table public.bookmarks (
 
 ### 6.10 RLSの原則(子テーブル共通)
 
-logo_* の子テーブルはすべて「SELECT は親ロゴの閲覧権限に準ずる / 書き込みは親ロゴの編集権限(editor以上)に準ずる」。例外: bookmarks(本人のみ)、logo_activities(append-only)。
+logo_* の子テーブルは「SELECTは親ロゴの閲覧権限に準ずる」を基本とする。書き込みは操作別に分け、正本は所有者・組織editor以上・共有`manager`、プレゼンはそれに共有`editor`を加える。visibility・移管・削除・再共有は所有主体側admin以上に限定する。例外はbookmarks(本人のみ)とlogo_activities(append-only)。
 
-## 7. ロゴの正規参照URL(CDN)
+## 7. ロゴの正規参照URL(CDN、未実装)
 
 ### URL体系
 
@@ -381,6 +387,8 @@ logo_* の子テーブルはすべて「SELECT は親ロゴの閲覧権限に準
 - 利用者はこのURLを `<img src>` やアプリアイコンのビルドパイプラインから直接参照できる = **ロゴCDN**(PRODUCT.md フェーズ2の実体)
 - 上書き更新してもURLは同じ(参照側は常に最新の正本を得る — これがCDNの価値)
 - 将来の層2バニティ(`/[handle]/[slug]/logo.svg`)は内部でこのURLに解決するエイリアス
+
+以下は実装予定の契約であり、現時点で`/l/[id]/...` Route Handlerは存在しない。
 
 ### 段階実装(CORS等の問題を吸収する後追い方針)
 
@@ -398,22 +406,22 @@ logo_* の子テーブルはすべて「SELECT は親ロゴの閲覧権限に準
 **2026-07-14 実装判断(R2移行時)**: SVGは数KB程度と小さいため、**マスターSVG・バリエーションはDBに直持ち**(`logo_candidates.svg` / `logo_variants.svg`)を維持し、**生成モックアップ画像(大きい)は Cloudflare R2**(`logo_mockups.image_path`)へ置く。CDN/配信ルート(§7)はDBの `image_path` とアプリの中継URL(`/api/mockups/...`)で解決する。
 
 - 将来、SVG自体もR2オブジェクト化するかは、その時点のCDN要件で判断する(スキーマ上は svg カラム→パス参照への変更のみ)
-- 適用済みスキーマの正本は [../supabase/migrations/0001_init.sql](../supabase/migrations/0001_init.sql)
+- 適用済みスキーマの正本は [../supabase/migrations/](../supabase/migrations/)
 
 ## 9. サイト構造(ここまでの全設計の統合)
 
 ```
-/                     入口。ロゴ投稿UI(メイン導線)+ 公開ギャラリー
-                      (Pinterest的カード、タグ絞込・検索、ブックマーク、0件は正常系)
-/p/[id]               プレゼンテーション。閲覧/編集モード。候補があればA/B/Cタブで比較
-/l/[id]/[variant]     ロゴアセットの正規参照URL(CDN層。常にprimary候補)
+/                     入口。登録後のロゴ投稿UI+公開ギャラリー
+                      (カード表示は実装済み。タグ絞込・検索・ブックマークは未実装)
+/p/[id]               プレゼンテーション。閲覧/編集モード
+/l/[id]/[variant]     ロゴアセットの正規参照URL(CDN層。未実装)
 /brand                管理コンソール(組織スコープ: KPI・会社情報・在庫・発注、ロゴのツリー表示)
 /assets               アセットライブラリ(自分/所属組織の管理アセット一覧)
 /assets/[id]          アセット詳細ページ(正本の編集: 名称・形式・関係・候補・バリエーション・
                       クレジット・商標・タグ・公開範囲・作業履歴の閲覧)
 /brand/logos/[id]     互換URL。同じアセット詳細画面を表示
-/settings             ユーザー設定(プロフィール編集・退会導線の置き場)
-/[handle]/[slug]      バニティURL(層2エイリアス。後日)
+/settings             ユーザー情報表示と退会。プロフィール編集は未実装
+/[handle]/[slug]      組織の公開ロゴ用バニティURL(実装済み)
 ```
 
 ## 10. 未決定事項

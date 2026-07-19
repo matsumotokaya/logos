@@ -23,9 +23,9 @@
 
 その信頼の上で、生成AIにロゴを**解釈・変形させることを仕様として許容**し、決定論では作れない表現(風化した看板・ネオン・刺繍・シネマティック)を探す。見た目・情緒のインパクトを最大化できる代わりに、プロの現場で使えるかは**使う側がリスクとリターンを判断**し、生成の実費もかかる。ハーネスの定義は「逸脱の禁止」ではなく**「逸脱を制御し、計測し、見せる」**——逸脱スコアボードが全生成物に忠実度を付けて返す。画像と動画は同じラボで扱う(動画生成はほぼ必ず参照画像を起点にするため、「作ったブランドイメージを動かす」までが一連の流れ)。
 
-### 統合(将来枠)
+### 統合モード — 最終アウトプットへ束ねる
 
-単発のアセットを組み合わせて、プロモーションビデオ・CM・バナー・LPという**マーケティングの最終アウトプット**に仕立てる領域。マーケの成果物は常に組み合わせで生まれる。素材側の3ラボが成熟してから着手する(今はプレースホルダー)。納品物にはLP/コーポレートサイトそのものや**Figmaファイル(デザインガイドライン・ブランドキット)**まで含める構想があり、その事業側の正本は [PRODUCT.md](../PRODUCT.md) の運用フェーズ構想(計画段階)。
+複数のソースとアセットを統合し、プロモーションビデオ・CM・バナー・LPという**マーケティングの最終アウトプット**に仕立てる領域。Campaign LabではURL・PDF・画像・テキストからService Brand Kitを作り、自己完結LPを生成する縦貫通が稼働中。30秒CM動画とSNS素材は同じBrand Kitを入力にする次フェーズで、詳細は [campaign/README.md](campaign/README.md) を正本とする。
 
 ## 体験のレイヤー = コストと課金の階段
 
@@ -35,28 +35,29 @@
 |---|---|---|---|---|
 | 1 | 静的: 高品質ガイドラインテンプレートへのロゴ配置 | 保証 | 本体プレゼン + Motion Lab | 無料 |
 | 2 | SVG/3Dモーション(アルゴリズムで実行) | 保証 | **Motion Lab** | 無料 |
-| 2.5 | 非生成AIの高品質合成(テンプレート合成は稼働中、Blender/Photoshopは計画) | 保証 | **Workflow Lab** | 無料〜低中(無料体験の画像セットはここで変動費ゼロ成立) |
+| 2.5 | 非生成AIの高品質合成(テンプレート合成とBlender焼き込みが稼働中、runtime Blenderは手動運用、Photoshopは計画) | 保証 | **Workflow Lab** | 無料〜低中(無料体験の画像セットはここで変動費ゼロ成立) |
 | 3〜4 | 生成AIハーネス(画像+ショートビデオ、逸脱スコアボード付き) | 探索 | **Generative Lab** | 中〜重(無料キャンペーンは原価計算前提) |
-| 5+ | 統合(30秒プロモ・CM・バナー・LP) | 統合 | Campaign Lab(将来) | 最重課金 |
+| 5+ | Service Brand KitからLP・30秒プロモ・CM・バナーへ統合 | 統合 | **Campaign Lab** | 最重課金 |
 
 ### 課金API(コスト正本)
 
 課金が発生する外部APIの一覧は [cost-sources.ts](cost-sources.ts) が正本で、`/labs` 最上部の**コスト節**に表示される。将来ここを**月次コストダッシュボード**にする(現状は静的表示、ライブ集計は未実装)。
 
 - **Gemini 2.5 Flash Image(Nano Banana / Google AI Studio)** — 本体プレゼン シーン10の写実モックアップ。≈$0.039/枚(目安)。**原価ログ未実装**(ダッシュボード化前に計測追加が必要)
-- **FLUX.2 [pro](Together AI)** — Generative Lab 主エンジン。$0.03/枚(実測)。原価ログ有
+- **Claude Opus 4.8(Anthropic)** — Campaign LabのService Brand Kit・LPコピー構造化生成。トークン従量。**原価ログ未実装**
+- **FLUX.2 pro (Together AI)** — Generative Lab 主エンジン。$0.03/枚(実測)。原価ログ有
 - **Recraft V4.1/V3** — Generative Lab 派生生成機。$0.035/枚(実測)。原価ログ有
 - **Gemini 3 Pro Image(Vertex AI)** — Generative Lab 対話修正層。Phase E3で接続予定(現状 未配線=課金なし)
 - **基盤費**: Supabase(DB/Auth/Storage)は per-call ではなくインフラ月額(現状 無料枠内)
 
-テキストLLM(OpenAI/Anthropic 等)は**未使用**(自動生成コピーは決定論的)。原価ログ有のソースは `var/*/jobs.jsonl` に全ジョブのコストを記録済みで、月次ダッシュボードはこれを集計して構築する。新しい課金APIを足すときは必ず cost-sources.ts に追記する。
+原価ログ有のソースは `var/*/jobs.jsonl` にジョブコストを記録する。Campaign LabのAnthropic呼び出しと本体Geminiは未計測のため、公開前に使用量記録を追加する。新しい課金APIを足すときは必ず cost-sources.ts に追記する。
 
 ## 現在地と次の一手
 
 - ✅ **Motion Lab**: 全16実験が実装済み(2026-07-12時点)。残タスクは採用判断(星評価・研究ノート)と、採用実験の本体プレゼンへの移植、組み合わせ検証(v2)
 - ✅ **Workflow Lab**(旧称 Image Lab、2026-07-12改称): 基盤要件書 Phase 1(2Dテンプレートフォーマット+決定論的合成エンジン+テンプレート3種+原価計測)が稼働中。**Phase 2 = Blender焼き込みパイプラインの第1弾が稼働**(2026-07-14実装: `mug-ceramic` テンプレート+uvWarp合成モード)——重いプロツールはテンプレート制作時のみ・ランタイムは決定論エンジンのみという型で、フォトリアルなマーチャンダイズを保証モード・変動費ゼロで実現した。次はテンプレート拡充(ボトル・キャップ・看板等)と採用判断、その後にQAゲート(Phase 2.5)
 - ✅ **Generative Lab**: Phase E1(プロバイダ抽象化+FLUX.2/Recraft統合+表現テンプレート8種+プリセット3段ダイヤル+原価計測・監査ログ)が稼働中(2026-07-12)。実APIキーでの実機検証済み(2026-07-13、両エンジン成功・ダイヤル実効性を一次確認)。次は Phase E2(逸脱スコアボード+ロゴ領域検出)
-- Campaign Lab は着手しない(素材側3ラボの成熟待ち)
+- ✅ **Campaign Lab**: URL・PDF・画像・テキスト → Service Brand Kit → 自己完結LPが稼働中(2026-07-19)。次は実サイトのパレット精度改善、その後にTTS+Remotionの30秒CM動画
 
 ## 研究所一覧
 
@@ -65,7 +66,7 @@
 | [Motion Lab](motion/README.md) | `/labs/motion` | 保証 | ✅ 稼働中(16実験) | SVG・CSS・Canvas・Three.js・Lottie によるアルゴリズム表現 |
 | [Workflow Lab](workflow/README.md) | `/labs/workflow` | 保証 | ✅ 稼働中(Phase 1) | 決定論的合成+プロツール連携(旧称 Image Lab。旧URL `/labs/image` はリダイレクト) |
 | [Generative Lab](generative/README.md) | `/labs/generative` | 探索 | ✅ 稼働中(Phase E1) | 生成AIハーネス: 3エンジン・表現テンプレート・ダイヤル4軸・逸脱スコアボード・ショートビデオ |
-| Campaign Lab | `/labs/campaign` | 統合 | 将来枠 | アセットを組み合わせた最終出力(CM・バナー・LP)。プレースホルダーのみ |
+| [Campaign Lab](campaign/README.md) | `/labs/campaign` | 統合 | ✅ 稼働中(LP縦貫通) | 複数ソース → Service Brand Kit → LP。30秒CM動画は次フェーズ |
 
 ## ディレクトリ構成
 
@@ -77,6 +78,7 @@ labs/
   motion/            # Motion Lab 本体(core / experiments / components)
   workflow/          # Workflow Lab 本体(core / engine / templates / components)
   generative/        # Generative Lab 本体(core / engine / templates / components)
+  campaign/          # Campaign Lab の引き継ぎ資料・CLI・音声パイプライン
   <slug>/            # 新しいラボはここに独立したディレクトリを作る
 app/labs/page.tsx        # 研究所インデックス(モード別グルーピング)
 app/labs/motion/page.tsx # 稼働中ラボの薄いルート(workflow / generative も同様)
@@ -85,6 +87,7 @@ app/lab/page.tsx         # 旧URL → /labs/motion リダイレクト
 app/labs/image/page.tsx  # 旧URL → /labs/workflow リダイレクト
 app/api/labs/workflow/*   # Workflow Lab の合成API(templates / compose / jobs)
 app/api/labs/generative/* # Generative Lab の生成API(templates / generate / jobs / outputs)
+app/api/labs/campaign/*   # Campaign Lab のBrand Kit・LP生成API
 ```
 
 ## 共有レイアウト構造(全ラボ共通・2026-07-14正本化)
@@ -93,14 +96,14 @@ app/api/labs/generative/* # Generative Lab の生成API(templates / generate / j
 
 | 部品 | 役割 |
 |---|---|
-| [shared/components/LabHeader.tsx](shared/components/LabHeader.tsx) | 本体(logos)と同じヘッダーフレーム。ただしワードマークは **`labos`**(`lib/config.ts` の `LABS_NAME`)。右側は本体と同じ言語切替+アカウントメニュー。その下のサブバーに現在のラボ名+モードバッジを出し、どのラボにいるか常に分かる。ラボ全体を「プロダクトの labos モード」として見せ、別アプリに見せない |
+| [shared/components/LabHeader.tsx](shared/components/LabHeader.tsx) | 共通`AppHeader`のLabs variant。ただしワードマークは **`labos`**(`lib/config.ts` の `LABS_NAME`)。右側は本体と同じ言語切替+アカウント+ハンバーガー。その下のサブバーに現在のラボ名+モードバッジを出し、どのラボにいるか常に分かる。ラボ全体を「プロダクトの labos モード」として見せ、別アプリに見せない |
 | [shared/components/LabShell.tsx](shared/components/LabShell.tsx) | ページ骨格の正本: LabHeader(slugで現在ラボを特定)→ 解説枠 → ロゴレール → `children(logo)`。**ラボ本体は選択ロゴを引数に受け取る関数として実装し、slug だけ渡す**(name/titleJa/mode は [directory.ts](directory.ts) から引く) |
 | [shared/components/LabExplainer.tsx](shared/components/LabExplainer.tsx) | 折りたたみ「仕組みを見る」枠+稼働中/未着手バッジ付きモジュールカード(要件書のUI向け要約) |
 | [shared/components/FilterChips.tsx](shared/components/FilterChips.tsx) | カタログ絞り込みのチップ行(すべて+選択肢) |
 
 コンテンツ幅は全ページ本体と同じ `max-w-6xl px-6 md:px-10` に統一(ラボ索引・各ラボで揃える)。ヘッダーは本体の Landing と同じフルブリード。
 
-ロゴレジストリ(選択ロゴ・アップロード)と研究ノート(星評価)は Motion Lab の `core/logo-store.ts` / `core/notes-store.ts` を全ラボの共有インフラとして使う(選んだロゴがラボ間で引き継がれるのは仕様。ストアの置き場は歴史的にmotion配下だが、消費はLabShell経由に統一)。
+ロゴレジストリと研究ノートは Motion Lab の`core/logo-store.ts`/`core/notes-store.ts`を全ラボの共有インフラとして使う。ロゴ一覧と追加は本体と同じ`BrandRepo`の正本を使い、localStorageに置くのは選択中のロゴIDと研究ノートだけ。選択はラボ間で引き継ぎ、各ページはLabShell経由で利用する。
 
 「そのロゴの成果物」の意味はモードで異なる: 保証モード(Motion/Workflow)は決定論でコストゼロなので**選択ロゴで即時再レンダリング**、探索モード(Generative)は実費が伴うので**そのロゴの生成レコード(レポート)を表示**し、新規生成は明示操作のみ。
 
@@ -108,4 +111,4 @@ app/api/labs/generative/* # Generative Lab の生成API(templates / generate / j
 
 ## 導線
 
-ヘッダーのアカウントメニュー(アバター)から **管理コンソール(/admin)** と **Labs(/labs)** に入れる(本登録ユーザーのみ表示)。
+ヘッダーのハンバーガーメニューから **Labs(/labs)** に入れる。導線とページ本体は、組織ロールではなくプラットフォームロール `platform_admin` / `labs_member` を持つ本登録ユーザーだけに表示する。Brand Manager(`/brand`) の組織owner/adminであることはLabs権限にならない。

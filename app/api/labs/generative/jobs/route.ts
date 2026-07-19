@@ -2,10 +2,11 @@
 // With ?logo=<hash16>: that logo's successful runs (the logo-report data).
 
 import { listRunsForLogo, summarizeGenJobs } from "@/labs/generative/engine/job-log";
-import { labsDisabledResponse, labsEnabled } from "@/lib/labs-access";
+import { guardLabsRequest } from "@/lib/labs-access";
 
 export async function GET(req: Request) {
-  if (!labsEnabled()) return labsDisabledResponse();
+  const denied = await guardLabsRequest(req);
+  if (denied) return denied;
   const logo = new URL(req.url).searchParams.get("logo");
   if (logo !== null) {
     if (!/^[a-f0-9]{16}$/.test(logo))

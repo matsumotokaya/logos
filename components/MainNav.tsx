@@ -1,17 +1,20 @@
 "use client";
 
-// The hamburger — user-facing navigation across the product. Home and (later)
-// Gallery live here; Assets and Brand Manager are reached from here too. This is the
-// public wayfinding menu; account actions and the internal Labs entrance live
-// in the avatar menu instead (see Account.tsx).
+// The hamburger is the single product navigation. Guests only see Home;
+// registered users also see product areas, and platform-authorized users see
+// the internal Labs entrance. Account actions stay in Account.tsx.
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
+import { usePlatformAccess } from "@/lib/use-platform-access";
 import { cn } from "@/lib/cn";
 
 export default function MainNav({ tone = "dark" }: { tone?: "dark" | "light" }) {
   const { dict } = useI18n();
+  const { enabled, loading, isSignedIn } = useAuth();
+  const { canAccessLabs } = usePlatformAccess();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -31,10 +34,18 @@ export default function MainNav({ tone = "dark" }: { tone?: "dark" | "light" }) 
 
   const items: { href: string; label: string }[] = [
     { href: "/", label: dict.header.home },
-    // Gallery gets its own route later; for now Home carries the gallery.
-    { href: "/assets", label: dict.header.assets },
-    { href: "/brand", label: dict.header.brandManager },
   ];
+
+  // localStorage mode has no registered identity, so it follows guest nav.
+  if (enabled && !loading && isSignedIn) {
+    items.push(
+      { href: "/assets", label: dict.header.assets },
+      { href: "/brand", label: dict.header.brandManager },
+    );
+    if (canAccessLabs) {
+      items.push({ href: "/labs", label: dict.header.labs });
+    }
+  }
 
   return (
     <div ref={ref} className="relative">

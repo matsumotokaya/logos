@@ -4,13 +4,24 @@
 
 import { readOutput } from "@/labs/generative/engine/storage";
 import { labsDisabledResponse, labsEnabled } from "@/lib/labs-access";
+import { verifyLabsOutputSignature } from "@/lib/labs-output-sign";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ name: string }> },
 ) {
   if (!labsEnabled()) return labsDisabledResponse();
   const { name } = await params;
+  const url = new URL(req.url);
+  if (
+    !verifyLabsOutputSignature(
+      name,
+      url.searchParams.get("exp"),
+      url.searchParams.get("sig"),
+    )
+  ) {
+    return labsDisabledResponse();
+  }
   try {
     const png = await readOutput(name);
     return new Response(new Uint8Array(png), {

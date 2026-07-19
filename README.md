@@ -17,7 +17,7 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | [PRODUCT.md](PRODUCT.md) | 事業構想・3層のプロダクト構想・収益モデル・差別化戦略 |
 | [docs/account-design.md](docs/account-design.md) | アカウント・権限・URL体系・RLS方針(Supabase設計) |
 | [docs/data-model.md](docs/data-model.md) | ロゴの正本(canonical record)・3層分離・CDN URL・サイト構造 |
-| [docs/logo-entity-lab-integration.md](docs/logo-entity-lab-integration.md) | Labs↔ロゴ正本エンティティ統合の要件・実装状況・ランタイムassetの暫定手動運用と次セッション引き継ぎ |
+| [docs/logo-entity-lab-integration.md](docs/logo-entity-lab-integration.md) | Labs↔ロゴ正本エンティティ統合の現行仕様・残課題・ランタイムassetの暫定手動運用 |
 | [docs/launch-plan.md](docs/launch-plan.md) | ベータローンチ準備のマイルストーン(セキュリティ・会員・法務・課金・品質・運用)と進捗チェックリスト |
 | [labs/README.md](labs/README.md) | **研究所群の入り口**: モード分類(保証/探索/統合)・体験レイヤー=課金の階段・ラボ一覧と現在地・ラボ追加手順 |
 | [labs/motion/README.md](labs/motion/README.md) | Motion Lab: 16実験カタログ・美的原則・使用技術とLottie比較 |
@@ -30,15 +30,17 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | パス | 内容 |
 |---|---|
 | `/` | ロゴ投稿UI(メイン導線)+ ギャラリー(「あなたのロゴ」+ 全ユーザーの公開ロゴの図鑑)。カードから各プレゼンへ |
-| `/p/[id]` | 生成されたブランドプレゼンテーション(共有可能な固有URL)。**所有者のみ**ヘッダーの「編集」でキャッチコピー・ストーリー・各シーンのリード文に加え、**どの motion / mockup / generated asset を各プレゼン配置に採用するか**をその場で切り替えられる。`/p/sample` はサンプル(編集不可) |
+| `/p/[id]` | 生成されたブランドプレゼンテーション(共有可能な固有URL)。所有者と共有`manager`/`editor`はヘッダーの「Edit」からキャッチコピー・ストーリー・各シーンのリード文、各プレゼン配置に採用するassetを編集し、明示的に保存できる。`/p/sample` はサンプル(編集不可) |
 | `/brand` | **Brand Manager**(旧称 Admin)。導入企業が**自社のブランド資産**(ロゴ・物品在庫・組織メンバー・公開ハンドル)を管理するハブ。プラットフォーム運営側の管理画面ではなく、そのブランドを持つ組織のための画面 |
 | `/assets` | アセットライブラリ。自分/所属組織が管理するロゴアセットを一覧し、各アセット詳細へ入る |
 | `/assets/[id]` | アセット詳細ページ。現時点ではロゴ正本の編集(正式名称・主体entity・ロゴ形式・役割・親子関係・公開範囲・公開スラッグ・コンタクト表示・タグ・制作クレジット・商標情報・マスターファイル差し替え・**組織への所有移管**・作業履歴)。あわせて**このロゴで現在どのプレゼン asset が採用されているか**、candidate配下のlockup / colorway階層も確認できる。旧 `/brand/logos/[id]` は同じ画面を指す互換URL |
-| `/settings` | 設定ページ。現時点ではユーザー情報表示・プロフィール編集枠・退会導線のプレースホルダー |
+| `/settings` | Accountページ。ユーザー情報表示・プロフィール編集枠・登録アカウントの退会導線。退会時は個人所有データとR2成果物を削除し、共同組織の資産は残す |
 | `/[handle]/[slug]` | バニティURL。組織ハンドル+ロゴスラッグを正規パーマリンク `/p/[id]` に解決(公開ロゴのみ) |
-| `/labs` | **研究所インデックス**(noindex)。表現R&Dのラボ群を**保証モード/探索モード/統合(将来枠)**で分類: 稼働中の [Motion Lab](labs/motion/README.md)(`/labs/motion`)・[Workflow Lab](labs/workflow/README.md)(`/labs/workflow`、旧称 Image Lab)・[Generative Lab](labs/generative/README.md)(`/labs/generative`、探索モード)と、将来枠の Campaign Lab。**各ラボは「プレゼン本編に入る section asset を設計・検証し、採用候補を作る場」**として位置づける。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow` へリダイレクト |
+| `/labs` | **研究所インデックス**(noindex)。表現R&Dを保証/探索/統合モードで分類する。稼働中は [Motion Lab](labs/motion/README.md)、[Workflow Lab](labs/workflow/README.md)、[Generative Lab](labs/generative/README.md)、ソースからService Brand KitとLPを生成する [Campaign Lab](labs/campaign/README.md)。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow` へリダイレクト |
 
 URL体系の設計意図(所有者を含まない壊れないパーマリンク等)は [docs/account-design.md](docs/account-design.md) を参照。
+
+ヘッダーのハンバーガーメニューは、未登録ユーザーには`Home`だけを表示する。本登録ユーザーには`Assets`と`Brand Manager`も表示し、`platform_admin`または`labs_member`を持つ場合だけ`Labs`を追加する。アバターメニューはメールアドレス、`Account`、`Sign out`だけを表示し、プロダクト内ナビゲーションと分離する。
 
 ## プレゼン構成モデル
 
@@ -73,9 +75,9 @@ SVGをアップロードすると、以下が1本のガイドラインドキュ�
 
 ロゴが手元になくても、ランディングの「サンプルを見る」からサンプルプレゼンを確認できる。
 
-### 所有者によるプレゼン編集
+### プレゼン編集
 
-所有者は `/p/[id]` のヘッダー「編集」から、以下の2層をその場で編集できる。
+所有者とロゴ単位で共有された`manager`/`editor`は、`/p/[id]`のヘッダー「Edit」から以下の2層をその場で編集できる。変更は編集中にステージされ、「Save」でまとめて保存される。未ログイン時に編集を試みるとサインイン画面を開く。
 
 - **文言層**: キャッチコピー・ストーリー・各シーンのリード文
 - **構成層**: 各 presentation placement にどの asset を採用するか、またその表示順
@@ -88,17 +90,25 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 
 ## Brand Manager(`/brand`)
 
-> **名称について**: 以前は「Admin(管理コンソール)」だったが、"Admin" だと**プラットフォーム運営側の管理画面**なのか**導入企業側の管理画面**なのか曖昧だった。この画面は後者——**導入企業が自社のブランド資産を管理する**場——なので **Brand Manager** に改称した(2026-07-14。ルートも `/admin` → `/brand`、UIラベルとi18nキー `header.brandManager` も更新済み)。
-
 白ベースのビジネスSaaS風ダッシュボード。KPI(登録アセット数・在庫アイテム数・要発注アイテム数・入荷待ち発注)、会社情報編集、**組織メンバーの招待・ロール管理(オーナー/管理者/編集者/購買担当/閲覧のみ)**、**公開URLハンドルの設定**、登録アセットの一覧・役割設定・削除、ロゴアイテムの在庫管理と発注(ダミーデータ)を表示する。ビジネスモデル(フェーズ3の物販事業)を体現する画面。メール招待は相手がそのメールで登録した瞬間に自動でメンバー化される(SMTP不要)。組織ロール名の「管理者(admin)」はこの画面名とは別物(組織メンバーの権限)。
 
 各アセットの詳細(`/assets/[id]`、旧 `/brand/logos/[id]`)では、正本編集だけでなく**そのロゴのプレゼン構成の現在値**も確認する。つまり Brand Manager は「ロゴファイルを持つ場所」だけでなく、**そのロゴがどんなブランドドキュメントとして出力されるか**を見るハブでもある。
+
+## Platform Admin / Labs権限
+
+サービス運営権限は組織ロールから独立している。`org_members.admin` はその企業のBrand Managerを管理する権限であり、Labsや将来のサービス運営ダッシュボードには入れない。
+
+- `platform_admin`: Logosサービス運営者。Labsと将来の運営ダッシュボードへアクセス
+- `labs_member`: Labsのみアクセス
+- `support`: 将来のサポート担当。現時点ではLabsアクセスなし
+
+Labsのページ、生成・集計・テンプレートAPIは `platform_admin` または `labs_member` を要求する。公開プレゼンが利用する `/api/labs/workflow/compose` と `/api/labs/workflow/runs` はこのゲートの対象外。
 
 ## アーキテクチャ
 
 - **Next.js (App Router) + TypeScript + Tailwind CSS v4**
 - アニメーションは **motion**(scroll-in reveal 等)と **gsap**(Splashの演出)
-- ロゴ解析は**全てクライアントサイド**(サーバー・DB不要)。アップロードされたSVGは外部送信されない
+- ロゴの構造・色・パス解析は**クライアントサイド**で完結する。保存時は正規化済みSVGをSupabaseへ保存し、利用者が写実モックアップ生成を明示実行した場合だけ、ラスタライズ画像をサーバー経由で生成AIへ送る
   - [lib/svg.ts](lib/svg.ts) — SVG正規化・計算済みスタイルの属性焼き込み・色抽出・単色変換・アウトライン化
   - [lib/paths.ts](lib/paths.ts) — path `d` 属性のパーサ(ベジェ骨格抽出)
   - [lib/color.ts](lib/color.ts) — HEX/RGB/CMYK変換・輝度判定
@@ -119,7 +129,7 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 
 ### ランタイムBlender assetの暫定手動運用
 
-永続ワーカーを作る前は、Workflow Labの依頼情報を**新しいローカルエージェントセッションへ貼り付けて手動実行する**。新しいセッションは、最初に [Labs↔ロゴ正本エンティティ統合](docs/logo-entity-lab-integration.md#5-ランタイムassetの暫定手動運用)を読むこと。
+永続ワーカーを作る前は、Workflow Labの依頼情報を**新しいローカルエージェントセッションへ貼り付けて手動実行する**。新しいセッションは、最初に [Labs↔ロゴ正本エンティティ統合](docs/logo-entity-lab-integration.md#4-ランタイムassetの暫定手動運用)を読むこと。
 
 利用者側の手順:
 
@@ -140,7 +150,7 @@ node --env-file=.env.local labs/workflow/scripts/run-runtime-asset.mjs \
   --asset-id workflow-neon-sign-v1
 ```
 
-詳細な事前確認、`--run-id`、低サンプル検証用`--no-publish`、合格条件は [暫定手動運用の正本](docs/logo-entity-lab-integration.md#5-ランタイムassetの暫定手動運用)を参照。
+詳細な事前確認、`--run-id`、低サンプル検証用`--no-publish`、合格条件は [暫定手動運用の正本](docs/logo-entity-lab-integration.md#4-ランタイムassetの暫定手動運用)を参照。
 
 ## 開発
 
@@ -155,7 +165,7 @@ npm run dev   # http://localhost:3000
 GEMINI_API_KEY=（Google AI Studioで発行したキー、課金有効なプロジェクトのもの）
 ```
 
-生成APIは**登録ユーザー(非匿名)専用**で、ユーザーごとに直近24時間の回数上限がある(既定20回、`GENERATION_DAILY_LIMIT` で変更可)。クォータは `0010_generation_quota.sql` の `generation_events` に記録されるため、Supabase設定([下記](#supabasedb移行))とマイグレーション適用が前提。localStorageモードでは生成は使えない。
+生成APIは**登録ユーザー(非匿名)専用**で、ユーザーごとに直近24時間の回数上限がある(既定20回、`GENERATION_DAILY_LIMIT` で変更可)。クォータは `0010_generation_quota.sql` の `generation_events` に記録されるため、[Supabase設定](#supabase)が前提。localStorageモードでは生成は使えない。
 
 Generative Lab(`/labs/generative`)の実エンジンを使うには `TOGETHER_API_KEY` / `RECRAFT_API_KEY` も設定する(未設定ならモックで全フローが動く)。詳細は [labs/generative/README.md](labs/generative/README.md)。
 
@@ -171,12 +181,14 @@ MOCKUP_URL_SECRET=（ランダム文字列。openssl rand -base64 32 等で生�
 
 `MOCKUP_URL_SECRET` はモックアップ画像URLの署名鍵。**非公開ロゴ**のモックアップ画像は、認証済みAPIが発行する期限付き署名URL経由でのみ取得できる(`<img>` がAuthorizationヘッダーを送れないため)。未設定の場合、公開/unlistedロゴの画像は従来どおり表示されるが、非公開ロゴのモックアップ画像は404になる。
 
-### Supabase(DB移行)
+R2バケットはpublic access(`r2.dev`と公開custom domain)を無効にする。ブラウザはR2へ直接アクセスせず同一オリジンのAPI経由で画像を取得するため、現行構成ではR2 CORSルールは不要(空)でよい。
 
-スキーマの正本は [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql)(アカウント・組織・ロゴ正本・RLS一式)。セットアップ手順:
+### Supabase
 
-1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0011、いずれも冪等・再実行可)
-2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(ゲスト投稿の前提)
+スキーマの正本は [supabase/migrations/](supabase/migrations/) の連番migration。現行のリモートプロジェクトには`0001`〜`0018`まで適用済み。新規環境のセットアップ手順:
+
+1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0018、いずれも冪等・再実行可)
+2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(公開ページ閲覧時のセッション初期化用。アップロードは本登録ユーザーのみ)
 3. `.env.local` に以下を追加:
 
 ```
@@ -184,14 +196,38 @@ NEXT_PUBLIC_SUPABASE_URL=（プロジェクトURL）
 NEXT_PUBLIC_SUPABASE_ANON_KEY=（anon / publishable キー）
 ```
 
-Supabase MCP(read-only)は [.mcp.json](.mcp.json) に設定済み。環境変数 `SUPABASE_ACCESS_TOKEN_LOGOS`(logosプロジェクトを持つアカウントの Dashboard → Account → Access Tokens で発行)を設定すると次回セッションから利用できる。
+退会APIを使う場合は、サーバー専用のservice roleキーも設定する。これは`NEXT_PUBLIC_`を付けず、チャット・ログ・クライアントコードへ貼らない。Vercelにも同名で設定する。
+
+```
+SUPABASE_SERVICE_ROLE_KEY=（Project Settings → API Keys の service_role）
+```
+
+本番でLabsを有効化する場合は、ページ/APIの有効化フラグと生成画像URLの署名鍵も設定する。署名鍵は十分に長いランダム値にし、`NEXT_PUBLIC_`を付けない。
+
+```
+LABS_ENABLED=1
+LABS_OUTPUT_URL_SECRET=（ランダムな署名鍵）
+```
+
+初回のプラットフォーム管理者は、`0014_platform_roles.sql` 適用後にSupabase SQL Editorから付与する。
+
+```sql
+insert into public.platform_role_assignments (user_id, role)
+select user_id, 'platform_admin'::public.platform_role
+from public.users
+where lower(contact_email) = lower('admin@example.com')
+on conflict (user_id, role) do nothing;
+```
+
+logosプロジェクト専用のSupabase MCPは [.mcp.json](.mcp.json) に設定済みで、読み書きに対応する。環境変数`SUPABASE_ACCESS_TOKEN_LOGOS`を設定すると次回セッションから利用できる。接続先は必ずproject ref `xhbdfzceyfrxsmaixkne`と照合し、リモート書き込み前にはSQLをレビューして明示的な承認を得る。
 
 #### 認証(サインアップ)
 
-匿名でアップロード → アカウント作成で本登録に昇格(`user_id` 不変、ロゴはそのまま引き継ぎ)。UIは Google → Apple → Figma → メール の順(ヘッダー右の「ログイン」から)。有効化に必要な設定:
+未ログインの利用者がアップロード操作を始めると、ファイルの保存前にサインアップ画面を開く。本登録後にアップロードできる。UIは Google → Apple → Figma → メール の順(ヘッダー右の「Sign in」から)。有効化に必要な設定:
 
 - **メール+パスワード**: 既定で利用可。ただし **Confirm email が ON** だと確認メール後に本登録完了(UIは「確認メールを送信しました」を表示)。PoCで即時サインアップにしたい場合は Authentication → Providers → Email で **Confirm email を OFF** にする(組み込みSMTPは送信レート制限が厳しい点にも注意)
-- **Google / Apple / Figma**: ボタンは配線済み。各プロバイダを Authentication → Providers で有効化し、OAuthクライアント情報を登録すると点灯する(Google Cloud / Apple Developer / Figma でクライアント発行が必要)
+- **Google**: Supabase/Google Cloud設定とlocalhost実機ログインを確認済み
+- **Apple / Figma**: ボタンは配線済み。各プロバイダを Authentication → Providers で有効化し、OAuthクライアント情報を登録すると利用可能になる
 - **Adobe**: Supabaseに組み込みプロバイダが無いため未対応。デザイナー向けには Figma を採用している
 
 Vercelにデプロイする場合は同じ環境変数を Settings → Environment Variables に追加する。
@@ -200,17 +236,16 @@ Vercelにデプロイする場合は同じ環境変数を Settings → Environme
 
 - 入力はSVGのみ。PNG/AI対応はロードマップ上(一般普及には必須)
 - 発注ボタンはlocalStorageに記録するのみで、実際の物品発注には連携していない
-- 会社・ユーザーごとのデータ分離やログインはまだない(単一ブラウザのlocalStorageのみ)
+- Supabase未設定時は会社・ユーザーごとの分離やログインがない(localStorageモード)
 
-## 残タスク・既知の課題(検証Findingsより)
+## 残タスク・既知の課題
 
-- **作業履歴の集約**: アセット詳細ページはセレクト変更のたびに「情報更新」が1行記録され、履歴がすぐ長くなる。連続する同種操作をまとめる集約(例: 一定時間内の同種更新を1行に)をSupabase移行時に検討する
-- **公開範囲変更のadmin限定**: `0011_visibility_admin_enforcement.sql` のトリガーでサーバー側でも強制済み(2026-07-17解消)
-- **プレゼン編集にUndoがない**: blur即保存のため取り消し手段は「自動生成コピーへの復帰」のみ。本格運用では編集の取り消しを検討
-- **OAuth(Google/Apple/Figma)は要プロバイダ設定**: ボタンは配線済みだがSupabase側で各プロバイダを有効化するまで点灯しない
+- **作業履歴の集約**: アセット詳細ページは変更ごとに「情報更新」を記録するため、一定時間内の同種更新をまとめる仕組みが必要
+- **プレゼン編集に保存後のUndoがない**: 編集中の変更は「Save」までステージされるが、保存済み内容の版管理・復元は未実装
+- **OAuth(Apple/Figma)は要プロバイダ設定**: Googleは設定・実機確認済み。Apple/FigmaはSupabase側のProvider設定が未完
 - **図鑑の検索・タグ絞り込みは未実装**: 公開ロゴは新着順48件のグリッド表示のみ。タグはデータとして保存済み
 - **個人ハンドルは未対応**: バニティURLのハンドルは組織のみ(設計上は共有名前空間で個人も可能)。`/[handle]` 単体のプロフィールページも未実装
-- **作業履歴の集約**(前掲)と同様、履歴・活動まわりの洗練は今後
+- **ロゴ単位共有の付与UIが未実装**: `logo_access_grants`とメール招待用`logo_access_invites`はリモートDBへ適用済みだが、招待・付与・解除UIが未完
 
 ## デプロイ
 

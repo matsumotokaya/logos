@@ -32,6 +32,8 @@ export default function OrgSection({ org }: { org: Organization }) {
   const [error, setError] = useState<string | null>(null);
 
   const canManage = org.myRole === "owner" || org.myRole === "admin";
+  const memberRoleOptions: OrgRole[] =
+    org.myRole === "owner" ? ["owner", ...ASSIGNABLE_ROLES] : ASSIGNABLE_ROLES;
 
   const load = async () => {
     const [m, i] = await Promise.all([
@@ -112,7 +114,7 @@ export default function OrgSection({ org }: { org: Organization }) {
                   onChange={(e) => void changeRole(m.userId, e.target.value as OrgRole)}
                   className={inputCls}
                 >
-                  {ASSIGNABLE_ROLES.map((r) => (
+                  {memberRoleOptions.map((r) => (
                     <option key={r} value={r}>
                       {ORG_ROLE_LABELS[r]}
                     </option>

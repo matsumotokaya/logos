@@ -4,10 +4,11 @@
 import { listExpressionTemplates } from "@/labs/generative/engine/registry";
 import { engineStatuses } from "@/labs/generative/engine/providers";
 import type { CatalogResponse } from "@/labs/generative/core/api-types";
-import { labsDisabledResponse, labsEnabled } from "@/lib/labs-access";
+import { guardLabsRequest } from "@/lib/labs-access";
 
-export async function GET() {
-  if (!labsEnabled()) return labsDisabledResponse();
+export async function GET(req: Request) {
+  const denied = await guardLabsRequest(req);
+  if (denied) return denied;
   const body: CatalogResponse = {
     engines: engineStatuses(),
     templates: await listExpressionTemplates(),

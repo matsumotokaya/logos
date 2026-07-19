@@ -1,9 +1,9 @@
 # アカウント・権限・URL設計
 
-最終更新: 2026-07-10
-ステータス: **設計合意フェーズ**(このドキュメントの合意後、Supabase移行を実装する)
+最終更新: 2026-07-18
+ステータス: **主要スキーマ・RLS・画面実装済み。共有付与UIとベータ運用設定は未完**
 
-localStorage PoC から Supabase への移行にあたり、**最初から法人利用に耐えるアカウント設計**にしておくための設計書。個人が軽い気持ちでアップロードするところから始まり、企業への買取・組織運用・退職引き継ぎまで、所有権が何度移っても壊れないことをゴールとする。
+Supabase上で**法人利用に耐えるアカウント・権限境界**を維持するための設計書。個人によるアップロードから企業への移管、組織運用、退職時の引き継ぎまで、所有権が何度移っても壊れないことをゴールとする。
 
 ---
 
@@ -12,8 +12,9 @@ localStorage PoC から Supabase への移行にあたり、**最初から法人
 1. **パーマリンクに所有者を含めない** — 所有権はあとから何度でも変わる。URLに owner を埋め込むと移管のたびにリンクが壊れる。よって正規URLは opaque ID のみで構成する
 2. **ロゴの所有者は「ユーザー」または「組織」のどちらか1つ**(ポリモーフィック所有、GitHubリポジトリと同じ)。移管 = 所有者フィールドの付け替えであり、ロゴのIDもURLも変わらない
 3. **作成者(created_by)と所有者(owner)を分離する** — 作成者は不変のクレジット情報。所有者は移り変わる権利情報。「デザイナーが作り、企業が買い取り、デザイナーは抜ける」を自然に表現できる
-4. **権限は組織ロールで与える**(ユーザー個人に都度付与しない)。退職 = メンバーシップ削除だけで済み、組織の資産は影響を受けない
-5. **guest でも即アップロードできる** — Supabase Anonymous Sign-in を使う。匿名ユーザーも実在の user_id を持つため、「所有者なしデータ」という特殊状態を作らない。本登録は同じ user_id への昇格なのでデータ移行不要
+4. **組織資産の権限は組織ロールで与える**(ユーザー個人に都度付与しない)。退職 = メンバーシップ削除だけで済み、組織の資産は影響を受けない
+5. **アップロード前に本登録を要求する** — 公開閲覧ではSupabase Anonymous Sign-inによるセッションを利用できるが、ロゴ行の作成は登録ユーザーだけに許可する。所有者不明・放置されたアップロードを作らない
+6. **サービス運営権限と組織権限を分離する** — `platform_admin` はLogos運営者、`org_members.admin` は1組織の管理者であり、相互に権限を継承しない
 
 ## 2. URL体系(2層)
 
@@ -23,8 +24,8 @@ localStorage PoC から Supabase への移行にあたり、**最初から法人
 /p/[id]        id = 推測不能な短い opaque ID(nanoid 12文字程度)
 ```
 
-- guest でも投稿の瞬間に発行される
-- 所有者情報を含まないため、guest→個人→組織と所有が移っても**URL不変**
+- 登録ユーザーの投稿時に発行される
+- 所有者情報を含まないため、個人→組織と所有が移っても**URL不変**
 - `unlisted`(限定公開)の共有リンクとしてそのまま機能する(IDが推測不能なので capability URL になる)
 
 ### 層2: バニティURL(公開・所有確定後のエイリアス)
@@ -36,12 +37,12 @@ localStorage PoC から Supabase への移行にあたり、**最初から法人
 
 - 組織に属さない個人は個人 handle を、組織はブランド handle を使う
 - 内部で層1の canonical ID に解決する(層1が常に正)
-- guest・非公開ロゴには付与しない
-- **実装は組織・公開機能が入るフェーズまで先送り**(スキーマ上は handles テーブルだけ先に確保)
+- 匿名セッション・非公開ロゴには付与しない
+- 組織ハンドルと公開ロゴの`/[handle]/[slug]`解決は実装済み。個人ハンドルは未実装
 
 ### 補足: ロゴアセットの正規参照URL(CDN層)
 
-プレゼンページとは別に、ロゴファイルそのものを参照する `/l/[id]/[variant].[ext]` を用意する(ロゴCDN)。層1と同じ「所有者を含まない・壊れない」原則。詳細は [data-model.md §4](data-model.md) を参照。
+プレゼンページとは別に、ロゴファイルそのものを参照する`/l/[id]/[variant].[ext]`を予定する(ロゴCDN、未実装)。層1と同じ「所有者を含まない・壊れない」原則。詳細は [data-model.md §7](data-model.md) を参照。
 
 ## 3. エンティティモデル
 
@@ -66,6 +67,20 @@ public.handles(ユーザー/組織の共有名前空間 — 層2 URL用)
 
 ## 4. ロールと権限マトリクス
 
+### 4.1 プラットフォームロール
+
+サービス全体の運営権限。`platform_role_assignments` にユーザー単位で付与し、組織への所属とは独立させる。
+
+| ロール | 用途 |
+|---|---|
+| `platform_admin` | サービス運営。Labs、将来の会員・監査ログ・運営ダッシュボードへアクセス |
+| `support` | 将来の問い合わせ対応。必要最小限の参照権限を個別定義し、Labs権限は含めない |
+| `labs_member` | Labsだけを利用する研究・制作メンバー |
+
+`platform_admin` と `labs_member` がLabsへアクセスできる。付与・剥奪は通常ユーザーのUIから行わず、監査可能な運営経路だけに限定する。
+
+### 4.2 組織ロール
+
 組織ロールは5種類。`purchaser` を独立させるのは「PR・購買担当がグッズ発注のためだけに使う」ユースケースのため(ブランド編集権を渡さずに発注業務ができる)。
 
 | 操作 | owner | admin | editor | purchaser | viewer |
@@ -80,7 +95,22 @@ public.handles(ユーザー/組織の共有名前空間 — 層2 URL用)
 | 組織の設定変更・削除・課金 | ✓ | – | – | – | – |
 
 - **owner** は複数人可(退職・不在に備え、最後の1人は削除不可)
+- ownerへの昇格はownerだけが実行できる。adminはowner以外のロールだけを変更できる
 - 個人所有ロゴの権限は本人のみ(= 実質 owner)
+
+### 4.3 ロゴ単位の共有アクセス
+
+外注先の制作会社・デザイナーには所有権を移さず、`logo_access_grants` で対象ロゴだけを共有する。制作者としての事実は引き続き `logo_credits` に記録し、操作権限とは混ぜない。
+
+| ロール | 閲覧 | 正本・ファイル編集 | プレゼン編集 | 公開・移管・削除・再共有 |
+|---|:-:|:-:|:-:|:-:|
+| `manager` | ✓ | ✓ | ✓ | – |
+| `editor` | ✓ | – | ✓ | – |
+| `viewer` | ✓ | – | – | – |
+
+共有先はユーザーまたは組織のどちらか1つ。組織に`manager/editor`を付与した場合も、その組織内で`owner/admin/editor`の人だけが付与範囲を編集でき、`purchaser/viewer`は閲覧のみ。公開範囲、移管、削除、共有メンバー管理は所有主体側のowner/adminに限定する。
+
+メール共有は`logo_access_invites`で未登録状態を保持する。登録済みメールならDB内で即座に`logo_access_grants`へ変換し、未登録なら30日以内のサインアップ・メール確認・OAuth昇格時に自動変換する。ブラウザから`users.contact_email`を検索しないため、アカウント列挙を許さない。
 
 ## 5. 公開範囲(visibility)
 
@@ -100,8 +130,8 @@ public.handles(ユーザー/組織の共有名前空間 — 層2 URL用)
 
 | # | シナリオ | この設計での挙動 |
 |---|---|---|
-| 1 | デザイナーが超軽い気持ちでアップ | 匿名サインイン(自動・無操作)→ 即 `/p/[id]` 発行。visibility=draft |
-| 2 | 気に入ったので保存・編集したい → サインアップ | 匿名ユーザーをメール登録に昇格。**user_id不変なのでロゴはそのまま自分のもの**(claimフロー不要) |
+| 1 | 未ログインのデザイナーがアップロードを選ぶ | 保存前にサインアップ画面を開き、DBにはロゴ行を作らない |
+| 2 | 登録後にアップロードする | 個人所有・`visibility=draft`で保存し、`/p/[id]`を発行 |
 | 3 | プレゼンを企業が買取り、企業アカウントへ | 個人所有 → 組織所有へ移管(owner付け替え)。`/p/[id]` は不変。created_by はデザイナーのまま残る(クレジット) |
 | 4 | 最初に作った人が抜ける | 組織所有なので影響なし。メンバーシップを削除するだけ |
 | 5 | ブランドマネージャーが運用 | editor ロールで招待。ロゴ・表示情報を編集できるが公開範囲・メンバー管理は不可 |
@@ -110,115 +140,26 @@ public.handles(ユーザー/組織の共有名前空間 — 層2 URL用)
 | 8 | 公開前のクローズド運用・公開範囲管理 | visibility を admin 以上が制御(private→unlisted→public) |
 | 9 | 退職者から別の担当者へ引き継ぎ | 組織所有: 何もしなくてよい(ロール付与のみ)。個人所有: 移管機能で新しい所有者へ |
 | 10 | クリエイターにコンタクト(Behance的) | 公開プレゼンに「Contact」ボタン。宛先は所有者優先(組織所有→組織の窓口、個人所有→created_byのプロフィール)。opt-inフラグで制御 |
-| 10.5 | ユーザー情報の確認・編集・退会 | `/settings` に集約。退会は所有アセット・組織所属・公開URL・課金履歴の扱いを決めてから接続 |
+| 10.5 | ユーザー情報の確認・編集・退会 | `/settings` に集約。退会時は個人所有データを削除し、共同組織の資産は残す。最後のownerなら先に別ownerを設定する |
 | 11 | (将来)ロゴの売買・契約 | プレゼンページを商談ルーム化する構想。移管機構(#3)がそのまま「売買成立=所有権移転」の実行部になる。まずは#10のコンタクトボタンから |
 
-## 7. Supabaseスキーマ案
+## 7. Supabase実装
 
-> 実装時は必ず実際のデータベースに問い合わせて現状確認してから適用する。
-> `auth.users` は直接参照しない(トリガーで `public.users` に同期し、FKはすべて `public.users(user_id)` へ張る)。
-> ロゴ周辺の追加テーブル(logo_variants / logo_presentations / tags / bookmarks)と logos への追加カラムは [data-model.md §3](data-model.md) に定義。
+適用スキーマの唯一の正本は [../supabase/migrations/](../supabase/migrations/) であり、この文書には複製SQLを置かない。`0001`〜`0018`が、認証ミラー、組織、ロゴ正本、presentation asset、生成クォータ、退会処理、プラットフォームロール、ロゴ単位共有を定義し、リモートDBへ適用済み。
 
-```sql
--- 認証ミラー(auth.users の INSERT トリガーで自動作成)
-create table public.users (
-  user_id      uuid primary key,              -- = auth.uid()
-  display_name text,
-  contact_email text,
-  is_anonymous boolean not null default true, -- 本登録で false に
-  created_at   timestamptz not null default now()
-);
-
-create table public.organizations (
-  org_id     uuid primary key default gen_random_uuid(),
-  name       text not null,
-  website    text,
-  industry   text,
-  location   text,
-  created_by uuid not null references public.users(user_id),
-  created_at timestamptz not null default now()
-);
-
-create type public.org_role as enum ('owner','admin','editor','purchaser','viewer');
-
-create table public.org_members (
-  org_id  uuid not null references public.organizations(org_id) on delete cascade,
-  user_id uuid not null references public.users(user_id) on delete cascade,
-  role    public.org_role not null default 'viewer',
-  created_at timestamptz not null default now(),
-  primary key (org_id, user_id)
-);
-
--- 層2 URL用の共有名前空間(ユーザー/組織のどちらか1つに紐づく)
-create table public.handles (
-  handle  text primary key,                   -- 小文字英数とハイフンに正規化
-  user_id uuid unique references public.users(user_id) on delete cascade,
-  org_id  uuid unique references public.organizations(org_id) on delete cascade,
-  check (num_nonnulls(user_id, org_id) = 1)
-);
-
-create type public.logo_visibility as enum ('draft','private','unlisted','public');
-
-create table public.logos (
-  id            text primary key,             -- nanoid(12)。/p/[id] のパーマリンク
-  owner_user_id uuid references public.users(user_id),
-  owner_org_id  uuid references public.organizations(org_id),
-  check (num_nonnulls(owner_user_id, owner_org_id) = 1),
-  created_by    uuid not null references public.users(user_id), -- 不変クレジット
-  title         text not null,
-  role          text not null default 'other', -- brand / corporate / service / other
-  visibility    public.logo_visibility not null default 'draft',
-  allow_contact boolean not null default false,
-  slug          text,                          -- 層2 URL用(公開時に設定)
-  svg           text not null,                 -- マスターSVG
-  analysis      jsonb,                         -- 抽出済みの色・パス解析(LogoData相当)
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
-);
-
--- 生成モックアップのキャッシュ(画像本体は Supabase Storage、ここはパス)
-create table public.logo_mockups (
-  logo_id    text not null references public.logos(id) on delete cascade,
-  slot       text not null,                   -- "mug" / "tote" / "cap" ...
-  image_path text not null,
-  created_at timestamptz not null default now(),
-  primary key (logo_id, slot)
-);
-
--- 在庫・発注は組織スコープ(フェーズ3の物販)
-create table public.inventory_items (
-  id         uuid primary key default gen_random_uuid(),
-  org_id     uuid not null references public.organizations(org_id) on delete cascade,
-  name       text not null,
-  spec       text,
-  category   text,
-  unit       text,
-  unit_price integer not null default 0,
-  stock      integer not null default 0,
-  par_level  integer not null default 0,
-  pending_qty integer not null default 0,
-  last_ordered_at timestamptz
-);
-
-create table public.orders (
-  id         uuid primary key default gen_random_uuid(),
-  org_id     uuid not null references public.organizations(org_id) on delete cascade,
-  item_id    uuid not null references public.inventory_items(id),
-  qty        integer not null,
-  amount     integer not null,
-  status     text not null default 'ordered', -- ordered / delivered
-  ordered_by uuid not null references public.users(user_id),
-  ordered_at timestamptz not null default now()
-);
-```
+- `auth.users`はアプリから直接参照せず、トリガーで`public.users`へ同期する
+- 所有権は`logos.owner_user_id`または`owner_org_id`のどちらか1つ
+- サービス運営権限は`platform_role_assignments`、組織権限は`org_members`、ロゴ単位共有は`logo_access_grants`で分離する
+- `SECURITY DEFINER`補助関数は非公開`private`スキーマに置き、Data APIロールへ実行権限を公開しない
+- リモートDBを変更するときは接続先project refを検証し、migrationまたはSQLをレビューしてから適用する
 
 ## 8. RLS方針
 
-すべてのテーブルで RLS を有効化。判定は `auth.uid()` と `public.org_members` の突合で行う。
+すべてのテーブルで RLS を有効化。判定は `auth.uid()` と `public.org_members` の突合で行う。`SECURITY DEFINER` のRLS補助関数はData APIに露出する`public`ではなく、非公開の`private`スキーマに置く。
 
 ```sql
 -- ヘルパー: 自分が組織で指定ロール以上か
-create function public.has_org_role(p_org_id uuid, p_roles public.org_role[])
+create function private.has_org_role(p_org_id uuid, p_roles public.org_role[])
 returns boolean language sql stable security definer as $$
   select exists (
     select 1 from public.org_members
@@ -229,41 +170,57 @@ $$;
 
 | テーブル | SELECT | INSERT/UPDATE/DELETE |
 |---|---|---|
-| logos | `visibility in ('unlisted','public')` または 個人所有者本人 または 所有組織メンバー | 編集: editor以上 / visibility変更・削除・移管: admin以上(個人所有は本人) |
+| logos | `visibility in ('unlisted','public')` または 個人所有者本人 または 所有組織メンバー または ロゴ共有先 | 正本編集: 組織editor以上/共有manager、プレゼン: 共有editor以上、visibility・削除・移管・再共有: 所有主体側admin以上 |
 | logo_mockups | 親ロゴのSELECT権限に準ずる | 親ロゴの編集権限に準ずる |
 | inventory_items / orders | 組織メンバー | owner / admin / purchaser |
 | organizations / org_members | 組織メンバー | メンバー管理: admin以上、組織設定: owner |
-| users | 本人 + 公開プロフィール項目 | 本人のみ |
+| users | 本人 + 同じ組織のメンバー | 本人のみ |
 
 注意点:
 
 - `unlisted` はRLS上「誰でもSELECT可」。ID列挙は不可能(nanoid)なので、一覧系クエリで `public` のみに絞ればcapability URLとして成立する
 - ギャラリー・図鑑のTOP掲載は `visibility = 'public'` のみを列挙する
+- `public.users.contact_email` は公開プロフィールではない。本人と同じ組織のメンバーだけが参照でき、招待先メールの照合は非公開DBトリガー内で行う
 
-## 9. 移行手順(段階実装)
+## 9. 退会・データ削除方針
 
-**フロントの `BrandRepo` インターフェースは維持**し、`lib/store/local.ts` と並ぶ `lib/store/supabase.ts` を実装して差し替える(PoCの設計意図どおり)。
+登録ユーザーの退会は`/settings`から行い、Next.jsの認証済みRoute Handlerがserver-onlyのSupabase service roleで、`0013_account_deletion.sql`の限定RPCを呼ぶ。service roleキーは`NEXT_PUBLIC_`を付けず、ブラウザへ渡さない。
 
-| Step | 内容 | 備考 |
-|---|---|---|
-| 1 | **ページづくり**: サイト構造分離(`/` 投稿UI+ギャラリー、`/p/[id]` プレゼン)、アセット詳細ページ、プレゼン編集モード([data-model.md](data-model.md) の編集サーフェス) | localStorage のまま先行実装し、データ構造を固める |
-| 2 | Supabaseプロジェクト作成 + 上記スキーマ適用 + Anonymous Sign-in 有効化 | ユーザー作業: プロジェクト作成 |
-| 3 | `SupabaseRepo` 実装(logos / mockups / company→organizations) + Storage(SVG・モックアップ画像) | RLSは最初から有効 |
-| 4 | 匿名→本登録の昇格フロー(サインアップUI) | user_id不変でデータ移行不要 |
-| 5 | 組織・メンバー招待・ロールUI、移管機能 | `/brand` を組織スコープに |
-| 6 | visibility制御UI + 公開ギャラリー・Contactボタン | ロゴ図鑑の入口 |
-| 7 | 層2バニティURL(`/[handle]/[slug]`) | handle予約は Step 2 のスキーマで確保済み |
+| データ | 退会時の扱い |
+|---|---|
+| `auth.users` / `public.users` | 削除。認証identity・sessionも失効 |
+| 個人所有ロゴ | 削除。candidate、variant、lockup、presentation、mockup、asset run、tag紐付け、活動履歴はFKでカスケード |
+| 個人所有ロゴのR2成果物 | DB削除と同じトランザクションで削除outboxへ記録し、Route HandlerがR2から削除。失敗分は`private.r2_deletion_queue`に残す |
+| 本人しか所属しない組織 | 組織ごと削除し、組織所有ロゴ・在庫・発注・handleもカスケード |
+| 共同組織 | 組織と組織所有ロゴを残し、本人のmembershipだけ削除。活動・クレジット等の参照user_idはNULL化して監査情報を残す |
+| 他メンバーがいる組織の最後のowner | 退会を拒否。既存メンバーをownerへ昇格してから再実行 |
+| 未リンクのブランド主体 | 退会者が作成し、残存ロゴ・組織から参照されないものだけ削除 |
 
-## 10. 将来構想(このドキュメントのスコープ外、方向性のみ)
+匿名ユーザーは同じ削除UIの対象外で、現行RLSではロゴを作成できない。匿名セッションを継続利用する間は、未登録の`auth.users`/`public.users`を最終活動から90日で掃除する定期処理を候補とする。所有ロゴや公開URLの保持問題は発生しない。
+
+## 10. 実装状況
+
+| 領域 | 状態 |
+|---|---|
+| Supabase repo・RLS・localStorageフォールバック | 実装済み |
+| 本登録前のアップロードゲート | 実装済み |
+| 組織・招待・組織ロール・所有移管 | 実装済み |
+| visibility・公開ギャラリー・組織バニティURL | 実装済み |
+| プラットフォームロールとLabsゲート | 実装済み |
+| ロゴ単位共有のgrant・メール招待・RLS | `0015`/`0017`/`0018`で実装・リモート適用済み |
+| ロゴ単位共有の招待・付与・解除UI | 未実装 |
+| 複数組織の選択とBrand Managerの組織作成 | 未実装。現在は最初の所属組織を暗黙選択 |
+| Google OAuth・メール運用・退会の破壊的E2E | ベータ公開前の確認が必要 |
+
+## 11. 将来構想(このドキュメントのスコープ外、方向性のみ)
 
 - **売買・契約**: プレゼンページを商談ルーム化し、成約 = 所有権移転(§6 #11)。移管機構が実行部になるため追加のデータモデル変更は小さい
-- **移管の承認フロー**: 現段階は「移管先組織のadmin以上である本人」が実行できる自己完結型。第三者への移管はリクエスト→承認制を将来追加
-- **監査ログ**: 所有権移転・公開範囲変更の履歴テーブル(法人利用で要望が出た時点で追加)
+- **移管の承認フロー**: `logo_transfer_requests`の申請スキーマは実装済み。現行UIは「移管先組織のadmin以上である本人」による即時移管だけで、第三者の承認・完了RPC・通知UIは未実装
+- **プラットフォーム監査ログ**: ロゴ単位の`logo_activities`は実装済み。会員・権限操作を横断する運営監査ログは将来追加
 - **ロゴ図鑑**: `visibility = 'public'` の集合がそのままコンテンツになる
 
-## 11. 未決定事項
+## 12. 未決定事項
 
 - 組織の課金モデルとプラン境界(SaaS課金の単位 = 組織で確定してよいか)
 - Contactボタンの実装形態(mailto / フォーム / 通知)
 - handle の予約語・命名規則の詳細(`/brand` `/p` 等との衝突回避)
-- 匿名ユーザーの保持期間(未登録のままのロゴをいつまで残すか)

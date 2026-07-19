@@ -3,9 +3,9 @@
 // Brand Manager: the business tenant's hub for its brand assets — company
 // profile, logo registry, and merch inventory/ordering. NOT a platform-operator
 // console; it belongs to the org whose brand it manages.
-// The repo is localStorage-backed, so all data access happens client-side.
+// BrandRepo uses Supabase when configured and localStorage only as a local
+// development fallback; this page keeps data access client-side in both modes.
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   repo,
@@ -101,28 +101,14 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
-      <AppHeader
-        section="Brand Manager"
-        links={[
-          { href: "/assets", label: "Assets" },
-          { href: "/", label: "サイトを見る" },
-        ]}
-      />
+      <AppHeader section="Brand Manager" />
 
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
           <h1 className="text-balance text-lg font-semibold">
             {SERVICE_NAME}®{" "}
             <span className="text-xs font-normal text-gray-500">Brand Manager</span>
           </h1>
-          <nav className="flex items-center gap-4" aria-label="Brand Manager navigation">
-            <Link href="/assets" className="text-sm text-gray-500 hover:text-gray-900">
-              Assets →
-            </Link>
-            <Link href="/" className="text-sm text-gray-500 hover:text-gray-900">
-              サイトを見る →
-            </Link>
-          </nav>
         </div>
 
         {/* KPI row */}

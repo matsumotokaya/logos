@@ -5,6 +5,7 @@
 import { ensureSession, hasSupabase, supabase } from "@/lib/supabase/client";
 
 export type OrgRole = "owner" | "admin" | "editor" | "purchaser" | "viewer";
+export const ORG_ADMIN_ROLES: ReadonlySet<OrgRole> = new Set(["owner", "admin"]);
 
 export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
   owner: "オーナー",
@@ -16,6 +17,9 @@ export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
 
 /** Roles that may be assigned through the UI (owner is implicit / protected). */
 export const ASSIGNABLE_ROLES: OrgRole[] = ["admin", "editor", "purchaser", "viewer"];
+export function hasOrgAdminRole(role: OrgRole): boolean {
+  return ORG_ADMIN_ROLES.has(role);
+}
 
 export type Organization = { id: string; name: string; myRole: OrgRole };
 export type OrgMember = {
@@ -118,30 +122,24 @@ export async function inviteMember(
   const normalized = email.trim().toLowerCase();
   if (!normalized) throw new Error("メールアドレスを入力してください。");
 
-  const { data: existing, error: lookupErr } = await supabase
-    .from("users")
-    .select("user_id")
-    .eq("contact_email", normalized)
-    .maybeSingle();
-  throwOn(lookupErr);
-
-  if (existing) {
-    // (org_id, user_id) is the real primary key, so this upsert is valid.
-    const { error } = await supabase
-      .from("org_members")
-      .upsert({ org_id: orgId, user_id: existing.user_id, role }, { onConflict: "org_id,user_id" });
-    throwOn(error);
-    return { joined: true };
-  }
-
   // Uniqueness on invites is a functional index (org_id, lower(email)), which
   // PostgREST's onConflict can't target — replace any prior invite explicitly.
+  // Migration 0012 resolves an already-registered email inside a protected DB
+  // trigger, so the browser never gets account-enumeration access to users.
   throwOn((await supabase.from("org_invites").delete().eq("org_id", orgId).eq("email", normalized)).error);
   const { error } = await supabase
     .from("org_invites")
     .insert({ org_id: orgId, email: normalized, role, invited_by: me });
   throwOn(error);
-  return { joined: false };
+
+  const { data: pending, error: pendingError } = await supabase
+    .from("org_invites")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("email", normalized)
+    .maybeSingle();
+  throwOn(pendingError);
+  return { joined: !pending };
 }
 
 export async function setMemberRole(

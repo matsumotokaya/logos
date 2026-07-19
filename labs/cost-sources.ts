@@ -6,9 +6,8 @@
 // list authoritative: a new paid API must be added here, so the cost surface
 // never drifts from reality.
 //
-// Verified 2026-07-14 by code audit: the product calls exactly these paid
-// APIs. No text LLM (OpenAI / Anthropic / etc.) is used anywhere — auto copy
-// is deterministic/template-based, not model-generated.
+// Verified 2026-07-19 by code audit: the product calls exactly these paid
+// APIs. Keep this list synchronized with every server-side provider client.
 
 export type CostStatus = "active" | "planned";
 
@@ -36,6 +35,18 @@ export type CostSource = {
 };
 
 export const COST_SOURCES: CostSource[] = [
+  {
+    id: "anthropic-campaign",
+    name: "Claude Opus 4.8",
+    provider: "Anthropic",
+    usedFor: "Campaign Lab: 複数ソースからService Brand KitとLPコピーを構造化生成",
+    where: "lib/campaign/creative.ts",
+    unitCost: "入出力トークン従量(Anthropic API価格表)",
+    billing: "per-call",
+    status: "active",
+    metered: false,
+    note: "原価ログ未実装。PDF・画像・長文入力で費用が変動するため、公開前にトークン使用量を記録する",
+  },
   {
     id: "gemini-flash-image",
     name: "Gemini 2.5 Flash Image (Nano Banana)",

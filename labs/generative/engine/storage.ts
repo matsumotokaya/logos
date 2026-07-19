@@ -8,6 +8,7 @@
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { signedLabsOutputUrl } from "@/lib/labs-output-sign";
 import { getR2Object, isR2Configured, putR2Object } from "@/lib/r2";
 
 const OUT_DIR = path.join(process.cwd(), "var", "generative-lab", "outputs");
@@ -16,7 +17,7 @@ const R2_PREFIX = "labs/generative/outputs";
 const NAME_RE = /^gen-[a-z0-9]+-[a-f0-9]{8}\.png$/;
 
 export function outputUrl(name: string): string {
-  return `/api/labs/generative/outputs/${name}`;
+  return signedLabsOutputUrl(name);
 }
 
 function outputKey(name: string): string {

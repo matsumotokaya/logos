@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/lib/auth";
 import AppHeader from "@/components/AppHeader";
+import DeleteAccountSection from "@/components/settings/DeleteAccountSection";
 
 function Field({
   label,
@@ -48,18 +49,12 @@ export default function SettingsPage() {
 
   return (
     <main className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
-      <AppHeader
-        section="Settings"
-        links={[
-          { href: "/assets", label: "Assets" },
-          { href: "/", label: "サイトを見る" },
-        ]}
-      />
+      <AppHeader section="Account" />
 
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8 md:px-10">
         <div>
-          <p className="text-xs text-gray-500">Settings</p>
-          <h1 className="mt-1 text-balance text-2xl font-semibold">設定</h1>
+          <p className="text-xs text-gray-500">Account</p>
+          <h1 className="mt-1 text-balance text-2xl font-semibold">アカウント</h1>
         </div>
 
         <Section
@@ -97,18 +92,7 @@ export default function SettingsPage() {
           </fieldset>
         </Section>
 
-        <Section
-          title="退会"
-          note="アカウント削除は、所有アセット・組織所属・公開URL・課金履歴をどう扱うかを決めてから接続します。"
-        >
-          <button
-            type="button"
-            disabled
-            className="rounded-md border border-red-200 bg-white px-3 py-2 text-sm text-red-400 disabled:cursor-not-allowed"
-          >
-            アカウントを削除（未実装）
-          </button>
-        </Section>
+        <DeleteAccountSection />
       </div>
     </main>
   );

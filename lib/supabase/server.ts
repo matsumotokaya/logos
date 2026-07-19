@@ -1,7 +1,12 @@
+import "server-only";
+
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 function requireEnv(
-  name: "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  name:
+    | "NEXT_PUBLIC_SUPABASE_URL"
+    | "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    | "SUPABASE_SERVICE_ROLE_KEY",
 ): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is not set.`);
@@ -41,9 +46,25 @@ export function createServerSupabaseForToken(accessToken: string): SupabaseClien
   );
 }
 
+/** Server-only client for narrowly scoped administrative account lifecycle work. */
+export function createAdminSupabase(): SupabaseClient {
+  return createClient(
+    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+}
+
 export type VerifiedUser = {
   token: string;
   id: string;
+  email: string | null;
   /** Guests (and unconfirmed email signups) stay anonymous — see lib/auth. */
   isAnonymous: boolean;
 };
@@ -60,6 +81,7 @@ export async function requireUser(req: Request): Promise<VerifiedUser> {
   return {
     token,
     id: data.user.id,
+    email: data.user.email ?? null,
     isAnonymous: data.user.is_anonymous ?? false,
   };
 }

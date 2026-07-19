@@ -1,6 +1,7 @@
 // Browser-side helpers for the Generative Lab endpoints.
 
 import type { LabLogo } from "@/labs/motion/core/experiment-api";
+import { labsRequest } from "@/lib/labs-client";
 import type {
   CatalogResponse,
   GenerateMeta,
@@ -20,13 +21,13 @@ export function generativeLogoPayload(logo: LabLogo): GenerativeLogo | null {
 }
 
 export async function fetchGenerativeCatalog(): Promise<CatalogResponse> {
-  const res = await fetch("/api/labs/generative/templates");
+  const res = await labsRequest("/api/labs/generative/templates");
   if (!res.ok) throw new Error(`カタログ取得に失敗 (${res.status})`);
   return (await res.json()) as CatalogResponse;
 }
 
 export async function fetchGenJobsSummary(): Promise<GenJobsSummary> {
-  const res = await fetch("/api/labs/generative/jobs");
+  const res = await labsRequest("/api/labs/generative/jobs");
   if (!res.ok) throw new Error(`集計取得に失敗 (${res.status})`);
   return (await res.json()) as GenJobsSummary;
 }
@@ -53,7 +54,7 @@ export async function computeLogoHash(logo: LabLogo): Promise<string | null> {
 export async function fetchLogoRuns(logo: LabLogo): Promise<LogoRunsResponse | null> {
   const hash = await computeLogoHash(logo);
   if (!hash) return null;
-  const res = await fetch(`/api/labs/generative/jobs?logo=${hash}`);
+  const res = await labsRequest(`/api/labs/generative/jobs?logo=${hash}`);
   if (!res.ok) throw new Error(`生成レコード取得に失敗 (${res.status})`);
   return (await res.json()) as LogoRunsResponse;
 }
@@ -75,7 +76,7 @@ export async function generate(
     context: context || undefined,
     palette: logo.colors.slice(0, 6).map((c) => c.hex),
   };
-  const res = await fetch("/api/labs/generative/generate", {
+  const res = await labsRequest("/api/labs/generative/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

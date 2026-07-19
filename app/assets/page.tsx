@@ -97,13 +97,7 @@ export default function AssetsPage() {
 
   return (
     <main className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
-      <AppHeader
-        section="Assets"
-        links={[
-          { href: "/brand", label: "Brand Manager" },
-          { href: "/", label: "サイトを見る" },
-        ]}
-      />
+      <AppHeader section="Assets" />
 
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8 md:px-10">
         <div>

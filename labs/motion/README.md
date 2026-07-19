@@ -9,7 +9,7 @@
 ## 使い方
 
 - 上部のロゴレールでロゴを切り替えると**全実験に即時反映**される(ここが核心機能)
-- ダミーロゴ3種(シンボル型 Halo / ワードマーク型 MONO / 複合型 Kite)同梱。SVG/PNGのアップロード可(localStorageに保存、外部送信なし)
+- ダミーロゴ3種(シンボル型 Halo / ワードマーク型 MONO / 複合型 Kite)を同梱。利用者のロゴは本体と同じ`BrandRepo`から読み、追加したSVGも正本ロゴとして保存する
 - カードはホバーで再生、クリックで全画面プレビュー(再生/一時停止/リプレイ)
 - 全画面プレビューの「研究ノート」に星評価とメモを記録できる(localStorage)。採用判断のログとして使う
 
@@ -21,10 +21,10 @@ labs/motion/
     experiment-api.ts   # 実験の共通インターフェース(ExperimentProps / ExperimentMeta)
     svg-utils.ts        # 前処理(本体 lib/svg.ts の analyzeSvg を再利用)+ マウント/計測ヘルパ
     dummy-logos.ts      # 同梱テストロゴ3種
-    logo-store.ts       # ロゴの登録・選択(localStorage、アップロードは再解析される)
+    logo-store.ts       # BrandRepoの正本ロゴ+同梱fixture。選択IDだけlocalStorage
     notes-store.ts      # 星評価・メモ(localStorage)
   experiments/
-    registry.ts         # カタログ(実装済みは遅延ロード、未実装はメタのみ)
+    registry.ts         # 16実験のカタログと遅延ロード
     001-classic-reveal/
       index.tsx         # 実験本体(1ファイル完結が原則)
       meta.ts
@@ -54,7 +54,7 @@ app/labs/motion/page.tsx  # 薄いルート(本体への影響はこの1ファ�
 | **Canvas 2D** | (標準API) | ピクセル単位の描画(粒子・ラスタライズ)。GSAPでは扱えない大量要素向け。 | 005 |
 | **CSS** | (標準) | mask / filter / gradient など GPU 合成で軽いエフェクト。GSAPが値を駆動。 | 002, 003, 006, 007, 009 |
 | **Three.js (R3F)** | `three` + `@react-three/fiber` + `@react-three/drei` | 3D(押し出し・マテリアル・空間)。SVGパスを `ExtrudeGeometry` で立体化。 | 012-014 |
-| **Lottie** | `lottie-web`(015で導入予定) | **書き出し互換の検証のみ**(下記)。 | 015 |
+| **Lottie** | `lottie-web` | **書き出し互換の検証のみ**(下記)。 | 015 |
 
 ### Framer Motion(`motion`)について
 
@@ -81,13 +81,13 @@ app/labs/motion/page.tsx  # 薄いルート(本体への影響はこの1ファ�
 | 009 | Ambient Background | 常駐ループ | gsap, css | ✅ 実装済み |
 | 010 | Guideline Reveal | プレゼンテーション | gsap, svg | ✅ 実装済み |
 | 011 | Lockup Variations | プレゼンテーション | gsap | ✅ 実装済み |
-| 012 | Extrude Turntable | 3D | three | 予定 |
+| 012 | Extrude Turntable | 3D | three | ✅ 実装済み |
 | 013 | Material Study | 3D | three | ✅ 実装済み |
 | 014 | Gallery Space | 3D | three | ✅ 実装済み |
 | 015 | Lottie 往復検証 | 書き出し検証 | lottie, gsap | ✅ 実装済み |
 | 016 | 動画書き出しフック | 書き出し検証 | canvas | ✅ インターフェースのみ(実装は将来) |
 
-全16実験が実装済み。001が基準器であり、以後の実験はすべて001と見比べて評価する。新規追加時はこの表を更新すること。
+全16エントリが実装済み。016は将来のエンコーダ差し替え口を検証するため、意図的にインターフェースのみ。001が基準器であり、以後の実験はすべて001と見比べて評価する。
 
 ## 組み合わせ検証(v2)
 

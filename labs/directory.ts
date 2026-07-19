@@ -35,9 +35,9 @@ export const MODE_INFO: Record<LabMode, { label: string; description: string }> 
       "生成AIにロゴを解釈させ、決定論では作れない表現を探す領域。逸脱を禁止するのではなく、方向をダイヤルで制御し、結果を計器盤で見せる。リスクとリターン(とコスト)は使う側が理解して選ぶ。",
   },
   integration: {
-    label: "統合(将来枠)",
+    label: "統合モード",
     description:
-      "単発のアセットを組み合わせて、CM・バナー・LPといったマーケティングの最終アウトプットに仕立てる領域。マーケの成果物は組み合わせで生まれる。今はプレースホルダー。",
+      "複数のソースとアセットをブランドキットへ統合し、LP・CM・バナーなどのマーケティング最終出力に仕立てる領域。Campaign LabではソースからLPまでの縦貫通が稼働中。",
   },
 };
 
@@ -161,20 +161,28 @@ export const LABS: LabInfo[] = [
     name: "Campaign Lab",
     titleJa: "統合表現研究所",
     tagline: "単発のアセットを、CM・バナー・LPという最終アウトプットに組み立てる",
-    status: "planned",
+    status: "active",
     mode: "integration",
     layer: "レイヤー5+: 統合(最重課金。30秒プロモ・キャンペーン一式)",
     description:
-      "Motion / Workflow / Generative の各ラボが作る個別アセット(モーション・モックアップ・生成ビジュアル・ショートクリップ)を組み合わせて、プロモーションビデオ・CM・バナーセット・ランディングページという最終的なマーケティング成果物に仕立てる構想。マーケの最終出力は常に組み合わせで生まれる。今はプレースホルダー(着手条件: 素材側3ラボの成熟)。",
+      "URL・PDF・画像・テキストからサービスを理解し、Service Brand Kitと自己完結LPを生成する統合ラボ。LPの縦貫通は稼働中で、同じBrand Kitとナレーションを入力にする30秒CM動画は次フェーズ。",
     scope: [
-      "30秒プロモ: Remotion / ffmpeg テンプレート駆動のコンポジション+生成クリップ+テロップ+BGM(生成BGMのライセンス)",
-      "バナーセット: サイズ展開の自動組版(保証モードの合成エンジンを流用)",
-      "LPセクション: ブランドページの構成要素をキャンペーン単位に再構成",
+      "ソース統合: URLスクレイピング、PDF・画像・テキストを共通入力へ正規化",
+      "Service Brand Kit: サービス理解・コピー・配色・30秒CMナレーションを構造化生成",
+      "最終出力: 自己完結LPは稼働中。Remotion動画・SNS素材・バナーは次フェーズ",
     ],
     modules: [
       {
-        title: "構想のみ(プレースホルダー)",
-        body: "素材を作る3ラボが成熟してから着手する。それまでは要件も調査もここには置かない。",
+        title: "Phase 0a: Brand Kit → LP",
+        body: "URL・ファイル・テキストからClaude structured outputsでBrand Kitを作り、テンプレート駆動のLPを生成する縦貫通が稼働中。",
+      },
+      {
+        title: "Phase 0a+: パレット精度",
+        body: "外部CSSを含む実サイトから証拠ベースで色を抽出するため、スクリーンショット・computed style・VLM裁定を追加する。",
+      },
+      {
+        title: "Phase 0b: 30秒CM動画",
+        body: "Brand KitのナレーションをTTS・タイミングJSON・Remotionテンプレートへ接続し、ブラウザプレビューと書き出しへ展開する。",
       },
     ],
   },

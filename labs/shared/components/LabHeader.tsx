@@ -10,11 +10,8 @@
 // surface reads as one "labos" mode of the product — not a separate app.
 
 import Link from "next/link";
-import { LABS_NAME } from "@/lib/config";
 import { cn } from "@/lib/cn";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
-import Account from "@/components/Account";
-import MainNav from "@/components/MainNav";
+import AppHeader from "@/components/AppHeader";
 import { MODE_INFO, type LabMode } from "@/labs/directory";
 
 export const LAB_CONTENT_WIDTH = "max-w-6xl";
@@ -27,17 +24,7 @@ export default function LabHeader({
 }) {
   return (
     <>
-      <header className="flex items-center justify-between border-b border-hairline px-6 py-5 md:px-10">
-        <Link href="/labs" className="font-display text-xl font-medium tracking-tight">
-          {LABS_NAME}
-          <span className="align-super text-[0.55em]">®</span>
-        </Link>
-        <div className="flex items-center gap-2 sm:gap-3">
-          <LanguageSwitcher />
-          <Account />
-          <MainNav />
-        </div>
-      </header>
+      <AppHeader variant="labs" />
 
       {current && (
         <div className="border-b border-hairline bg-paper/90 backdrop-blur">

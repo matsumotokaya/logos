@@ -2,12 +2,17 @@
 
 // Account control for the app headers: a "Sign in" affordance for guests that
 // opens an auth dialog (Google → Apple → Figma → email), and for signed-in
-// users an avatar menu (Assets / settings / labs / sign out). In localStorage
-// mode (no auth) the Brand Manager and labs links render as plain links.
+// users an avatar menu containing identity and account-only actions.
+// localStorage mode has no account identity and therefore no account menu.
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useAuth, type OAuthProvider } from "@/lib/auth";
+import {
+  OPEN_AUTH_DIALOG_EVENT,
+  useAuth,
+  type AuthDialogMode,
+  type OAuthProvider,
+} from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 
@@ -49,8 +54,18 @@ const PROVIDERS: { id: OAuthProvider; label: string; icon: React.ReactNode }[] =
 ];
 
 export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) {
-  const { enabled, loading, isSignedIn, user, signInWithOAuth, signUpWithEmail, signInWithEmail, signOut } =
-    useAuth();
+  const {
+    enabled,
+    loading,
+    isSignedIn,
+    user,
+    signInWithOAuth,
+    signUpWithEmail,
+    signInWithEmail,
+    oauthCallbackError,
+    dismissOAuthCallbackError,
+    signOut,
+  } = useAuth();
   const { dict } = useI18n();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -60,6 +75,8 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const activeMode = oauthCallbackError ? "signin" : mode;
+  const activeError = oauthCallbackError ?? error;
 
   // Once the session becomes a real signed-in account (e.g. instant signup when
   // email confirmation is off, or a successful sign-in), close the dialog.
@@ -84,42 +101,57 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
     };
   }, [menuOpen]);
 
-  // localStorage mode (no auth): an avatar-only menu. No email/logout, but the
-  // internal Labs entrance, Assets, and Settings stay reachable here.
-  if (!enabled) {
-    return (
-      <div ref={menuRef} className="relative">
-        <AvatarButton
-          initial="•"
-          tone={tone}
-          open={menuOpen}
-          onClick={() => setMenuOpen((o) => !o)}
-        />
-        {menuOpen && (
-          <AccountMenu
-            onNavigate={() => setMenuOpen(false)}
-            labs={dict.header.labs}
-            assets={dict.header.assets}
-            settings={dict.header.settings}
-          />
-        )}
-      </div>
-    );
-  }
-
   const open = (initial: "create" | "signin" = "create") => {
     setMode(initial);
     setPhase("form");
     setError(null);
     dialogRef.current?.showModal();
   };
-  const close = () => dialogRef.current?.close();
+  const close = () => {
+    dismissOAuthCallbackError();
+    dialogRef.current?.close();
+  };
 
   const switchMode = (next: "create" | "signin") => {
+    dismissOAuthCallbackError();
     setMode(next);
     setPhase("form");
     setError(null);
   };
+
+  useEffect(() => {
+    const onOpenAuth = (event: Event) => {
+      const detail = (event as CustomEvent<AuthDialogMode>).detail;
+      open(detail ?? "create");
+    };
+    window.addEventListener(OPEN_AUTH_DIALOG_EVENT, onOpenAuth);
+    return () => {
+      window.removeEventListener(OPEN_AUTH_DIALOG_EVENT, onOpenAuth);
+    };
+  }, []);
+
+  // OAuth failures return after a full-page redirect. Reopen the dialog so the
+  // result is visible instead of leaving a technical error in the address bar.
+  useEffect(() => {
+    if (!oauthCallbackError) return;
+    if (!dialogRef.current?.open) dialogRef.current?.showModal();
+  }, [oauthCallbackError]);
+
+  // localStorage mode has no registered identity, so account-only navigation
+  // remains unavailable.
+  if (!enabled) {
+    return (
+      <span
+        aria-disabled="true"
+        className={cn(
+          "text-sm opacity-60",
+          tone === "dark" ? "text-ink-muted" : "text-white/70",
+        )}
+      >
+        {dict.auth.signIn}
+      </span>
+    );
+  }
 
   // Read from the form via FormData rather than controlled state: React's
   // synthetic onChange does not fire for inputs inside a showModal() <dialog>
@@ -132,7 +164,7 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
     setBusy(true);
     setError(null);
     const { error, pendingConfirmation } =
-      mode === "create"
+      activeMode === "create"
         ? await signUpWithEmail(email, password)
         : await signInWithEmail(email, password);
     setBusy(false);
@@ -147,6 +179,7 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
   };
 
   const oauth = async (provider: OAuthProvider) => {
+    dismissOAuthCallbackError();
     setError(null);
     const { error } = await signInWithOAuth(provider);
     if (error) setError(error);
@@ -173,9 +206,7 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
           {menuOpen && (
             <AccountMenu
               email={user?.email}
-              labs={dict.header.labs}
-              assets={dict.header.assets}
-              settings={dict.header.settings}
+              account={dict.header.account}
               signOutLabel={dict.auth.signOut}
               onNavigate={() => setMenuOpen(false)}
               onSignOut={() => {
@@ -193,6 +224,9 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
 
       <dialog
         ref={dialogRef}
+        aria-labelledby="auth-dialog-title"
+        aria-describedby="auth-dialog-description"
+        onClose={dismissOAuthCallbackError}
         onClick={(e) => {
           // Backdrop click (the dialog element itself) closes it.
           if (e.target === dialogRef.current) close();
@@ -201,17 +235,17 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
       >
         <div className="flex flex-col gap-6 p-8">
           <div>
-            <h2 className="font-display text-2xl font-medium text-balance">
+            <h2 id="auth-dialog-title" className="font-display text-2xl font-medium text-balance">
               {phase === "sent"
                 ? dict.auth.sentTitle
-                : mode === "create"
+                : activeMode === "create"
                   ? dict.auth.title
                   : dict.auth.signInTitle}
             </h2>
-            <p className="mt-2 text-pretty text-sm text-ink-muted">
+            <p id="auth-dialog-description" className="mt-2 text-pretty text-sm text-ink-muted">
               {phase === "sent"
                 ? dict.auth.checkEmail
-                : mode === "create"
+                : activeMode === "create"
                   ? dict.auth.subtitle
                   : dict.auth.signInSubtitle}
             </p>
@@ -241,6 +275,18 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
                 ))}
               </div>
 
+              {activeError && (
+                <div
+                  id="auth-dialog-error"
+                  role="alert"
+                  aria-atomic="true"
+                  className="border-l-2 border-red-600 pl-3 text-pretty text-sm text-red-700"
+                >
+                  <p className="font-medium">{dict.auth.failed}</p>
+                  <p className="mt-1">{activeError}</p>
+                </div>
+              )}
+
               <div className="flex items-center gap-3">
                 <span className="h-px flex-1 bg-hairline" />
                 <span className="font-mono text-xs uppercase text-ink-faint">
@@ -250,7 +296,7 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
               </div>
 
               {/* key forces fresh inputs when switching modes (autocomplete). */}
-              <form key={mode} onSubmit={submitEmail} className="flex flex-col gap-3">
+              <form key={activeMode} onSubmit={submitEmail} className="flex flex-col gap-3">
                 <label className="flex flex-col gap-1">
                   <span className="text-xs text-ink-muted">{dict.auth.email}</span>
                   <input
@@ -268,15 +314,10 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
                     name="password"
                     required
                     minLength={6}
-                    autoComplete={mode === "create" ? "new-password" : "current-password"}
+                    autoComplete={activeMode === "create" ? "new-password" : "current-password"}
                     className="rounded-lg border border-hairline bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none"
                   />
                 </label>
-                {error && (
-                  <p aria-live="polite" className="text-pretty text-sm text-red-600">
-                    {error}
-                  </p>
-                )}
                 <button
                   type="submit"
                   disabled={busy}
@@ -284,7 +325,7 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
                 >
                   {busy
                     ? dict.auth.working
-                    : mode === "create"
+                    : activeMode === "create"
                       ? dict.auth.createAccount
                       : dict.auth.signInEmail}
                 </button>
@@ -293,10 +334,10 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
               <div className="flex items-center justify-between text-xs">
                 <button
                   type="button"
-                  onClick={() => switchMode(mode === "create" ? "signin" : "create")}
+                  onClick={() => switchMode(activeMode === "create" ? "signin" : "create")}
                   className="text-ink-muted underline underline-offset-2 hover:text-ink"
                 >
-                  {mode === "create" ? dict.auth.haveAccount : dict.auth.needAccount}
+                  {activeMode === "create" ? dict.auth.haveAccount : dict.auth.needAccount}
                 </button>
                 <button
                   type="button"
@@ -345,21 +386,16 @@ function AvatarButton({
   );
 }
 
-// The account menu: identity (email) + account actions. Labs is the internal
-// entrance — it belongs here (staff-only), NOT in the public hamburger.
+// The account menu is intentionally limited to identity and account actions.
 function AccountMenu({
   email,
-  labs,
-  assets,
-  settings,
+  account,
   signOutLabel,
   onNavigate,
   onSignOut,
 }: {
   email?: string | null;
-  labs: string;
-  assets: string;
-  settings: string;
+  account: string;
   signOutLabel?: string;
   onNavigate: () => void;
   onSignOut?: () => void;
@@ -376,30 +412,11 @@ function AccountMenu({
       )}
       <Link
         role="menuitem"
-        href="/assets"
-        onClick={onNavigate}
-        className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
-      >
-        {assets}
-      </Link>
-      <Link
-        role="menuitem"
         href="/settings"
         onClick={onNavigate}
         className="block px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
       >
-        {settings}
-      </Link>
-      <Link
-        role="menuitem"
-        href="/labs"
-        onClick={onNavigate}
-        className="flex items-center gap-2 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
-      >
-        {labs}
-        <span className="rounded-full border border-hairline px-1.5 py-0.5 text-[9px] text-ink-faint">
-          社内
-        </span>
+        {account}
       </Link>
       {onSignOut && (
         <>

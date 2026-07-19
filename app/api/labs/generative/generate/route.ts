@@ -25,7 +25,7 @@ import type {
   GenerateRequest,
   GenerativeLogo,
 } from "@/labs/generative/core/api-types";
-import { labsDisabledResponse, labsEnabled } from "@/lib/labs-access";
+import { guardLabsRequest } from "@/lib/labs-access";
 
 const MAX_LOGO_BYTES = 3 * 1024 * 1024;
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -46,7 +46,8 @@ function parseLogo(raw: unknown): GenerativeLogo {
 }
 
 export async function POST(req: Request) {
-  if (!labsEnabled()) return labsDisabledResponse();
+  const denied = await guardLabsRequest(req);
+  if (denied) return denied;
   let body: GenerateRequest;
   let logo: GenerativeLogo;
   let preset: PresetId;

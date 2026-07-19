@@ -208,13 +208,7 @@ export default function LogoInfoPage({
   if (!loaded) {
     return (
       <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
-        <AppHeader
-          section="Asset Detail"
-          links={[
-            { href: "/assets", label: "Assets" },
-            { href: "/brand", label: "Brand Manager" },
-          ]}
-        />
+        <AppHeader section="Asset Detail" />
         <div className="flex min-h-[60dvh] items-center justify-center">
           <p className="text-sm text-gray-500">読み込み中…</p>
         </div>
@@ -225,13 +219,7 @@ export default function LogoInfoPage({
   if (!logo) {
     return (
       <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
-        <AppHeader
-          section="Asset Detail"
-          links={[
-            { href: "/assets", label: "Assets" },
-            { href: "/brand", label: "Brand Manager" },
-          ]}
-        />
+        <AppHeader section="Asset Detail" />
         <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-4">
           <p className="text-sm text-gray-500">ロゴが見つかりません。</p>
           <Link href="/assets" className="text-sm underline underline-offset-2">
@@ -245,13 +233,7 @@ export default function LogoInfoPage({
   if (logo.canEdit === false) {
     return (
       <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
-        <AppHeader
-          section="Asset Detail"
-          links={[
-            { href: "/assets", label: "Assets" },
-            { href: "/brand", label: "Brand Manager" },
-          ]}
-        />
+        <AppHeader section="Asset Detail" />
         <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-4">
           <p className="text-sm text-gray-500">このロゴを管理する権限がありません。</p>
           <Link href="/assets" className="text-sm underline underline-offset-2">
@@ -298,8 +280,7 @@ export default function LogoInfoPage({
 
   // Visibility is an admin-level decision: personal logos are always yours to
   // set, org-owned ones require owner/admin in the owning org.
-  const canAdminVisibility =
-    !hasSupabase || !logo.ownerOrgId || adminOrgs.some((o) => o.id === logo.ownerOrgId);
+  const canAdminVisibility = !hasSupabase || logo.canAdmin === true;
 
   const addTag = () => {
     const tag = tagInput.trim();
@@ -370,14 +351,7 @@ export default function LogoInfoPage({
 
   return (
     <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
-      <AppHeader
-        section="Asset Detail"
-        links={[
-          { href: "/assets", label: "Assets" },
-          { href: "/brand", label: "Brand Manager" },
-          { href: `/p/${logo.id}`, label: "プレゼンを見る" },
-        ]}
-      />
+      <AppHeader section="Asset Detail" />
 
       <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -730,7 +704,7 @@ export default function LogoInfoPage({
           </div>
         </Card>
 
-        {hasSupabase && (
+        {hasSupabase && logo.canAdmin && (
           <Card
             title="所有者"
             note="ロゴの所有を組織に移管できます。移管してもURL・作図・制作クレジットは変わらず、組織メンバーが権限に応じて編集できるようになります。"

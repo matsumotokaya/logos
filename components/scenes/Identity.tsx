@@ -68,12 +68,12 @@ export default function Identity({ logo, name, variants }: SceneProps) {
   ];
 
   return (
-    <section className="flex min-h-dvh flex-col justify-center bg-paper">
+    <section className="flex min-h-dvh flex-col bg-paper">
       {/* Image plate — white knockout on a photographic / generated field. */}
-      <Reveal>
+      <Reveal className="flex flex-1 items-center px-6 pt-8 md:px-12 md:pt-12">
         <div
           className={cn(
-            "relative aspect-[4/5] w-full overflow-hidden sm:aspect-[3/2] lg:aspect-[16/9]",
+            "relative min-h-[44dvh] w-full overflow-hidden sm:min-h-[50dvh] lg:min-h-[58dvh]",
             !primaryIsDark && "bg-plate"
           )}
           style={primaryIsDark ? { backgroundColor: primary } : undefined}
@@ -90,12 +90,14 @@ export default function Identity({ logo, name, variants }: SceneProps) {
           {plate.status === "loading" && (
             <div className="absolute inset-0 animate-pulse bg-white/10" />
           )}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={svgToDataUri(variants.white)}
-            alt={name}
-            className="absolute inset-0 m-auto max-h-[42%] w-[34%]"
-          />
+          <div className="absolute inset-0 flex items-center justify-center px-8">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={svgToDataUri(variants.white)}
+              alt={name}
+              className="max-h-[42%] w-[34%] object-contain"
+            />
+          </div>
           {plate.status !== "done" && (
             <div className="absolute bottom-4 left-4 flex flex-wrap items-center gap-3 md:bottom-6 md:left-6">
               <button

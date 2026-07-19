@@ -11,9 +11,7 @@ import {
   type PresentationCatalogResponse,
 } from "@/lib/presentation-catalog";
 import { resolvePresentationAssets } from "@/lib/presentation-schema";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
-import Account from "@/components/Account";
-import MainNav from "@/components/MainNav";
+import AppHeader from "@/components/AppHeader";
 import PresentationLayoutEditor from "@/components/presentation/PresentationLayoutEditor";
 import MockupScene from "@/components/scenes/MockupScene";
 import {
@@ -35,29 +33,61 @@ type Props = {
   name: string;
   mockupLogoId?: string;
   mockupCandidateId?: string;
-  onNameChange: (name: string) => void;
   onReset: () => void;
   /** Creator contact address; renders a mailto link in the footer when set. */
   contactEmail?: string | null;
   /** Editorial copy + per-logo presentation layout overrides. */
   presentation?: LogoPresentation | null;
-  /** Present when the viewer may edit presentation copy/layout in place. */
-  onSavePresentation?: (patch: PresentationPatch) => void;
+  /** The current viewer owns the logo / has edit rights. */
+  canEdit?: boolean;
+  /** A real account is required to enter edit mode. */
+  isSignedIn?: boolean;
+  /** Opens the auth dialog when editing requires sign-in. */
+  onRequestSignIn?: () => void;
+  /** Persist all staged edits in one save action. */
+  onCommitEdits?: (payload: {
+    name: string;
+    presentation: LogoPresentation;
+  }) => void | Promise<void>;
 };
+
+function applyPresentationPatch(
+  base: LogoPresentation,
+  patch: PresentationPatch,
+): LogoPresentation {
+  if ("layout" in patch) {
+    return { ...base, layout: patch.layout };
+  }
+  if ("sceneLead" in patch) {
+    const { slug, lead } = patch.sceneLead;
+    const sceneTexts = { ...base.sceneTexts };
+    if (lead) sceneTexts[slug] = { ...sceneTexts[slug], lead };
+    else delete sceneTexts[slug];
+    return { ...base, sceneTexts };
+  }
+  return { ...base, ...patch };
+}
 
 export default function Presentation({
   logo,
   name,
   mockupLogoId,
   mockupCandidateId,
-  onNameChange,
   onReset,
   contactEmail,
   presentation,
-  onSavePresentation,
+  canEdit = false,
+  isSignedIn = false,
+  onRequestSignIn,
+  onCommitEdits,
 }: Props) {
   const { dict, format } = useI18n();
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draftName, setDraftName] = useState(name);
+  const [draftPresentation, setDraftPresentation] = useState<LogoPresentation>(
+    presentation ?? emptyPresentation(),
+  );
   const [assetCatalog, setAssetCatalog] = useState<PresentationCatalogResponse | null>(null);
   const variants = useMemo<Variants>(
     () => ({
@@ -67,22 +97,32 @@ export default function Presentation({
     [logo.svg]
   );
 
-  const scene = { logo, name, variants, mockupLogoId, mockupCandidateId };
-  const editable = onSavePresentation !== undefined;
+  const sourcePresentation = presentation ?? emptyPresentation();
+  const editable = canEdit;
+  const activeName = editing ? draftName : name;
+  const activePresentation = editing ? draftPresentation : sourcePresentation;
+  const scene = {
+    logo,
+    name: activeName,
+    variants,
+    mockupLogoId,
+    mockupCandidateId,
+  };
   const editCtx = useMemo(
     () => ({
       editing: editable && editing,
-      catchphrase: presentation?.catchphrase ?? "",
-      story: presentation?.story ?? "",
+      catchphrase: activePresentation.catchphrase ?? "",
+      story: activePresentation.story ?? "",
       sceneLeads: Object.fromEntries(
-        Object.entries(presentation?.sceneTexts ?? {}).map(([slug, t]) => [
+        Object.entries(activePresentation.sceneTexts ?? {}).map(([slug, t]) => [
           slug,
           t.lead,
         ])
       ),
-      save: onSavePresentation ?? (() => {}),
+      save: (patch: PresentationPatch) =>
+        setDraftPresentation((current) => applyPresentationPatch(current, patch)),
     }),
-    [editable, editing, presentation, onSavePresentation]
+    [activePresentation, editable, editing]
   );
 
   useEffect(() => {
@@ -104,9 +144,9 @@ export default function Presentation({
   const mockupEntries = useMemo(() => {
     return resolvePresentationAssets(
       assetCatalog?.definitions ?? [],
-      presentation?.layout ?? emptyPresentation().layout,
+      activePresentation.layout ?? emptyPresentation().layout,
     );
-  }, [assetCatalog?.definitions, presentation?.layout]);
+  }, [activePresentation.layout, assetCatalog?.definitions]);
 
   const assetDefinitions = assetCatalog?.definitions ?? [];
 
@@ -117,59 +157,86 @@ export default function Presentation({
     (entry) => entry.placement.scene === "generated",
   );
 
+  const handleEditButton = async () => {
+    if (!editable) return;
+    if (!isSignedIn) {
+      onRequestSignIn?.();
+      return;
+    }
+    if (!editing) {
+      setDraftName(name);
+      setDraftPresentation(sourcePresentation);
+      setEditing(true);
+      return;
+    }
+    if (saving) return;
+    (document.activeElement as HTMLElement | null)?.blur();
+    await Promise.resolve();
+    setSaving(true);
+    try {
+      await onCommitEdits?.({
+        name: draftName.trim() || name,
+        presentation: draftPresentation,
+      });
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <main className="bg-paper text-ink">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-hairline bg-paper/90 px-6 py-4 backdrop-blur-sm md:px-12">
-        <div className="flex items-baseline gap-4">
-          <p className="font-display text-base font-medium">
-            {SERVICE_NAME}
-            <span className="align-super text-[10px]">®</span>
-          </p>
-          <p className="hidden font-mono text-xs uppercase text-ink-muted sm:block">
-            {dict.doc.brandGuidelines} — {name}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <LanguageSwitcher />
-          <Account />
-          <MainNav />
-          {editable && (
+      <AppHeader
+        sticky
+        section={`${dict.doc.brandGuidelines} — ${name}`}
+        actions={
+          <>
+            {editable && (
+              <button
+                type="button"
+                onClick={() => void handleEditButton()}
+                aria-pressed={editing}
+                className={cn(
+                  "bg-ink px-4 py-1.5 text-sm font-medium text-paper transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-60",
+                )}
+                disabled={saving}
+              >
+                {editing ? dict.header.editDone : dict.header.edit}
+              </button>
+            )}
+            {editing ? (
+              <input
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                aria-label={dict.header.brandName}
+                className="w-40 border-b border-hairline bg-transparent px-1 py-1.5 text-sm focus:border-ink focus:outline-none"
+              />
+            ) : (
+              <p className="max-w-40 truncate font-mono text-xs uppercase text-ink-muted">
+                {activeName}
+              </p>
+            )}
             <button
               type="button"
-              onClick={() => setEditing((e) => !e)}
-              aria-pressed={editing}
-              className={cn(
-                "border px-4 py-1.5 text-sm font-medium transition-colors",
-                editing
-                  ? "border-accent bg-accent text-paper"
-                  : "border-hairline text-ink-muted hover:border-ink hover:text-ink"
-              )}
+              onClick={onReset}
+              className="bg-ink px-4 py-1.5 text-sm font-medium text-paper transition-colors hover:bg-accent"
             >
-              {editing ? dict.header.editDone : dict.header.edit}
+              {dict.header.newLogo}
             </button>
-          )}
-          <input
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-            aria-label={dict.header.brandName}
-            className="w-40 border-b border-hairline bg-transparent px-1 py-1.5 text-sm focus:border-ink focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={onReset}
-            className="bg-ink px-4 py-1.5 text-sm font-medium text-paper transition-colors hover:bg-accent"
-          >
-            {dict.header.newLogo}
-          </button>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <PresentationEditProvider value={editCtx}>
       {editable && editing && (
         <PresentationLayoutEditor
           definitions={assetDefinitions}
-          layout={presentation?.layout ?? emptyPresentation().layout}
-          onSaveLayout={(layout) => onSavePresentation?.({ layout })}
+          layout={activePresentation.layout ?? emptyPresentation().layout}
+          onSaveLayout={(layout) =>
+            setDraftPresentation((current) =>
+              applyPresentationPatch(current, { layout }),
+            )
+          }
         />
       )}
       <Splash {...scene} />

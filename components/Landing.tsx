@@ -4,13 +4,11 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { analyzeSvg, type LogoData } from "@/lib/svg";
-import { SERVICE_NAME } from "@/lib/config";
+import { requestAuthDialog, useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import AppHeader from "@/components/AppHeader";
 import Gallery from "@/components/Gallery";
-import Account from "@/components/Account";
-import MainNav from "@/components/MainNav";
 
 type Props = {
   onLogo: (logo: LogoData, suggestedName: string) => Promise<void>;
@@ -24,13 +22,23 @@ function nameFromFile(fileName: string): string {
 
 export default function Landing({ onLogo }: Props) {
   const { dict } = useI18n();
+  const { enabled, isSignedIn, loading } = useAuth();
   const reducedMotion = useReducedMotion();
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
 
+  const requireAccountBeforeUpload = () => {
+    if (!enabled) return false;
+    if (loading) return true;
+    if (isSignedIn) return false;
+    requestAuthDialog("create");
+    return true;
+  };
+
   const handleFile = async (file: File) => {
+    if (requireAccountBeforeUpload()) return;
     setError(null);
     const isSvg =
       file.type === "image/svg+xml" || /\.svg$/i.test(file.name);
@@ -99,17 +107,7 @@ export default function Landing({ onLogo }: Props) {
         )}
       />
 
-      <header className="flex items-center justify-between border-b border-hairline px-6 py-5 md:px-10">
-        <p className="font-display text-xl font-medium">
-          {SERVICE_NAME}
-          <span className="align-super text-[0.55em]">®</span>
-        </p>
-        <div className="flex items-center gap-2 sm:gap-3">
-          <LanguageSwitcher />
-          <Account />
-          <MainNav />
-        </div>
-      </header>
+      <AppHeader />
 
       <motion.div
         variants={container}
@@ -143,7 +141,10 @@ export default function Landing({ onLogo }: Props) {
           <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
             <button
               type="button"
-              onClick={() => inputRef.current?.click()}
+              onClick={() => {
+                if (requireAccountBeforeUpload()) return;
+                inputRef.current?.click();
+              }}
               aria-describedby={error ? "upload-error" : undefined}
               className="bg-ink px-8 py-4 text-sm font-medium text-paper transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >

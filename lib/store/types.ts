@@ -33,6 +33,8 @@ export const LOGO_TYPE_LABELS: Record<LogoType, string> = {
 
 export type LogoVisibility = "draft" | "private" | "unlisted" | "public";
 
+export type LogoAccessRole = "manager" | "editor" | "viewer";
+
 export const VISIBILITY_LABELS: Record<LogoVisibility, string> = {
   draft: "下書き",
   private: "非公開",
@@ -136,6 +138,12 @@ export type StoredLogo = {
    * treated as editable. Writes are always enforced by RLS server-side too.
    */
   canEdit?: boolean;
+  /** Transient: presentation-only editors may edit layer B but not the master. */
+  canEditPresentation?: boolean;
+  /** Transient: whether this viewer may transfer/delete/share the logo. */
+  canAdmin?: boolean;
+  /** Transient logo-scoped grant, separate from ownership and creator credit. */
+  accessRole?: LogoAccessRole | null;
   /** Transient: the current primary candidate, used for candidate-scoped assets. */
   primaryCandidateId?: string;
   /** Transient: the owning org id, or null when personally owned. */

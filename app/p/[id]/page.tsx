@@ -6,12 +6,12 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { requestAuthDialog, useAuth } from "@/lib/auth";
 import { analyzeSvg, type LogoData } from "@/lib/svg";
 import { SAMPLE_SVG, SAMPLE_NAME } from "@/lib/sample";
 import { emptyPresentation, repo, type LogoPresentation } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
 import Presentation from "@/components/Presentation";
-import type { PresentationPatch } from "@/components/scenes/shared";
 
 type State =
   | { status: "loading" }
@@ -33,6 +33,7 @@ export default function PresentationPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const { isSignedIn } = useAuth();
   const { dict } = useI18n();
   const [state, setState] = useState<State>({ status: "loading" });
   const [pres, setPres] = useState<LogoPresentation | null>(null);
@@ -70,7 +71,7 @@ export default function PresentationPage({
             name: stored.title,
             mockupCandidateId: stored.primaryCandidateId ?? null,
             stored: true,
-            canEdit: stored.canEdit ?? true,
+            canEdit: stored.canEditPresentation ?? stored.canEdit ?? true,
             contactEmail,
           };
           nextPres = await repo.getPresentation(id);
@@ -87,32 +88,32 @@ export default function PresentationPage({
     };
   }, [id]);
 
-  // Apply one in-place edit (blur) to layer B and persist it. No-op saves
-  // (blur without change) are skipped so the work history stays clean.
-  const handleSavePresentation = async (patch: PresentationPatch) => {
+  const handleCommitEdits = async ({
+    name,
+    presentation,
+  }: {
+    name: string;
+    presentation: LogoPresentation;
+  }) => {
+    if (state.status !== "ready") return;
     const base = pres ?? emptyPresentation();
-    let next: LogoPresentation;
-    if ("layout" in patch) {
-      next = { ...base, layout: patch.layout };
-    } else if ("sceneLead" in patch) {
-      const { slug, lead } = patch.sceneLead;
-      const sceneTexts = { ...base.sceneTexts };
-      if (lead) sceneTexts[slug] = { ...sceneTexts[slug], lead };
-      else delete sceneTexts[slug];
-      next = { ...base, sceneTexts };
-    } else {
-      next = { ...base, ...patch };
-    }
-    if (
-      next.catchphrase === base.catchphrase &&
-      next.story === base.story &&
-      JSON.stringify(next.sceneTexts) === JSON.stringify(base.sceneTexts) &&
-      JSON.stringify(next.layout) === JSON.stringify(base.layout)
-    ) {
-      return;
-    }
-    setPres(next);
-    await repo.savePresentation(id, next);
+    const nextName = name.trim() || state.name;
+    const nameChanged = nextName !== state.name;
+    const presentationChanged =
+      presentation.catchphrase !== base.catchphrase ||
+      presentation.story !== base.story ||
+      JSON.stringify(presentation.sceneTexts) !== JSON.stringify(base.sceneTexts) ||
+      JSON.stringify(presentation.layout) !== JSON.stringify(base.layout);
+
+    if (!nameChanged && !presentationChanged) return;
+
+    setState({ ...state, name: nextName });
+    setPres(presentation);
+
+    await Promise.all([
+      nameChanged ? repo.updateLogo(id, { title: nextName }) : Promise.resolve(),
+      presentationChanged ? repo.savePresentation(id, presentation) : Promise.resolve(),
+    ]);
   };
 
   if (state.status === "loading") {
@@ -145,17 +146,15 @@ export default function PresentationPage({
       name={state.name}
       mockupLogoId={id === "sample" ? undefined : id}
       mockupCandidateId={state.mockupCandidateId ?? undefined}
-      onNameChange={(name) => {
-        setState({ ...state, name });
-        // Renaming a stored logo updates its canonical title everywhere.
-        if (state.stored) void repo.updateLogo(id, { title: name });
-      }}
       onReset={() => router.push("/")}
       contactEmail={state.contactEmail}
       presentation={pres}
-      onSavePresentation={
-        state.stored && state.canEdit
-          ? (patch) => void handleSavePresentation(patch)
+      canEdit={state.stored && state.canEdit}
+      isSignedIn={isSignedIn}
+      onRequestSignIn={() => requestAuthDialog("signin")}
+      onCommitEdits={
+        state.stored && state.canEdit && isSignedIn
+          ? (payload) => void handleCommitEdits(payload)
           : undefined
       }
     />
