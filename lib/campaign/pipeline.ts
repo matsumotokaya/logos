@@ -7,9 +7,14 @@ import {
   generateBrandKit,
   adjudicatePalette,
   judgeBrandMatch,
+  formatUsage,
+  LLM_ENGINE,
+  LLM_MODEL,
+  LLM_PROVIDER,
   type SourceFile,
   type AdjudicatedPalette,
   type BrandMatchJudgment,
+  type LlmUsage,
 } from "./creative";
 import { renderLandingPage } from "./render-lp";
 import type { BrandAssets, CampaignBrandKit } from "./schema";
@@ -45,6 +50,14 @@ export interface PipelineOptions {
   verify?: boolean;
 }
 
+export interface LlmUsageSummary {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number;
+  breakdown: LlmUsage[];
+}
+
 export interface PipelineResult {
   kit: CampaignBrandKit;
   html: string;
@@ -53,6 +66,7 @@ export interface PipelineResult {
     adjudicated: boolean;
     candidates: PaletteCandidate[] | null;
     verification: (BrandMatchJudgment & { retried: boolean }) | null;
+    usage: LlmUsageSummary;
   };
   /** debug artifacts for CLI inspection */
   debug: {
@@ -68,6 +82,14 @@ export async function runCampaignPipeline(
   const progress = (message: string, level: PipelineProgress["level"] = "info") =>
     opts.onProgress?.({ message, level });
   const files = [...input.files];
+
+  // Cost transparency: every LLM call is logged with model, tokens and an
+  // estimated USD cost, and totalled at the end of the run.
+  const usages: LlmUsage[] = [];
+  const track = (usage: LlmUsage | null) => {
+    if (usage) usages.push(usage);
+  };
+  progress(`engine: ${LLM_ENGINE} を使用`);
 
   // Stage 1a: static ingest (text, meta, og:image) — also the fallback path.
   let raw: RawServiceInfo | null = null;
@@ -138,11 +160,13 @@ export async function runCampaignPipeline(
   // Stage 3a: VLM adjudication (choose-only, no invention).
   let adjudicated: AdjudicatedPalette | null = null;
   if (capture && candidates && candidates.length >= 2) {
-    progress("adjudicate: スクリーンショットを見てパレットの役割を裁定中…");
-    adjudicated = await adjudicatePalette({ capture, candidates });
+    progress(`adjudicate: ${LLM_MODEL} にスクショ+候補を送信して役割を裁定中…`);
+    const adj = await adjudicatePalette({ capture, candidates });
+    track(adj.usage);
+    adjudicated = adj.palette;
     if (adjudicated) {
       progress(
-        `adjudicate: primary ${adjudicated.primary} / accent ${adjudicated.accent} / bg ${adjudicated.background}（サイトから抽出）`,
+        `adjudicate: primary ${adjudicated.primary} / accent ${adjudicated.accent} / bg ${adjudicated.background}（サイトから抽出）${adj.usage ? `（${formatUsage(adj.usage)}）` : ""}`,
         "success"
       );
     } else {
@@ -165,7 +189,9 @@ export async function runCampaignPipeline(
   const designTokens = capture?.designTokens ?? null;
 
   // Stage 3b: Brand Kit generation.
-  progress("creative: Brand Kit を生成中…（コピー・ナレーション執筆、1〜2分かかります）");
+  progress(
+    `creative: ${LLM_MODEL} で Brand Kit を生成中…（コピー・ナレーション執筆、1〜2分かかります）`
+  );
   const creativeInput = {
     raw,
     userName: input.userName,
@@ -175,26 +201,33 @@ export async function runCampaignPipeline(
     adjudicated,
     designTokens,
   };
-  const toCampaignKit = (generated: Awaited<ReturnType<typeof generateBrandKit>>) => ({
+  const toCampaignKit = (generated: import("./schema").BrandKit): CampaignBrandKit => ({
     ...generated,
     assets,
     design_tokens: designTokens,
   });
-  let kit: CampaignBrandKit = toCampaignKit(await generateBrandKit(creativeInput));
-  progress(`creative: 「${kit.service.name}」の Brand Kit を生成`, "success");
+  const gen = await generateBrandKit(creativeInput);
+  track(gen.usage);
+  let kit: CampaignBrandKit = toCampaignKit(gen.kit);
+  progress(
+    `creative: 「${kit.service.name}」の Brand Kit を生成（${formatUsage(gen.usage)}）`,
+    "success"
+  );
   let html = renderLandingPage(kit);
 
   // Stage 4: self-verification loop (one retry).
   let verification: (BrandMatchJudgment & { retried: boolean }) | null = null;
   let lpShot: string | null = null;
   if ((opts.verify ?? true) && capture) {
-    progress("verify: 生成LPをスクリーンショットして元サイトと見比べ中…");
+    progress(`verify: 生成LPをスクショし、${LLM_MODEL} で元サイトと見比べ中…`);
     lpShot = await screenshotHtml(html);
     if (lpShot) {
-      let judgment = await judgeBrandMatch({
+      const first = await judgeBrandMatch({
         originalShot: capture.screenshots.desktop,
         generatedShot: lpShot,
       });
+      track(first.usage);
+      let judgment = first.judgment;
       let retried = false;
       if (judgment.verdict !== "pass") {
         progress(`verify: ${judgment.verdict} — ${judgment.reason}`, "warn");
@@ -208,17 +241,22 @@ export async function runCampaignPipeline(
             candidates,
             feedback: judgment.reason,
           });
-          if (redo) creativeInput.adjudicated = redo;
+          track(redo.usage);
+          if (redo.palette) creativeInput.adjudicated = redo.palette;
         }
-        kit = toCampaignKit(await generateBrandKit({ ...creativeInput, feedback }));
+        const regen = await generateBrandKit({ ...creativeInput, feedback });
+        track(regen.usage);
+        kit = toCampaignKit(regen.kit);
         html = renderLandingPage(kit);
         const retryShot = await screenshotHtml(html);
         if (retryShot) {
           lpShot = retryShot;
-          judgment = await judgeBrandMatch({
+          const second = await judgeBrandMatch({
             originalShot: capture.screenshots.desktop,
             generatedShot: retryShot,
           });
+          track(second.usage);
+          judgment = second.judgment;
         }
       }
       verification = { ...judgment, retried };
@@ -229,6 +267,18 @@ export async function runCampaignPipeline(
     }
   }
 
+  const usageSummary: LlmUsageSummary = {
+    calls: usages.length,
+    inputTokens: usages.reduce((s, u) => s + u.inputTokens, 0),
+    outputTokens: usages.reduce((s, u) => s + u.outputTokens, 0),
+    estimatedCostUsd: usages.reduce((s, u) => s + u.estimatedCostUsd, 0),
+    breakdown: usages,
+  };
+  progress(
+    `cost: ${LLM_PROVIDER} 呼び出し${usageSummary.calls}回 — ${formatUsage(usageSummary)}`,
+    "success"
+  );
+
   return {
     kit,
     html,
@@ -237,6 +287,7 @@ export async function runCampaignPipeline(
       adjudicated: adjudicated !== null,
       candidates,
       verification,
+      usage: usageSummary,
     },
     debug: { capture, lpShot },
   };

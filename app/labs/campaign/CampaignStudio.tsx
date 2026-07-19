@@ -31,6 +31,12 @@ type GenerateMeta = {
     reason: string;
     retried: boolean;
   } | null;
+  usage?: {
+    calls: number;
+    inputTokens: number;
+    outputTokens: number;
+    estimatedCostUsd: number;
+  } | null;
 };
 
 type StepLevel = "info" | "success" | "warn";
@@ -412,85 +418,142 @@ export default function CampaignStudio() {
         </section>
       )}
 
-      {steps.length > 0 && <ProcessLog steps={steps} working={phase === "working"} />}
+      {/* Result layout is always visible: placeholders first (so you can
+          predict what you'll get), then filled in when the job completes. */}
+      <ResultDigest
+        kit={kit}
+        html={html}
+        meta={meta}
+        lpUrl={lpUrl}
+        onReset={phase === "done" ? reset : null}
+        working={phase === "working"}
+      />
 
-      {phase === "done" && kit && (
-        <ResultDigest
-          kit={kit}
-          html={html}
-          meta={meta}
-          lpUrl={lpUrl}
-          onReset={reset}
-        />
+      {/* While running: the log floats as a popup. When finished it
+          auto-dismisses and reappears below the assets as reference info. */}
+      {phase === "working" && steps.length > 0 && <ProcessLogPopup steps={steps} />}
+      {phase !== "working" && steps.length > 0 && (
+        <ProcessLog steps={steps} working={false} />
       )}
     </main>
   );
 }
 
-// The agentic process, visible: each pipeline stage streams in while
-// generating and the whole log stays on screen afterwards as history — you
-// can see at a glance whether capture ran or was skipped (⚠).
+const LOG_MARKS: Record<StepLevel, { icon: string; cls: string }> = {
+  info: { icon: "·", cls: "text-ink-faint" },
+  success: { icon: "✓", cls: "text-emerald-600" },
+  warn: { icon: "⚠", cls: "text-amber-600" },
+};
+
+function ProcessLogLines({ steps, working }: { steps: StepEvent[]; working: boolean }) {
+  return (
+    <ol className="space-y-1.5 font-mono text-[11px] leading-relaxed">
+      {steps.map((s) => (
+        <li key={s.id} className="flex items-start gap-2">
+          <span className="shrink-0 text-ink-faint">{s.ts}</span>
+          <span className={`w-3 shrink-0 text-center ${LOG_MARKS[s.level].cls}`}>
+            {LOG_MARKS[s.level].icon}
+          </span>
+          <span className={s.level === "warn" ? "text-amber-700" : undefined}>
+            {s.message}
+          </span>
+        </li>
+      ))}
+      {working && (
+        <li className="flex items-center gap-2 text-ink-muted">
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ink-faint border-t-ink" />
+          <span>…</span>
+        </li>
+      )}
+    </ol>
+  );
+}
+
+// While the job runs, the log floats as a popup window over the placeholder
+// layout — the agentic process is visible without occupying the page. It
+// disappears automatically when the run settles.
+function ProcessLogPopup({ steps }: { steps: StepEvent[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [steps]);
+  return (
+    <div className="fixed bottom-6 right-6 z-50 w-[min(440px,calc(100vw-3rem))] overflow-hidden rounded-2xl border border-hairline bg-paper shadow-2xl">
+      <div className="flex items-center justify-between border-b border-hairline bg-ink/5 px-4 py-2.5">
+        <span className="flex items-center gap-2 text-[12px] font-semibold">
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ink-faint border-t-ink" />
+          処理ログ — 実行中
+        </span>
+        <span className="text-[10px] text-ink-muted">ページを閉じても継続します</span>
+      </div>
+      <div ref={scrollRef} className="max-h-[40vh] overflow-y-auto p-4">
+        <ProcessLogLines steps={steps} working />
+      </div>
+    </div>
+  );
+}
+
+// After the run, the same log sits below the marketing assets as reference
+// info — you can still see whether capture ran or was skipped (⚠).
 function ProcessLog({ steps, working }: { steps: StepEvent[]; working: boolean }) {
-  const MARKS: Record<StepLevel, { icon: string; cls: string }> = {
-    info: { icon: "·", cls: "text-ink-faint" },
-    success: { icon: "✓", cls: "text-emerald-600" },
-    warn: { icon: "⚠", cls: "text-amber-600" },
-  };
   return (
     <section className="mt-6 rounded-2xl border border-hairline bg-paper p-5">
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm font-semibold">処理ログ</h2>
-        <span className="text-[11px] text-ink-muted">
-          {working ? "実行中…（ページを閉じても継続します）" : "完了（この実行の履歴）"}
-        </span>
+        <span className="text-[11px] text-ink-muted">この実行の参考情報</span>
       </div>
-      <ol className="mt-3 space-y-1.5 font-mono text-[11px] leading-relaxed">
-        {steps.map((s) => (
-          <li key={s.id} className="flex items-start gap-2">
-            <span className="shrink-0 text-ink-faint">{s.ts}</span>
-            <span className={`w-3 shrink-0 text-center ${MARKS[s.level].cls}`}>
-              {MARKS[s.level].icon}
-            </span>
-            <span className={s.level === "warn" ? "text-amber-700" : undefined}>
-              {s.message}
-            </span>
-          </li>
-        ))}
-        {working && (
-          <li className="flex items-center gap-2 text-ink-muted">
-            <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ink-faint border-t-ink" />
-            <span>…</span>
-          </li>
-        )}
-      </ol>
+      <div className="mt-3">
+        <ProcessLogLines steps={steps} working={working} />
+      </div>
     </section>
   );
 }
 
-// One-shot marketing asset digest: Brand Kit summary, LP hero preview
-// (click through to the real page), and the promo-video slot.
+// Grey placeholder bar. Pulsing while a run is in progress is driven by the
+// parent section's `[&_.ph]:animate-pulse` variant class.
+function Ph({ className = "" }: { className?: string }) {
+  return <span aria-hidden className={`ph inline-block rounded bg-ink/10 ${className}`} />;
+}
+
+// Result digest. Always rendered — placeholders first, so the user can see
+// from the start what a run will produce; filled in when the job completes.
+// Structure follows the information hierarchy:
+//   1. Service header — what this business IS (analysis of the sources)
+//   2. Marketing assets — what was generated FROM it:
+//      Service Brand Kit (design), sales page (LP), promo video (+ narration)
 function ResultDigest({
   kit,
   html,
   meta,
   lpUrl,
   onReset,
+  working,
 }: {
-  kit: CampaignBrandKit;
+  kit: CampaignBrandKit | null;
   html: string | null;
   meta: GenerateMeta | null;
   lpUrl: string | null;
-  onReset: () => void;
+  onReset: (() => void) | null;
+  working: boolean;
 }) {
-  const swatches = [
-    { label: "Primary", hex: kit.brand.primary },
-    { label: "Accent", hex: kit.brand.accent },
-    { label: "BG", hex: kit.brand.background },
-    { label: "Surface", hex: kit.brand.surface },
-    { label: "Text", hex: kit.brand.text },
-  ];
+  const swatches = kit
+    ? [
+        { label: "Primary", hex: kit.brand.primary },
+        { label: "Accent", hex: kit.brand.accent },
+        { label: "BG", hex: kit.brand.background },
+        { label: "Surface", hex: kit.brand.surface },
+        { label: "Text", hex: kit.brand.text },
+      ]
+    : [
+        { label: "Primary", hex: null },
+        { label: "Accent", hex: null },
+        { label: "BG", hex: null },
+        { label: "Surface", hex: null },
+        { label: "Text", hex: null },
+      ];
 
-  const tokens: { label: string; value: string | null }[] = kit.design_tokens
+  const tokens: { label: string; value: string | null }[] = kit?.design_tokens
     ? [
         { label: "本文フォント", value: kit.design_tokens.body_font },
         { label: "見出しフォント", value: kit.design_tokens.heading_font },
@@ -520,105 +583,155 @@ function ResultDigest({
   };
 
   return (
-    <section className="mt-8">
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-display text-lg font-semibold">
-          マーケティングアセット
-        </h2>
-        <button
-          type="button"
-          onClick={onReset}
-          className="text-[11px] text-ink-muted underline-offset-2 hover:underline"
-        >
-          別のソースで作り直す
-        </button>
+    <section className={`mt-8 ${working ? "[&_.ph]:animate-pulse" : ""}`}>
+      {/* ---- Service header: the analysis, one level above the assets ---- */}
+      <div className="rounded-2xl border border-hairline bg-paper p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            {kit ? (
+              <>
+                <p className="font-display text-2xl font-semibold">{kit.service.name}</p>
+                <p className="mt-1 text-[13px] text-ink-muted">{kit.service.tagline}</p>
+              </>
+            ) : (
+              <>
+                <p className="font-display text-2xl font-semibold text-ink-faint">
+                  サービス分析
+                </p>
+                <p className="mt-1 text-[13px] text-ink-faint">
+                  ソースから読み取ったサービスの実像がここに入ります
+                </p>
+              </>
+            )}
+          </div>
+          {onReset && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="shrink-0 text-[11px] text-ink-muted underline-offset-2 hover:underline"
+            >
+              別のソースで作り直す
+            </button>
+          )}
+        </div>
+        <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-5 gap-y-1.5 text-[12px] sm:grid-cols-[auto_1fr_auto_1fr]">
+          <dt className="text-ink-faint">業種</dt>
+          <dd>{kit ? kit.service.industry : <Ph className="h-3.5 w-28" />}</dd>
+          <dt className="text-ink-faint">事業タイプ</dt>
+          <dd>
+            {kit ? (
+              (BUSINESS_TYPE_LABELS[kit.service.business_type] ?? kit.service.business_type)
+            ) : (
+              <Ph className="h-3.5 w-20" />
+            )}
+          </dd>
+          <dt className="text-ink-faint">提供価値</dt>
+          <dd className="sm:col-span-3">
+            {kit ? kit.service.offering : <Ph className="h-3.5 w-full max-w-md" />}
+          </dd>
+          <dt className="text-ink-faint">ターゲット</dt>
+          <dd className="sm:col-span-3">
+            {kit ? kit.service.audience : <Ph className="h-3.5 w-56" />}
+          </dd>
+          <dt className="text-ink-faint">概要</dt>
+          <dd className="sm:col-span-3">
+            {kit ? kit.service.description : <Ph className="h-3.5 w-full max-w-lg" />}
+          </dd>
+        </dl>
       </div>
 
+      <h2 className="mt-8 font-display text-lg font-semibold">マーケティングアセット</h2>
+
       <div className="mt-4 grid gap-6 lg:grid-cols-2">
-        {/* ---- Brand Kit summary ---- */}
+        {/* ---- Service Brand Kit: the design system ---- */}
         <div className="rounded-2xl border border-hairline p-6">
           <h3 className="text-sm font-semibold">Service Brand Kit</h3>
+          <p className="mt-1 text-[11px] text-ink-muted">
+            ロゴ・カラー・タイポグラフィなど、全アセット共通のデザイン基盤
+          </p>
 
-          <div className="mt-4 flex items-center gap-4">
-            {kit.assets?.logo && (
-              <div className="rounded-xl border border-hairline bg-white p-2">
+          <div className="mt-4">
+            <p className="text-[11px] font-semibold text-ink-muted">ロゴ</p>
+            {kit?.assets?.logo ? (
+              <div className="mt-2 inline-block rounded-xl border border-hairline bg-white p-3">
                 {/* base64 data URI from our own capture — next/image not applicable */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`data:${kit.assets.logo.media_type};base64,${kit.assets.logo.data}`}
                   alt={`${kit.service.name} のロゴ`}
-                  className="h-10 w-auto max-w-[160px] object-contain"
+                  className="h-10 w-auto max-w-[200px] object-contain"
                 />
               </div>
+            ) : kit ? (
+              <p className="mt-2 text-[12px] text-ink-muted">
+                取得できず — ワードマーク（タイポグラフィ）で代替
+              </p>
+            ) : (
+              <div className="mt-2 flex h-16 w-44 items-center justify-center rounded-xl border border-dashed border-hairline text-[11px] text-ink-faint">
+                サイトから取得
+              </div>
             )}
-            <div>
-              <p className="font-display text-xl font-semibold">{kit.service.name}</p>
-              <p className="text-[12px] text-ink-muted">{kit.service.tagline}</p>
+          </div>
+
+          <div className="mt-5">
+            <p className="text-[11px] font-semibold text-ink-muted">カラーパレット</p>
+            <div className="mt-2 flex gap-2">
+              {swatches.map((s) => (
+                <div key={s.label} className="text-center">
+                  <div
+                    className={`h-9 w-9 rounded-lg border border-hairline ${
+                      s.hex ? "" : `bg-ink/5 ${working ? "animate-pulse" : ""}`
+                    }`}
+                    style={s.hex ? { backgroundColor: s.hex } : undefined}
+                    title={s.hex ? `${s.label} ${s.hex}` : s.label}
+                  />
+                  <p className="mt-1 text-[9px] text-ink-faint">{s.label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {kit ? (
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                    kit.brand.palette_source === "extracted"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}
+                  title={
+                    kit.brand.palette_source === "extracted"
+                      ? "実際のサイトをレンダリングして収集した証拠から選ばれたパレット"
+                      : "サイトの証拠が取れなかったため、AIが提案したパレット"
+                  }
+                >
+                  {kit.brand.palette_source === "extracted" ? "サイトから抽出" : "AI提案"}
+                </span>
+              ) : (
+                <span className="rounded-full bg-ink/5 px-2.5 py-0.5 text-[10px] text-ink-faint">
+                  実サイトの証拠から抽出（取れなければAI提案と明示）
+                </span>
+              )}
+              {kit && meta?.verification && (
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                    meta.verification.verdict === "pass"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-red-50 text-red-700"
+                  }`}
+                  title={meta.verification.reason}
+                >
+                  {meta.verification.verdict === "pass"
+                    ? `元サイトと照合済み${meta.verification.retried ? "（1回再生成）" : ""}`
+                    : `検証: ${meta.verification.verdict}`}
+                </span>
+              )}
             </div>
           </div>
 
-          <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[12px]">
-            <dt className="text-ink-faint">業種</dt>
-            <dd>{kit.service.industry}</dd>
-            <dt className="text-ink-faint">事業タイプ</dt>
-            <dd>{BUSINESS_TYPE_LABELS[kit.service.business_type] ?? kit.service.business_type}</dd>
-            <dt className="text-ink-faint">提供価値</dt>
-            <dd>{kit.service.offering}</dd>
-            <dt className="text-ink-faint">ターゲット</dt>
-            <dd>{kit.service.audience}</dd>
-            <dt className="text-ink-faint">概要</dt>
-            <dd>{kit.service.description}</dd>
-          </dl>
-
-          <div className="mt-5 flex gap-2">
-            {swatches.map((s) => (
-              <div key={s.label} className="text-center">
-                <div
-                  className="h-9 w-9 rounded-lg border border-hairline"
-                  style={{ backgroundColor: s.hex }}
-                  title={`${s.label} ${s.hex}`}
-                />
-                <p className="mt-1 text-[9px] text-ink-faint">{s.label}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                kit.brand.palette_source === "extracted"
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-amber-50 text-amber-700"
-              }`}
-              title={
-                kit.brand.palette_source === "extracted"
-                  ? "実際のサイトをレンダリングして収集した証拠から選ばれたパレット"
-                  : "サイトの証拠が取れなかったため、AIが提案したパレット"
-              }
-            >
-              {kit.brand.palette_source === "extracted" ? "サイトから抽出" : "AI提案"}
-            </span>
-            {meta?.verification && (
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                  meta.verification.verdict === "pass"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-red-50 text-red-700"
-                }`}
-                title={meta.verification.reason}
-              >
-                {meta.verification.verdict === "pass"
-                  ? `元サイトと照合済み${meta.verification.retried ? "（1回再生成）" : ""}`
-                  : `検証: ${meta.verification.verdict}`}
-              </span>
-            )}
-          </div>
-
-          {tokens.length > 0 && (
-            <div className="mt-5">
-              <p className="text-[11px] font-semibold text-ink-muted">
-                デザイントークン（CSSからの推定）
-              </p>
+          <div className="mt-5">
+            <p className="text-[11px] font-semibold text-ink-muted">
+              デザイントークン（CSSからの推定）
+            </p>
+            {tokens.length > 0 ? (
               <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-[11px]">
                 {tokens.map((t) => (
                   <div key={t.label} className="contents">
@@ -627,73 +740,87 @@ function ResultDigest({
                   </div>
                 ))}
               </dl>
-            </div>
-          )}
-
-          <div className="mt-5 rounded-xl bg-ink/5 p-4">
-            <p className="text-[11px] font-semibold text-ink-muted">
-              30秒CM ナレーション原稿（動画レンダラーの入力）
-            </p>
-            <p className="mt-2 text-[12px] leading-relaxed">{kit.narration}</p>
+            ) : kit ? (
+              <p className="mt-2 text-[12px] text-ink-muted">取得できず</p>
+            ) : (
+              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 font-mono text-[11px]">
+                {["本文フォント", "見出しフォント", "ボタン角丸", "セクション余白"].map(
+                  (label) => (
+                    <div key={label} className="contents">
+                      <dt className="text-ink-faint">{label}</dt>
+                      <dd>
+                        <Ph className="h-3 w-24" />
+                      </dd>
+                    </div>
+                  )
+                )}
+              </dl>
+            )}
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-5">
             <button
               type="button"
+              disabled={!kit}
               onClick={() =>
+                kit &&
                 download("brandkit.json", JSON.stringify(kit, null, 2), "application/json")
               }
-              className="rounded-full border border-hairline px-4 py-1.5 text-[12px] hover:border-ink"
+              className="rounded-full border border-hairline px-4 py-1.5 text-[12px] hover:border-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-hairline"
             >
               Brand Kit (JSON)
             </button>
-            {html && (
-              <button
-                type="button"
-                onClick={() => download("index.html", html, "text/html")}
-                className="rounded-full border border-hairline px-4 py-1.5 text-[12px] hover:border-ink"
-              >
-                LPをダウンロード
-              </button>
-            )}
           </div>
         </div>
 
-        {/* ---- LP hero digest + video slot ---- */}
+        {/* ---- Sales page (LP) digest + promo video ---- */}
         <div className="flex flex-col gap-6">
           <div className="overflow-hidden rounded-2xl border border-hairline">
             <div className="flex items-center justify-between border-b border-hairline bg-ink/5 px-4 py-2">
-              <span className="text-[11px] font-semibold">LP（ペラ1）</span>
+              <span className="text-[11px] font-semibold">セールスページ（LP）</span>
               <button
                 type="button"
                 onClick={openLp}
-                className="rounded-full border border-hairline bg-paper px-3 py-1 text-[11px] hover:border-ink"
+                disabled={!html && !lpUrl}
+                className="rounded-full border border-hairline bg-paper px-3 py-1 text-[11px] hover:border-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-hairline"
               >
                 LPを開く ↗
               </button>
             </div>
             <div
-              className="group relative h-[360px] cursor-pointer overflow-hidden bg-white"
-              onClick={openLp}
-              title="クリックでLP全体を開く"
+              className={`group relative h-[360px] overflow-hidden ${
+                html ? "cursor-pointer bg-white" : "bg-ink/5"
+              }`}
+              onClick={html ? openLp : undefined}
+              title={html ? "クリックでLP全体を開く" : undefined}
             >
               {html ? (
-                <iframe
-                  title={`${kit.service.name} — LPヒーロープレビュー`}
-                  srcDoc={html}
-                  sandbox=""
-                  scrolling="no"
-                  className="pointer-events-none h-[900px] w-full origin-top-left"
-                />
+                <>
+                  <iframe
+                    title={`${kit?.service.name ?? "LP"} — LPヒーロープレビュー`}
+                    srcDoc={html}
+                    sandbox=""
+                    scrolling="no"
+                    className="pointer-events-none h-[900px] w-full origin-top-left"
+                  />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white to-transparent" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[11px] text-ink-muted opacity-0 transition group-hover:opacity-100">
+                    クリックでLP全体を表示
+                  </div>
+                </>
               ) : (
-                <div className="flex h-full items-center justify-center text-[12px] text-ink-muted">
-                  プレビューを読み込めませんでした
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-8">
+                  <div className="w-full max-w-sm space-y-2 text-center">
+                    <Ph className="h-6 w-3/4" />
+                    <Ph className="h-3.5 w-full" />
+                    <Ph className="h-3.5 w-5/6" />
+                    <Ph className="mt-2 h-8 w-32 rounded-full" />
+                  </div>
+                  <p className="text-[11px] text-ink-faint">
+                    Heroセクションのプレビュー。クリックで本物のLPが開きます
+                  </p>
                 </div>
               )}
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white to-transparent" />
-              <div className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[11px] text-ink-muted opacity-0 transition group-hover:opacity-100">
-                クリックでLP全体を表示
-              </div>
             </div>
           </div>
 
@@ -708,9 +835,23 @@ function ResultDigest({
               <div className="text-center">
                 <p className="text-2xl">▶</p>
                 <p className="mt-2 text-[12px] text-ink-muted">
-                  この Brand Kit のナレーション原稿から生成されます（Phase 0b）
+                  下のナレーション原稿から生成されます（Phase 0b）
                 </p>
               </div>
+            </div>
+            <div className="border-t border-hairline p-4">
+              <p className="text-[11px] font-semibold text-ink-muted">
+                30秒CM ナレーション原稿（動画レンダラーの入力）
+              </p>
+              {kit ? (
+                <p className="mt-2 text-[12px] leading-relaxed">{kit.narration}</p>
+              ) : (
+                <div className="mt-2 space-y-1.5">
+                  <Ph className="h-3.5 w-full" />
+                  <Ph className="h-3.5 w-full" />
+                  <Ph className="h-3.5 w-2/3" />
+                </div>
+              )}
             </div>
           </div>
         </div>

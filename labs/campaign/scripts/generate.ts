@@ -95,8 +95,8 @@ function slugify(s: string): string {
 
 async function main() {
   loadEnvLocal();
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error("ANTHROPIC_API_KEY が .env.local にありません");
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("OPENAI_API_KEY が .env.local にありません");
     process.exit(1);
   }
   const args = parseArgs(process.argv.slice(2));

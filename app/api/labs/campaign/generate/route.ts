@@ -73,9 +73,9 @@ export async function POST(req: Request) {
   if (denied) return denied;
   const user = await requireUser(req);
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY is not set. Add it to .env.local and restart." },
+      { error: "OPENAI_API_KEY is not set. Add it to .env.local and restart." },
       { status: 500 }
     );
   }
@@ -127,6 +127,7 @@ export async function POST(req: Request) {
           captured: result.meta.captured,
           adjudicated: result.meta.adjudicated,
           verification: result.meta.verification,
+          usage: result.meta.usage,
         },
       })
     )

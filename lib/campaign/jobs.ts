@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CampaignBrandKit } from "./schema";
-import type { PipelineProgress } from "./pipeline";
+import type { PipelineProgress, LlmUsageSummary } from "./pipeline";
 import type { BrandMatchJudgment } from "./creative";
 
 // Campaign job store — generation runs server-side detached from the HTTP
@@ -17,6 +17,8 @@ export interface CampaignJobMeta {
   captured: boolean;
   adjudicated: boolean;
   verification: (BrandMatchJudgment & { retried: boolean }) | null;
+  /** LLM API cost of this run (absent on records from before cost tracking). */
+  usage?: LlmUsageSummary | null;
 }
 
 export interface CampaignJobStep extends PipelineProgress {

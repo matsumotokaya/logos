@@ -1,7 +1,7 @@
 import "server-only";
 
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import OpenAI from "openai";
+import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { BrandKitSchema, type BrandKit } from "./schema";
 import type { RawServiceInfo } from "./ingest";
@@ -10,13 +10,13 @@ import { describeCandidates, type PaletteCandidate } from "./palette";
 import { luminance } from "../color";
 
 // Campaign creative — turn any mix of sources (scraped URL, pasted text,
-// uploaded PDFs / images) into a validated Service Brand Kit via Claude
+// uploaded PDFs / images) into a validated Service Brand Kit via OpenAI
 // structured outputs. NotebookLM-style: every source type funnels into the
 // same generation stage.
 //
 // Tier S palette pipeline (see labs/campaign/docs/palette-accuracy.md):
 // - adjudicatePalette (Stage 3): given screenshots + deterministic candidates,
-//   Claude vision assigns roles. Output colors are enum-constrained to the
+//   the VLM assigns roles. Output colors are enum-constrained to the
 //   candidate hexes, so invention is structurally impossible.
 // - generateBrandKit: when an adjudicated palette exists it is injected as
 //   fixed truth (palette_source: "extracted"); otherwise the palette is an AI
@@ -24,7 +24,54 @@ import { luminance } from "../color";
 // - judgeBrandMatch (Stage 4): compare the rendered LP against the original
 //   site screenshot and flag mismatches before shipping.
 
-const MODEL = "claude-opus-4-8";
+const MODEL = "gpt-5.6-terra";
+export const LLM_MODEL = MODEL;
+export const LLM_PROVIDER = "OpenAI API";
+export const LLM_ENGINE = `OpenAI API（Chat Completions + structured outputs / ${MODEL}）`;
+
+// Pricing (USD per 1M tokens) — for the cost line in the process log.
+// GPT-5.6 family GA 2026-07-09: sol $5/$30, terra $2.50/$15, luna $1/$6.
+// Update if the model or its pricing changes.
+const PRICE_PER_MTOK: Record<string, { input: number; output: number }> = {
+  "gpt-5.6-sol": { input: 5, output: 30 },
+  "gpt-5.6-terra": { input: 2.5, output: 15 },
+  "gpt-5.6-luna": { input: 1, output: 6 },
+};
+
+/** Token usage + estimated cost of one LLM API call. */
+export interface LlmUsage {
+  model: string;
+  purpose: "palette-adjudication" | "brand-kit" | "brand-match";
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number;
+}
+
+function usageOf(
+  response: { usage?: { prompt_tokens: number; completion_tokens: number } | null },
+  purpose: LlmUsage["purpose"]
+): LlmUsage {
+  const inputTokens = response.usage?.prompt_tokens ?? 0;
+  const outputTokens = response.usage?.completion_tokens ?? 0;
+  const price = PRICE_PER_MTOK[MODEL] ?? { input: 0, output: 0 };
+  return {
+    model: MODEL,
+    purpose,
+    inputTokens,
+    outputTokens,
+    estimatedCostUsd:
+      (inputTokens * price.input + outputTokens * price.output) / 1_000_000,
+  };
+}
+
+/** Log-friendly rendering: 入力12,345 / 出力678トークン ≈ $0.08 */
+export function formatUsage(u: {
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number;
+}): string {
+  return `入力${u.inputTokens.toLocaleString()} / 出力${u.outputTokens.toLocaleString()}トークン ≈ $${u.estimatedCostUsd.toFixed(3)}`;
+}
 
 export type SourceFile =
   | { kind: "pdf"; data: string }
@@ -70,34 +117,42 @@ Rules:
 - Never invent false claims (user counts, awards, pricing). Stay within what the source material supports; when unsure, write aspirational but non-factual copy.
 - narration: exactly the words a voice actor reads aloud for a ~30 second CM (roughly 180-260 Japanese characters). No headings, no directions.`;
 
-export async function generateBrandKit(input: CreativeInput): Promise<BrandKit> {
-  const client = new Anthropic();
+type ContentPart = OpenAI.Chat.Completions.ChatCompletionContentPart;
 
-  const content: Anthropic.ContentBlockParam[] = [];
+function imagePart(mediaType: string, base64: string): ContentPart {
+  return { type: "image_url", image_url: { url: `data:${mediaType};base64,${base64}` } };
+}
+
+export async function generateBrandKit(
+  input: CreativeInput
+): Promise<{ kit: BrandKit; usage: LlmUsage }> {
+  const client = new OpenAI();
+
+  const content: ContentPart[] = [];
   for (const file of input.files.slice(0, 5)) {
     if (file.kind === "pdf") {
       content.push({
-        type: "document",
-        source: { type: "base64", media_type: "application/pdf", data: file.data },
+        type: "file",
+        file: { filename: "source.pdf", file_data: `data:application/pdf;base64,${file.data}` },
       });
     } else {
-      content.push({
-        type: "image",
-        source: { type: "base64", media_type: file.mediaType, data: file.data },
-      });
+      content.push(imagePart(file.mediaType, file.data));
     }
   }
   content.push({ type: "text", text: buildUserPrompt(input) });
 
-  const response = await client.messages.parse({
+  const response = await client.chat.completions.parse({
     model: MODEL,
-    max_tokens: 8192,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content }],
-    output_config: { format: zodOutputFormat(BrandKitSchema) },
+    max_completion_tokens: 16000,
+    reasoning_effort: "medium",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content },
+    ],
+    response_format: zodResponseFormat(BrandKitSchema, "brand_kit"),
   });
 
-  const kit = response.parsed_output;
+  const kit = response.choices[0]?.message.parsed;
   if (!kit) {
     throw new Error("Brand Kit の生成に失敗しました（構造化出力なし）");
   }
@@ -119,7 +174,7 @@ export async function generateBrandKit(input: CreativeInput): Promise<BrandKit> 
   } else {
     kit.brand.palette_source = "generated";
   }
-  return kit;
+  return { kit, usage: usageOf(response, "brand-kit") };
 }
 
 function buildUserPrompt(input: CreativeInput): string {
@@ -209,9 +264,9 @@ export async function adjudicatePalette(input: {
   candidates: PaletteCandidate[];
   /** Stage 4 reviewer feedback when re-adjudicating after a mismatch. */
   feedback?: string;
-}): Promise<AdjudicatedPalette | null> {
+}): Promise<{ palette: AdjudicatedPalette | null; usage: LlmUsage | null }> {
   const hexes = input.candidates.map((c) => c.hex);
-  if (hexes.length < 2) return null;
+  if (hexes.length < 2) return { palette: null, usage: null };
 
   const HexEnum = z.enum(hexes as [string, ...string[]]);
   const AdjudicationSchema = z.object({
@@ -232,8 +287,8 @@ export async function adjudicatePalette(input: {
     rationale: z.string().describe("1-3 sentences: why these roles, citing the evidence"),
   });
 
-  const client = new Anthropic();
-  const content: Anthropic.ContentBlockParam[] = [];
+  const client = new OpenAI();
+  const content: ContentPart[] = [];
   const shots: [string, string | null][] = [
     ["Desktop above-the-fold (1440px)", input.capture.screenshots.desktop],
     ["Full page (downscaled)", input.capture.screenshots.fullPage],
@@ -242,10 +297,7 @@ export async function adjudicatePalette(input: {
   for (const [label, data] of shots) {
     if (!data) continue;
     content.push({ type: "text", text: label });
-    content.push({
-      type: "image",
-      source: { type: "base64", media_type: "image/jpeg", data },
-    });
+    content.push(imagePart("image/jpeg", data));
   }
   content.push({
     type: "text",
@@ -258,16 +310,21 @@ export async function adjudicatePalette(input: {
     }\n\nAssign the palette roles now.`,
   });
 
-  const response = await client.messages.parse({
+  const response = await client.chat.completions.parse({
     model: MODEL,
-    max_tokens: 1500,
-    system: ADJUDICATOR_SYSTEM,
-    messages: [{ role: "user", content }],
-    output_config: { format: zodOutputFormat(AdjudicationSchema) },
+    max_completion_tokens: 4000,
+    reasoning_effort: "low",
+    messages: [
+      { role: "system", content: ADJUDICATOR_SYSTEM },
+      { role: "user", content },
+    ],
+    response_format: zodResponseFormat(AdjudicationSchema, "palette_adjudication"),
   });
 
-  const out = response.parsed_output;
-  if (!out || out.assessment === "insufficient" || !out.palette) return null;
+  const usage = usageOf(response, "palette-adjudication");
+  const out = response.choices[0]?.message.parsed;
+  if (!out || out.assessment === "insufficient" || !out.palette)
+    return { palette: null, usage };
 
   // Deterministic readability guard: cards render body text (var(--text)) on
   // var(--surface), so an unreadable surface pick must never ship. Quality is
@@ -276,7 +333,7 @@ export async function adjudicatePalette(input: {
   if (contrastRatio(palette.surface, palette.text) < 4.5) {
     palette.surface = palette.background;
   }
-  return { ...palette, rationale: out.rationale };
+  return { palette: { ...palette, rationale: out.rationale }, usage };
 }
 
 function contrastRatio(a: string, b: string): number {
@@ -304,37 +361,37 @@ Layout and copy differences are expected and must NOT cause a failure.`;
 export async function judgeBrandMatch(input: {
   originalShot: string; // base64 jpeg
   generatedShot: string; // base64 jpeg
-}): Promise<BrandMatchJudgment> {
+}): Promise<{ judgment: BrandMatchJudgment; usage: LlmUsage }> {
   const JudgmentSchema = z.object({
     verdict: z.enum(["pass", "palette_mismatch", "tone_mismatch"]),
     reason: z.string().describe("1-2 sentences in Japanese"),
   });
 
-  const client = new Anthropic();
-  const response = await client.messages.parse({
+  const client = new OpenAI();
+  const response = await client.chat.completions.parse({
     model: MODEL,
-    max_tokens: 800,
-    system: VERIFIER_SYSTEM,
+    max_completion_tokens: 2000,
+    reasoning_effort: "low",
     messages: [
+      { role: "system", content: VERIFIER_SYSTEM },
       {
         role: "user",
         content: [
           { type: "text", text: "Original site:" },
-          {
-            type: "image",
-            source: { type: "base64", media_type: "image/jpeg", data: input.originalShot },
-          },
+          imagePart("image/jpeg", input.originalShot),
           { type: "text", text: "Generated landing page:" },
-          {
-            type: "image",
-            source: { type: "base64", media_type: "image/jpeg", data: input.generatedShot },
-          },
+          imagePart("image/jpeg", input.generatedShot),
           { type: "text", text: "Judge now." },
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(JudgmentSchema) },
+    response_format: zodResponseFormat(JudgmentSchema, "brand_match_judgment"),
   });
 
-  return response.parsed_output ?? { verdict: "pass", reason: "判定結果を取得できず既定でpass" };
+  return {
+    judgment:
+      response.choices[0]?.message.parsed ??
+      { verdict: "pass", reason: "判定結果を取得できず既定でpass" },
+    usage: usageOf(response, "brand-match"),
+  };
 }
