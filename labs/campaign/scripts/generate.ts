@@ -1,22 +1,23 @@
-// Campaign pipeline CLI — run ingest → creative → LP from the terminal,
-// without the web UI or Labs auth. Imports the same lib/campaign modules the
-// API route uses, so there is exactly one pipeline implementation.
+// Campaign pipeline CLI — run the full Tier S pipeline (capture → palette
+// candidates → VLM adjudication → creative → LP → self-verification) from the
+// terminal, without the web UI or Labs auth. Imports the same lib/campaign
+// modules the API route uses, so there is exactly one pipeline implementation.
 //
 // Usage (from the repo root):
-//   npm run campaign -- <url> [--name NAME] [--desc TEXT] [--shots DIR]
+//   npm run campaign -- <url> [--name NAME] [--desc TEXT] [--shots DIR] [--no-verify]
 //   npm run campaign -- --name "MyApp" --desc "..." --shots ./materials
 //
 // --shots accepts a directory of PDFs and images (flyers, decks, screenshots).
 // Output: var/campaign/<slug>/{brandkit.json, index.html, narration.txt}
+//         plus debug artifacts: candidates.json, original.jpg, lp.jpg
 //
 // Note: the npm script sets NODE_OPTIONS=--conditions=react-server so the
 // "server-only" guard inside lib/campaign resolves to its no-op build.
 
 import fs from "node:fs";
 import path from "node:path";
-import { scrapeUrl, fetchImageAsBase64, type RawServiceInfo } from "../../../lib/campaign/ingest";
-import { generateBrandKit, type SourceFile } from "../../../lib/campaign/creative";
-import { renderLandingPage } from "../../../lib/campaign/render-lp";
+import type { SourceFile } from "../../../lib/campaign/creative";
+import { runCampaignPipeline } from "../../../lib/campaign/pipeline";
 
 // Minimal .env.local loader (Next.js loads it automatically; plain Node does not).
 function loadEnvLocal() {
@@ -33,20 +34,22 @@ interface CliArgs {
   name?: string;
   desc?: string;
   shotsDir?: string;
+  verify: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { url: null };
+  const args: CliArgs = { url: null, verify: true };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--name") args.name = argv[++i];
     else if (a === "--desc") args.desc = argv[++i];
     else if (a === "--shots") args.shotsDir = argv[++i];
+    else if (a === "--no-verify") args.verify = false;
     else if (!a.startsWith("--")) args.url = a;
   }
   if (!args.url && !args.name) {
     console.error(
-      "Usage: npm run campaign -- <url> [--name NAME] [--desc TEXT] [--shots DIR]"
+      "Usage: npm run campaign -- <url> [--name NAME] [--desc TEXT] [--shots DIR] [--no-verify]"
     );
     process.exit(1);
   }
@@ -98,44 +101,71 @@ async function main() {
   }
   const args = parseArgs(process.argv.slice(2));
 
-  let raw: RawServiceInfo | null = null;
-  if (args.url) {
-    console.log(`[1/3] ingest: ${args.url} を解析中...`);
-    raw = await scrapeUrl(args.url);
-    console.log(`      title: ${raw.title ?? "(none)"}`);
-    console.log(`      colors: ${raw.colorHints.slice(0, 5).join(", ") || "(none)"}`);
-  } else {
-    console.log("[1/3] ingest: URLなし（ユーザー入力のみで生成）");
-  }
-
   const files: SourceFile[] = args.shotsDir ? loadSourceFiles(args.shotsDir) : [];
-  if (files.length) console.log(`      sources: ${files.length}ファイル読み込み`);
-  if (!files.some((f) => f.kind === "image") && raw?.ogImage) {
-    const og = await fetchImageAsBase64(raw.ogImage);
-    if (og) {
-      files.push({ kind: "image", mediaType: og.mediaType, data: og.data });
-      console.log("      og:image をキービジュアルとして取得");
+  if (files.length) console.log(`sources: ${files.length}ファイル読み込み`);
+
+  const result = await runCampaignPipeline(
+    {
+      url: args.url,
+      userName: args.name,
+      userDescription: args.desc,
+      files,
+    },
+    {
+      verify: args.verify,
+      onProgress: (e) => {
+        const mark = e.level === "success" ? "✓" : e.level === "warn" ? "⚠" : "…";
+        console.log(`[${new Date().toISOString().slice(11, 19)}] ${mark} ${e.message}`);
+      },
     }
+  );
+
+  const { kit, html, meta } = result;
+  console.log(`\nservice: ${kit.service.name} / ${kit.service.tagline}`);
+  console.log(
+    `analysis: ${kit.service.industry} / ${kit.service.business_type} — ${kit.service.offering}`
+  );
+  if (kit.design_tokens) {
+    const t = Object.entries(kit.design_tokens)
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(" ");
+    if (t) console.log(`tokens: ${t}`);
   }
-
-  console.log("[2/3] creative: Brand Kit を生成中...");
-  const kit = await generateBrandKit({
-    raw,
-    userName: args.name,
-    userDescription: args.desc,
-    files,
-  });
-  console.log(`      service: ${kit.service.name} / ${kit.service.tagline}`);
-  console.log(`      palette: ${kit.brand.primary} / ${kit.brand.accent} (${kit.brand.mode})`);
-
-  console.log("[3/3] lp: LPをレンダリング中...");
-  const html = renderLandingPage(kit);
+  console.log(`logo: ${kit.assets?.logo ? "captured" : "none (wordmark fallback)"}`);
+  console.log(
+    `palette: ${kit.brand.primary} / ${kit.brand.accent} on ${kit.brand.background} (${kit.brand.mode}, source=${kit.brand.palette_source})`
+  );
+  if (meta.candidates) {
+    console.log(`candidates (${meta.candidates.length}):`);
+    for (const c of meta.candidates)
+      console.log(`  ${c.hex}  ${c.evidence.join(" / ") || "補助候補"}`);
+  }
+  if (meta.verification) {
+    console.log(
+      `verification: ${meta.verification.verdict}${meta.verification.retried ? " (1回再生成)" : ""} — ${meta.verification.reason}`
+    );
+  }
 
   const outDir = path.join("var", "campaign", slugify(args.name ?? args.url ?? "output"));
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "brandkit.json"), JSON.stringify(kit, null, 2));
   fs.writeFileSync(path.join(outDir, "index.html"), html);
   fs.writeFileSync(path.join(outDir, "narration.txt"), kit.narration + "\n");
+  if (meta.candidates)
+    fs.writeFileSync(
+      path.join(outDir, "candidates.json"),
+      JSON.stringify(meta.candidates, null, 2)
+    );
+  if (result.debug.capture)
+    fs.writeFileSync(
+      path.join(outDir, "original.jpg"),
+      Buffer.from(result.debug.capture.screenshots.desktop, "base64")
+    );
+  if (result.debug.lpShot)
+    fs.writeFileSync(path.join(outDir, "lp.jpg"), Buffer.from(result.debug.lpShot, "base64"));
+  if (kit.assets?.logo)
+    fs.writeFileSync(path.join(outDir, "logo.png"), Buffer.from(kit.assets.logo.data, "base64"));
 
   console.log(`\n完了: ${outDir}/`);
   console.log(`プレビュー: open ${path.join(outDir, "index.html")}`);

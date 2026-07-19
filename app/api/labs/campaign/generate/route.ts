@@ -1,17 +1,28 @@
-// POST: one Campaign Lab generation — sources in, Brand Kit + LP out.
+// POST: kick off one Campaign Lab generation as a detached server-side job.
 //
 // NotebookLM-style intake: any mix of { url, pasted text, uploaded PDFs /
 // images } funnels into the same creative stage (Claude structured outputs),
-// which emits a Service Brand Kit. The LP is rendered server-side from the
-// kit and returned inline; the same kit later feeds the video renderer.
+// which emits a Service Brand Kit. The pipeline runs detached from this
+// request and persists every progress event to the job store, so the client
+// can close the tab / lose the connection and re-attach later by polling
+// GET /api/labs/campaign/jobs — nothing is lost on reload.
+//
+// Note: the detached run assumes a long-lived Node process (local dev / a
+// real server). On serverless the process may be frozen after the response —
+// Labs is local-first, and Phase 1 moves this to a real queue.
 
 import { NextResponse } from "next/server";
 import { guardLabsRequest } from "@/lib/labs-access";
-import { scrapeUrl, fetchImageAsBase64, type RawServiceInfo } from "@/lib/campaign/ingest";
-import { generateBrandKit, type SourceFile } from "@/lib/campaign/creative";
-import { renderLandingPage } from "@/lib/campaign/render-lp";
+import { requireUser } from "@/lib/supabase/server";
+import type { SourceFile } from "@/lib/campaign/creative";
+import { runCampaignPipeline } from "@/lib/campaign/pipeline";
+import {
+  createCampaignJob,
+  appendCampaignStep,
+  completeCampaignJob,
+  failCampaignJob,
+} from "@/lib/campaign/jobs";
 
-// Structured generation with documents can take a couple of minutes.
 export const maxDuration = 300;
 
 const MAX_FILES = 5;
@@ -60,6 +71,7 @@ function parseUrl(raw: unknown): string | null {
 export async function POST(req: Request) {
   const denied = await guardLabsRequest(req);
   if (denied) return denied;
+  const user = await requireUser(req);
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
@@ -68,9 +80,9 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: GenerateBody;
   let url: string | null;
   let files: SourceFile[];
+  let body: GenerateBody;
   try {
     body = (await req.json()) as GenerateBody;
     url = parseUrl(body.url);
@@ -86,36 +98,42 @@ export async function POST(req: Request) {
     );
   }
 
-  try {
-    // Stage 1: ingest
-    let raw: RawServiceInfo | null = null;
-    if (url) {
-      raw = await scrapeUrl(url);
-      // Use og:image as a key visual when the user attached nothing visual.
-      if (!files.some((f) => f.kind === "image") && raw.ogImage) {
-        const og = await fetchImageAsBase64(raw.ogImage);
-        if (og) files.push({ kind: "image", mediaType: og.mediaType, data: og.data });
-      }
-    }
+  const job = createCampaignJob(user.id, {
+    url,
+    name: body.name?.trim() || null,
+    files: files.length,
+    hasText: Boolean(body.pastedText?.trim()),
+  });
 
-    // Stage 2: creative (Claude structured outputs → Brand Kit)
-    const kit = await generateBrandKit({
-      raw,
+  // Detached run: progress and result live in the job store, not in this
+  // response. The client re-attaches via polling — reload-safe by design.
+  void runCampaignPipeline(
+    {
+      url,
       userName: body.name?.trim() || undefined,
       userDescription: body.description?.trim() || undefined,
       pastedText: body.pastedText?.trim() || undefined,
       files,
+    },
+    {
+      onProgress: (event) => appendCampaignStep(job.id, event),
+    }
+  )
+    .then((result) =>
+      completeCampaignJob(job.id, {
+        kit: result.kit,
+        html: result.html,
+        meta: {
+          captured: result.meta.captured,
+          adjudicated: result.meta.adjudicated,
+          verification: result.meta.verification,
+        },
+      })
+    )
+    .catch((e) => {
+      console.error("Campaign generate failed:", e);
+      failCampaignJob(job.id, e instanceof Error ? e.message : "生成に失敗しました");
     });
 
-    // Stage 3: LP render
-    const html = renderLandingPage(kit);
-
-    return NextResponse.json({ kit, html });
-  } catch (e) {
-    console.error("Campaign generate failed:", e);
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "生成に失敗しました" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({ jobId: job.id }, { status: 202 });
 }

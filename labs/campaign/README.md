@@ -6,15 +6,16 @@
 
 ## 1. いま何ができるか（現在地）
 
-**「ソース → Service Brand Kit → LP」の縦貫通が動いている。動画はまだ。**
+**「ソース → Service Brand Kit → LP」の縦貫通が動いている。パレットはTier S（実画面レンダリング証拠 + VLM裁定 + 自己検証）で抽出される。動画はまだ。**
 
 UIフロー（`/labs/campaign`、Labsロール必須）:
 
 1. **ソース追加カード**: URL入力（サンプルチップ: Anthropic/Apple/Google）、PDF・画像のドラッグ&ドロップ（5個・各4.5MBまで）、テキスト貼り付け。NotebookLMの「ソースを追加」を踏襲した設計
-2. 「LPと動画素材を生成」ボタン → 生成中の段階演出（「サービスを理解しています…」等）。**1〜2分かかる**（Claude opusの構造化生成）
-3. 結果は2パネル:
-   - **左 = Service Brand Kit パネル**: サービス名・タグライン、カラーパレット5色、ジャンル/ターゲット、**30秒CMナレーション原稿**（これが将来の動画レンダラーの入力）、ダウンロードボタン（LP HTML / brandkit.json）
-   - **右 = LPライブプレビュー**: 生成されたペラ1をiframeで即時表示。「新しいタブで開く」可。LP内には動画埋め込みスロットを確保済み（今は「生成中」表示のプレースホルダ）
+2. 「LPと動画素材を生成」ボタン → **サーバー側のジョブとして生成が走る**（`var/campaign-lab/jobs/` に永続化、UIは2.5秒ポーリングで追従）。**処理ログ**にパイプラインの実イベントが流れ（ingest→capture→palette→adjudicate→creative→verify）、完了後もその実行の履歴として画面に残る。captureが実行されたかスキップされたか（⚠表示）が利用者にも開発者にも見える。**ページを閉じても・回線が切れても生成は継続**し、次に開いたとき最新ジョブ（ログ+結果）が復元される。**2〜4分かかる**
+3. 結果は**マーケティングアセットのダイジェスト**:
+   - **Service Brand Kit 概要**: 取得した実ロゴ・サービス名・タグライン、**分析結果**（業種・事業タイプ・提供価値・ターゲット・概要）、パレット5色+出所バッジ、**CSSから推定したデザイントークン**（フォント・ボタン角丸/余白・セクション余白・コンテンツ幅）、30秒CMナレーション原稿、brandkit.json / LP HTMLダウンロード
+   - **LP（ペラ1）**: Heroセクションだけのダイジェストプレビュー。クリックで**本物のLP**（署名付きURL `/api/labs/campaign/lp/[id]`）が新しいタブで開く。LPヘッダーには取得した実ロゴを使用
+   - **紹介動画（30秒CM）**: Phase 0bで生成されるスロット（プレースホルダ）
 
 CLIでも同じパイプラインを実行できる（Web UI・ログイン不要、検証・開発用）:
 
@@ -26,19 +27,29 @@ npm run campaign -- --name "MyApp" --desc "説明" --shots ./materials  # PDFや
 
 必要な環境変数: `.env.local` の `ANTHROPIC_API_KEY`。秘密値はリポジトリへコミットしない。
 
+パレット抽出（Tier S capture）はローカルにChromiumが必要: `npx playwright install chromium`（`playwright` はdependencies導入済み）。無いホストではcaptureが自動でスキップされ、`palette_source: "generated"` のAI提案パレットに落ちる。
+
 ## 2. アーキテクチャの核: Service Brand Kit
 
 動画でもLPでもなく、**「サービス理解+ブランド」の中間表現（Brand Kit）がプロダクトの核**。zodスキーマは `lib/campaign/schema.ts`。
 
 ```
 ソース（URL / PDF / 画像 / テキスト）
-   ▼ Stage 1: ingest（スクレイピング・ブランドカラー抽出・og:image取得）
-   ▼ Stage 2: creative（Claude claude-opus-4-8 + structured outputs）
-Service Brand Kit（service / brand(palette) / copy(LP全文) / narration(CM原稿)）
-   ├→ LPレンダラー ……………… 実装済み（render-lp.ts）
+   ▼ Stage 1: ingest（スクレイピング・og:image） + capture（Playwrightで実画面レンダリング・証拠収集・ロゴ画像・デザイントークン）
+   ▼ Stage 2: palette（CIELABクラスタリング → 証拠付きパレット候補）
+   ▼ Stage 3: creative（VLM裁定=候補からの選択のみ + Claude claude-opus-4-8 structured outputs）
+Service Brand Kit
+  = service（名前/タグライン/概要 + 分析: 業種/事業タイプ/提供価値/ターゲット）
+  + brand（palette + palette_source / font_style）
+  + copy（LP全文） + narration（CM原稿）
+  + assets（実ロゴPNG・favicon/og:image URL）+ design_tokens（CSS推定: フォント/角丸/余白/幅）
+   ├→ LPレンダラー ……………… 実装済み（render-lp.ts、実ロゴをヘッダーに使用）
+   ▼ Stage 4: verify（生成LPと元サイトのスクショ比較 → 不一致なら1回だけ再生成）
    ├→ 動画レンダラー（Remotion） … 次フェーズ（Phase 0b）
    └→ SNS素材・OGP・バナー ……… 将来
 ```
+
+assets / design_tokens はLLM出力ではなく、パイプラインが決定論的にマージする（`CampaignBrandKit`型）。Brand Kitのフィールドセット自体の妥当性検証は [docs/deep-research-prompts.md](docs/deep-research-prompts.md) §7 のリサーチプロンプトを参照。
 
 設計原則: **LLMには閉じたスキーマのJSONだけを出力させ、見た目の品質はテンプレート側で担保する**。雑な入力でも壊れない。ロゴス本体の思想でいえば、Brand Kitのコピー/パレット生成は「探索」、レンダラーは「保証」に相当する。
 
@@ -46,16 +57,20 @@ Service Brand Kit（service / brand(palette) / copy(LP全文) / narration(CM原�
 
 ```
 lib/campaign/            # パイプライン本体（API routeとCLIの両方から使う唯一の実装）
-├── schema.ts            #   Service Brand Kit の zod スキーマ
+├── pipeline.ts          #   オーケストレーション（capture→palette→裁定→creative→LP→verify）
+├── schema.ts            #   Service Brand Kit の zod スキーマ + CampaignBrandKit（assets/design_tokens）
 ├── ingest.ts            #   URL → テキスト・メタ・カラーヒント・og:image
-├── creative.ts          #   Claude structured outputs → Brand Kit（PDF/画像/テキスト対応）
+├── capture.ts           #   Playwrightで実画面レンダリング→スクショ・ヒストグラム・ロゴ画像・デザイントークン
+├── palette.ts           #   CIELABクラスタリング→証拠付きパレット候補
+├── creative.ts          #   VLM裁定 + Brand Kit生成 + LP照合判定（Claude structured outputs）
+├── jobs.ts              #   ジョブ永続化（var/campaign-lab/jobs/、リロード復元の裏側）
 └── render-lp.ts         #   Brand Kit → 自己完結HTML（外部依存ゼロ・CSS変数テーマ）
 
 app/labs/campaign/       # 入口UX
 ├── page.tsx             #   ラボページ（LabHeader + noindex）
 └── CampaignStudio.tsx   #   ソース追加UI・生成・結果2パネル表示
 
-app/api/labs/campaign/generate/route.ts  # 生成API（guardLabsRequestで保護、maxDuration 300）
+app/api/labs/campaign/generate/route.ts  # 生成API（guardLabsRequestで保護、maxDuration 300、NDJSONストリーミング: progress/ping/result/error）
 
 labs/campaign/
 ├── README.md            # この資料
@@ -74,8 +89,8 @@ labs/campaign/
 
 ## 4. ロードマップ
 
-### Phase 0a+: パレット精度の改善（最優先・着手前）
-現行のカラー抽出はHTML静的解析のみで、外部CSSのサイト（例: wealth-park.com）では**証拠ゼロ→AIが色を発明する**破綻が実証済み。Playwrightスクショ + computed styleヒストグラム + VLM裁定 + 自己検証ループの「最強プラン」を設計済み。**詳細・実測診断・受け入れ基準: [docs/palette-accuracy.md](docs/palette-accuracy.md)**。初回品質＝アハ体験なので動画より先にやる。
+### Phase 0a+: パレット精度の改善（✅ Tier S 実装済み 2026-07-19）
+Playwrightスクショ + computed styleヒストグラム + VLM裁定（候補からの選択のみ・発明禁止）+ 自己検証ループのTier Sを実装し、受け入れ基準を実測で確認済み（wealth-parkで白/黒/青が返り緑は消滅、anthropic.comは劣化なし）。**設計・実装対応表・実測結果: [docs/palette-accuracy.md](docs/palette-accuracy.md)**。Vercel本番ではChromiumが動かないためcaptureは自動でスキップされ`palette_source: "generated"`のAI提案パレットに落ちる（マネージドブラウザへの差し替えはプロダクト化時）。
 
 ### Phase 0b: 動画レンダラー（次にやること）
 `narration.txt`（Brand Kitに含まれる）を起点に:

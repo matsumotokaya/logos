@@ -1,4 +1,4 @@
-import type { BrandKit } from "./schema";
+import type { BrandKit, CampaignBrandKit } from "./schema";
 
 // Stage LP: render a Brand Kit into a standalone one-page site (inline CSS,
 // no external dependencies). Quality lives in this template; the LLM only
@@ -16,10 +16,18 @@ const FONT_STACKS: Record<BrandKit["brand"]["font_style"], string> = {
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-export function renderLandingPage(kit: BrandKit, opts: { videoEmbed?: string } = {}): string {
+export function renderLandingPage(
+  kit: BrandKit | CampaignBrandKit,
+  opts: { videoEmbed?: string } = {}
+): string {
   const { service, brand, copy } = kit;
   const font = FONT_STACKS[brand.font_style];
   const ctaHref = service.url ? esc(service.url) : "#";
+  // Real logo (captured from the source site) beats a typographic wordmark.
+  const logo = "assets" in kit ? kit.assets?.logo : null;
+  const logoHtml = logo
+    ? `<img src="data:${logo.media_type};base64,${logo.data}" alt="${esc(service.name)}" style="height:30px;width:auto;display:block">`
+    : `${esc(service.name)}<span class="dot">.</span>`;
 
   return `<!DOCTYPE html>
 <html lang="ja">
@@ -82,7 +90,7 @@ footer{padding:40px 0;text-align:center;font-size:.85rem;opacity:.6;border-top:1
 <body>
 <header>
   <div class="container nav">
-    <div class="logo">${esc(service.name)}<span class="dot">.</span></div>
+    <div class="logo">${logoHtml}</div>
     <a class="btn small" href="${ctaHref}">${esc(copy.hero.cta_label)}</a>
   </div>
 </header>

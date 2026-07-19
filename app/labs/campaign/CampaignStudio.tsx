@@ -2,12 +2,16 @@
 
 // Campaign Studio — NotebookLM-style intake on top of the campaign pipeline.
 // Add any mix of sources (URL / PDF / images / pasted text), press generate,
-// and get a Service Brand Kit + instantly rendered LP. The same kit will
-// feed the promo-video renderer next.
+// and get the marketing asset digest in one shot: Service Brand Kit summary,
+// LP hero preview (click through to the real page) and the promo-video slot.
+//
+// Generation runs as a detached server-side job: this component only polls
+// the job store, so closing the tab or losing the connection never loses a
+// run — on reload the latest job (log history included) is restored.
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import type { BrandKit } from "@/lib/campaign/schema";
+import type { CampaignBrandKit } from "@/lib/campaign/schema";
 
 type UiFile = {
   id: string;
@@ -19,20 +23,57 @@ type UiFile = {
 
 type Phase = "idle" | "working" | "done" | "error";
 
+type GenerateMeta = {
+  captured: boolean;
+  adjudicated: boolean;
+  verification: {
+    verdict: "pass" | "palette_mismatch" | "tone_mismatch";
+    reason: string;
+    retried: boolean;
+  } | null;
+};
+
+type StepLevel = "info" | "success" | "warn";
+type StepEvent = { id: number; ts: string; message: string; level: StepLevel };
+
+type JobPayload = {
+  job: {
+    id: string;
+    status: "running" | "done" | "error";
+    createdAt: string;
+    steps: { ts: string; message: string; level: StepLevel }[];
+    kit: CampaignBrandKit | null;
+    meta: GenerateMeta | null;
+    error: string | null;
+  } | null;
+  html?: string | null;
+  lpUrl?: string | null;
+};
+
 const SAMPLES: { label: string; url: string }[] = [
   { label: "Anthropic", url: "https://www.anthropic.com" },
   { label: "Apple", url: "https://www.apple.com/jp/" },
   { label: "Google", url: "https://about.google/" },
 ];
 
-const WORKING_MESSAGES = [
-  "ソースを読み込んでいます…",
-  "サービスを理解しています…",
-  "ブランドカラーを分析しています…",
-  "コピーを書いています…",
-  "ナレーション原稿を練っています…",
-  "LPを組み立てています…",
-];
+const BUSINESS_TYPE_LABELS: Record<string, string> = {
+  saas: "SaaS",
+  app: "アプリ",
+  web_service: "Webサービス",
+  ecommerce: "EC",
+  media: "メディア",
+  consulting: "コンサルティング",
+  agency: "制作・代理店",
+  restaurant: "飲食",
+  retail: "小売",
+  local_service: "サービス業（実店舗）",
+  freelance: "フリーランス・個人",
+  community: "コミュニティ",
+  tool: "ツール",
+  other: "その他",
+};
+
+const POLL_INTERVAL_MS = 2500;
 
 const ACCEPTED = new Set([
   "application/pdf",
@@ -61,19 +102,34 @@ async function fileToUiFile(file: File): Promise<UiFile | null> {
   };
 }
 
+async function authedFetch(path: string, init?: RequestInit): Promise<Response> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("ログインが必要です（Labsアクセス権のあるアカウント）");
+  return fetch(path, {
+    ...init,
+    headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
+  });
+}
+
+const stepTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString("ja-JP", { hour12: false });
+
 export default function CampaignStudio() {
   const [url, setUrl] = useState("");
   const [pastedText, setPastedText] = useState("");
   const [showPaste, setShowPaste] = useState(false);
   const [files, setFiles] = useState<UiFile[]>([]);
   const [phase, setPhase] = useState<Phase>("idle");
-  const [workingMsg, setWorkingMsg] = useState(WORKING_MESSAGES[0]);
+  const [steps, setSteps] = useState<StepEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [kit, setKit] = useState<BrandKit | null>(null);
+  const [kit, setKit] = useState<CampaignBrandKit | null>(null);
   const [html, setHtml] = useState<string | null>(null);
+  const [meta, setMeta] = useState<GenerateMeta | null>(null);
+  const [lpUrl, setLpUrl] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const workingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const hasSource = url.trim() !== "" || files.length > 0 || pastedText.trim() !== "";
 
@@ -87,34 +143,94 @@ export default function CampaignStudio() {
       setFiles((prev) => [...prev, ...added].slice(0, 5));
   }, []);
 
-  const startWorkingTicker = () => {
-    let i = 0;
-    setWorkingMsg(WORKING_MESSAGES[0]);
-    workingTimer.current = setInterval(() => {
-      i = Math.min(i + 1, WORKING_MESSAGES.length - 1);
-      setWorkingMsg(WORKING_MESSAGES[i]);
-    }, 9000);
-  };
-  const stopWorkingTicker = () => {
-    if (workingTimer.current) clearInterval(workingTimer.current);
-    workingTimer.current = null;
-  };
+  const stopPolling = useCallback(() => {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+    pollTimer.current = null;
+  }, []);
+
+  const applyJobPayload = useCallback(
+    (payload: JobPayload): "running" | "settled" | "none" => {
+      const job = payload.job;
+      if (!job) return "none";
+      setSteps(
+        job.steps.map((s, i) => ({
+          id: i,
+          ts: stepTime(s.ts),
+          message: s.message,
+          level: s.level,
+        }))
+      );
+      if (job.status === "done" && job.kit) {
+        setKit(job.kit);
+        setHtml(payload.html ?? null);
+        setMeta(job.meta);
+        setLpUrl(payload.lpUrl ?? null);
+        setPhase("done");
+        return "settled";
+      }
+      if (job.status === "error") {
+        setError(job.error ?? "生成に失敗しました");
+        setPhase("error");
+        return "settled";
+      }
+      setPhase("working");
+      return "running";
+    },
+    []
+  );
+
+  const startPolling = useCallback(
+    (jobId: string) => {
+      stopPolling();
+      const tick = async () => {
+        try {
+          const res = await authedFetch(`/api/labs/campaign/jobs?id=${jobId}`);
+          if (!res.ok) return; // transient — keep polling
+          const state = applyJobPayload((await res.json()) as JobPayload);
+          if (state !== "running") stopPolling();
+        } catch {
+          // network hiccup: the job keeps running server-side, just retry
+        }
+      };
+      void tick();
+      pollTimer.current = setInterval(() => void tick(), POLL_INTERVAL_MS);
+    },
+    [applyJobPayload, stopPolling]
+  );
+
+  // Reload / reconnect recovery: restore the latest job (log + result).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authedFetch("/api/labs/campaign/jobs");
+        if (!res.ok || cancelled) return;
+        const payload = (await res.json()) as JobPayload;
+        if (cancelled) return;
+        const state = applyJobPayload(payload);
+        if (state === "running" && payload.job) startPolling(payload.job.id);
+      } catch {
+        // signed out or labs-gated: stay idle
+      }
+    })();
+    return () => {
+      cancelled = true;
+      stopPolling();
+    };
+  }, [applyJobPayload, startPolling, stopPolling]);
 
   const generate = async () => {
     setError(null);
+    setSteps([]);
+    setKit(null);
+    setHtml(null);
+    setMeta(null);
+    setLpUrl(null);
     setPhase("working");
-    startWorkingTicker();
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error("ログインが必要です（Labsアクセス権のあるアカウント）");
-
-      const res = await fetch("/api/labs/campaign/generate", {
+      const res = await authedFetch("/api/labs/campaign/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: url.trim() || undefined,
           pastedText: pastedText.trim() || undefined,
@@ -125,20 +241,14 @@ export default function CampaignStudio() {
           })),
         }),
       });
-      const json = (await res.json()) as
-        | { kit: BrandKit; html: string }
-        | { error: string };
-      if (!res.ok || "error" in json) {
-        throw new Error("error" in json ? json.error : `生成に失敗しました (HTTP ${res.status})`);
+      const json = (await res.json()) as { jobId?: string; error?: string };
+      if (!res.ok || !json.jobId) {
+        throw new Error(json.error ?? `生成を開始できませんでした (HTTP ${res.status})`);
       }
-      setKit(json.kit);
-      setHtml(json.html);
-      setPhase("done");
+      startPolling(json.jobId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "生成に失敗しました");
       setPhase("error");
-    } finally {
-      stopWorkingTicker();
     }
   };
 
@@ -146,6 +256,8 @@ export default function CampaignStudio() {
     setPhase("idle");
     setKit(null);
     setHtml(null);
+    setMeta(null);
+    setLpUrl(null);
     setError(null);
   };
 
@@ -160,8 +272,9 @@ export default function CampaignStudio() {
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-ink-muted">
           URL・PDF・スクリーンショット・テキスト。サービスの内容がわかるものを渡すと、
-          ブランドを理解した Service Brand Kit を生成し、そのままLPを組み立てます。
-          動画（30秒CM）レンダラーは次のフェーズで同じKitに接続されます。
+          ブランドを理解した Service Brand Kit を生成し、LP・紹介動画などの
+          マーケティングアセットが一式で出てきます。生成はサーバー側で走るので、
+          ページを閉じても次に開いたときに結果が復元されます。
         </p>
       </header>
 
@@ -292,39 +405,101 @@ export default function CampaignStudio() {
             {phase === "working" && (
               <span className="flex items-center gap-2 text-[12px] text-ink-muted">
                 <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ink-faint border-t-ink" />
-                {workingMsg}
+                {steps.length > 0 ? steps[steps.length - 1].message : "開始しています…"}
               </span>
             )}
           </div>
         </section>
       )}
 
-      {phase === "done" && kit && html && (
-        <ResultView kit={kit} html={html} onReset={reset} />
+      {steps.length > 0 && <ProcessLog steps={steps} working={phase === "working"} />}
+
+      {phase === "done" && kit && (
+        <ResultDigest
+          kit={kit}
+          html={html}
+          meta={meta}
+          lpUrl={lpUrl}
+          onReset={reset}
+        />
       )}
     </main>
   );
 }
 
-function ResultView({
+// The agentic process, visible: each pipeline stage streams in while
+// generating and the whole log stays on screen afterwards as history — you
+// can see at a glance whether capture ran or was skipped (⚠).
+function ProcessLog({ steps, working }: { steps: StepEvent[]; working: boolean }) {
+  const MARKS: Record<StepLevel, { icon: string; cls: string }> = {
+    info: { icon: "·", cls: "text-ink-faint" },
+    success: { icon: "✓", cls: "text-emerald-600" },
+    warn: { icon: "⚠", cls: "text-amber-600" },
+  };
+  return (
+    <section className="mt-6 rounded-2xl border border-hairline bg-paper p-5">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold">処理ログ</h2>
+        <span className="text-[11px] text-ink-muted">
+          {working ? "実行中…（ページを閉じても継続します）" : "完了（この実行の履歴）"}
+        </span>
+      </div>
+      <ol className="mt-3 space-y-1.5 font-mono text-[11px] leading-relaxed">
+        {steps.map((s) => (
+          <li key={s.id} className="flex items-start gap-2">
+            <span className="shrink-0 text-ink-faint">{s.ts}</span>
+            <span className={`w-3 shrink-0 text-center ${MARKS[s.level].cls}`}>
+              {MARKS[s.level].icon}
+            </span>
+            <span className={s.level === "warn" ? "text-amber-700" : undefined}>
+              {s.message}
+            </span>
+          </li>
+        ))}
+        {working && (
+          <li className="flex items-center gap-2 text-ink-muted">
+            <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ink-faint border-t-ink" />
+            <span>…</span>
+          </li>
+        )}
+      </ol>
+    </section>
+  );
+}
+
+// One-shot marketing asset digest: Brand Kit summary, LP hero preview
+// (click through to the real page), and the promo-video slot.
+function ResultDigest({
   kit,
   html,
+  meta,
+  lpUrl,
   onReset,
 }: {
-  kit: BrandKit;
-  html: string;
+  kit: CampaignBrandKit;
+  html: string | null;
+  meta: GenerateMeta | null;
+  lpUrl: string | null;
   onReset: () => void;
 }) {
-  const swatches = useMemo(
-    () => [
-      { label: "Primary", hex: kit.brand.primary },
-      { label: "Accent", hex: kit.brand.accent },
-      { label: "BG", hex: kit.brand.background },
-      { label: "Surface", hex: kit.brand.surface },
-      { label: "Text", hex: kit.brand.text },
-    ],
-    [kit]
-  );
+  const swatches = [
+    { label: "Primary", hex: kit.brand.primary },
+    { label: "Accent", hex: kit.brand.accent },
+    { label: "BG", hex: kit.brand.background },
+    { label: "Surface", hex: kit.brand.surface },
+    { label: "Text", hex: kit.brand.text },
+  ];
+
+  const tokens: { label: string; value: string | null }[] = kit.design_tokens
+    ? [
+        { label: "本文フォント", value: kit.design_tokens.body_font },
+        { label: "見出しフォント", value: kit.design_tokens.heading_font },
+        { label: "ボタン角丸", value: kit.design_tokens.button_radius },
+        { label: "ボタン余白", value: kit.design_tokens.button_padding },
+        { label: "セクション余白", value: kit.design_tokens.section_spacing },
+        { label: "コンテンツ幅", value: kit.design_tokens.container_width },
+      ].filter((t) => t.value)
+    : [];
 
   const download = (name: string, content: string, type: string) => {
     const blob = new Blob([content], { type });
@@ -335,107 +510,210 @@ function ResultView({
     URL.revokeObjectURL(a.href);
   };
 
-  const openInTab = () => {
-    const blob = new Blob([html], { type: "text/html" });
-    window.open(URL.createObjectURL(blob), "_blank");
+  const openLp = () => {
+    if (lpUrl) {
+      window.open(lpUrl, "_blank");
+    } else if (html) {
+      const blob = new Blob([html], { type: "text/html" });
+      window.open(URL.createObjectURL(blob), "_blank");
+    }
   };
 
   return (
-    <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,380px)_1fr]">
-      {/* Brand Kit panel */}
-      <div className="rounded-2xl border border-hairline p-6">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold">Service Brand Kit</h2>
-          <button
-            type="button"
-            onClick={onReset}
-            className="text-[11px] text-ink-muted underline-offset-2 hover:underline"
-          >
-            別のソースで作り直す
-          </button>
-        </div>
-
-        <p className="mt-4 font-display text-xl font-semibold">{kit.service.name}</p>
-        <p className="text-[12px] text-ink-muted">{kit.service.tagline}</p>
-
-        <div className="mt-4 flex gap-2">
-          {swatches.map((s) => (
-            <div key={s.label} className="text-center">
-              <div
-                className="h-9 w-9 rounded-lg border border-hairline"
-                style={{ backgroundColor: s.hex }}
-                title={`${s.label} ${s.hex}`}
-              />
-              <p className="mt-1 text-[9px] text-ink-faint">{s.label}</p>
-            </div>
-          ))}
-        </div>
-
-        <dl className="mt-4 space-y-2 text-[12px]">
-          <div>
-            <dt className="text-ink-faint">ジャンル / ターゲット</dt>
-            <dd>{kit.service.genre} / {kit.service.audience}</dd>
-          </div>
-          <div>
-            <dt className="text-ink-faint">ヒーローコピー</dt>
-            <dd className="font-medium">{kit.copy.hero.headline}</dd>
-          </div>
-        </dl>
-
-        <div className="mt-5 rounded-xl bg-ink/5 p-4">
-          <p className="text-[11px] font-semibold text-ink-muted">
-            30秒CM ナレーション原稿（動画レンダラーの入力）
-          </p>
-          <p className="mt-2 text-[12px] leading-relaxed">{kit.narration}</p>
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => download("index.html", html, "text/html")}
-            className="rounded-full border border-hairline px-4 py-1.5 text-[12px] hover:border-ink"
-          >
-            LPをダウンロード
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              download("brandkit.json", JSON.stringify(kit, null, 2), "application/json")
-            }
-            className="rounded-full border border-hairline px-4 py-1.5 text-[12px] hover:border-ink"
-          >
-            Brand Kit (JSON)
-          </button>
-          <button
-            type="button"
-            onClick={openInTab}
-            className="rounded-full border border-hairline px-4 py-1.5 text-[12px] hover:border-ink"
-          >
-            新しいタブで開く
-          </button>
-        </div>
-
-        <div className="mt-5 rounded-xl border border-dashed border-hairline p-4 text-[11px] text-ink-muted">
-          ▶ 紹介動画（30秒CM）はこのKitから次フェーズで生成されます。LP内に動画スロットを確保済み。
-        </div>
+    <section className="mt-8">
+      <div className="flex items-baseline justify-between">
+        <h2 className="font-display text-lg font-semibold">
+          マーケティングアセット
+        </h2>
+        <button
+          type="button"
+          onClick={onReset}
+          className="text-[11px] text-ink-muted underline-offset-2 hover:underline"
+        >
+          別のソースで作り直す
+        </button>
       </div>
 
-      {/* LP preview */}
-      <div className="overflow-hidden rounded-2xl border border-hairline">
-        <div className="flex items-center gap-2 border-b border-hairline bg-ink/5 px-4 py-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-ink-faint" />
-          <span className="h-2.5 w-2.5 rounded-full bg-ink-faint" />
-          <span className="h-2.5 w-2.5 rounded-full bg-ink-faint" />
-          <span className="ml-2 truncate text-[11px] text-ink-muted">
-            {kit.service.name} — 生成されたLP
-          </span>
+      <div className="mt-4 grid gap-6 lg:grid-cols-2">
+        {/* ---- Brand Kit summary ---- */}
+        <div className="rounded-2xl border border-hairline p-6">
+          <h3 className="text-sm font-semibold">Service Brand Kit</h3>
+
+          <div className="mt-4 flex items-center gap-4">
+            {kit.assets?.logo && (
+              <div className="rounded-xl border border-hairline bg-white p-2">
+                {/* base64 data URI from our own capture — next/image not applicable */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`data:${kit.assets.logo.media_type};base64,${kit.assets.logo.data}`}
+                  alt={`${kit.service.name} のロゴ`}
+                  className="h-10 w-auto max-w-[160px] object-contain"
+                />
+              </div>
+            )}
+            <div>
+              <p className="font-display text-xl font-semibold">{kit.service.name}</p>
+              <p className="text-[12px] text-ink-muted">{kit.service.tagline}</p>
+            </div>
+          </div>
+
+          <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[12px]">
+            <dt className="text-ink-faint">業種</dt>
+            <dd>{kit.service.industry}</dd>
+            <dt className="text-ink-faint">事業タイプ</dt>
+            <dd>{BUSINESS_TYPE_LABELS[kit.service.business_type] ?? kit.service.business_type}</dd>
+            <dt className="text-ink-faint">提供価値</dt>
+            <dd>{kit.service.offering}</dd>
+            <dt className="text-ink-faint">ターゲット</dt>
+            <dd>{kit.service.audience}</dd>
+            <dt className="text-ink-faint">概要</dt>
+            <dd>{kit.service.description}</dd>
+          </dl>
+
+          <div className="mt-5 flex gap-2">
+            {swatches.map((s) => (
+              <div key={s.label} className="text-center">
+                <div
+                  className="h-9 w-9 rounded-lg border border-hairline"
+                  style={{ backgroundColor: s.hex }}
+                  title={`${s.label} ${s.hex}`}
+                />
+                <p className="mt-1 text-[9px] text-ink-faint">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                kit.brand.palette_source === "extracted"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+              title={
+                kit.brand.palette_source === "extracted"
+                  ? "実際のサイトをレンダリングして収集した証拠から選ばれたパレット"
+                  : "サイトの証拠が取れなかったため、AIが提案したパレット"
+              }
+            >
+              {kit.brand.palette_source === "extracted" ? "サイトから抽出" : "AI提案"}
+            </span>
+            {meta?.verification && (
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                  meta.verification.verdict === "pass"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-red-50 text-red-700"
+                }`}
+                title={meta.verification.reason}
+              >
+                {meta.verification.verdict === "pass"
+                  ? `元サイトと照合済み${meta.verification.retried ? "（1回再生成）" : ""}`
+                  : `検証: ${meta.verification.verdict}`}
+              </span>
+            )}
+          </div>
+
+          {tokens.length > 0 && (
+            <div className="mt-5">
+              <p className="text-[11px] font-semibold text-ink-muted">
+                デザイントークン（CSSからの推定）
+              </p>
+              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-[11px]">
+                {tokens.map((t) => (
+                  <div key={t.label} className="contents">
+                    <dt className="text-ink-faint">{t.label}</dt>
+                    <dd>{t.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+
+          <div className="mt-5 rounded-xl bg-ink/5 p-4">
+            <p className="text-[11px] font-semibold text-ink-muted">
+              30秒CM ナレーション原稿（動画レンダラーの入力）
+            </p>
+            <p className="mt-2 text-[12px] leading-relaxed">{kit.narration}</p>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                download("brandkit.json", JSON.stringify(kit, null, 2), "application/json")
+              }
+              className="rounded-full border border-hairline px-4 py-1.5 text-[12px] hover:border-ink"
+            >
+              Brand Kit (JSON)
+            </button>
+            {html && (
+              <button
+                type="button"
+                onClick={() => download("index.html", html, "text/html")}
+                className="rounded-full border border-hairline px-4 py-1.5 text-[12px] hover:border-ink"
+              >
+                LPをダウンロード
+              </button>
+            )}
+          </div>
         </div>
-        <iframe
-          title="生成されたLPのプレビュー"
-          srcDoc={html}
-          sandbox=""
-          className="h-[70vh] w-full bg-white"
-        />
+
+        {/* ---- LP hero digest + video slot ---- */}
+        <div className="flex flex-col gap-6">
+          <div className="overflow-hidden rounded-2xl border border-hairline">
+            <div className="flex items-center justify-between border-b border-hairline bg-ink/5 px-4 py-2">
+              <span className="text-[11px] font-semibold">LP（ペラ1）</span>
+              <button
+                type="button"
+                onClick={openLp}
+                className="rounded-full border border-hairline bg-paper px-3 py-1 text-[11px] hover:border-ink"
+              >
+                LPを開く ↗
+              </button>
+            </div>
+            <div
+              className="group relative h-[360px] cursor-pointer overflow-hidden bg-white"
+              onClick={openLp}
+              title="クリックでLP全体を開く"
+            >
+              {html ? (
+                <iframe
+                  title={`${kit.service.name} — LPヒーロープレビュー`}
+                  srcDoc={html}
+                  sandbox=""
+                  scrolling="no"
+                  className="pointer-events-none h-[900px] w-full origin-top-left"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-[12px] text-ink-muted">
+                  プレビューを読み込めませんでした
+                </div>
+              )}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[11px] text-ink-muted opacity-0 transition group-hover:opacity-100">
+                クリックでLP全体を表示
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-hairline">
+            <div className="flex items-center justify-between border-b border-hairline bg-ink/5 px-4 py-2">
+              <span className="text-[11px] font-semibold">紹介動画（30秒CM）</span>
+              <span className="rounded-full bg-ink/10 px-2.5 py-0.5 text-[10px] text-ink-muted">
+                次フェーズ
+              </span>
+            </div>
+            <div className="flex aspect-video items-center justify-center bg-ink/5">
+              <div className="text-center">
+                <p className="text-2xl">▶</p>
+                <p className="mt-2 text-[12px] text-ink-muted">
+                  この Brand Kit のナレーション原稿から生成されます（Phase 0b）
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

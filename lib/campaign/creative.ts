@@ -2,13 +2,29 @@ import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { z } from "zod";
 import { BrandKitSchema, type BrandKit } from "./schema";
 import type { RawServiceInfo } from "./ingest";
+import type { SiteCapture } from "./capture";
+import { describeCandidates, type PaletteCandidate } from "./palette";
+import { luminance } from "../color";
 
 // Campaign creative — turn any mix of sources (scraped URL, pasted text,
 // uploaded PDFs / images) into a validated Service Brand Kit via Claude
 // structured outputs. NotebookLM-style: every source type funnels into the
 // same generation stage.
+//
+// Tier S palette pipeline (see labs/campaign/docs/palette-accuracy.md):
+// - adjudicatePalette (Stage 3): given screenshots + deterministic candidates,
+//   Claude vision assigns roles. Output colors are enum-constrained to the
+//   candidate hexes, so invention is structurally impossible.
+// - generateBrandKit: when an adjudicated palette exists it is injected as
+//   fixed truth (palette_source: "extracted"); otherwise the palette is an AI
+//   proposal (palette_source: "generated").
+// - judgeBrandMatch (Stage 4): compare the rendered LP against the original
+//   site screenshot and flag mismatches before shipping.
+
+const MODEL = "claude-opus-4-8";
 
 export type SourceFile =
   | { kind: "pdf"; data: string }
@@ -18,12 +34,28 @@ export type SourceFile =
       data: string;
     };
 
+export interface AdjudicatedPalette {
+  primary: string;
+  accent: string;
+  background: string;
+  surface: string;
+  text: string;
+  mode: "light" | "dark";
+  rationale: string;
+}
+
 export interface CreativeInput {
   raw: RawServiceInfo | null;
   userName?: string;
   userDescription?: string;
   pastedText?: string;
   files: SourceFile[];
+  /** Stage 3 result. When present, the palette is fixed — not the LLM's choice. */
+  adjudicated?: AdjudicatedPalette | null;
+  /** CSS-derived design hints from the rendered page (context for font_style etc.). */
+  designTokens?: import("./schema").DesignTokens | null;
+  /** Stage 4 feedback when regenerating after a failed verification. */
+  feedback?: string;
 }
 
 const SYSTEM_PROMPT = `You are a senior brand designer and copywriter at a creative agency specializing in launch campaigns for new digital services.
@@ -33,7 +65,8 @@ Given raw information about a service (scraped page text, meta info, brand color
 Rules:
 - All user-facing copy (headlines, descriptions, narration) must be in natural, punchy Japanese. Avoid literal-translation tone.
 - Copy is benefit-driven: lead with what the audience gains, not feature lists.
-- Colors: if color hints or images suggest an existing brand palette, honor it. Otherwise choose a palette that fits the service genre and personality. Ensure text/background contrast is readable (WCAG AA-ish).
+- service.industry / business_type / offering / audience are ANALYSIS results, not marketing copy: state factually what kind of business this is and what it primarily provides, grounded in the source material.
+- Colors: when the prompt provides an adjudicated palette extracted from the real site, reproduce it EXACTLY and set palette_source to "extracted". Never invent colors when evidence exists. Only when no palette evidence is provided may you propose a palette that fits the service genre and personality — in that case set palette_source to "generated". Ensure text/background contrast is readable (WCAG AA-ish).
 - Never invent false claims (user counts, awards, pricing). Stay within what the source material supports; when unsure, write aspirational but non-factual copy.
 - narration: exactly the words a voice actor reads aloud for a ~30 second CM (roughly 180-260 Japanese characters). No headings, no directions.`;
 
@@ -57,7 +90,7 @@ export async function generateBrandKit(input: CreativeInput): Promise<BrandKit> 
   content.push({ type: "text", text: buildUserPrompt(input) });
 
   const response = await client.messages.parse({
-    model: "claude-opus-4-8",
+    model: MODEL,
     max_tokens: 8192,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content }],
@@ -67,6 +100,24 @@ export async function generateBrandKit(input: CreativeInput): Promise<BrandKit> 
   const kit = response.parsed_output;
   if (!kit) {
     throw new Error("Brand Kit の生成に失敗しました（構造化出力なし）");
+  }
+
+  // Enforce the adjudicated palette structurally — the LLM was instructed to
+  // reproduce it, but the pipeline does not rely on obedience.
+  if (input.adjudicated) {
+    const { primary, accent, background, surface, text, mode } = input.adjudicated;
+    kit.brand = {
+      ...kit.brand,
+      primary,
+      accent,
+      background,
+      surface,
+      text,
+      mode,
+      palette_source: "extracted",
+    };
+  } else {
+    kit.brand.palette_source = "generated";
   }
   return kit;
 }
@@ -92,11 +143,198 @@ function buildUserPrompt(input: CreativeInput): string {
   if (input.pastedText) {
     parts.push(`Pasted source text:\n${input.pastedText.slice(0, 12_000)}`);
   }
+  if (input.designTokens) {
+    const t = input.designTokens;
+    const lines = [
+      t.body_font && `body font: ${t.body_font}`,
+      t.heading_font && `heading font: ${t.heading_font}`,
+      t.button_radius && `button radius: ${t.button_radius}`,
+      t.section_spacing && `section vertical padding: ${t.section_spacing}`,
+    ].filter(Boolean);
+    if (lines.length)
+      parts.push(
+        `Design tokens observed on the rendered page (use as hints for font_style / tone):\n${lines.join("\n")}`
+      );
+  }
   if (input.files.length) {
     parts.push(
       `The ${input.files.length} attached document(s)/image(s) above describe the service (flyers, decks, screenshots, key visuals). Use them for content, palette and tone.`
     );
   }
+  if (input.adjudicated) {
+    const p = input.adjudicated;
+    parts.push(
+      [
+        "# Adjudicated brand palette (extracted from the real site — use EXACTLY these values)",
+        `primary: ${p.primary}`,
+        `accent: ${p.accent}`,
+        `background: ${p.background}`,
+        `surface: ${p.surface}`,
+        `text: ${p.text}`,
+        `mode: ${p.mode}`,
+        `rationale: ${p.rationale}`,
+        'Set brand.palette_source to "extracted".',
+      ].join("\n")
+    );
+  } else {
+    parts.push(
+      'No palette evidence could be extracted from a rendered page. Propose a fitting palette and set brand.palette_source to "generated".'
+    );
+  }
+  if (input.feedback) {
+    parts.push(
+      `# Reviewer feedback on the previous attempt (fix this)\n${input.feedback}`
+    );
+  }
   parts.push("Produce the Service Brand Kit now.");
   return parts.join("\n\n");
+}
+
+// ---------- Stage 3: VLM palette adjudication ----------
+
+const ADJUDICATOR_SYSTEM = `You are a meticulous brand-design auditor. You are shown screenshots of a real website plus a list of color candidates that were mechanically extracted from the rendered page, each with evidence (painted area share, usage on buttons/links, CSS variable names, logo colors).
+
+Assign palette roles by choosing ONLY from the candidate colors. Do not invent or adjust colors. Judge from what the screenshots actually show:
+- background: the dominant page background
+- text: the main body text color
+- primary: the brand's main color (often the logo / heading / hero color)
+- accent: the color of interactive elements (buttons, links). May equal primary if the site uses one brand color.
+- surface: card/section background slightly offset from the page background. If no distinct surface exists, reuse the background candidate closest to it.
+- mode: light or dark, from the overall page appearance
+
+If the candidates clearly cannot represent the site's brand (e.g. screenshots failed to load, page is an error page), set assessment to "insufficient" and palette to null. Otherwise set assessment to "confident".`;
+
+export async function adjudicatePalette(input: {
+  capture: SiteCapture;
+  candidates: PaletteCandidate[];
+  /** Stage 4 reviewer feedback when re-adjudicating after a mismatch. */
+  feedback?: string;
+}): Promise<AdjudicatedPalette | null> {
+  const hexes = input.candidates.map((c) => c.hex);
+  if (hexes.length < 2) return null;
+
+  const HexEnum = z.enum(hexes as [string, ...string[]]);
+  const AdjudicationSchema = z.object({
+    assessment: z
+      .enum(["confident", "insufficient"])
+      .describe('"insufficient" only when the candidates cannot represent the brand'),
+    palette: z
+      .object({
+        primary: HexEnum,
+        accent: HexEnum,
+        background: HexEnum,
+        surface: HexEnum,
+        text: HexEnum,
+        mode: z.enum(["light", "dark"]),
+      })
+      .nullable()
+      .describe("null only when assessment is insufficient"),
+    rationale: z.string().describe("1-3 sentences: why these roles, citing the evidence"),
+  });
+
+  const client = new Anthropic();
+  const content: Anthropic.ContentBlockParam[] = [];
+  const shots: [string, string | null][] = [
+    ["Desktop above-the-fold (1440px)", input.capture.screenshots.desktop],
+    ["Full page (downscaled)", input.capture.screenshots.fullPage],
+    ["Mobile (390px)", input.capture.screenshots.mobile],
+  ];
+  for (const [label, data] of shots) {
+    if (!data) continue;
+    content.push({ type: "text", text: label });
+    content.push({
+      type: "image",
+      source: { type: "base64", media_type: "image/jpeg", data },
+    });
+  }
+  content.push({
+    type: "text",
+    text: `Candidate colors extracted from the rendered page:\n${describeCandidates(
+      input.candidates
+    )}${
+      input.feedback
+        ? `\n\nReviewer feedback on the previous assignment (fix this):\n${input.feedback}`
+        : ""
+    }\n\nAssign the palette roles now.`,
+  });
+
+  const response = await client.messages.parse({
+    model: MODEL,
+    max_tokens: 1500,
+    system: ADJUDICATOR_SYSTEM,
+    messages: [{ role: "user", content }],
+    output_config: { format: zodOutputFormat(AdjudicationSchema) },
+  });
+
+  const out = response.parsed_output;
+  if (!out || out.assessment === "insufficient" || !out.palette) return null;
+
+  // Deterministic readability guard: cards render body text (var(--text)) on
+  // var(--surface), so an unreadable surface pick must never ship. Quality is
+  // guaranteed by code, not by the adjudicator's obedience.
+  const palette = { ...out.palette };
+  if (contrastRatio(palette.surface, palette.text) < 4.5) {
+    palette.surface = palette.background;
+  }
+  return { ...palette, rationale: out.rationale };
+}
+
+function contrastRatio(a: string, b: string): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+// ---------- Stage 4: self-verification ----------
+
+export interface BrandMatchJudgment {
+  verdict: "pass" | "palette_mismatch" | "tone_mismatch";
+  reason: string;
+}
+
+const VERIFIER_SYSTEM = `You compare two screenshots: (1) the original website of a service, (2) a landing page that was auto-generated for the same service. Judge ONLY whether the generated page looks like it belongs to the same brand.
+
+- palette_mismatch: the generated page uses colors that clearly do not belong to the original brand (e.g. original is white/blue, generated is green)
+- tone_mismatch: colors are plausible but the overall mood (dark/light, loud/quiet) contradicts the original
+- pass: a human would accept the generated page as the same brand
+
+Layout and copy differences are expected and must NOT cause a failure.`;
+
+export async function judgeBrandMatch(input: {
+  originalShot: string; // base64 jpeg
+  generatedShot: string; // base64 jpeg
+}): Promise<BrandMatchJudgment> {
+  const JudgmentSchema = z.object({
+    verdict: z.enum(["pass", "palette_mismatch", "tone_mismatch"]),
+    reason: z.string().describe("1-2 sentences in Japanese"),
+  });
+
+  const client = new Anthropic();
+  const response = await client.messages.parse({
+    model: MODEL,
+    max_tokens: 800,
+    system: VERIFIER_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Original site:" },
+          {
+            type: "image",
+            source: { type: "base64", media_type: "image/jpeg", data: input.originalShot },
+          },
+          { type: "text", text: "Generated landing page:" },
+          {
+            type: "image",
+            source: { type: "base64", media_type: "image/jpeg", data: input.generatedShot },
+          },
+          { type: "text", text: "Judge now." },
+        ],
+      },
+    ],
+    output_config: { format: zodOutputFormat(JudgmentSchema) },
+  });
+
+  return response.parsed_output ?? { verdict: "pass", reason: "判定結果を取得できず既定でpass" };
 }

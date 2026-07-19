@@ -68,6 +68,15 @@ cm-maker の技術選定で「最先端の状況を確認してから決めた�
 > 3. CC0/パブリックドメイン音源の実用性
 > 「ジャンルタグからBGMを自動選定し、顧客の広告動画に同梱して納品する」場合の最も安全でスケールする構成を提案してください。
 
+## 7. Brand Kit 抽出のフィールド設計と既存ツール（優先度: 中）
+
+> 「WebサイトのURLから、その企業/サービスのブランド情報を構造化して抽出する」機能を設計しています。車輪の再発明を避けるため、既存のブランド抽出サービス・標準・手法を調査してください。
+> 1. ブランドデータAPIの抽出フィールド比較: Brandfetch, Clearbit (HubSpot Breeze Intelligence), Ritekit, uplead等が「ロゴ・カラー・フォント・業種・企業属性」として何をどんな構造で返すか（APIレスポンスのスキーマ例まで）
+> 2. 構造化メタデータ標準からの取得: schema.org Organization / OpenGraph / Web App Manifest（theme_color, icons）/ humans.txt 等、ブランド情報として機械可読なものの網羅と実際の普及率
+> 3. デザイントークン抽出: レンダリング済みページのcomputed CSSから spacing scale・タイポグラフィスケール・角丸・シャドウ等を推定する既存ツール/研究（Project Wallace, CSS Stats, superposition等）と、その出力形式（W3C Design Tokens Format等）
+> 4. 業種・事業タイプ分類: マーケティングツールが使う事業分類タクソノミー（NAICS/JSIC等の公的分類 vs LinkedIn/Clearbitの実用分類）で、「SaaS/アプリ/コンサル/飲食/フリーランス」級の粒度に適したもの
+> 5. これらを踏まえ、「LP・CM動画・SNS素材の自動生成に必要十分なService Brand Kitのフィールドセット」を提案してください（現行案: 基本情報・ロゴ・パレット・フォント・余白・業種/事業タイプ/提供価値・ターゲット・ナレーション原稿）
+
 ---
 
 ## リサーチ結果の反映先

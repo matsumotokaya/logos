@@ -1,7 +1,7 @@
 # パレット精度の改善計画（引き継ぎ資料）
 
 最終更新: 2026-07-19
-ステータス: **未着手（設計済み）**。次のラボ作業はここから。
+ステータス: **Tier S 実装済み**（2026-07-19）。実装の対応表と実測結果は[§6](#6-tier-s-実装2026-07-19)。
 
 ## 1. 事象
 
@@ -77,3 +77,36 @@ LLMに**色の証拠が一切渡っていない**まま、プロンプトの補�
 - `wealth-park.com/ja/business/` → background 白系 / text 黒系 / accent 青系 が返ること。緑が出ないこと
 - 証拠が取れたサイトで `palette_source: "extracted"`、取れないソース（テキストのみ入力等）で `"generated"` が正しく立つこと
 - anthropic.com 等、現在うまくいっているケースが劣化しないこと（回帰確認）
+
+## 6. Tier S 実装（2026-07-19）
+
+§3の設計をそのまま実装した。設計とコードの対応:
+
+| 設計 | 実装 |
+|---|---|
+| Stage 1 実画面証拠収集 | `lib/campaign/capture.ts` — `captureSite()`。Playwrightを動的import（Chromiumが無いホストではnullを返しフォールバック）。デスクトップ1440/モバイル390スクショ、フルページ（高さ4500pxまで・縮小）、computed styleヒストグラム（背景=面積、テキスト=文字数×fontSize²、ボーダー、インタラクティブ要素別枠）、`:root`CSS変数、ヘッダーロゴ要素スクショ+favicon画素解析（sharp） |
+| Stage 2 決定論候補生成 | `lib/campaign/palette.ts` — `buildPaletteCandidates()`。CIELAB(ΔE76、閾値10)の貪欲クラスタリング。候補最大14色、各候補に証拠文字列（背景面積%・ボタン/リンク要素数・CSS変数名・ロゴ含有%） |
+| Stage 3 VLM裁定 | `lib/campaign/creative.ts` — `adjudicatePalette()`。**候補hexのz.enumで出力を構造的に制約**（発明は不可能）。不十分なら`assessment: "insufficient"`→ generated経路へ。裁定結果は`generateBrandKit()`後にコードで強制上書き（LLMの従順さに依存しない） |
+| Stage 4 自己検証 | `lib/campaign/creative.ts` `judgeBrandMatch()` + `lib/campaign/pipeline.ts`。生成LPを`screenshotHtml()`でスクショ→元サイトと比較→pass / palette_mismatch / tone_mismatch。不一致なら指摘をfeedbackとして1回だけ再裁定+再生成 |
+| `palette_source`フラグ | `lib/campaign/schema.ts` の `BrandSchema`。UI（CampaignStudio）に「サイトから抽出」/「AI提案」バッジ |
+| オーケストレーション | `lib/campaign/pipeline.ts` `runCampaignPipeline()` — API routeとCLIの唯一の実装。CLIは`--no-verify`でStage 4を省略可、`candidates.json` / `original.jpg` / `lp.jpg` をデバッグ出力 |
+
+実装上の注意:
+
+- **`page.evaluate`に関数を渡さない**。tsx(esbuild)のkeepNamesが`__name`ヘルパーを注入し、ブラウザ側で`ReferenceError: __name is not defined`になる。ページ内コレクタは純粋JSの文字列（`COLLECT_PAGE_COLORS`）として保持している
+- Playwright/Chromiumはローカルに`npm i playwright && npx playwright install chromium`で導入済み。`playwright`はNext.jsの既定`serverExternalPackages`に含まれるためnext.config変更は不要。Vercel本番ではcaptureがnullになりgenerated経路に落ちる（設計どおり。マネージド差し替えは`docs/deep-research-prompts.md`§4）
+- 裁定・検証のモデルは`claude-opus-4-8`（Tier S=精度優先・コスト度外視。Tierを下げる際の第一候補は検証の省略と裁定モデルのSonnet化）
+
+### 実測結果（受け入れ基準の検証・2026-07-19）
+
+| 基準 | 結果 |
+|---|---|
+| wealth-park.com/ja/business/ で白/黒/青・緑なし | ✅ `#ffffff` bg / `#000000` text・primary / `#1e6cff` accent（ボタン・リンク34要素 + `--wp-color-link` が証拠）。緑は候補にすら現れない。verification: pass |
+| `palette_source` フラグ | ✅ capture成功時 `"extracted"`。capture失敗時（フォールバック経路を実測）は `"generated"` が立ち、AI提案パレット（このときはティール——まさに旧破綻経路）がバッジで明示される |
+| anthropic.com の非劣化 | ✅ `#f0eee6`（実際のアイボリー）bg / `#141413` text・primary。verification: pass。静的解析時代より忠実 |
+
+実測ログ・スクショ・候補リストは `var/campaign/<slug>/`（`candidates.json` / `original.jpg` / `lp.jpg`）。
+
+実装後に見つけて塞いだ問題:
+
+- **裁定が surface に暗色を選び黒地黒文字になる**ケース（anthropic.com 初回で発生。検証はabove-the-foldしか見ないためpassしてしまう）→ 裁定後に決定論ガードを追加: `contrast(surface, text) < 4.5` なら surface を background にスナップ（`creative.ts`）。品質はコード側で保証する原則どおり
