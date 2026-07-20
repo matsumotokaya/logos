@@ -233,3 +233,37 @@ export type CampaignBrandKit = Omit<BrandKit, "theme" | "cm_script"> & {
 export function narrationTextFromScript(scenes: CmScene[]): string {
   return scenes.map((s) => s.text.trim()).join("");
 }
+
+// ---------- progressive partials (accumulate while a run is in flight) ----------
+
+/**
+ * Intermediate artifacts a generation run publishes as soon as each stage
+ * finishes, so the UI fills the result layout piece by piece instead of all
+ * at once. Everything here is superseded by the final kit; the job store
+ * drops it on completion.
+ */
+export interface CampaignPartial {
+  /** Stage 1a ingest: page meta — the first thing on screen (~5s). */
+  source?: {
+    title: string | null;
+    description: string | null;
+    url: string;
+    favicon_url: string | null;
+  };
+  /** Stage 1b capture: the real logo (~20s). */
+  logo?: {
+    logo: { data: string; media_type: "image/png" } | null;
+    logo_svg: string | null;
+  };
+  design_tokens?: DesignTokens;
+  /** Stage 2: role-less evidence colors (~30s). */
+  palette_candidates?: string[];
+  /** Stage 3a adjudication: the five roles, fixed (~50s). */
+  palette?: {
+    primary: string;
+    accent: string;
+    background: string;
+    surface: string;
+    text: string;
+  };
+}

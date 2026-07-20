@@ -51,6 +51,11 @@ export interface PipelineProgress {
 
 export interface PipelineOptions {
   onProgress?: (event: PipelineProgress) => void;
+  /** Stage artifacts as soon as each stage finishes — drives the progressive
+   *  result UI (logo pops in at ~20s instead of everything at 2-4min). */
+  onPartial?: (patch: import("./schema").CampaignPartial) => void;
+  /** Creative done, verify still ahead: the full kit + LP, published early. */
+  onDraft?: (kit: CampaignBrandKit, html: string) => void;
   /** Stage 4 self-verification (needs capture + Chromium). Default true. */
   verify?: boolean;
 }
@@ -105,6 +110,14 @@ export async function runCampaignPipeline(
       `ingest: 「${raw.title ?? "(タイトルなし)"}」を取得（見出し${raw.headings.length}件・カラーヒント${raw.colorHints.length}色）`,
       "success"
     );
+    opts.onPartial?.({
+      source: {
+        title: raw.title,
+        description: raw.description,
+        url: raw.url,
+        favicon_url: raw.faviconUrl,
+      },
+    });
   }
 
   // og:image = the site's own key visual. Used two ways: as a vision input
@@ -151,6 +164,15 @@ export async function runCampaignPipeline(
           `capture: デザイントークン${tokenCount}項目を推定（フォント・角丸・余白など）`,
           "success"
         );
+      opts.onPartial?.({
+        logo: {
+          logo: capture.logoImage
+            ? { data: capture.logoImage, media_type: "image/png" }
+            : null,
+          logo_svg: capture.logoSvg ?? null,
+        },
+        ...(tokenCount > 0 ? { design_tokens: capture.designTokens } : {}),
+      });
     } else {
       progress(
         "capture: この環境ではブラウザレンダリングを実行できないためスキップ（パレットはAI提案になります）",
@@ -173,6 +195,7 @@ export async function runCampaignPipeline(
         .join(" ")}…）`,
       "success"
     );
+    opts.onPartial?.({ palette_candidates: candidates.slice(0, 8).map((c) => c.hex) });
   }
 
   // Stage 3a: VLM adjudication (choose-only, no invention).
@@ -187,6 +210,15 @@ export async function runCampaignPipeline(
         `adjudicate: primary ${adjudicated.primary} / accent ${adjudicated.accent} / bg ${adjudicated.background}（サイトから抽出）${adj.usage ? `（${formatUsage(adj.usage)}）` : ""}`,
         "success"
       );
+      opts.onPartial?.({
+        palette: {
+          primary: adjudicated.primary,
+          accent: adjudicated.accent,
+          background: adjudicated.background,
+          surface: adjudicated.surface,
+          text: adjudicated.text,
+        },
+      });
     } else {
       progress("adjudicate: 候補が不十分と判定 — AI提案パレットに切り替え", "warn");
     }
@@ -234,6 +266,8 @@ export async function runCampaignPipeline(
     "success"
   );
   let html = renderLandingPage(kit);
+  // Publish early: the digest fills completely while verify still runs.
+  opts.onDraft?.(kit, html);
 
   // Stage 4: self-verification loop (one retry).
   let verification: (BrandMatchJudgment & { retried: boolean }) | null = null;

@@ -3,7 +3,7 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { CampaignBrandKit } from "./schema";
+import type { CampaignBrandKit, CampaignPartial } from "./schema";
 import type { CampaignCmState, CmVoiceTrack } from "./cm-types";
 import type { PipelineProgress, LlmUsageSummary } from "./pipeline";
 import type { BrandMatchJudgment } from "./creative";
@@ -39,6 +39,9 @@ export interface CampaignJob {
   error: string | null;
   /** CM voice/video assets (Phase 0b). Absent before the first voice run. */
   cm?: CampaignCmState | null;
+  /** Stage-by-stage artifacts while running — the UI fills the result layout
+   *  progressively from these. Cleared when the final kit lands. */
+  partial?: CampaignPartial | null;
 }
 
 const JOBS_DIR = path.join(process.cwd(), "var", "campaign-lab", "jobs");
@@ -86,6 +89,27 @@ export function appendCampaignStep(id: string, step: PipelineProgress): void {
   writeJob(job);
 }
 
+/** Merge stage artifacts into the running job (progressive UI). */
+export function updateCampaignPartial(id: string, patch: CampaignPartial): void {
+  const job = getCampaignJob(id);
+  if (!job || job.status !== "running") return;
+  job.partial = { ...job.partial, ...patch };
+  writeJob(job);
+}
+
+/** Creative stage done, verify still running: publish the kit + LP early so
+ *  the digest fills while the self-verification loop finishes. */
+export function saveCampaignJobDraft(
+  id: string,
+  result: { kit: CampaignBrandKit; html: string }
+): void {
+  const job = getCampaignJob(id);
+  if (!job || job.status !== "running") return;
+  job.kit = result.kit;
+  fs.writeFileSync(htmlPath(id), result.html);
+  writeJob(job);
+}
+
 export function completeCampaignJob(
   id: string,
   result: { kit: CampaignBrandKit; meta: CampaignJobMeta; html: string }
@@ -95,6 +119,7 @@ export function completeCampaignJob(
   job.status = "done";
   job.kit = result.kit;
   job.meta = result.meta;
+  job.partial = null; // superseded by the kit
   fs.writeFileSync(htmlPath(id), result.html);
   writeJob(job);
 }

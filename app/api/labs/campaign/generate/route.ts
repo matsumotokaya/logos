@@ -19,6 +19,8 @@ import { runCampaignPipeline } from "@/lib/campaign/pipeline";
 import {
   createCampaignJob,
   appendCampaignStep,
+  updateCampaignPartial,
+  saveCampaignJobDraft,
   completeCampaignJob,
   failCampaignJob,
 } from "@/lib/campaign/jobs";
@@ -117,6 +119,8 @@ export async function POST(req: Request) {
     },
     {
       onProgress: (event) => appendCampaignStep(job.id, event),
+      onPartial: (patch) => updateCampaignPartial(job.id, patch),
+      onDraft: (kit, html) => saveCampaignJobDraft(job.id, { kit, html }),
     }
   )
     .then((result) =>

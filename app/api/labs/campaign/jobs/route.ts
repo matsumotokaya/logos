@@ -21,7 +21,9 @@ function jobResponse(job: CampaignJob) {
   return Response.json(
     {
       job,
-      html: done ? readCampaignJobHtml(job.id) : null,
+      // The kit (and its LP html) can appear while still running — the draft
+      // published after the creative stage, before verification settles.
+      html: job.kit ? readCampaignJobHtml(job.id) : null,
       lpUrl: done
         ? signedLabsUrl(`/c/${job.id}`, `campaign-lp:${job.id}`)
         : null,

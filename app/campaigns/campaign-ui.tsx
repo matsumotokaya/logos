@@ -9,7 +9,7 @@
 import { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabase/client";
-import type { CampaignBrandKit } from "@/lib/campaign/schema";
+import type { CampaignBrandKit, CampaignPartial } from "@/lib/campaign/schema";
 import type { CampaignCmState, CmVoiceTrack } from "@/lib/campaign/cm-types";
 import { resolveTheme } from "@/lib/campaign/themes";
 import { SAMPLE_CM_AUDIO, SAMPLE_CM_VIDEO } from "@/lib/campaign/sample";
@@ -57,6 +57,7 @@ export type JobPayload = {
     meta: GenerateMeta | null;
     error: string | null;
     cm?: CampaignCmState | null;
+    partial?: CampaignPartial | null;
   } | null;
   html?: string | null;
   lpUrl?: string | null;
@@ -217,6 +218,7 @@ export function ResultDigest({
   lpUrl,
   sample,
   working,
+  partial,
   cm,
   audioUrl,
   videoUrl,
@@ -228,6 +230,9 @@ export function ResultDigest({
   lpUrl: string | null;
   sample: boolean;
   working: boolean;
+  /** Stage artifacts of an in-flight run — fills the layout progressively
+   *  (source meta → logo → palette) before the kit lands. */
+  partial?: CampaignPartial | null;
   /** CM voice/video state of this job (undefined on surfaces without it). */
   cm?: CampaignCmState | null;
   /** Signed URL of the job's voice WAV, present once the voice stage is done. */
@@ -237,19 +242,22 @@ export function ResultDigest({
   /** Starts the CM generation (explicit action — TTS costs API money). */
   onGenerateCm?: () => void;
 }) {
-  const logoSvg = kit?.assets?.logo_svg ?? null;
-  const logoPng = kit?.assets?.logo ?? null;
+  // Everything below prefers the final kit, then falls back to the in-flight
+  // partial — that fallback is what makes the layout fill piece by piece.
+  const logoSvg = kit?.assets?.logo_svg ?? partial?.logo?.logo_svg ?? null;
+  const logoPng = kit?.assets?.logo ?? partial?.logo?.logo ?? null;
   const theme = kit ? resolveTheme(kit) : null;
   // Dark-canvas LPs (glass variant) need a dark preview frame and fade.
   const glassLp = theme?.lp.variant === "glass";
 
-  const swatches = kit
+  const brandColors = kit?.brand ?? partial?.palette ?? null;
+  const swatches = brandColors
     ? [
-        { label: "Primary", hex: kit.brand.primary },
-        { label: "Accent", hex: kit.brand.accent },
-        { label: "BG", hex: kit.brand.background },
-        { label: "Surface", hex: kit.brand.surface },
-        { label: "Text", hex: kit.brand.text },
+        { label: "Primary", hex: brandColors.primary },
+        { label: "Accent", hex: brandColors.accent },
+        { label: "BG", hex: brandColors.background },
+        { label: "Surface", hex: brandColors.surface },
+        { label: "Text", hex: brandColors.text },
       ]
     : [
         { label: "Primary", hex: null },
@@ -259,14 +267,15 @@ export function ResultDigest({
         { label: "Text", hex: null },
       ];
 
-  const tokens: { label: string; value: string | null }[] = kit?.design_tokens
+  const designTokens = kit?.design_tokens ?? partial?.design_tokens ?? null;
+  const tokens: { label: string; value: string | null }[] = designTokens
     ? [
-        { label: "本文フォント", value: kit.design_tokens.body_font },
-        { label: "見出しフォント", value: kit.design_tokens.heading_font },
-        { label: "ボタン角丸", value: kit.design_tokens.button_radius },
-        { label: "ボタン余白", value: kit.design_tokens.button_padding },
-        { label: "セクション余白", value: kit.design_tokens.section_spacing },
-        { label: "コンテンツ幅", value: kit.design_tokens.container_width },
+        { label: "本文フォント", value: designTokens.body_font },
+        { label: "見出しフォント", value: designTokens.heading_font },
+        { label: "ボタン角丸", value: designTokens.button_radius },
+        { label: "ボタン余白", value: designTokens.button_padding },
+        { label: "セクション余白", value: designTokens.section_spacing },
+        { label: "コンテンツ幅", value: designTokens.container_width },
       ].filter((t) => t.value)
     : [];
 
@@ -305,6 +314,18 @@ export function ResultDigest({
               </p>
               <p className="mt-1 text-[13px] text-ink-muted">{kit.service.tagline}</p>
             </>
+          ) : partial?.source ? (
+            <>
+              <p className="fill-in flex items-center gap-2.5 font-display text-2xl font-semibold">
+                {partial.source.title ?? "（タイトル解析中）"}
+                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold tracking-normal text-amber-700">
+                  取得情報（仮）
+                </span>
+              </p>
+              <p className="mt-1 truncate text-[13px] text-ink-muted">
+                {partial.source.url} — 分析・執筆中…
+              </p>
+            </>
           ) : (
             <>
               <p className="font-display text-2xl font-semibold text-ink-faint">
@@ -337,7 +358,13 @@ export function ResultDigest({
           </dd>
           <dt className="text-ink-faint">概要</dt>
           <dd className="sm:col-span-3">
-            {kit ? kit.service.description : <Ph className="h-3.5 w-full max-w-lg" />}
+            {kit ? (
+              kit.service.description
+            ) : partial?.source?.description ? (
+              <span className="fill-in inline-block">{partial.source.description}</span>
+            ) : (
+              <Ph className="h-3.5 w-full max-w-lg" />
+            )}
           </dd>
         </dl>
       </div>
@@ -354,8 +381,8 @@ export function ResultDigest({
 
           <div className="mt-4">
             <p className="text-[11px] font-semibold text-ink-muted">ロゴ</p>
-            {kit && (logoSvg || logoPng) ? (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+            {logoSvg || logoPng ? (
+              <div className="fill-in mt-2 flex flex-wrap items-center gap-2">
                 <span className="inline-block rounded-xl border border-hairline bg-white p-3">
                   {/* base64 data URI from our own capture — next/image not applicable */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -365,14 +392,14 @@ export function ResultDigest({
                         ? `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(logoSvg)))}`
                         : `data:${logoPng!.media_type};base64,${logoPng!.data}`
                     }
-                    alt={`${kit.service.name} のロゴ`}
+                    alt={`${kit?.service.name ?? partial?.source?.title ?? "サービス"} のロゴ`}
                     className="h-10 w-auto max-w-[200px] object-contain"
                   />
                 </span>
                 {logoSvg && (
                   <span
                     className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700"
-                    title="サイトのインラインSVGから計算済みスタイルを焼き込んで取得したベクターデータ"
+                    title="サイトからSVGベクターとして取得したデータ（インラインSVGまたは参照ファイル）"
                   >
                     SVGベクター取得
                   </span>
@@ -394,19 +421,38 @@ export function ResultDigest({
           <div className="mt-5">
             <p className="text-[11px] font-semibold text-ink-muted">カラーパレット</p>
             <div className="mt-2 flex gap-2">
-              {swatches.map((s) => (
+              {swatches.map((s, i) => (
                 <div key={s.label} className="text-center">
                   <div
                     className={`h-9 w-9 rounded-lg border border-hairline ${
-                      s.hex ? "" : `bg-ink/5 ${working ? "animate-pulse" : ""}`
+                      s.hex ? "fill-in" : `bg-ink/5 ${working ? "animate-pulse" : ""}`
                     }`}
-                    style={s.hex ? { backgroundColor: s.hex } : undefined}
+                    style={
+                      s.hex
+                        ? { backgroundColor: s.hex, animationDelay: `${i * 90}ms` }
+                        : undefined
+                    }
                     title={s.hex ? `${s.label} ${s.hex}` : s.label}
                   />
                   <p className="mt-1 text-[9px] text-ink-faint">{s.label}</p>
                 </div>
               ))}
             </div>
+            {!brandColors && partial?.palette_candidates && (
+              <div className="fill-in mt-2 flex flex-wrap items-center gap-1.5">
+                {partial.palette_candidates.map((hex) => (
+                  <span
+                    key={hex}
+                    className="h-4 w-4 rounded-full border border-hairline"
+                    style={{ backgroundColor: hex }}
+                    title={hex}
+                  />
+                ))}
+                <span className="text-[10px] text-ink-faint">
+                  証拠色を収集 — 役割を裁定中…
+                </span>
+              </div>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {sample ? (
                 <span className="rounded-full bg-ink/5 px-2.5 py-0.5 text-[10px] font-semibold text-ink-muted">
@@ -426,6 +472,13 @@ export function ResultDigest({
                   }
                 >
                   {kit.brand.palette_source === "extracted" ? "サイトから抽出" : "AI提案"}
+                </span>
+              ) : partial?.palette ? (
+                <span
+                  className="fill-in rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700"
+                  title="実際のサイトをレンダリングして収集した証拠から選ばれたパレット"
+                >
+                  サイトから抽出
                 </span>
               ) : (
                 <span className="rounded-full bg-ink/5 px-2.5 py-0.5 text-[10px] text-ink-faint">
@@ -473,7 +526,7 @@ export function ResultDigest({
               デザイントークン（CSSからの推定）
             </p>
             {tokens.length > 0 ? (
-              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-[11px]">
+              <dl className="fill-in mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-[11px]">
                 {tokens.map((t) => (
                   <div key={t.label} className="contents">
                     <dt className="text-ink-faint">{t.label}</dt>
@@ -520,7 +573,15 @@ export function ResultDigest({
         <div className="flex flex-col gap-6">
           <div className="overflow-hidden rounded-2xl border border-hairline">
             <div className="flex items-center justify-between border-b border-hairline bg-ink/5 px-4 py-2">
-              <span className="text-[11px] font-semibold">セールスページ（LP）</span>
+              <span className="flex items-center gap-2 text-[11px] font-semibold">
+                セールスページ（LP）
+                {working && kit && !sample && (
+                  <span className="flex items-center gap-1.5 text-[10px] font-normal text-ink-muted">
+                    <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border border-ink-faint border-t-ink" />
+                    元サイトと照合中…
+                  </span>
+                )}
+              </span>
               <button
                 type="button"
                 onClick={openLp}

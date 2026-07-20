@@ -50,3 +50,19 @@ body {
   background: var(--accent);
   color: #ffffff;
 }
+
+/* Progressive campaign results: a freshly filled block rises in and flashes
+   briefly so the eye catches "this part just completed". Mounted whenever
+   placeholder markup is replaced by real data (see campaign-ui ResultDigest). */
+@keyframes fill-in-rise {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes fill-in-flash {
+  0% { box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--accent) 10%, transparent); }
+  100% { box-shadow: none; }
+}
+.fill-in {
+  animation: fill-in-rise 0.45s ease-out both, fill-in-flash 1.1s ease-out both;
+  border-radius: 6px;
+}

@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { sampleCampaignKit, SAMPLE_CAMPAIGN_ID } from "@/lib/campaign/sample";
-import type { CampaignBrandKit } from "@/lib/campaign/schema";
+import type { CampaignBrandKit, CampaignPartial } from "@/lib/campaign/schema";
 import type { CampaignCmState } from "@/lib/campaign/cm-types";
 import {
   POLL_INTERVAL_MS,
@@ -43,6 +43,7 @@ export default function CampaignDetail({
   const [steps, setSteps] = useState<StepEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
+  const [partial, setPartial] = useState<CampaignPartial | null>(null);
   const [cm, setCm] = useState<CampaignCmState | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -71,9 +72,16 @@ export default function CampaignDetail({
     const job = payload.job;
     if (!job) return "settled";
     setSteps(toStepEvents(job.steps));
+    setPartial(job.partial ?? null);
     setCm(job.cm ?? null);
     setAudioUrl(payload.audioUrl ?? null);
     setVideoUrl(payload.videoUrl ?? null);
+    // Draft kit: published after the creative stage while verify still runs —
+    // the digest fills completely, polling continues for the final result.
+    if (job.status === "running" && job.kit) {
+      setKit(job.kit);
+      setHtml(payload.html ?? null);
+    }
     if (job.status === "done" && job.kit) {
       setKit(job.kit);
       setHtml(payload.html ?? null);
@@ -253,6 +261,7 @@ export default function CampaignDetail({
               lpUrl={digestLpUrl}
               sample={isSample}
               working={working}
+              partial={isSample ? null : partial}
               cm={isSample ? null : cm}
               audioUrl={isSample ? null : audioUrl}
               videoUrl={isSample ? null : videoUrl}
