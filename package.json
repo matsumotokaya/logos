@@ -18,6 +18,7 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@remotion/media": "^4.0.472",
+    "@remotion/media-utils": "^4.0.472",
     "@remotion/player": "^4.0.472",
     "@supabase/supabase-js": "^2.110.2",
     "@types/three": "^0.180.0",

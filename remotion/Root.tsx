@@ -22,13 +22,14 @@ type NullableProps = {
   kit: CampaignBrandKit | null;
   track: CmVoiceTrack | null;
   audioSrc: string | null;
+  bgmSrc: string | null;
 };
 
-const CmOrEmpty: React.FC<NullableProps> = ({ kit, track, audioSrc }) => {
+const CmOrEmpty: React.FC<NullableProps> = ({ kit, track, audioSrc, bgmSrc }) => {
   if (!kit || !track) {
     return null;
   }
-  return <CmComposition {...({ kit, track, audioSrc } satisfies CmVideoProps)} />;
+  return <CmComposition {...({ kit, track, audioSrc, bgmSrc } satisfies CmVideoProps)} />;
 };
 
 export const RemotionRoot: React.FC = () => {
@@ -44,6 +45,7 @@ export const RemotionRoot: React.FC = () => {
         kit: null as CampaignBrandKit | null,
         track: null as CmVoiceTrack | null,
         audioSrc: null as string | null,
+        bgmSrc: null as string | null,
       }}
       calculateMetadata={({ props }) => ({
         durationInFrames: props.track ? cmDurationInFrames(props.track) : 300,

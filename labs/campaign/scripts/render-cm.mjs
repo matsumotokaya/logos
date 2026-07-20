@@ -36,12 +36,28 @@ let propsPath;
 let publicDir;
 let out = readFlag("--out");
 
+// The default BGM lives in public/campaigns; Remotion resolves staticFile()
+// names relative to a single --public-dir, so for job renders we copy it into
+// the jobs dir next to the per-job audio and reference it by name.
+const BGM_SRC = path.join(ROOT, "public", "campaigns", "bgm.mp3");
+const ensureBgm = (dir) => {
+  if (!fs.existsSync(BGM_SRC)) return null;
+  const dst = path.join(dir, "bgm.mp3");
+  if (path.resolve(dst) !== path.resolve(BGM_SRC)) fs.copyFileSync(BGM_SRC, dst);
+  return "bgm.mp3";
+};
+
 if (sample) {
-  propsPath = path.join(ROOT, "var", "campaign-lab", "sample-cm-props.json");
   publicDir = path.join(ROOT, "public", "campaigns");
   out ??= path.join(ROOT, "var", "campaign-lab", "sample-cm.mp4");
-  if (!fs.existsSync(propsPath))
+  const samplePropsPath = path.join(ROOT, "var", "campaign-lab", "sample-cm-props.json");
+  if (!fs.existsSync(samplePropsPath))
     fail("sample props not found — run `npm run campaign:sample-voice` first.");
+  // Re-emit props with bgmSrc merged in (keeps sample-voice output simple).
+  const sp = JSON.parse(fs.readFileSync(samplePropsPath, "utf8"));
+  sp.bgmSrc = ensureBgm(publicDir);
+  propsPath = path.join(ROOT, "var", "campaign-lab", "sample-cm-props.render.json");
+  fs.writeFileSync(propsPath, JSON.stringify(sp));
 } else if (jobId) {
   const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
   if (!fs.existsSync(jobPath)) fail(`job not found: ${jobPath}`);
@@ -54,12 +70,17 @@ if (sample) {
   const wav = path.join(JOBS_DIR, `${jobId}.cm.wav`);
   if (!fs.existsSync(wav)) fail(`voice audio not found: ${wav}`);
 
+  publicDir = JOBS_DIR;
   propsPath = path.join(JOBS_DIR, `${jobId}.cm-props.json`);
   fs.writeFileSync(
     propsPath,
-    JSON.stringify({ kit: job.kit, track: job.cm.track, audioSrc: `${jobId}.cm.wav` })
+    JSON.stringify({
+      kit: job.kit,
+      track: job.cm.track,
+      audioSrc: `${jobId}.cm.wav`,
+      bgmSrc: ensureBgm(publicDir),
+    })
   );
-  publicDir = JOBS_DIR;
   out ??= path.join(JOBS_DIR, `${jobId}.cm.mp4`);
 } else {
   fail("usage: npm run campaign:render -- --job <jobId> | --sample [--out <path>]");

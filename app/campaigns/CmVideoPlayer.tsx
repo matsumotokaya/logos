@@ -16,11 +16,13 @@ import {
   type CmVideoProps,
 } from "@/remotion/cm/CmComposition";
 
-export default function CmVideoPlayer({ kit, track, audioSrc }: CmVideoProps) {
+export default function CmVideoPlayer({ kit, track, audioSrc, bgmSrc }: CmVideoProps) {
   return (
     <Player
       component={CmComposition}
-      inputProps={{ kit, track, audioSrc } satisfies CmVideoProps}
+      inputProps={
+        { kit, track, audioSrc, bgmSrc: bgmSrc ?? "/campaigns/bgm.mp3" } satisfies CmVideoProps
+      }
       durationInFrames={cmDurationInFrames(track)}
       fps={CM_FPS}
       compositionWidth={CM_WIDTH}
