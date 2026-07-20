@@ -1,14 +1,33 @@
 # Campaign Lab — 統合表現研究所（引き継ぎ資料）
 
-最終更新: 2026-07-19
+最終更新: 2026-07-20
 
-最小限のソース（URL・PDF・画像・テキスト）から、サービス紹介の**LP（ペラ1）と30秒CM動画**を自動生成するラボ。旧・独立プロジェクト「cm-maker」（`~/projects/cm-maker`、クローズ済み）を合流させたもので、**パイプラインの正本はこのリポジトリだけ**にある。
+最小限のソース（URL・PDF・画像・テキスト）から、サービス紹介の**セールスページ（LP）と30秒CM動画**を自動生成する。旧・独立プロジェクト「cm-maker」（`~/projects/cm-maker`、クローズ済み）を合流させたもので、**パイプラインの正本はこのリポジトリだけ**にある。
+
+## 0. 🎓 製品面への卒業（2026-07-20）
+
+ラボとしての研究フェーズは終了し、**CM Maker として `/campaigns` へ格上げ**した。以降の開発（Phase 0b 動画以降）は製品面の上で行う。
+
+- **管理UIは2ページ構成**（2026-07-20再編）: `/campaigns`（トップ）= ソース入力+サンプル展開+カード一覧で、**生成開始と同時に `/campaigns/[jobId]` へ遷移**。`/campaigns/[id]`（詳細）= 左カラムにキャンペーン一覧+「＋新しいキャンペーン」、右ペインに選択キャンペーンの展開表示。生成中の追従（プレースホルダー+ログポップアップ+2.5秒ポーリング）は詳細ページが担い、リロード・回線断からもjob IDで復帰する。サンプル = CM Maker自身のセールスページ（`lib/campaign/sample.ts`、全項目が手書きの仮情報）は `/campaigns/sample`。旧 `/labs/campaign` はリダイレクト
+- **生成物の正規URL**: `/c/[id]`（`/p/[id]` と対称の opaque ID。所有者・階層を含めない——URL設計の正本は [docs/account-design.md](../../docs/account-design.md) §2）。`/c/sample` はサンプルとして公開。ジョブ由来ページは `campaigns` テーブル導入まで署名URL経由の暫定運用
+- **LPテンプレートはSaaS型フル構成（v2）**: nav / hero（プロダクトモックSVG）/ 実績3指標 / クライアント名row / 課題 / 機能（交互レイアウト+イラスト）/ 使い方 / 動画スロット / 利用者の声 / 料金3プラン / FAQ / クロージング。実績・料金・声などソースに無い情報はLLMが**もっともらしい仮情報**として必ず埋め、ページ側で「サンプル・要差し替え」と明示する（入力補完思想 = 仮情報をユーザーが後から確定情報へ差し替える）
+- **デザインテーマ7種を導入（2026-07-20）**: 正本は `lib/campaign/themes.ts`。各テーマは対象業種・LLM向け選定基準・**全レンダラー共通のトーン&マナー指示文（`direction`）**・LP描画パラメータ（variant: `glass`=ダークフロストグラス / `flat`=従来のライトSaaS、`heroBackground`=ヒーロー背景写真+スクリム）を持つ。生成時にLLMが業種・事業タイプから `kit.theme` を**enumで選択**（構造的に不正値が出ない）し、kit JSONに保存されるので**後から変更して再レンダリングできる**。`direction` はコピー・ナレーションのトーンに現在反映され、Phase 0b以降の動画・バナー・BGM選定にもそのまま渡す設計。テーマ: tech-glass / minimal-light / corporate-trust / care-warm / friendly-pop / food-casual / luxury-serif（旧kitはminimal-lightへフォールバック）
+- **生成LPのヒーローに背景写真（2026-07-20）**: `public/campaigns/bg/` の抽象ガラス写真5枚を**テーマに固定割当**（tech-glass=simon-nilsen / minimal-light=milad-fakurian / corporate-trust=pramod-tiwari / care-warm=hassaan-here / luxury-serif=philip-oroni。friendly-pop / food-casual は専用背景ができるまで写真なし）。ヒーローは減光スクリム+白文字で描画し、本文はテーマ本来のキャンバスを維持する。写真は同一オリジンの `/campaigns/bg/*` を参照（LPを単体ファイルとして持ち出すと画像は外れる——テーマ別専用背景の用意と合わせて今後の課題）
+- **Campaigns UI（管理画面）は白のまま**: `/campaigns` のフルスクリーンヒーロー（背景は simon-nilsen 固定+ソース入力のグラスカード）だけが例外で、ヒーロー以下の一覧・ダイジェスト・詳細ページ `/campaigns/[id]` は通常の白いツールUI。背景写真セットは管理UIの装飾ではなく**生成LPのヒーロー用**
+- **API・ジョブ基盤は現行のまま**: `/api/labs/campaign/*`（Labsゲート継続。公開ファネル化はPhase 1）、ジョブ永続化は `var/campaign-lab/jobs/`
+- ナビ: ハンバーガーの `Campaigns`（Labsロール保持者のみ、Phase 1で一般公開）
 
 ## 1. いま何ができるか（現在地）
 
-**「ソース → Service Brand Kit → LP」の縦貫通が動いている。パレットはTier S（実画面レンダリング証拠 + VLM裁定 + 自己検証）で抽出される。動画はまだ。**
+**「ソース → Service Brand Kit → セールスページ（SaaS型フル構成）」の縦貫通が動いている。パレットはTier S（実画面レンダリング証拠 + VLM裁定 + 自己検証）で抽出される。動画はまだ。**
 
-UIフロー（`/labs/campaign`、Labsロール必須）:
+2026-07-20 精度パス2（funds.jp事例、正本は [docs/palette-accuracy.md](docs/palette-accuracy.md) §7）:
+
+- **ロゴ検出は候補スコアリング方式**。インラインSVGロゴは計算済みスタイルを焼き込んだ**ベクターのまま取得**し（`assets.logo_svg`）、LP・ダイジェストでPNGスクショより優先
+- **パレット証拠にグラデーション・画面ピクセル・og:image(KV)を追加**。ヒーローが画像/グラデーションでも色相が候補に入る。accentはprimaryと異なる第2色相を優先
+- **デザイントークンをLPに実適用**: 実フォント（既知ファミリーはGoogle Fontsから読込——自己完結HTMLの唯一の外部依存）・CTA角丸・コンテナ幅・セクション余白
+
+UIフロー（`/campaigns`、当面Labsロール必須）:
 
 1. **ソース追加カード**: URL入力（サンプルチップ: Anthropic/Apple/Google）、PDF・画像のドラッグ&ドロップ（5個・各4.5MBまで）、テキスト貼り付け。NotebookLMの「ソースを追加」を踏襲した設計
 2. **結果レイアウトは最初からプレースホルダーで表示**（何が生成されるかを実行前から予測できる）。「LPと動画素材を生成」ボタン → **サーバー側のジョブとして生成が走る**（`var/campaign-lab/jobs/` に永続化、UIは2.5秒ポーリングで追従）。**ページを閉じても・回線が切れても生成は継続**し、次に開いたとき最新ジョブ（ログ+結果）が復元される。**2〜4分かかる**
@@ -17,7 +36,7 @@ UIフロー（`/labs/campaign`、Labsロール必須）:
    - **サービスヘッダー（分析結果）**: サービス名・タグライン・業種・事業タイプ・提供価値・ターゲット・概要。全アセットの一段上に置く
    - **マーケティングアセット**:
      - **Service Brand Kit（デザイン基盤）**: 取得した実ロゴ、パレット5色+出所バッジ、CSSから推定したデザイントークン（フォント・ボタン角丸/余白・セクション余白・コンテンツ幅）、brandkit.jsonダウンロード
-     - **セールスページ（LP）**: Heroセクションだけのダイジェストプレビュー。クリックで**本物のLP**（署名付きURL `/api/labs/campaign/lp/[id]`）が新しいタブで開く。LPヘッダーには取得した実ロゴを使用
+     - **セールスページ（LP）**: Heroセクションだけのダイジェストプレビュー。クリックで**本物のLP**（署名付きURL `/c/[id]`）が新しいタブで開く。LPヘッダーには取得した実ロゴを使用
      - **紹介動画（30秒CM）**: Phase 0bで生成されるスロット。動画レンダラーの入力となる**ナレーション原稿はこのセクションの下**に表示
 
 CLIでも同じパイプラインを実行できる（Web UI・ログイン不要、検証・開発用）:
@@ -62,16 +81,24 @@ assets / design_tokens はLLM出力ではなく、パイプラインが決定論
 lib/campaign/            # パイプライン本体（API routeとCLIの両方から使う唯一の実装）
 ├── pipeline.ts          #   オーケストレーション（capture→palette→裁定→creative→LP→verify）
 ├── schema.ts            #   Service Brand Kit の zod スキーマ + CampaignBrandKit（assets/design_tokens）
+│                        #   + SaaS型フルLP用の proof / testimonials / pricing / faq（仮情報セクション）
+├── sample.ts            #   バンドルサンプル: CM Maker自身のセールスページ（/campaigns初期表示・/c/sample）
 ├── ingest.ts            #   URL → テキスト・メタ・カラーヒント・og:image
 ├── capture.ts           #   Playwrightで実画面レンダリング→スクショ・ヒストグラム・ロゴ画像・デザイントークン
 ├── palette.ts           #   CIELABクラスタリング→証拠付きパレット候補
-├── creative.ts          #   VLM裁定 + Brand Kit生成 + LP照合判定（Claude structured outputs）
-├── jobs.ts              #   ジョブ永続化（var/campaign-lab/jobs/、リロード復元の裏側）
-└── render-lp.ts         #   Brand Kit → 自己完結HTML（外部依存ゼロ・CSS変数テーマ）
+├── creative.ts          #   VLM裁定 + Brand Kit生成（テーマ選択含む） + LP照合判定（OpenAI structured outputs）
+├── themes.ts            #   デザインテーマ7種の正本（LP variant・ヒーロー背景割当 + 全レンダラー共通のトーン&マナー指示文）
+├── jobs.ts              #   ジョブ永続化（var/campaign-lab/jobs/、リロード復元・カード一覧の裏側）
+└── render-lp.ts         #   Brand Kit → 自己完結HTML（SaaS型フルテンプレートv2、kit.themeでglass/flatを切替）
 
-app/labs/campaign/       # 入口UX
-├── page.tsx             #   ラボページ（LabHeader + noindex）
-└── CampaignStudio.tsx   #   ソース追加UI・生成・結果2パネル表示
+app/campaigns/           # 入口UX（製品面）
+├── page.tsx             #   /campaigns（AppHeader + サンプルLPをサーバー側でレンダリングして注入）
+├── CampaignsTop.tsx     #   フルスクリーンヒーロー（背景固定+ソース入力のグラスカード）+ カード一覧 + サンプル展開
+├── campaign-ui.tsx      #   共有UI（ResultDigest・処理ログ・ジョブAPIヘルパー）
+└── [id]/                #   キャンペーン詳細（左: 一覧サイドバー / 右: ダイジェスト+処理ログ、白いツールUI）
+
+app/c/[id]/route.ts      # 生成LPの正規URL（/c/sample は公開、ジョブ由来は署名URL）
+next.config.ts           # 旧URL /labs/campaign → /campaigns リダイレクト（静的ページ内redirect()は本番で効かないため）
 
 app/api/labs/campaign/generate/route.ts  # 生成API（guardLabsRequestで保護、maxDuration 300、NDJSONストリーミング: progress/ping/result/error）
 
@@ -88,7 +115,7 @@ labs/campaign/
     └── prepare.mjs          #   素材集約・タイミングJSON正規化・WAV尺算出（参考）
 ```
 
-`labs/directory.ts` のCampaign Labエントリは`active`で、研究所インデックスから稼働中ラボとして導線を出す。
+`labs/directory.ts` のCampaign Labエントリは`graduated`で、研究所インデックスには「本体へ卒業」バッジ付きで残り、カードは `/campaigns` へリンクする。
 
 ## 4. ロードマップ
 

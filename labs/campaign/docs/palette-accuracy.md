@@ -110,3 +110,24 @@ LLMに**色の証拠が一切渡っていない**まま、プロンプトの補�
 実装後に見つけて塞いだ問題:
 
 - **裁定が surface に暗色を選び黒地黒文字になる**ケース（anthropic.com 初回で発生。検証はabove-the-foldしか見ないためpassしてしまう）→ 裁定後に決定論ガードを追加: `contrast(surface, text) < 4.5` なら surface を background にスナップ（`creative.ts`）。品質はコード側で保証する原則どおり
+
+## 7. 精度パス2（2026-07-20・funds.jp事例）
+
+funds.jp の実測で3つの構造的な穴が見つかった。いずれも「証拠の収集範囲」の問題で、Tier S の骨格（決定論候補+choose-only裁定）自体は変えていない。
+
+**事象**: (a) ヘッダーにインラインSVGロゴがあるのに「特定できず」 (b) 画面の過半を占める空色グラデーションのヒーローが候補にすら現れず、accent=primary=紺で裁定 (c) デザイントークンが宣言スタック先頭の機械採用（LP側もトークンを表示するだけで未使用）。
+
+| 穴 | 原因 | 修正 |
+|---|---|---|
+| ロゴ不検出 | セレクタの**最初のマッチだけ**を試し、それが0×0のアイコンスプライト`<svg>`だと即諦めていた（funds.jpは3番目のマッチが本物） | `PICK_LOGO_ELEMENT`（capture.ts）: 全候補をページ内でスコアリング（logo/brand命名+3、`href="/"`内+3、上部+2、ワードマーク比率+2、アイコンサイズ減点等）し、最良1つをスクショ。**インラインSVGは計算済みfill/strokeを焼き込んでベクターのまま取得**（`assets.logo_svg`、LP/ダイジェストはPNGより優先）。faviconフォールバックはapple-touch-icon等PNG系を優先（ingest.ts） |
+| ヒーロー色の欠落 | 証拠が computed style の `backgroundColor` のみ。**グラデーション（background-image）と画像はヒストグラムに構造的に映らない** | 証拠を3系統追加: ①`backgroundImage`のgradient色ストップ（面積加重）②レンダリング済みビューポートの**画素ヒストグラム**（sharp、16階調量子化）③**og:image（キービジュアル）の支配色**。palette.tsの候補選定に「グラデ背景」「画面ピクセル%」「キービジュアル%」枠を追加。裁定プロンプトも「ヒーロー/KVを支配する色相はボタンに出ていなくても正当なブランド色」「accentはprimaryと異なる第2色相を優先、モノクロームブランドのみ同色可」に更新。検証プロンプトに「原サイトを支配する色相が生成ページに皆無なら palette_mismatch」を追加 |
+| トークンが雑 | フォント=宣言スタックの先頭（リセット由来でも採用）、ボタン=円形アイコンボタン（radius 50%）混入、**LPはトークンを使っていない** | フォント: genericと`* Fallback`（next/fontのシム）を除いた実ファミリー上位2つ（例 `Ubuntu, Noto Sans JP`）。ボタン: CTA色（彩度or暗色）かつボタン比率の要素のみ、`<a>`が未塗装なら単独子要素を追跡、pillは`999px`に正規化。**render-lpがトークンを実適用**: フォントスタック先頭（既知ファミリーはGoogle Fontsから読込=LPで唯一の外部依存）、`.btn`角丸、コンテナ幅（880–1240にクランプ）、セクション余白（56–140） |
+
+**実測結果（2026-07-20）**:
+
+| サイト | 結果 |
+|---|---|
+| funds.jp | ✅ ロゴ=インラインSVGベクター取得。候補11色（#70dbfdに「グラデ背景67%/画面ピクセル20%/KV34%」の証拠）。裁定 primary `#062952`（紺）/ accent `#70dbfd`（空色）。トークン `Ubuntu, Noto Sans JP`・pill・1100px がLPに実適用。verification: pass |
+| anthropic.com 非劣化 | ✅ `#f0eee6` / `#141413` 維持。モノクロームブランドとして accent=primary を正しく維持。実フォント Anthropic Serif / Anthropic Sans を捕捉（Google Fonts外はフォールバック） |
+
+デバッグはLLM無しで回せる: capture+palette だけを叩くハーネスをscratchpadに作り、候補リストと証拠行を直接見る（`NODE_OPTIONS=--conditions=react-server npx tsx` で `captureSite`+`buildPaletteCandidates` を呼ぶ）。

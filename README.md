@@ -34,13 +34,16 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | `/brand` | **Brand Manager**(旧称 Admin)。導入企業が**自社のブランド資産**(ロゴ・物品在庫・組織メンバー・公開ハンドル)を管理するハブ。プラットフォーム運営側の管理画面ではなく、そのブランドを持つ組織のための画面 |
 | `/assets` | アセットライブラリ。自分/所属組織が管理するロゴアセットを一覧し、各アセット詳細へ入る |
 | `/assets/[id]` | アセット詳細ページ。現時点ではロゴ正本の編集(正式名称・主体entity・ロゴ形式・役割・親子関係・公開範囲・公開スラッグ・コンタクト表示・タグ・制作クレジット・商標情報・マスターファイル差し替え・**組織への所有移管**・作業履歴)。あわせて**このロゴで現在どのプレゼン asset が採用されているか**、candidate配下のlockup / colorway階層も確認できる。旧 `/brand/logos/[id]` は同じ画面を指す互換URL |
+| `/campaigns` | **CM Maker のトップ**(旧 Campaign Lab、2026-07-20格上げ)。画面高100%のヒーロー(青いガラス質背景に、左: タイトル+解説、右: ソース入力のグラスカード)だけがダークで、以下はロゴス本体と同じ白いUI: サンプル(CM Maker自身のセールスページ)の展開表示+自分のキャンペーンのカード一覧。**生成を開始すると `/campaigns/[id]` へ遷移**する。当面は生成APIがLabsゲート下のため `platform_admin` / `labs_member` 向け |
+| `/campaigns/[id]` | キャンペーン詳細(管理UI)。**左カラム=キャンペーン一覧+「新しいキャンペーン」、右ペイン=選択キャンペーンの展開表示**(Service Brand Kit・LPプレビュー・ナレーション・処理ログ)。生成中はプレースホルダー+ログポップアップで追従し、完了すると実データに置き換わる。`/campaigns/sample` はサンプルの詳細 |
+| `/c/[id]` | 生成されたセールスページの正規URL(`/p/[id]` と対称の opaque ID・所有者を含まない)。LPは `kit.theme` の**デザインテーマ(7種・業種からLLMが自動選択、正本は [lib/campaign/themes.ts](lib/campaign/themes.ts))**で描画され、ヒーローにはテーマ固定割当の背景写真([public/campaigns/bg/](public/campaigns/bg/))が入る。テーマはkitに保存されるため後から変更・再レンダリングできる。`/c/sample` はサンプル(公開・tech-glassテーマ)。ジョブ由来のページは暫定的に署名URL経由(campaignsテーブル導入後にRLSベースへ移行) |
 | `/settings` | Accountページ。ユーザー情報表示・プロフィール編集枠・登録アカウントの退会導線。退会時は個人所有データとR2成果物を削除し、共同組織の資産は残す |
-| `/[handle]/[slug]` | バニティURL。組織ハンドル+ロゴスラッグを正規パーマリンク `/p/[id]` に解決(公開ロゴのみ) |
-| `/labs` | **研究所インデックス**(noindex)。表現R&Dを保証/探索/統合モードで分類する。稼働中は [Motion Lab](labs/motion/README.md)、[Workflow Lab](labs/workflow/README.md)、[Generative Lab](labs/generative/README.md)、ソースからService Brand KitとLPを生成する [Campaign Lab](labs/campaign/README.md)。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow` へリダイレクト |
+| `/[handle]/[slug]` | バニティURL。組織ハンドル+ロゴスラッグを正規パーマリンク `/p/[id]` に解決(公開ロゴのみ)。将来はキャンペーン(`/c/[id]`)も同じ共有名前空間で解決する |
+| `/labs` | **研究所インデックス**(noindex)。表現R&Dを保証/探索/統合モードで分類する。稼働中は [Motion Lab](labs/motion/README.md)、[Workflow Lab](labs/workflow/README.md)、[Generative Lab](labs/generative/README.md)。[Campaign Lab](labs/campaign/README.md) は `/campaigns`(CM Maker)へ卒業済み。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow`、旧 `/labs/campaign` → `/campaigns` へリダイレクト |
 
 URL体系の設計意図(所有者を含まない壊れないパーマリンク等)は [docs/account-design.md](docs/account-design.md) を参照。
 
-ヘッダーのハンバーガーメニューは、未登録ユーザーには`Home`だけを表示する。本登録ユーザーには`Assets`と`Brand Manager`も表示し、`platform_admin`または`labs_member`を持つ場合だけ`Labs`を追加する。アバターメニューはメールアドレス、`Account`、`Sign out`だけを表示し、プロダクト内ナビゲーションと分離する。
+ヘッダーのハンバーガーメニューは、未登録ユーザーには`Home`だけを表示する。本登録ユーザーには`Assets`と`Brand Manager`も表示し、`platform_admin`または`labs_member`を持つ場合だけ`Campaigns`と`Labs`を追加する(CampaignsはPhase 1の公開ファネル化までLabsと同じ対象者)。アバターメニューはメールアドレス、`Account`、`Sign out`だけを表示し、プロダクト内ナビゲーションと分離する。
 
 ## プレゼン構成モデル
 
@@ -94,6 +97,15 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 
 各アセットの詳細(`/assets/[id]`、旧 `/brand/logos/[id]`)では、正本編集だけでなく**そのロゴのプレゼン構成の現在値**も確認する。つまり Brand Manager は「ロゴファイルを持つ場所」だけでなく、**そのロゴがどんなブランドドキュメントとして出力されるか**を見るハブでもある。
 
+## CM Maker(`/campaigns`)
+
+最小限のソース(URL・PDF・画像・テキスト)から、サービス紹介の**セールスページ(LP)と30秒CM動画(Phase 0b予定)**を自動生成するプロダクト面。旧 Campaign Lab の卒業先で、**詳細な引き継ぎ資料・パイプライン解説の正本は [labs/campaign/README.md](labs/campaign/README.md)**。2026-07-20時点の骨子:
+
+- **Service Brand Kit が核**: ソースから「サービス分析+ブランド(証拠ベースで抽出したパレット・実ロゴ・デザイントークン)+LP全文コピー+CMナレーション」の中間表現を1回生成し、全レンダラー(LP・動画・バナー)がこれを消費する
+- **デザインテーマ7種**([lib/campaign/themes.ts](lib/campaign/themes.ts) が正本): tech-glass / minimal-light / corporate-trust / care-warm / friendly-pop / food-casual / luxury-serif。各テーマは対象業種・LP描画パラメータ(glass/flatバリアント・ヒーロー背景写真)・**全レンダラー共通のトーン&マナー指示文(`direction`)**を持つ。生成時にLLMが業種からenumで自動選択し、`kit.theme` として保存されるため**後から変更して再レンダリングできる**
+- **生成LPのヒーローは背景写真でリッチに**: [public/campaigns/bg/](public/campaigns/bg/) の抽象ガラス写真5枚をテーマに固定割当(スクリム+白文字、本文はテーマ本来のキャンバス)。テーマ別の専用背景に将来差し替える
+- **UI**: `/campaigns` トップは画面高100%のヒーロー(青いガラス質背景+ソース入力のグラスカード)、それ以外の管理UI(一覧・ダイジェスト・詳細 `/campaigns/[id]`)はロゴス本体と同じ白いツールUI。生成は非同期ジョブで、ページを閉じても継続する
+
 ## Platform Admin / Labs権限
 
 サービス運営権限は組織ロールから独立している。`org_members.admin` はその企業のBrand Managerを管理する権限であり、Labsや将来のサービス運営ダッシュボードには入れない。
@@ -102,7 +114,7 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 - `labs_member`: Labsのみアクセス
 - `support`: 将来のサポート担当。現時点ではLabsアクセスなし
 
-Labsのページ、生成・集計・テンプレートAPIは `platform_admin` または `labs_member` を要求する。公開プレゼンが利用する `/api/labs/workflow/compose` と `/api/labs/workflow/runs` はこのゲートの対象外。
+Labsのページ、生成・集計・テンプレートAPIは `platform_admin` または `labs_member` を要求する。`/campaigns`(CM Maker)の生成・ジョブAPI(`/api/labs/campaign/*`)も当面同じゲート下にある。公開プレゼンが利用する `/api/labs/workflow/compose` と `/api/labs/workflow/runs`、および公開サンプル `/c/sample` はこのゲートの対象外。
 
 ## アーキテクチャ
 

@@ -7,6 +7,7 @@ export type Dict = {
     labs: string;
     home: string;
     assets: string;
+    campaigns: string;
     account: string;
     newLogo: string;
     brandName: string;
@@ -137,6 +138,7 @@ const en: Dict = {
     labs: "Labs",
     home: "Home",
     assets: "Assets",
+    campaigns: "Campaigns",
     account: "Account",
     newLogo: "New logo",
     brandName: "Brand name",
@@ -284,6 +286,7 @@ const ja: Dict = {
     labs: "ラボ",
     home: "ホーム",
     assets: "アセット",
+    campaigns: "キャンペーン",
     account: "アカウント",
     newLogo: "新しいロゴ",
     brandName: "ブランド名",
@@ -431,6 +434,7 @@ const ko: Dict = {
     labs: "랩",
     home: "홈",
     assets: "에셋",
+    campaigns: "캠페인",
     account: "계정",
     newLogo: "새 로고",
     brandName: "브랜드명",
@@ -578,6 +582,7 @@ const zhHant: Dict = {
     labs: "實驗室",
     home: "首頁",
     assets: "資產",
+    campaigns: "行銷活動",
     account: "帳號",
     newLogo: "新標誌",
     brandName: "品牌名稱",
@@ -724,6 +729,7 @@ const zhHans: Dict = {
     labs: "实验室",
     home: "首页",
     assets: "资产",
+    campaigns: "营销活动",
     account: "账号",
     newLogo: "新标志",
     brandName: "品牌名称",

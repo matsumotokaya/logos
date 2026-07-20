@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { BrandKitSchema, type BrandKit } from "./schema";
+import { describeThemesForPrompt } from "./themes";
 import type { RawServiceInfo } from "./ingest";
 import type { SiteCapture } from "./capture";
 import { describeCandidates, type PaletteCandidate } from "./palette";
@@ -114,7 +115,9 @@ Rules:
 - Copy is benefit-driven: lead with what the audience gains, not feature lists.
 - service.industry / business_type / offering / audience are ANALYSIS results, not marketing copy: state factually what kind of business this is and what it primarily provides, grounded in the source material.
 - Colors: when the prompt provides an adjudicated palette extracted from the real site, reproduce it EXACTLY and set palette_source to "extracted". Never invent colors when evidence exists. Only when no palette evidence is provided may you propose a palette that fits the service genre and personality — in that case set palette_source to "generated". Ensure text/background contrast is readable (WCAG AA-ish).
-- Never invent false claims (user counts, awards, pricing). Stay within what the source material supports; when unsure, write aspirational but non-factual copy.
+- In hero / problem / features / how_it_works, never invent false claims (user counts, awards, pricing). Stay within what the source material supports; when unsure, write aspirational but non-factual copy.
+- copy.proof / testimonials / pricing / faq are PLACEHOLDER sections: the page must always render a complete SaaS-style layout, so when the sources say nothing about them, write plausible fiction. Keep it clearly generic: fictional Japanese personas, coined brand names (never real companies), round plausible numbers. If the sources DO state real pricing or metrics, use those. The page labels these sections as sample content the owner will replace.
+- theme: choose exactly ONE design theme id from the theme catalog in the prompt, matching the service's industry / business_type / brand personality. The theme drives the LP template and, later, the CM video / banners / BGM. Let the chosen theme's 方向性 guide the copy tone and narration voice. When palette_source is "generated", also let it guide the proposed palette — but a theme NEVER overrides an adjudicated (extracted) palette.
 - narration: exactly the words a voice actor reads aloud for a ~30 second CM (roughly 180-260 Japanese characters). No headings, no directions.`;
 
 type ContentPart = OpenAI.Chat.Completions.ChatCompletionContentPart;
@@ -236,6 +239,7 @@ function buildUserPrompt(input: CreativeInput): string {
       'No palette evidence could be extracted from a rendered page. Propose a fitting palette and set brand.palette_source to "generated".'
     );
   }
+  parts.push(describeThemesForPrompt());
   if (input.feedback) {
     parts.push(
       `# Reviewer feedback on the previous attempt (fix this)\n${input.feedback}`
@@ -247,14 +251,14 @@ function buildUserPrompt(input: CreativeInput): string {
 
 // ---------- Stage 3: VLM palette adjudication ----------
 
-const ADJUDICATOR_SYSTEM = `You are a meticulous brand-design auditor. You are shown screenshots of a real website plus a list of color candidates that were mechanically extracted from the rendered page, each with evidence (painted area share, usage on buttons/links, CSS variable names, logo colors).
+const ADJUDICATOR_SYSTEM = `You are a meticulous brand-design auditor. You are shown screenshots of a real website plus a list of color candidates that were mechanically extracted from the rendered page, each with evidence (painted area share, gradient backgrounds, rendered-pixel share, og:image key-visual share, usage on buttons/links, CSS variable names, logo colors).
 
 Assign palette roles by choosing ONLY from the candidate colors. Do not invent or adjust colors. Judge from what the screenshots actually show:
 - background: the dominant page background
 - text: the main body text color
 - primary: the brand's main color (often the logo / heading / hero color)
-- accent: the color of interactive elements (buttons, links). May equal primary if the site uses one brand color.
-- surface: card/section background slightly offset from the page background. If no distinct surface exists, reuse the background candidate closest to it.
+- accent: a SECOND brand color, different from primary, used for emphasis. Look for a distinct hue in the hero / key visual / gradients / links / highlights — evidence lines like グラデーション背景, 画面ピクセル and キービジュアル mark exactly these. A hue that dominates the hero imagery is a legitimate brand color even if no button uses it. Reuse the primary ONLY when the site is truly monochromatic (no second hue anywhere in the screenshots).
+- surface: card/section background slightly offset from the page background. If no distinct surface exists, reuse the background candidate closest to it. A pale tint of the hero hue is a good surface when the site uses one.
 - mode: light or dark, from the overall page appearance
 
 If the candidates clearly cannot represent the site's brand (e.g. screenshots failed to load, page is an error page), set assessment to "insufficient" and palette to null. Otherwise set assessment to "confident".`;
@@ -352,7 +356,7 @@ export interface BrandMatchJudgment {
 
 const VERIFIER_SYSTEM = `You compare two screenshots: (1) the original website of a service, (2) a landing page that was auto-generated for the same service. Judge ONLY whether the generated page looks like it belongs to the same brand.
 
-- palette_mismatch: the generated page uses colors that clearly do not belong to the original brand (e.g. original is white/blue, generated is green)
+- palette_mismatch: the generated page uses colors that clearly do not belong to the original brand (e.g. original is white/blue, generated is green), OR a hue that visually dominates the original (e.g. a hero / key-visual background covering a large share of the screen) is entirely absent from the generated page
 - tone_mismatch: colors are plausible but the overall mood (dark/light, loud/quiet) contradicts the original
 - pass: a human would accept the generated page as the same brand
 

@@ -11,6 +11,7 @@ import { signedLabsUrl } from "@/lib/labs-output-sign";
 import {
   getCampaignJob,
   latestCampaignJobForUser,
+  listCampaignJobsForUser,
   readCampaignJobHtml,
   type CampaignJob,
 } from "@/lib/campaign/jobs";
@@ -22,7 +23,7 @@ function jobResponse(job: CampaignJob) {
       job,
       html: done ? readCampaignJobHtml(job.id) : null,
       lpUrl: done
-        ? signedLabsUrl(`/api/labs/campaign/lp/${job.id}`, `campaign-lp:${job.id}`)
+        ? signedLabsUrl(`/c/${job.id}`, `campaign-lp:${job.id}`)
         : null,
     },
     { headers: { "Cache-Control": "no-store" } }
@@ -34,7 +35,23 @@ export async function GET(req: Request) {
   if (denied) return denied;
   const user = await requireUser(req);
 
-  const id = new URL(req.url).searchParams.get("id");
+  const search = new URL(req.url).searchParams;
+
+  // ?list=1 — card summaries for /campaigns (no step logs / HTML payloads).
+  if (search.get("list")) {
+    const jobs = listCampaignJobsForUser(user.id).map((job) => ({
+      id: job.id,
+      createdAt: job.createdAt,
+      status: job.status,
+      name: job.kit?.service.name ?? job.input.name ?? job.input.url ?? "無題",
+      tagline: job.kit?.service.tagline ?? null,
+      primary: job.kit?.brand.primary ?? null,
+      accent: job.kit?.brand.accent ?? null,
+    }));
+    return Response.json({ jobs }, { headers: { "Cache-Control": "no-store" } });
+  }
+
+  const id = search.get("id");
   if (id) {
     const job = getCampaignJob(id);
     if (!job || job.userId !== user.id)

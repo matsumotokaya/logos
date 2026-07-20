@@ -22,6 +22,13 @@ export interface CaptureEvidence {
   texts: WeightedColor[];
   /** border colors, weighted by border length * width */
   borders: WeightedColor[];
+  /** CSS-gradient background stops, weighted by painted area (px^2) —
+   *  hero key visuals are usually here, not in backgrounds */
+  gradients?: WeightedColor[];
+  /** rendered-viewport pixel share 0..1 (photography, imagery, everything) */
+  pixels?: WeightedColor[];
+  /** dominant colors of the og:image key visual, share 0..1 */
+  keyVisual?: WeightedColor[];
   /** colors used on interactive elements (a / button / inputs) */
   interactive: InteractiveColor[];
   /** :root CSS custom properties that resolve to a color */
@@ -36,6 +43,9 @@ export interface PaletteCandidate {
   evidence: string[];
   bgShare: number;
   textShare: number;
+  gradShare: number;
+  pixelShare: number;
+  keyVisualShare: number;
   interactiveCount: number;
   fromLogo: boolean;
   cssVarNames: string[];
@@ -103,6 +113,9 @@ interface Cluster {
   bgWeight: number;
   textWeight: number;
   borderWeight: number;
+  gradWeight: number;
+  pixelShare: number;
+  keyVisualShare: number;
   interactiveCount: number;
   logoShare: number;
   cssVarNames: string[];
@@ -134,6 +147,9 @@ function clusterEvidence(ev: CaptureEvidence): Cluster[] {
         bgWeight: 0,
         textWeight: 0,
         borderWeight: 0,
+        gradWeight: 0,
+        pixelShare: 0,
+        keyVisualShare: 0,
         interactiveCount: 0,
         logoShare: 0,
         cssVarNames: [],
@@ -154,6 +170,12 @@ function clusterEvidence(ev: CaptureEvidence): Cluster[] {
   for (const e of sorted(ev.backgrounds)) upsert(e.hex, e.weight, (c) => (c.bgWeight += e.weight));
   for (const e of sorted(ev.texts)) upsert(e.hex, e.weight, (c) => (c.textWeight += e.weight));
   for (const e of sorted(ev.borders)) upsert(e.hex, e.weight, (c) => (c.borderWeight += e.weight));
+  for (const e of sorted(ev.gradients ?? []))
+    upsert(e.hex, e.weight, (c) => (c.gradWeight += e.weight));
+  for (const e of sorted(ev.pixels ?? []))
+    upsert(e.hex, e.weight * 1000, (c) => (c.pixelShare += e.weight));
+  for (const e of sorted(ev.keyVisual ?? []))
+    upsert(e.hex, e.weight * 1000, (c) => (c.keyVisualShare += e.weight));
   for (const e of ev.interactive) upsert(e.hex, e.count, (c) => (c.interactiveCount += e.count));
   for (const e of ev.logoColors) upsert(e.hex, e.share * 1000, (c) => (c.logoShare += e.share));
   for (const e of ev.cssVars) upsert(e.hex, 1, (c) => c.cssVarNames.push(e.name));
@@ -172,12 +194,20 @@ export function buildPaletteCandidates(ev: CaptureEvidence): PaletteCandidate[] 
 
   const totalBg = clusters.reduce((s, c) => s + c.bgWeight, 0) || 1;
   const totalText = clusters.reduce((s, c) => s + c.textWeight, 0) || 1;
+  const totalGrad = clusters.reduce((s, c) => s + c.gradWeight, 0) || 1;
 
   const toCandidate = (c: Cluster): PaletteCandidate => {
     const bgShare = c.bgWeight / totalBg;
     const textShare = c.textWeight / totalText;
+    const gradShare = c.gradWeight / totalGrad;
     const evidence: string[] = [];
     if (bgShare >= 0.005) evidence.push(`背景面積${(bgShare * 100).toFixed(1)}%`);
+    if (c.gradWeight > 0 && gradShare >= 0.05)
+      evidence.push(`グラデーション背景${(gradShare * 100).toFixed(0)}%`);
+    if (c.pixelShare >= 0.02)
+      evidence.push(`画面ピクセル${(c.pixelShare * 100).toFixed(0)}%`);
+    if (c.keyVisualShare >= 0.05)
+      evidence.push(`キービジュアル(og:image)に${Math.round(c.keyVisualShare * 100)}%`);
     if (textShare >= 0.005) evidence.push(`テキスト量${(textShare * 100).toFixed(1)}%`);
     if (c.interactiveCount > 0)
       evidence.push(`ボタン/リンク${c.interactiveCount}要素で使用`);
@@ -189,6 +219,9 @@ export function buildPaletteCandidates(ev: CaptureEvidence): PaletteCandidate[] 
       evidence,
       bgShare,
       textShare,
+      gradShare,
+      pixelShare: c.pixelShare,
+      keyVisualShare: c.keyVisualShare,
       interactiveCount: c.interactiveCount,
       fromLogo: c.logoShare > 0.02,
       cssVarNames: c.cssVarNames,
@@ -214,6 +247,27 @@ export function buildPaletteCandidates(ev: CaptureEvidence): PaletteCandidate[] 
       .filter((c) => c.interactiveCount > 0 && c.chroma > 15)
       .sort((a, b) => b.interactiveCount - a.interactiveCount),
     4
+  );
+  // Hero / key-visual hues: gradient backgrounds, dominant rendered pixels
+  // and og:image colors. This is where "the site is obviously blue" lives
+  // when the blue is a gradient or photograph.
+  take(
+    [...all]
+      .filter((c) => c.gradShare > 0.08 && c.chroma > 8)
+      .sort((a, b) => b.gradShare - a.gradShare),
+    3
+  );
+  take(
+    [...all]
+      .filter((c) => c.pixelShare > 0.04 && c.chroma > 12)
+      .sort((a, b) => b.pixelShare - a.pixelShare),
+    3
+  );
+  take(
+    [...all]
+      .filter((c) => c.keyVisualShare > 0.08 && c.chroma > 15)
+      .sort((a, b) => b.keyVisualShare - a.keyVisualShare),
+    2
   );
   // Logo colors.
   take([...all].filter((c) => c.fromLogo).sort((a, b) => b.chroma - a.chroma), 3);

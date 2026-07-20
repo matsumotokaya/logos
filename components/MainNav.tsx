@@ -43,7 +43,13 @@ export default function MainNav({ tone = "dark" }: { tone?: "dark" | "light" }) 
       { href: "/brand", label: dict.header.brandManager },
     );
     if (canAccessLabs) {
-      items.push({ href: "/labs", label: dict.header.labs });
+      // Campaigns (CM Maker) is a product surface, but generation still runs
+      // on labs-gated APIs — expose it to the same audience until the public
+      // funnel (Phase 1) opens.
+      items.push(
+        { href: "/campaigns", label: dict.header.campaigns },
+        { href: "/labs", label: dict.header.labs },
+      );
     }
   }
 

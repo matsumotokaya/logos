@@ -1,7 +1,12 @@
 import "server-only";
 
 import { scrapeUrl, fetchImageAsBase64, type RawServiceInfo } from "./ingest";
-import { captureSite, screenshotHtml, type SiteCapture } from "./capture";
+import {
+  captureSite,
+  imageDominantColors,
+  screenshotHtml,
+  type SiteCapture,
+} from "./capture";
 import { buildPaletteCandidates, type PaletteCandidate } from "./palette";
 import {
   generateBrandKit,
@@ -100,9 +105,17 @@ export async function runCampaignPipeline(
       `ingest: 「${raw.title ?? "(タイトルなし)"}」を取得（見出し${raw.headings.length}件・カラーヒント${raw.colorHints.length}色）`,
       "success"
     );
-    if (!files.some((f) => f.kind === "image") && raw.ogImage) {
-      const og = await fetchImageAsBase64(raw.ogImage);
-      if (og) {
+  }
+
+  // og:image = the site's own key visual. Used two ways: as a vision input
+  // for the creative stage, and as palette evidence (its dominant hues are
+  // brand colors even when no button uses them).
+  let keyVisualColors: { hex: string; share: number }[] = [];
+  if (raw?.ogImage) {
+    const og = await fetchImageAsBase64(raw.ogImage);
+    if (og) {
+      keyVisualColors = await imageDominantColors(Buffer.from(og.data, "base64"));
+      if (!files.some((f) => f.kind === "image")) {
         files.push({ kind: "image", mediaType: og.mediaType, data: og.data });
         progress("ingest: og:image をキービジュアルとして取得", "success");
       }
@@ -125,10 +138,12 @@ export async function runCampaignPipeline(
         "success"
       );
       progress(
-        capture.logoImage
-          ? "capture: ロゴ画像を取得（Brand Kitに同梱）"
-          : "capture: ロゴ画像は特定できず（ワードマークで代替）",
-        capture.logoImage ? "success" : "warn"
+        capture.logoSvg
+          ? "capture: ロゴを取得（インラインSVGベクター + PNG）"
+          : capture.logoImage
+            ? "capture: ロゴ画像を取得（Brand Kitに同梱）"
+            : "capture: ロゴ画像は特定できず（ワードマークで代替）",
+        capture.logoImage || capture.logoSvg ? "success" : "warn"
       );
       const tokenCount = Object.values(capture.designTokens).filter(Boolean).length;
       if (tokenCount > 0)
@@ -144,10 +159,13 @@ export async function runCampaignPipeline(
     }
   }
 
-  // Stage 2: deterministic palette candidates.
+  // Stage 2: deterministic palette candidates (rendered evidence + og:image).
   let candidates: PaletteCandidate[] | null = null;
   if (capture) {
-    candidates = buildPaletteCandidates(capture.evidence);
+    candidates = buildPaletteCandidates({
+      ...capture.evidence,
+      keyVisual: keyVisualColors.map((c) => ({ hex: c.hex, weight: c.share })),
+    });
     progress(
       `palette: 証拠付き候補${candidates.length}色を抽出（${candidates
         .slice(0, 4)
@@ -181,6 +199,7 @@ export async function runCampaignPipeline(
           logo: capture?.logoImage
             ? { data: capture.logoImage, media_type: "image/png" }
             : null,
+          logo_svg: capture?.logoSvg ?? null,
           favicon_url: raw?.faviconUrl ?? null,
           og_image_url: raw?.ogImage ?? null,
           source_url: raw?.url ?? input.url,

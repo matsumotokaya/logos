@@ -24,6 +24,9 @@ export interface SiteCapture {
   evidence: CaptureEvidence;
   /** header logo element screenshot (or favicon fallback), base64 PNG */
   logoImage: string | null;
+  /** inline-SVG logo with computed fills baked in (vector master), when the
+   *  detected logo element was an <svg> */
+  logoSvg: string | null;
   /** best-effort design guideline hints from computed CSS */
   designTokens: DesignTokens;
 }
@@ -36,6 +39,7 @@ type RawPageColors = {
   bg: [string, number][];
   txt: [string, number][];
   border: [string, number][];
+  grad: [string, number][]; // gradient background stops, weighted by area
   inter: [string, number][]; // key: "hex|role"
   vars: { name: string; hex: string }[];
   tokens: {
@@ -56,6 +60,7 @@ const COLLECT_PAGE_COLORS = String.raw`(() => {
   const bg = new Map();
   const txt = new Map();
   const border = new Map();
+  const grad = new Map();
   const inter = new Map();
 
   const parse = (s) => {
@@ -95,6 +100,16 @@ const COLLECT_PAGE_COLORS = String.raw`(() => {
 
     const area = Math.min(r.width, vw) * Math.min(r.height, scanH);
     add(bg, parse(cs.backgroundColor), area);
+
+    // Gradient backgrounds (hero key visuals live here — invisible to the
+    // backgroundColor histogram): weight each stop by the painted area.
+    const bi = cs.backgroundImage;
+    if (bi && bi.indexOf("gradient(") !== -1 && area > 4000) {
+      const stops = bi.match(/rgba?\([^)]*\)|#[0-9a-fA-F]{3,8}\b/g) || [];
+      for (const s of stops.slice(0, 6)) {
+        add(grad, parse(s), area / Math.max(stops.length, 1));
+      }
+    }
 
     let textLen = 0;
     for (const n of Array.from(el.childNodes)) {
@@ -145,20 +160,66 @@ const COLLECT_PAGE_COLORS = String.raw`(() => {
     for (const [k, v] of m) if (v > n) { best = k; n = v; }
     return best;
   };
-  const firstFont = (v) => (v ? v.split(",")[0].trim().replace(/^["']|["']$/g, "") : null);
+  // Brand font families: the leading real families of the declared stack.
+  // Skips generic keywords and synthetic "<X> Fallback" faces (next/font
+  // metric shims). Keeps up to two — JP sites routinely pair a Latin face
+  // with a JP face (e.g. "Ubuntu, Noto Sans JP") and both matter.
+  const GENERIC = /^(sans-serif|serif|monospace|system-ui|ui-sans-serif|ui-serif|ui-monospace|ui-rounded|cursive|fantasy|math|emoji|-apple-system|BlinkMacSystemFont|Segoe UI|Helvetica( Neue)?|Arial|Roboto Fallback)$/i;
+  const renderedFont = (el) => {
+    if (!el) return null;
+    const fam = getComputedStyle(el).fontFamily || "";
+    const families = fam
+      .split(",")
+      .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+      .filter((f) => f && !GENERIC.test(f) && !/ Fallback$/i.test(f));
+    return families.length ? families.slice(0, 2).join(", ") : null;
+  };
   const tokens = { bodyFont: null, headingFont: null, buttonRadius: null, buttonPadding: null, sectionSpacing: null, containerWidth: null };
   try {
-    tokens.bodyFont = firstFont(getComputedStyle(document.body).fontFamily);
-    const h = document.querySelector("h1, h2");
-    if (h) tokens.headingFont = firstFont(getComputedStyle(h).fontFamily);
+    // Body font: measure on a real paragraph when possible (body itself is
+    // often reset-styled).
+    let textEl = null;
+    for (const p of Array.from(document.querySelectorAll("p, li")).slice(0, 200)) {
+      const t = (p.textContent || "").trim();
+      const r = p.getBoundingClientRect();
+      if (t.length >= 20 && r.width > 100) { textEl = p; break; }
+    }
+    tokens.bodyFont = renderedFont(textEl || document.body);
+    tokens.headingFont = renderedFont(document.querySelector("h1, h2")) || tokens.bodyFont;
 
+    // Button tokens: only CTA-looking elements (saturated or dark solid
+    // background, button proportions). Circular icon buttons (radius 50%,
+    // near-square) previously polluted this — exclude them.
+    const chromaOf = (hex) => {
+      const n = parseInt(hex.slice(1), 16);
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      return Math.max(r, g, b) - Math.min(r, g, b);
+    };
+    const lumaOf = (hex) => {
+      const n = parseInt(hex.slice(1), 16);
+      return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+    };
     const radii = [], paddings = [];
-    for (const el of Array.from(document.querySelectorAll('button, a, [role="button"]')).slice(0, 200)) {
-      const cs = getComputedStyle(el);
-      if (!parse(cs.backgroundColor)) continue; // only real button-like elements
+    for (const el of Array.from(document.querySelectorAll('button, a, [role="button"], input[type="submit"]')).slice(0, 400)) {
+      // CTA styling often lives on the anchor's single wrapper child, not on
+      // the <a> itself — follow one level down when the anchor is unpainted.
+      let cs = getComputedStyle(el);
+      let bgHex = parse(cs.backgroundColor);
+      if (!bgHex && el.children.length === 1) {
+        const child = el.children[0];
+        const ccs = getComputedStyle(child);
+        const cHex = parse(ccs.backgroundColor);
+        if (cHex) { cs = ccs; bgHex = cHex; }
+      }
+      if (!bgHex) continue;
+      if (chromaOf(bgHex) < 24 && lumaOf(bgHex) > 96) continue; // not a CTA color
       const r = el.getBoundingClientRect();
-      if (r.width < 40 || r.height < 24) continue;
-      radii.push(cs.borderTopLeftRadius);
+      if (r.width < 72 || r.height < 30 || r.width / r.height < 1.6) continue; // icons/circles out
+      const rad = cs.borderTopLeftRadius;
+      if (rad && !rad.endsWith("%")) {
+        // normalize pills: radius >= half height means "fully rounded"
+        radii.push(parseFloat(rad) >= r.height / 2 ? "999px" : rad);
+      }
       paddings.push(cs.paddingTop + " " + cs.paddingLeft);
     }
     tokens.buttonRadius = mode(radii);
@@ -190,10 +251,103 @@ const COLLECT_PAGE_COLORS = String.raw`(() => {
     bg: Array.from(bg.entries()),
     txt: Array.from(txt.entries()),
     border: Array.from(border.entries()),
+    grad: Array.from(grad.entries()),
     inter: Array.from(inter.entries()),
     vars,
     tokens,
   };
+})()`;
+
+// Runs inside the page: score every plausible logo element and tag the best
+// one for an element screenshot. The old approach took the FIRST selector
+// match and gave up when it was unsuitable — on real sites that first match
+// is routinely a 0x0 icon-sprite <svg>, so the actual header logo (match #3)
+// was never tried. Also serializes inline-SVG logos with computed fills baked
+// in: a real vector master, which is exactly this product's currency.
+const PICK_LOGO_ELEMENT = String.raw`(() => {
+  const SEL = 'header img, header svg, nav img, nav svg, [class*="logo" i] img, [class*="logo" i] svg, img[alt*="logo" i], a[href="/"] img, a[href="/"] svg';
+  const seen = new Set();
+  const cands = [];
+  for (const el of Array.from(document.querySelectorAll(SEL))) {
+    if (seen.has(el)) continue;
+    seen.add(el);
+    const r = el.getBoundingClientRect();
+    if (r.width < 16 || r.height < 8 || r.width > 640 || r.height > 240) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden" || parseFloat(cs.opacity) < 0.1) continue;
+    if (r.bottom < 0 || r.top > window.innerHeight) continue;
+
+    let hasLogoName = false, inHomeLink = false;
+    let a = el, depth = 0;
+    while (a && depth < 5) {
+      const cls = (typeof a.className === "string" ? a.className : (a.getAttribute && a.getAttribute("class")) || "");
+      const idc = (cls + " " + (a.id || "") + " " + ((a.getAttribute && a.getAttribute("alt")) || "") + " " + ((a.getAttribute && a.getAttribute("aria-label")) || "")).toLowerCase();
+      if (idc.indexOf("logo") !== -1 || idc.indexOf("brand") !== -1) hasLogoName = true;
+      if (a.tagName === "A") {
+        const href = a.getAttribute("href") || "";
+        if (href === "/" || href === location.origin || href === location.origin + "/") inHomeLink = true;
+      }
+      a = a.parentElement;
+      depth++;
+    }
+
+    let score = 0;
+    if (hasLogoName) score += 3;
+    if (inHomeLink) score += 3;
+    if (r.top < 160) score += 2;
+    if (r.left < window.innerWidth * 0.4) score += 1;
+    const ar = r.width / r.height;
+    if (ar >= 1.6 && ar <= 12) score += 2;       // wordmark proportions
+    else if (ar >= 0.8) score += 1;               // square-ish mark
+    const area = r.width * r.height;
+    if (area >= 600 && area <= 60000) score += 1;
+    if (area < 900 && !hasLogoName) score -= 2;   // hamburger-sized icons
+    if (!hasLogoName && !inHomeLink && el.closest('button, [role="button"]')) score -= 2;
+
+    cands.push({ el, score, r, area });
+  }
+  cands.sort((x, y) => y.score - x.score || y.area - x.area);
+  const best = cands[0];
+  if (!best || best.score < 3) return null;
+
+  for (const n of Array.from(document.querySelectorAll("[data-logos-pick]"))) n.removeAttribute("data-logos-pick");
+  best.el.setAttribute("data-logos-pick", "1");
+
+  // Inline <svg> logo → serialize with computed fills/strokes inlined so the
+  // markup survives outside the page's stylesheets.
+  let svg = null;
+  if (best.el.tagName.toLowerCase() === "svg") {
+    try {
+      const clone = best.el.cloneNode(true);
+      const src = [best.el].concat(Array.from(best.el.querySelectorAll("*")));
+      const dst = [clone].concat(Array.from(clone.querySelectorAll("*")));
+      for (let i = 0; i < src.length && i < dst.length; i++) {
+        const c = getComputedStyle(src[i]);
+        const d = dst[i];
+        if (!d.setAttribute) continue;
+        if (c.fill) d.setAttribute("fill", c.fill);
+        if (c.stroke && c.stroke !== "none") {
+          d.setAttribute("stroke", c.stroke);
+          if (parseFloat(c.strokeWidth)) d.setAttribute("stroke-width", c.strokeWidth);
+        }
+        const op = parseFloat(c.opacity);
+        if (op >= 0 && op < 1) d.setAttribute("opacity", String(op));
+        const fo = parseFloat(c.fillOpacity);
+        if (fo >= 0 && fo < 1) d.setAttribute("fill-opacity", String(fo));
+        d.removeAttribute("class");
+      }
+      clone.removeAttribute("data-logos-pick");
+      clone.setAttribute("width", String(Math.round(best.r.width)));
+      clone.setAttribute("height", String(Math.round(best.r.height)));
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      svg = clone.outerHTML;
+      if (svg.length > 300000) svg = null;
+    } catch (e) {
+      svg = null;
+    }
+  }
+
+  return { tag: best.el.tagName.toLowerCase(), score: best.score, svg };
 })()`;
 
 async function toJpegBase64(png: Buffer, width: number, maxHeight = 3000): Promise<string> {
@@ -204,6 +358,47 @@ async function toJpegBase64(png: Buffer, width: number, maxHeight = 3000): Promi
     return (await img.jpeg({ quality: 72 }).toBuffer()).toString("base64");
   }
   return meta.data.toString("base64");
+}
+
+/** Dominant colors of the rendered viewport, share 0..1 — this is what a
+ *  human sees, including hero photography and CSS-gradient key visuals that
+ *  no computed-style histogram can observe. */
+async function screenPixelColors(png: Buffer): Promise<{ hex: string; share: number }[]> {
+  try {
+    const { data } = await sharp(png)
+      .resize(240, 240, { fit: "inside" })
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const counts = new Map<string, number>();
+    let total = 0;
+    for (let i = 0; i < data.length; i += 3) {
+      const r = data[i] & 0xf0;
+      const g = data[i + 1] & 0xf0;
+      const b = data[i + 2] & 0xf0;
+      counts.set(`${r},${g},${b}`, (counts.get(`${r},${g},${b}`) ?? 0) + 1);
+      total++;
+    }
+    if (total === 0) return [];
+    const h = (n: number) => (n | 8).toString(16).padStart(2, "0");
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([key, n]) => {
+        const [r, g, b] = key.split(",").map(Number);
+        return { hex: `#${h(r)}${h(g)}${h(b)}`, share: n / total };
+      })
+      .filter((c) => c.share >= 0.015);
+  } catch {
+    return [];
+  }
+}
+
+/** Dominant colors of an image buffer (logo / favicon / og:image), share 0..1. */
+export async function imageDominantColors(
+  buf: Buffer
+): Promise<{ hex: string; share: number }[]> {
+  return dominantColors(buf);
 }
 
 /** Dominant colors of an image buffer (logo / favicon), share 0..1. */
@@ -254,11 +449,17 @@ async function toLogoPng(buf: Buffer): Promise<string | null> {
   }
 }
 
-function rawToEvidence(raw: RawPageColors, logoColors: { hex: string; share: number }[]): CaptureEvidence {
+function rawToEvidence(
+  raw: RawPageColors,
+  logoColors: { hex: string; share: number }[],
+  pixels: { hex: string; share: number }[]
+): CaptureEvidence {
   return {
     backgrounds: raw.bg.map(([hex, weight]) => ({ hex, weight })),
     texts: raw.txt.map(([hex, weight]) => ({ hex, weight })),
     borders: raw.border.map(([hex, weight]) => ({ hex, weight })),
+    gradients: (raw.grad ?? []).map(([hex, weight]) => ({ hex, weight })),
+    pixels: pixels.map((p) => ({ hex: p.hex, weight: p.share })),
     interactive: raw.inter.map(([key, count]) => {
       const [hex, role] = key.split("|") as [string, "background" | "text"];
       return { hex, role, count };
@@ -267,16 +468,6 @@ function rawToEvidence(raw: RawPageColors, logoColors: { hex: string; share: num
     logoColors,
   };
 }
-
-const LOGO_SELECTOR = [
-  "header img",
-  "header svg",
-  "nav img",
-  "nav svg",
-  '[class*="logo" i] img',
-  '[class*="logo" i] svg',
-  'img[alt*="logo" i]',
-].join(", ");
 
 export async function captureSite(
   url: string,
@@ -309,7 +500,11 @@ export async function captureSite(
 
     const raw = (await page.evaluate(COLLECT_PAGE_COLORS)) as RawPageColors;
 
-    const desktopShot = await toJpegBase64(await page.screenshot({ type: "png" }), 1024);
+    const desktopPng = await page.screenshot({ type: "png" });
+    const desktopShot = await toJpegBase64(desktopPng, 1024);
+    // What a human actually sees above the fold — catches hero photography
+    // and gradient key visuals invisible to the computed-style histogram.
+    const pixels = await screenPixelColors(desktopPng);
 
     let fullPage: string | null = null;
     try {
@@ -326,18 +521,23 @@ export async function captureSite(
       fullPage = null;
     }
 
-    // logo element screenshot → the logo asset itself + its dominant colors
+    // Logo: score all candidates in-page, screenshot the winner, and keep the
+    // inline-SVG vector when the logo element is an <svg>.
     let logoColors: { hex: string; share: number }[] = [];
     let logoImage: string | null = null;
+    let logoSvg: string | null = null;
     try {
-      const logoEl = page.locator(LOGO_SELECTOR).first();
-      if ((await logoEl.count()) > 0) {
-        const box = await logoEl.boundingBox();
-        if (box && box.width >= 16 && box.height >= 10 && box.width <= 800) {
-          const png = await logoEl.screenshot({ type: "png" });
-          logoColors = await dominantColors(png);
-          logoImage = await toLogoPng(png);
-        }
+      const picked = (await page.evaluate(PICK_LOGO_ELEMENT)) as {
+        tag: string;
+        score: number;
+        svg: string | null;
+      } | null;
+      if (picked) {
+        logoSvg = picked.svg;
+        const logoEl = page.locator('[data-logos-pick="1"]').first();
+        const png = await logoEl.screenshot({ type: "png" });
+        logoColors = await dominantColors(png);
+        logoImage = await toLogoPng(png);
       }
     } catch {
       // logo detection is best-effort
@@ -385,8 +585,9 @@ export async function captureSite(
     return {
       url,
       screenshots: { desktop: desktopShot, fullPage, mobile },
-      evidence: rawToEvidence(raw, logoColors),
+      evidence: rawToEvidence(raw, logoColors, pixels),
       logoImage,
+      logoSvg,
       designTokens: {
         body_font: raw.tokens?.bodyFont ?? null,
         heading_font: raw.tokens?.headingFont ?? null,

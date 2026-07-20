@@ -36,16 +36,18 @@ export type CostSource = {
 
 export const COST_SOURCES: CostSource[] = [
   {
-    id: "anthropic-campaign",
-    name: "Claude Opus 4.8",
-    provider: "Anthropic",
-    usedFor: "Campaign Lab: 複数ソースからService Brand KitとLPコピーを構造化生成",
+    id: "openai-campaign",
+    name: "GPT-5.6 terra",
+    provider: "OpenAI",
+    usedFor:
+      "CM Maker(/campaigns、旧Campaign Lab): Brand Kit生成・パレット裁定・LP照合の構造化出力",
     where: "lib/campaign/creative.ts",
-    unitCost: "入出力トークン従量(Anthropic API価格表)",
+    unitCost: "入力$2.50 / 出力$15 per 1Mトークン",
     billing: "per-call",
     status: "active",
-    metered: false,
-    note: "原価ログ未実装。PDF・画像・長文入力で費用が変動するため、公開前にトークン使用量を記録する",
+    metered: true,
+    jobLog: "var/campaign-lab/jobs/*.json",
+    note: "全LLM呼び出しの実トークン数と概算USDをジョブ記録と処理ログに明示(2026-07-19実装)",
   },
   {
     id: "gemini-flash-image",

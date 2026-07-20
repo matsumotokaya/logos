@@ -17,7 +17,9 @@
 //
 // Shared bar for every lab: 「ロゴが立派に見えるか」— never "does it move".
 
-export type LabStatus = "active" | "planned";
+// "graduated" = the lab's research is done and the feature moved to a product
+// surface; the entry stays here as the record of where it went.
+export type LabStatus = "active" | "planned" | "graduated";
 
 export type LabMode = "assurance" | "exploration" | "integration";
 
@@ -160,12 +162,12 @@ export const LABS: LabInfo[] = [
     slug: "campaign",
     name: "Campaign Lab",
     titleJa: "統合表現研究所",
-    tagline: "単発のアセットを、CM・バナー・LPという最終アウトプットに組み立てる",
-    status: "active",
+    tagline: "本体機能 CM Maker（/campaigns）へ卒業。ソース→Brand Kit→セールスページの縦貫通を確立",
+    status: "graduated",
     mode: "integration",
     layer: "レイヤー5+: 統合(最重課金。30秒プロモ・キャンペーン一式)",
     description:
-      "URL・PDF・画像・テキストからサービスを理解し、Service Brand Kitと自己完結LPを生成する統合ラボ。LPの縦貫通は稼働中で、同じBrand Kitとナレーションを入力にする30秒CM動画は次フェーズ。",
+      "URL・PDF・画像・テキストからサービスを理解し、Service Brand Kitと自己完結LPを生成する統合ラボ。2026-07-20に製品面 /campaigns（CM Maker）へ格上げされ、このラボURLはリダイレクトになった。30秒CM動画（Phase 0b）以降の開発は /campaigns 上で継続する。",
     scope: [
       "ソース統合: URLスクレイピング、PDF・画像・テキストを共通入力へ正規化",
       "Service Brand Kit: サービス理解・コピー・配色・30秒CMナレーションを構造化生成",

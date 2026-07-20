@@ -42,13 +42,26 @@ export async function scrapeUrl(url: string): Promise<RawServiceInfo> {
   const description = meta("og:description") ?? meta("description");
 
   const ogImage = resolveMaybe(meta("og:image"), base);
+  // Prefer icons sharp can decode (PNG/SVG): apple-touch-icon is almost
+  // always a PNG, while bare /favicon.ico often defeats the logo fallback.
   const faviconUrl =
+    resolveMaybe($('link[rel="apple-touch-icon"]').first().attr("href"), base) ??
     resolveMaybe(
-      $('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]')
+      $('link[rel="icon"], link[rel="shortcut icon"]')
+        .filter((_, el) => {
+          const href = $(el).attr("href") ?? "";
+          const type = $(el).attr("type") ?? "";
+          return /png|svg/i.test(type) || /\.(png|svg)(\?|$)/i.test(href);
+        })
         .first()
         .attr("href"),
       base
-    ) ?? new URL("/favicon.ico", base).href;
+    ) ??
+    resolveMaybe(
+      $('link[rel="icon"], link[rel="shortcut icon"]').first().attr("href"),
+      base
+    ) ??
+    new URL("/favicon.ico", base).href;
 
   const themeColor = meta("theme-color");
 

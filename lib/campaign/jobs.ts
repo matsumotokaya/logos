@@ -124,7 +124,13 @@ export function readCampaignJobHtml(id: string): string | null {
 
 /** Most recent job for a user (reload/reconnect recovery). */
 export function latestCampaignJobForUser(userId: string): CampaignJob | null {
-  let latest: CampaignJob | null = null;
+  const jobs = listCampaignJobsForUser(userId);
+  return jobs[0] ?? null;
+}
+
+/** All jobs of a user, newest first — the card list on /campaigns. */
+export function listCampaignJobsForUser(userId: string): CampaignJob[] {
+  const jobs: CampaignJob[] = [];
   try {
     for (const f of fs.readdirSync(JOBS_DIR)) {
       if (!f.endsWith(".json")) continue;
@@ -132,14 +138,13 @@ export function latestCampaignJobForUser(userId: string): CampaignJob | null {
         const job = JSON.parse(
           fs.readFileSync(path.join(JOBS_DIR, f), "utf8")
         ) as CampaignJob;
-        if (job.userId !== userId) continue;
-        if (!latest || job.createdAt > latest.createdAt) latest = job;
+        if (job.userId === userId) jobs.push(job);
       } catch {
         // skip unreadable records
       }
     }
   } catch {
-    return null; // dir doesn't exist yet
+    return []; // dir doesn't exist yet
   }
-  return latest;
+  return jobs.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
