@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { sampleCampaignKit, SAMPLE_CAMPAIGN_ID } from "@/lib/campaign/sample";
 import type { CampaignBrandKit } from "@/lib/campaign/schema";
+import type { CampaignCmState } from "@/lib/campaign/cm-types";
 import {
   POLL_INTERVAL_MS,
   ProcessLog,
@@ -42,6 +43,12 @@ export default function CampaignDetail({
   const [steps, setSteps] = useState<StepEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
+  const [cm, setCm] = useState<CampaignCmState | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  // Bumped to restart polling after an action kicks a new server-side run
+  // (e.g. the CM voice generation) on an already-settled job.
+  const [pollEpoch, setPollEpoch] = useState(0);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -64,13 +71,17 @@ export default function CampaignDetail({
     const job = payload.job;
     if (!job) return "settled";
     setSteps(toStepEvents(job.steps));
+    setCm(job.cm ?? null);
+    setAudioUrl(payload.audioUrl ?? null);
+    setVideoUrl(payload.videoUrl ?? null);
     if (job.status === "done" && job.kit) {
       setKit(job.kit);
       setHtml(payload.html ?? null);
       setMeta(job.meta);
       setLpUrl(payload.lpUrl ?? null);
       setStatus("done");
-      return "settled";
+      // A CM voice run keeps the poll alive after the main job settled.
+      return job.cm?.status === "running" ? "running" : "settled";
     }
     if (job.status === "error") {
       setError(job.error ?? "生成に失敗しました");
@@ -133,7 +144,30 @@ export default function CampaignDetail({
       cancelled = true;
       stopPolling();
     };
-  }, [id, isSample, applyPayload, fetchJobs, stopPolling]);
+  }, [id, isSample, applyPayload, fetchJobs, stopPolling, pollEpoch]);
+
+  // Kick the CM voice run (TTS) and follow it with the regular job polling.
+  const generateCm = useCallback(async () => {
+    try {
+      setCm({ status: "running", error: null, track: null });
+      const res = await authedFetch("/api/labs/campaign/voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: id }),
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "音声生成を開始できませんでした");
+      }
+      setPollEpoch((n) => n + 1);
+    } catch (e) {
+      setCm({
+        status: "error",
+        error: e instanceof Error ? e.message : "音声生成に失敗しました",
+        track: null,
+      });
+    }
+  }, [id]);
 
   const digestKit = isSample ? sampleCampaignKit : kit;
   const digestHtml = isSample ? sampleHtml : html;
@@ -219,15 +253,21 @@ export default function CampaignDetail({
               lpUrl={digestLpUrl}
               sample={isSample}
               working={working}
+              cm={isSample ? null : cm}
+              audioUrl={isSample ? null : audioUrl}
+              videoUrl={isSample ? null : videoUrl}
+              onGenerateCm={isSample || status !== "done" ? undefined : generateCm}
             />
             {!isSample && status !== "running" && steps.length > 0 && (
-              <ProcessLog steps={steps} working={false} />
+              <ProcessLog steps={steps} working={cm?.status === "running"} />
             )}
           </>
         )}
       </div>
 
-      {status === "running" && steps.length > 0 && <ProcessLogPopup steps={steps} />}
+      {(status === "running" || cm?.status === "running") && steps.length > 0 && (
+        <ProcessLogPopup steps={steps} />
+      )}
     </main>
   );
 }

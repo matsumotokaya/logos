@@ -216,6 +216,26 @@ const WORDMARK_STYLES = [
   "font-family:'SF Mono',monospace;font-weight:700;letter-spacing:-.01em;font-size:.9em",
 ];
 
+/** <video> markup for the LP's video slot (opts.videoEmbed / injectCmVideo). */
+export function cmVideoEmbed(src: string): string {
+  return `<video controls playsinline preload="metadata" src="${esc(src)}"></video>`;
+}
+
+/**
+ * Swap the LP's video-slot placeholder for the real CM embed at serve time.
+ * Stored job HTML predates the MP4, and signed video URLs expire, so the
+ * embed can never be baked into the stored document — /c/[id] injects it on
+ * every response instead. HTML from before the marker existed is returned
+ * unchanged.
+ */
+export function injectCmVideo(html: string, src: string): string {
+  const embed = `<div class="video-slot">${cmVideoEmbed(src)}</div>`;
+  const marked = /<!--cm-video-slot-->[\s\S]*?<!--\/cm-video-slot-->/;
+  if (marked.test(html)) return html.replace(marked, embed);
+  // Job HTML stored before the marker existed: replace the bare placeholder.
+  return html.replace(/<div class="video-slot"><span>[^<]*<\/span><\/div>/, embed);
+}
+
 export function renderLandingPage(
   kit: BrandKit | CampaignBrandKit,
   opts: { videoEmbed?: string } = {}
@@ -377,6 +397,7 @@ section{padding:${sectionPad}px 0}
 .step p{font-size:.92rem;opacity:.85}
 .video-slot{max-width:800px;margin:0 auto;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:var(--surface);display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
 .video-slot span{opacity:.5;font-size:.95rem}
+.video-slot video{width:100%;height:100%;object-fit:cover;display:block}
 .quotes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px}
 .quote{display:flex;flex-direction:column;gap:18px;padding:30px 28px;border-radius:18px;background:var(--surface);border:1px solid var(--line-soft)}
 .alt .quote{background:var(--bg)}
@@ -499,11 +520,11 @@ header{background:color-mix(in srgb, var(--bg) 62%, transparent)}
 
   <section>
     <div class="container">
-      ${
+      <!--cm-video-slot-->${
         opts.videoEmbed
           ? `<div class="video-slot">${opts.videoEmbed}</div>`
-          : `<div class="video-slot"><span>▶ 紹介動画（生成中）</span></div>`
-      }
+          : `<div class="video-slot"><span>▶ 紹介動画</span></div>`
+      }<!--/cm-video-slot-->
     </div>
   </section>
 

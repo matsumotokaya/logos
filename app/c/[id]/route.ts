@@ -11,10 +11,18 @@
 // the same RLS-driven model as /p/[id].
 
 import { labsDisabledResponse, labsEnabled } from "@/lib/labs-access";
-import { verifyLabsSignature } from "@/lib/labs-output-sign";
-import { readCampaignJobHtml } from "@/lib/campaign/jobs";
-import { renderLandingPage } from "@/lib/campaign/render-lp";
-import { SAMPLE_CAMPAIGN_ID, sampleCampaignKit } from "@/lib/campaign/sample";
+import { signedLabsUrl, verifyLabsSignature } from "@/lib/labs-output-sign";
+import { campaignCmMp4Exists, readCampaignJobHtml } from "@/lib/campaign/jobs";
+import {
+  cmVideoEmbed,
+  injectCmVideo,
+  renderLandingPage,
+} from "@/lib/campaign/render-lp";
+import {
+  SAMPLE_CAMPAIGN_ID,
+  SAMPLE_CM_VIDEO,
+  sampleCampaignKit,
+} from "@/lib/campaign/sample";
 
 function htmlResponse(html: string, cacheControl: string): Response {
   return new Response(html, {
@@ -34,7 +42,9 @@ export async function GET(
 
   if (id === SAMPLE_CAMPAIGN_ID) {
     return htmlResponse(
-      renderLandingPage(sampleCampaignKit),
+      renderLandingPage(sampleCampaignKit, {
+        videoEmbed: cmVideoEmbed(SAMPLE_CM_VIDEO),
+      }),
       "public, max-age=300"
     );
   }
@@ -51,7 +61,16 @@ export async function GET(
     return labsDisabledResponse();
   }
 
-  const html = readCampaignJobHtml(id);
+  let html = readCampaignJobHtml(id);
   if (!html) return Response.json({ error: "LPが見つかりません" }, { status: 404 });
+
+  // The stored HTML predates the CM; once the MP4 exists, swap the video-slot
+  // placeholder for the real embed with a freshly signed URL on every serve.
+  if (campaignCmMp4Exists(id)) {
+    html = injectCmVideo(
+      html,
+      signedLabsUrl(`/api/labs/campaign/video/${id}`, `campaign-video:${id}`)
+    );
+  }
   return htmlResponse(html, "private, no-store");
 }

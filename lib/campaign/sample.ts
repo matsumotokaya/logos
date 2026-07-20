@@ -1,4 +1,8 @@
-import type { CampaignBrandKit } from "./schema";
+import {
+  narrationTextFromScript,
+  type CampaignBrandKit,
+  type CmScene,
+} from "./schema";
 
 // The bundled sample campaign: CM Maker's own sales page.
 //
@@ -11,6 +15,28 @@ import type { CampaignBrandKit } from "./schema";
 // Plain data only — imported from both server routes and client components.
 
 export const SAMPLE_CAMPAIGN_ID = "sample";
+
+/** Committed sample CM assets (regenerate: npm run campaign:sample-voice,
+ *  then npm run campaign:render -- --sample --out public/campaigns/sample-cm.mp4). */
+export const SAMPLE_CM_AUDIO = "/campaigns/sample-cm.wav";
+export const SAMPLE_CM_VIDEO = "/campaigns/sample-cm.mp4";
+
+// Hand-written 5-scene CM script (same problem-solution template the LLM
+// fills for generated campaigns). One scene = one TTS section = one video
+// sequence; the flat narration below is derived from it.
+const sampleCmScript: CmScene[] = [
+  { role: "hook", text: "新しいサービス、作りっぱなしになっていませんか。" },
+  { role: "problem", text: "LPを作る時間も、動画を作る予算もない。" },
+  { role: "solution", text: "そんな立ち上げ期のあなたへ、CM Maker。" },
+  {
+    role: "features",
+    text: "サービスのURLを貼るだけで、ブランドを理解したセールスページと30秒CMが数分で完成します。色もロゴも、あなたのサービスのまま。",
+  },
+  {
+    role: "cta",
+    text: "マーケティングの最初の一歩は、もう自動でいい。CM Makerで、今日から売り始めよう。",
+  },
+];
 
 export const sampleCampaignKit: CampaignBrandKit = {
   service: {
@@ -190,8 +216,8 @@ export const sampleCampaignKit: CampaignBrandKit = {
       cta_label: "無料でつくってみる",
     },
   },
-  narration:
-    "新しいサービス、作りっぱなしになっていませんか。LPを作る時間も、動画を作る予算もない。そんな立ち上げ期のあなたへ、CM Maker。サービスのURLを貼るだけで、ブランドを理解したセールスページと30秒CMが数分で完成します。色もロゴも、あなたのサービスのまま。マーケティングの最初の一歩は、もう自動でいい。CM Makerで、今日から売り始めよう。",
+  cm_script: sampleCmScript,
+  narration: narrationTextFromScript(sampleCmScript),
   assets: null,
   design_tokens: null,
 };

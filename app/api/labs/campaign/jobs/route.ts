@@ -25,6 +25,18 @@ function jobResponse(job: CampaignJob) {
       lpUrl: done
         ? signedLabsUrl(`/c/${job.id}`, `campaign-lp:${job.id}`)
         : null,
+      audioUrl: job.cm?.track
+        ? signedLabsUrl(
+            `/api/labs/campaign/audio/${job.id}`,
+            `campaign-audio:${job.id}`
+          )
+        : null,
+      videoUrl: job.cm?.mp4
+        ? signedLabsUrl(
+            `/api/labs/campaign/video/${job.id}`,
+            `campaign-video:${job.id}`
+          )
+        : null,
     },
     { headers: { "Cache-Control": "no-store" } }
   );

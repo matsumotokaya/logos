@@ -22,7 +22,7 @@ import {
   type LlmUsage,
 } from "./creative";
 import { renderLandingPage } from "./render-lp";
-import type { BrandAssets, CampaignBrandKit } from "./schema";
+import { narrationTextFromScript, type BrandAssets, type CampaignBrandKit } from "./schema";
 
 // Campaign pipeline orchestration — the single implementation behind both the
 // API route and the CLI. Tier S (labs/campaign/docs/palette-accuracy.md):
@@ -139,7 +139,7 @@ export async function runCampaignPipeline(
       );
       progress(
         capture.logoSvg
-          ? "capture: ロゴを取得（インラインSVGベクター + PNG）"
+          ? "capture: ロゴを取得（SVGベクター + PNG）"
           : capture.logoImage
             ? "capture: ロゴ画像を取得（Brand Kitに同梱）"
             : "capture: ロゴ画像は特定できず（ワードマークで代替）",
@@ -222,6 +222,7 @@ export async function runCampaignPipeline(
   };
   const toCampaignKit = (generated: import("./schema").BrandKit): CampaignBrandKit => ({
     ...generated,
+    narration: narrationTextFromScript(generated.cm_script),
     assets,
     design_tokens: designTokens,
   });

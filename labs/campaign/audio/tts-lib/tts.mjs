@@ -78,7 +78,8 @@ export async function synthesizeSection({ text, voice, persona, model, provider 
   if (text.length > MAX_SECTION_CHARS) {
     throw new Error(`Section too long for TTS (${text.length} > ${MAX_SECTION_CHARS} chars).`);
   }
-  if (process.env.WKFL_TTS_MOCK === "1") return mockPcm(text);
+  if (process.env.WKFL_TTS_MOCK === "1" || process.env.CAMPAIGN_TTS_MOCK === "1")
+    return mockPcm(text);
 
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set. Add it to tts-studio/.env or the repo root .env.");
   const synthesize = PROVIDERS[provider];

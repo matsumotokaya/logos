@@ -7,13 +7,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "campaign": "NODE_OPTIONS=--conditions=react-server tsx labs/campaign/scripts/generate.ts"
+    "campaign": "NODE_OPTIONS=--conditions=react-server tsx labs/campaign/scripts/generate.ts",
+    "campaign:sample-voice": "NODE_OPTIONS=--conditions=react-server tsx --env-file-if-exists=.env.local labs/campaign/scripts/sample-voice.ts",
+    "campaign:render": "node labs/campaign/scripts/render-cm.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1086.0",
     "@base-ui/react": "^1.6.0",
+    "@google/genai": "^2.12.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
+    "@remotion/media": "^4.0.472",
+    "@remotion/player": "^4.0.472",
     "@supabase/supabase-js": "^2.110.2",
     "@types/three": "^0.180.0",
     "cheerio": "^1.2.0",
@@ -26,6 +31,7 @@
     "playwright": "^1.61.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "remotion": "^4.0.472",
     "server-only": "^0.0.1",
     "sharp": "^0.35.3",
     "tailwind-merge": "^3.6.0",
@@ -33,6 +39,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@remotion/cli": "^4.0.472",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

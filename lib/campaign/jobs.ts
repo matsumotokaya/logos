@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CampaignBrandKit } from "./schema";
+import type { CampaignCmState, CmVoiceTrack } from "./cm-types";
 import type { PipelineProgress, LlmUsageSummary } from "./pipeline";
 import type { BrandMatchJudgment } from "./creative";
 
@@ -36,6 +37,8 @@ export interface CampaignJob {
   kit: CampaignBrandKit | null;
   meta: CampaignJobMeta | null;
   error: string | null;
+  /** CM voice/video assets (Phase 0b). Absent before the first voice run. */
+  cm?: CampaignCmState | null;
 }
 
 const JOBS_DIR = path.join(process.cwd(), "var", "campaign-lab", "jobs");
@@ -102,6 +105,80 @@ export function failCampaignJob(id: string, error: string): void {
   job.status = "error";
   job.error = error;
   writeJob(job);
+}
+
+// ---------- CM voice/video assets (Phase 0b) ----------
+
+function cmWavPath(id: string): string {
+  return path.join(JOBS_DIR, `${id}.cm.wav`);
+}
+function cmMp4Path(id: string): string {
+  return path.join(JOBS_DIR, `${id}.cm.mp4`);
+}
+
+export function startCampaignCm(id: string): void {
+  const job = getCampaignJob(id);
+  if (!job) return;
+  job.cm = { status: "running", error: null, track: null, mp4: false };
+  writeJob(job);
+}
+
+/** Voice stage finished: the Player can start while the MP4 still renders. */
+export function saveCampaignCmVoice(
+  id: string,
+  result: { wav: Buffer; track: CmVoiceTrack }
+): void {
+  const job = getCampaignJob(id);
+  if (!job) return;
+  fs.writeFileSync(cmWavPath(id), result.wav);
+  job.cm = { status: "running", error: null, track: result.track, mp4: false };
+  writeJob(job);
+}
+
+export function finishCampaignCm(id: string, result: { mp4: boolean }): void {
+  const job = getCampaignJob(id);
+  if (!job) return;
+  job.cm = {
+    status: "done",
+    error: null,
+    track: job.cm?.track ?? null,
+    mp4: result.mp4,
+  };
+  writeJob(job);
+}
+
+export function failCampaignCm(id: string, error: string): void {
+  const job = getCampaignJob(id);
+  if (!job) return;
+  job.cm = {
+    status: "error",
+    error,
+    track: job.cm?.track ?? null,
+    mp4: job.cm?.mp4 ?? false,
+  };
+  writeJob(job);
+}
+
+export function readCampaignCmWav(id: string): Buffer | null {
+  if (!SAFE_ID.test(id)) return null;
+  try {
+    return fs.readFileSync(cmWavPath(id));
+  } catch {
+    return null;
+  }
+}
+
+export function readCampaignCmMp4(id: string): Buffer | null {
+  if (!SAFE_ID.test(id)) return null;
+  try {
+    return fs.readFileSync(cmMp4Path(id));
+  } catch {
+    return null;
+  }
+}
+
+export function campaignCmMp4Exists(id: string): boolean {
+  return SAFE_ID.test(id) && fs.existsSync(cmMp4Path(id));
 }
 
 export function getCampaignJob(id: string): CampaignJob | null {

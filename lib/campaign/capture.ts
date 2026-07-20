@@ -347,7 +347,14 @@ const PICK_LOGO_ELEMENT = String.raw`(() => {
     }
   }
 
-  return { tag: best.el.tagName.toLowerCase(), score: best.score, svg };
+  // <img> logo → also report the referenced file URL. The file itself beats
+  // any element screenshot: an .svg reference IS a vector master, and a
+  // raster file at natural resolution is sharper than the rendered box.
+  const src = best.el.tagName.toLowerCase() === "img"
+    ? (best.el.currentSrc || best.el.getAttribute("src") || null)
+    : null;
+
+  return { tag: best.el.tagName.toLowerCase(), score: best.score, svg, src };
 })()`;
 
 async function toJpegBase64(png: Buffer, width: number, maxHeight = 3000): Promise<string> {
@@ -531,13 +538,49 @@ export async function captureSite(
         tag: string;
         score: number;
         svg: string | null;
+        src: string | null;
       } | null;
       if (picked) {
         logoSvg = picked.svg;
+
+        // <img src="…"> logo: fetch the referenced file through the page's
+        // browser context. An .svg file is the vector master (same value as
+        // an inline <svg>); any raster file at natural resolution beats the
+        // rendered-size element screenshot below.
+        if (!logoSvg && picked.src) {
+          try {
+            const abs = new URL(picked.src, page.url()).href;
+            const resp = await page.request.get(abs, { timeout: 10_000 });
+            if (resp.ok()) {
+              const body = await resp.body();
+              const ct = resp.headers()["content-type"] ?? "";
+              const isSvg =
+                ct.includes("svg") ||
+                new URL(abs).pathname.toLowerCase().endsWith(".svg");
+              if (isSvg && body.length < 300_000) {
+                // Scripts are inert in the <img data:> contexts we embed
+                // into, but strip them anyway.
+                logoSvg = body
+                  .toString("utf8")
+                  .replace(/<script[\s\S]*?<\/script>/gi, "");
+              } else if (!isSvg && body.length < 3_000_000) {
+                try {
+                  logoImage = await toLogoPng(body);
+                  logoColors = await dominantColors(body);
+                } catch {
+                  // not a decodable raster — fall back to the screenshot
+                }
+              }
+            }
+          } catch {
+            // fetch failed — the element screenshot below still works
+          }
+        }
+
         const logoEl = page.locator('[data-logos-pick="1"]').first();
         const png = await logoEl.screenshot({ type: "png" });
-        logoColors = await dominantColors(png);
-        logoImage = await toLogoPng(png);
+        if (logoColors.length === 0) logoColors = await dominantColors(png);
+        if (!logoImage) logoImage = await toLogoPng(png);
       }
     } catch {
       // logo detection is best-effort

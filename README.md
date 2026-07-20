@@ -35,7 +35,7 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 | `/assets` | アセットライブラリ。自分/所属組織が管理するロゴアセットを一覧し、各アセット詳細へ入る |
 | `/assets/[id]` | アセット詳細ページ。現時点ではロゴ正本の編集(正式名称・主体entity・ロゴ形式・役割・親子関係・公開範囲・公開スラッグ・コンタクト表示・タグ・制作クレジット・商標情報・マスターファイル差し替え・**組織への所有移管**・作業履歴)。あわせて**このロゴで現在どのプレゼン asset が採用されているか**、candidate配下のlockup / colorway階層も確認できる。旧 `/brand/logos/[id]` は同じ画面を指す互換URL |
 | `/campaigns` | **CM Maker のトップ**(旧 Campaign Lab、2026-07-20格上げ)。画面高100%のヒーロー(青いガラス質背景に、左: タイトル+解説、右: ソース入力のグラスカード)だけがダークで、以下はロゴス本体と同じ白いUI: サンプル(CM Maker自身のセールスページ)の展開表示+自分のキャンペーンのカード一覧。**生成を開始すると `/campaigns/[id]` へ遷移**する。当面は生成APIがLabsゲート下のため `platform_admin` / `labs_member` 向け |
-| `/campaigns/[id]` | キャンペーン詳細(管理UI)。**左カラム=キャンペーン一覧+「新しいキャンペーン」、右ペイン=選択キャンペーンの展開表示**(Service Brand Kit・LPプレビュー・ナレーション・処理ログ)。生成中はプレースホルダー+ログポップアップで追従し、完了すると実データに置き換わる。`/campaigns/sample` はサンプルの詳細 |
+| `/campaigns/[id]` | キャンペーン詳細(管理UI)。**左カラム=キャンペーン一覧+「新しいキャンペーン」、右ペイン=選択キャンペーンの展開表示**(Service Brand Kit・LPプレビュー・**製品紹介動画(30秒CM)**・ナレーション・処理ログ)。「製品紹介動画を生成」でTTS音声→`@remotion/player`のブラウザ内即時再生が可能になり、**続けて同ジョブがMP4をローカル書き出しし、LPの動画スロットにも自動掲載される**(ダウンロードリンク付き)。生成中はプレースホルダー+ログポップアップで追従し、完了すると実データに置き換わる。`/campaigns/sample` はサンプルの詳細(CM動画も再生可) |
 | `/c/[id]` | 生成されたセールスページの正規URL(`/p/[id]` と対称の opaque ID・所有者を含まない)。LPは `kit.theme` の**デザインテーマ(7種・業種からLLMが自動選択、正本は [lib/campaign/themes.ts](lib/campaign/themes.ts))**で描画され、ヒーローにはテーマ固定割当の背景写真([public/campaigns/bg/](public/campaigns/bg/))が入る。テーマはkitに保存されるため後から変更・再レンダリングできる。`/c/sample` はサンプル(公開・tech-glassテーマ)。ジョブ由来のページは暫定的に署名URL経由(campaignsテーブル導入後にRLSベースへ移行) |
 | `/settings` | Accountページ。ユーザー情報表示・プロフィール編集枠・登録アカウントの退会導線。退会時は個人所有データとR2成果物を削除し、共同組織の資産は残す |
 | `/[handle]/[slug]` | バニティURL。組織ハンドル+ロゴスラッグを正規パーマリンク `/p/[id]` に解決(公開ロゴのみ)。将来はキャンペーン(`/c/[id]`)も同じ共有名前空間で解決する |
@@ -105,6 +105,7 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 - **デザインテーマ7種**([lib/campaign/themes.ts](lib/campaign/themes.ts) が正本): tech-glass / minimal-light / corporate-trust / care-warm / friendly-pop / food-casual / luxury-serif。各テーマは対象業種・LP描画パラメータ(glass/flatバリアント・ヒーロー背景写真)・**全レンダラー共通のトーン&マナー指示文(`direction`)**を持つ。生成時にLLMが業種からenumで自動選択し、`kit.theme` として保存されるため**後から変更して再レンダリングできる**
 - **生成LPのヒーローは背景写真でリッチに**: [public/campaigns/bg/](public/campaigns/bg/) の抽象ガラス写真5枚をテーマに固定割当(スクリム+白文字、本文はテーマ本来のキャンバス)。テーマ別の専用背景に将来差し替える
 - **UI**: `/campaigns` トップは画面高100%のヒーロー(青いガラス質背景+ソース入力のグラスカード)、それ以外の管理UI(一覧・ダイジェスト・詳細 `/campaigns/[id]`)はロゴス本体と同じ白いツールUI。生成は非同期ジョブで、ページを閉じても継続する
+- **30秒CM動画(Phase 0b・ローカル実装済み)**: ナレーションは5シーン構造(`cm_script`)で生成され、シーンごとのTTS(Gemini)→タイミングJSON→**Remotion**で組み立てる。プレビューはブラウザ内 `@remotion/player`(無料・即時)。**MP4は同じ生成ジョブが自動でローカル書き出しし、LP(`/c/[id]`)の動画スロットへ配信時に署名URLで差し込まれる**(Chromiumが動かないホストでは書き出しをスキップしプレビューのみ)。クラウド化はRemotion Lambda(AWS)採用予定=課金ポイント。`CAMPAIGN_TTS_MOCK=1` でAPIキーなし開発可
 
 ## Platform Admin / Labs権限
 
@@ -176,6 +177,8 @@ npm run dev   # http://localhost:3000
 ```
 GEMINI_API_KEY=（Google AI Studioで発行したキー、課金有効なプロジェクトのもの）
 ```
+
+同じキーを **CM Makerの30秒CM音声(Gemini TTS)** も使用する。キーなしで動画パイプラインを開発する場合は `CAMPAIGN_TTS_MOCK=1` を設定するとプレースホルダー音声で全フローが動く。サンプルCM音声の再生成は `npm run campaign:sample-voice`、MP4書き出しは `npm run campaign:render -- --job <id> | --sample`(初回はChrome Headless Shellを自動ダウンロード)。
 
 生成APIは**登録ユーザー(非匿名)専用**で、ユーザーごとに直近24時間の回数上限がある(既定20回、`GENERATION_DAILY_LIMIT` で変更可)。クォータは `0010_generation_quota.sql` の `generation_events` に記録されるため、[Supabase設定](#supabase)が前提。localStorageモードでは生成は使えない。
 

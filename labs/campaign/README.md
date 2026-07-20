@@ -19,11 +19,11 @@
 
 ## 1. いま何ができるか（現在地）
 
-**「ソース → Service Brand Kit → セールスページ（SaaS型フル構成）」の縦貫通が動いている。パレットはTier S（実画面レンダリング証拠 + VLM裁定 + 自己検証）で抽出される。動画はまだ。**
+**「ソース → Service Brand Kit → セールスページ（SaaS型フル構成）+ 30秒CM（ローカル）」の縦貫通が動いている。パレットはTier S（実画面レンダリング証拠 + VLM裁定 + 自己検証）で抽出される。動画はPhase 0bのローカル実装が完了（2026-07-20）: ナレーションは構造化5シーン、TTS→タイミングJSON→Remotionで、ブラウザ内Playerプレビュー+ローカルMP4書き出しまで検証済み。**
 
 2026-07-20 精度パス2（funds.jp事例、正本は [docs/palette-accuracy.md](docs/palette-accuracy.md) §7）:
 
-- **ロゴ検出は候補スコアリング方式**。インラインSVGロゴは計算済みスタイルを焼き込んだ**ベクターのまま取得**し（`assets.logo_svg`）、LP・ダイジェストでPNGスクショより優先
+- **ロゴ検出は候補スコアリング方式**。ベクター取得は2経路（2026-07-20拡張）: ①インラインSVGは計算済みスタイルを焼き込んで取得、②`<img src="*.svg">` は**参照先ファイルそのものを取得**（bakuraku.jpで実証）。`<img>` がPNG/JPEG参照でも原寸ファイルを取得し、要素スクショは最終フォールバック。いずれも `assets.logo_svg` / `assets.logo` としてLP・ダイジェスト・CM動画が消費
 - **パレット証拠にグラデーション・画面ピクセル・og:image(KV)を追加**。ヒーローが画像/グラデーションでも色相が候補に入る。accentはprimaryと異なる第2色相を優先
 - **デザイントークンをLPに実適用**: 実フォント（既知ファミリーはGoogle Fontsから読込——自己完結HTMLの唯一の外部依存）・CTA角丸・コンテナ幅・セクション余白
 
@@ -88,8 +88,23 @@ lib/campaign/            # パイプライン本体（API routeとCLIの両方�
 ├── palette.ts           #   CIELABクラスタリング→証拠付きパレット候補
 ├── creative.ts          #   VLM裁定 + Brand Kit生成（テーマ選択含む） + LP照合判定（OpenAI structured outputs）
 ├── themes.ts            #   デザインテーマ7種の正本（LP variant・ヒーロー背景割当 + 全レンダラー共通のトーン&マナー指示文）
-├── jobs.ts              #   ジョブ永続化（var/campaign-lab/jobs/、リロード復元・カード一覧の裏側）
-└── render-lp.ts         #   Brand Kit → 自己完結HTML（SaaS型フルテンプレートv2、kit.themeでglass/flatを切替）
+├── jobs.ts              #   ジョブ永続化（var/campaign-lab/jobs/、リロード復元・カード一覧の裏側）+ CM成果物
+├── render-lp.ts         #   Brand Kit → 自己完結HTML（SaaS型フルテンプレートv2、kit.themeでglass/flatを切替）
+├── cm-types.ts          #   CM動画のデータ契約（CmVoiceTrack等、server/client/Remotion共有）
+├── voice.ts             #   Stage 5 voice: cm_script → TTS → シーン境界+字幕タイミング+WAV
+├── sample-cm-track.json #   サンプルCMのタイミング（campaign:sample-voiceが生成、コミット済み）
+└── (sample.ts)          #   sampleCmScript（5シーン手書き）を含む
+
+remotion/                # CM動画コンポジション（Player・CLI共用、"@/"エイリアス不使用）
+├── cm/CmComposition.tsx #   課題解決型テンプレート本体（シーン群・字幕・ブランドパレット）
+├── Root.tsx / index.ts  #   Remotion CLI/Studio用エントリ（calculateMetadataで音声実尺→フレーム数）
+└── (remotion.config.ts) #   リポジトリルート。CLI設定
+
+app/campaigns/CmVideoPlayer.tsx          # @remotion/playerラッパー（dynamic import）
+app/api/labs/campaign/voice/route.ts     # POST: CM音声生成（detachedジョブ）
+app/api/labs/campaign/audio/[id]/route.ts# GET: 音声WAV（署名URL経由）
+labs/campaign/scripts/sample-voice.ts    # サンプルCM音声の再生成（npm run campaign:sample-voice）
+labs/campaign/scripts/render-cm.mjs      # ローカルMP4書き出し（npm run campaign:render）
 
 app/campaigns/           # 入口UX（製品面）
 ├── page.tsx             #   /campaigns（AppHeader + サンプルLPをサーバー側でレンダリングして注入）
@@ -122,15 +137,35 @@ labs/campaign/
 ### Phase 0a+: パレット精度の改善（✅ Tier S 実装済み 2026-07-19）
 Playwrightスクショ + computed styleヒストグラム + VLM裁定（候補からの選択のみ・発明禁止）+ 自己検証ループのTier Sを実装し、受け入れ基準を実測で確認済み（wealth-parkで白/黒/青が返り緑は消滅、anthropic.comは劣化なし）。**設計・実装対応表・実測結果: [docs/palette-accuracy.md](docs/palette-accuracy.md)**。Vercel本番ではChromiumが動かないためcaptureは自動でスキップされ`palette_source: "generated"`のAI提案パレットに落ちる（マネージドブラウザへの差し替えはプロダクト化時）。
 
-### Phase 0b: 動画レンダラー（次にやること）
-`narration.txt`（Brand Kitに含まれる）を起点に:
-1. **voice**: TTS（`audio/tts-lib/tts.mjs` のプロバイダ抽象を土台に。Gemini TTSは動く。字幕同期精度を上げるならElevenLabsのcharacter timestampsを追加）→ タイミングJSON → BGMダッキングミックス（`audio.mjs`）
-2. **video**: Remotionコンポジション。Brand Kit + タイミングJSONをpropsに、テンプレート駆動で組み立て。WKFL（`~/projects/WKFL/video/src/`）の `calculateMetadata`（音声実尺→フレーム数）、`captions.ts buildCaptions()`（文字数按分字幕）、`TopicScene`（ケンバーンズ）が実装の参照元
-3. プレビューは `@remotion/player` でブラウザ内即時再生（MP4レンダリング不要 = アハ体験の核）。MP4書き出しはローカルCLI→将来Remotion Lambda
+### Phase 0b: 動画レンダラー（✅ ローカル実装完了 2026-07-20）
 
-**動画テンプレートは2種に固定**（出力の予測可能性 = 期待値を揃える）:
-- 課題解決型: 「〇〇について説明します」→「こんなお悩みありませんか?」(3つ) →「全部これで解決」→ 機能3つ → 活用例 → CTA
-- チュートリアル型: 「今日は使ってみました」
+実装済みのパイプライン（1シーン=1TTSセクション=1映像シーケンス、すべて `cm_script` が単一の正本）:
+
+1. **script**: `kit.cm_script` — LLMが5シーン構造（hook → problem → solution → features → cta）でナレーションを出力（`schema.ts CmSceneSchema`）。平文 `kit.narration` はここからの導出値。旧kitは`cm_script`なし=動画不可（再生成を促す）
+2. **voice**: `lib/campaign/voice.ts` — シーンごとにGemini TTS（`audio/tts-lib/`のWKFL資産を使用、`CAMPAIGN_TTS_MOCK=1`でキーなし開発可）→ `mixEpisode` でシーン境界が確定 → 文字数按分の文単位字幕。成果物はWAV+`CmVoiceTrack`（`cm-types.ts`）。UIの「製品紹介動画を生成」ボタン→ `POST /api/labs/campaign/voice`（detachedジョブ・**実行中は処理ログポップアップが進捗を表示**）
+3. **video**: `remotion/cm/CmComposition.tsx` — 課題解決型テンプレート。Brand Kit（パレット・実ロゴSVG・テーマvariant・LPコピー）+ CmVoiceTrackをpropsに、シーン境界は音声実尺から算出。glass系テーマはダークキャンバス、flat系はブランド背景色
+4. **プレビュー**: `@remotion/player`（`app/campaigns/CmVideoPlayer.tsx`、dynamic import）でブラウザ内即時再生。voice完了時点でPlayerが再生可能になり、MP4はその後バックグラウンドで書き出される
+5. **MP4（voiceジョブが自動で続けて書き出す）**: voice完了後、同じdetachedジョブが `npm run campaign:render`（Remotion CLI・ローカルChromium）をspawnしてMP4を書き出す。**Vercel serverless上ではレンダリング不可**（Chromium依存が関数サイズ上限を超える）ため、その環境ではwarnログを出してスキップ（Playerプレビューは動作）——captureと同じ縮退方針。クラウド化はRemotion Lambda（AWS）採用予定で、コンポジションとpropsの契約はそのまま使える。CLI単体実行は `npm run campaign:render -- --job <id> | --sample`
+6. **LP連動**: LPテンプレートのvideo-slotは `<!--cm-video-slot-->` マーカー付きで保存され、`/c/[id]` が**配信のたびに**MP4の存在を確認して署名URL付き `<video>` に差し替える（保存済みHTMLに署名URLを焼き込まない——期限切れ対策）。サンプルLP（`/c/sample`）は `public/campaigns/sample-cm.mp4`（コミット済み）を直接埋め込む
+
+**成果物の保存場所**（ラボ期・すべてローカル。Phase 1で `campaigns` テーブル+R2へ）:
+
+| ファイル | 内容 |
+|---|---|
+| `var/campaign-lab/jobs/<id>.json` | ジョブrecord: Brand Kit・処理ログ・`cm`（CmVoiceTrack=シーン/字幕タイミング・mp4フラグ） |
+| `var/campaign-lab/jobs/<id>.html` | 生成LP（video-slotマーカー入り） |
+| `var/campaign-lab/jobs/<id>.cm.wav` | ナレーション音声（モノラル24kHz） |
+| `var/campaign-lab/jobs/<id>.cm.mp4` | 書き出し済みCM動画（1080p30） |
+| `public/campaigns/sample-cm.{wav,mp4}` + `lib/campaign/sample-cm-track.json` | サンプルCMの音声/動画/タイミング（コミット済み。再生成: `npm run campaign:sample-voice` → `npm run campaign:render -- --sample --out public/campaigns/sample-cm.mp4`） |
+
+「動画そのもの」はMP4になる前から存在する点が重要: Playerは **kit + track + wav の3点をブラウザ内で合成して再生**しており、MP4はLP埋め込み・配布用の書き出し形態にすぎない。
+
+残タスク:
+- **チュートリアル型テンプレート**（2種目）: 「今日は使ってみました」
+- **BGM**: ミックス機構（ダッキング）は実装済みだがライセンス未解決（§6リサーチ待ち）のため無効
+- 字幕同期の精度向上（ElevenLabs character timestamps をプロバイダ辞書に追加）
+- テーマ`direction`のTTSペルソナ/映像演出への反映（現在は固定ペルソナ・声はKore固定）
+- MP4のクラウドレンダリング（Remotion Lambda）+ R2保存（課金ポイント。ダウンロードUIはローカル版実装済み）
 
 ### ロゴスへのマージ方針（意思決定メモ・検討中 2026-07-19）
 

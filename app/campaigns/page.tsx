@@ -5,8 +5,8 @@
 
 import type { Metadata } from "next";
 import AppHeader from "@/components/AppHeader";
-import { renderLandingPage } from "@/lib/campaign/render-lp";
-import { sampleCampaignKit } from "@/lib/campaign/sample";
+import { cmVideoEmbed, renderLandingPage } from "@/lib/campaign/render-lp";
+import { SAMPLE_CM_VIDEO, sampleCampaignKit } from "@/lib/campaign/sample";
 import CampaignsTop from "./CampaignsTop";
 
 export const metadata: Metadata = {
@@ -15,7 +15,9 @@ export const metadata: Metadata = {
 };
 
 export default function CampaignsPage() {
-  const sampleHtml = renderLandingPage(sampleCampaignKit);
+  const sampleHtml = renderLandingPage(sampleCampaignKit, {
+    videoEmbed: cmVideoEmbed(SAMPLE_CM_VIDEO),
+  });
 
   return (
     <div className="relative min-h-dvh flex-1 bg-paper text-ink">

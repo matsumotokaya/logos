@@ -115,6 +115,26 @@ export const CopySchema = z.object({
   }),
 });
 
+// 30-second CM script, structured as ordered scenes so the video renderer,
+// TTS sectioning, captions and scene transitions are all driven by the same
+// single source. One scene = one TTS section = one visual sequence.
+export const CM_SCENE_ROLES = ["hook", "problem", "solution", "features", "cta"] as const;
+
+export const CmSceneSchema = z.object({
+  role: z
+    .enum(CM_SCENE_ROLES)
+    .describe(
+      "Scene role in the problem-solution CM template. Must appear exactly once each, in order: hook, problem, solution, features, cta"
+    ),
+  text: z
+    .string()
+    .describe(
+      "Exactly the words the voice actor reads aloud in this scene, in Japanese. No headings, no stage directions, no markdown."
+    ),
+});
+
+export type CmScene = z.infer<typeof CmSceneSchema>;
+
 export const BrandKitSchema = z.object({
   service: z.object({
     name: z.string(),
@@ -158,10 +178,12 @@ export const BrandKitSchema = z.object({
     ),
   brand: BrandSchema,
   copy: CopySchema,
-  narration: z
-    .string()
+  cm_script: z
+    .array(CmSceneSchema)
+    .min(5)
+    .max(5)
     .describe(
-      "30-second CM narration script in Japanese. Spoken words only — no stage directions, no markdown. Flows: hook, problem, solution, features, CTA."
+      "30-second CM narration as 5 scenes in fixed order (hook → problem → solution → features → cta), ~180-260 Japanese characters in total. problem echoes copy.problem.points; features echoes copy.features titles; cta ends with a clear action."
     ),
 });
 
@@ -194,9 +216,20 @@ export interface DesignTokens {
 }
 
 /** The full portable artifact: LLM-generated kit + deterministic evidence. */
-export type CampaignBrandKit = Omit<BrandKit, "theme"> & {
+export type CampaignBrandKit = Omit<BrandKit, "theme" | "cm_script"> & {
   /** Absent on kits stored before themes existed; resolveTheme() falls back. */
   theme?: BrandKit["theme"];
+  /** Absent on kits stored before the structured CM script (2026-07-20).
+   *  Old kits must be re-generated before the video renderer can run. */
+  cm_script?: CmScene[];
+  /** Flat narration text, derived from cm_script by the pipeline (kept for
+   *  display / narration.txt; old kits stored it as the LLM output itself). */
+  narration: string;
   assets: BrandAssets | null;
   design_tokens: DesignTokens | null;
 };
+
+/** Join the scene texts into the flat display / TTS-preview narration. */
+export function narrationTextFromScript(scenes: CmScene[]): string {
+  return scenes.map((s) => s.text.trim()).join("");
+}

@@ -5,8 +5,12 @@
 
 import type { Metadata } from "next";
 import AppHeader from "@/components/AppHeader";
-import { renderLandingPage } from "@/lib/campaign/render-lp";
-import { SAMPLE_CAMPAIGN_ID, sampleCampaignKit } from "@/lib/campaign/sample";
+import { cmVideoEmbed, renderLandingPage } from "@/lib/campaign/render-lp";
+import {
+  SAMPLE_CAMPAIGN_ID,
+  SAMPLE_CM_VIDEO,
+  sampleCampaignKit,
+} from "@/lib/campaign/sample";
 import CampaignDetail from "./CampaignDetail";
 
 export const metadata: Metadata = {
@@ -21,7 +25,11 @@ export default async function CampaignDetailPage({
 }) {
   const { id } = await params;
   const sampleHtml =
-    id === SAMPLE_CAMPAIGN_ID ? renderLandingPage(sampleCampaignKit) : null;
+    id === SAMPLE_CAMPAIGN_ID
+      ? renderLandingPage(sampleCampaignKit, {
+          videoEmbed: cmVideoEmbed(SAMPLE_CM_VIDEO),
+        })
+      : null;
 
   return (
     <div className="min-h-dvh flex-1 bg-paper text-ink">

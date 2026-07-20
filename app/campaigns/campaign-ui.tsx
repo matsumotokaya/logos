@@ -7,9 +7,26 @@
 // pages render campaigns identically.
 
 import { useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabase/client";
 import type { CampaignBrandKit } from "@/lib/campaign/schema";
+import type { CampaignCmState, CmVoiceTrack } from "@/lib/campaign/cm-types";
 import { resolveTheme } from "@/lib/campaign/themes";
+import { SAMPLE_CM_AUDIO, SAMPLE_CM_VIDEO } from "@/lib/campaign/sample";
+import sampleCmTrackJson from "@/lib/campaign/sample-cm-track.json";
+
+// Remotion is heavy — load the Player only when a campaign actually has a
+// voice track to play.
+const CmVideoPlayer = dynamic(() => import("./CmVideoPlayer"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex aspect-video items-center justify-center bg-ink/5 text-[12px] text-ink-muted">
+      プレビューを読み込み中…
+    </div>
+  ),
+});
+
+const sampleCmTrack = sampleCmTrackJson as unknown as CmVoiceTrack;
 
 export type GenerateMeta = {
   captured: boolean;
@@ -39,9 +56,12 @@ export type JobPayload = {
     kit: CampaignBrandKit | null;
     meta: GenerateMeta | null;
     error: string | null;
+    cm?: CampaignCmState | null;
   } | null;
   html?: string | null;
   lpUrl?: string | null;
+  audioUrl?: string | null;
+  videoUrl?: string | null;
 };
 
 export type JobSummary = {
@@ -197,6 +217,10 @@ export function ResultDigest({
   lpUrl,
   sample,
   working,
+  cm,
+  audioUrl,
+  videoUrl,
+  onGenerateCm,
 }: {
   kit: CampaignBrandKit | null;
   html: string | null;
@@ -204,6 +228,14 @@ export function ResultDigest({
   lpUrl: string | null;
   sample: boolean;
   working: boolean;
+  /** CM voice/video state of this job (undefined on surfaces without it). */
+  cm?: CampaignCmState | null;
+  /** Signed URL of the job's voice WAV, present once the voice stage is done. */
+  audioUrl?: string | null;
+  /** Signed URL of the rendered MP4, present once the local render finished. */
+  videoUrl?: string | null;
+  /** Starts the CM generation (explicit action — TTS costs API money). */
+  onGenerateCm?: () => void;
 }) {
   const logoSvg = kit?.assets?.logo_svg ?? null;
   const logoPng = kit?.assets?.logo ?? null;
@@ -545,19 +577,91 @@ export function ResultDigest({
 
           <div className="rounded-2xl border border-hairline">
             <div className="flex items-center justify-between border-b border-hairline bg-ink/5 px-4 py-2">
-              <span className="text-[11px] font-semibold">紹介動画（30秒CM）</span>
-              <span className="rounded-full bg-ink/10 px-2.5 py-0.5 text-[10px] text-ink-muted">
-                次フェーズ
-              </span>
+              <span className="text-[11px] font-semibold">製品紹介動画（30秒CM）</span>
+              {cm?.track?.mock ? (
+                <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                  モック音声
+                </span>
+              ) : cm?.status === "running" && cm.track ? (
+                <span className="flex items-center gap-1.5 rounded-full bg-ink/10 px-2.5 py-0.5 text-[10px] text-ink-muted">
+                  <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border border-ink-faint border-t-ink" />
+                  MP4を書き出し中
+                </span>
+              ) : sample || cm?.track ? (
+                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  生成済み
+                </span>
+              ) : (
+                <span className="rounded-full bg-ink/10 px-2.5 py-0.5 text-[10px] text-ink-muted">
+                  未生成
+                </span>
+              )}
             </div>
-            <div className="flex aspect-video items-center justify-center bg-ink/5">
-              <div className="text-center">
-                <p className="text-2xl">▶</p>
-                <p className="mt-2 text-[12px] text-ink-muted">
-                  下のナレーション原稿から生成されます（Phase 0b）
-                </p>
+            {sample && kit ? (
+              <CmVideoPlayer kit={kit} track={sampleCmTrack} audioSrc={SAMPLE_CM_AUDIO} />
+            ) : cm?.track && kit ? (
+              // The Player starts as soon as the voice stage is done — the
+              // MP4 keeps rendering in the background for the LP embed.
+              <CmVideoPlayer kit={kit} track={cm.track} audioSrc={audioUrl ?? null} />
+            ) : cm?.status === "running" ? (
+              <div className="flex aspect-video items-center justify-center bg-ink/5">
+                <div className="text-center">
+                  <span className="mx-auto inline-block h-4 w-4 animate-spin rounded-full border-2 border-ink-faint border-t-ink" />
+                  <p className="mt-3 text-[12px] text-ink-muted">
+                    製品紹介動画を生成中…（右下の処理ログに進捗が出ます）
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex aspect-video items-center justify-center bg-ink/5">
+                <div className="text-center">
+                  {kit && kit.cm_script?.length && onGenerateCm ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={onGenerateCm}
+                        className="rounded-full bg-ink px-6 py-2.5 text-[12px] font-semibold text-paper hover:opacity-85"
+                      >
+                        製品紹介動画を生成
+                      </button>
+                      <p className="mt-3 text-[11px] text-ink-muted">
+                        ナレーション音声合成＋映像組み立て。完成するとLPの動画スロットにも掲載されます
+                        {cm?.status === "error" && cm.error && (
+                          <span className="mt-1 block text-amber-700">
+                            前回: {cm.error}
+                          </span>
+                        )}
+                      </p>
+                    </>
+                  ) : kit && !kit.cm_script?.length ? (
+                    <p className="px-8 text-[12px] text-ink-muted">
+                      このキャンペーンは旧形式です。再生成すると製品紹介動画を作成できます
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-2xl">▶</p>
+                      <p className="mt-2 text-[12px] text-ink-muted">
+                        Brand Kitとナレーション原稿から、30秒CMがここに生成されます
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+            {(sample || videoUrl) && (
+              <div className="flex items-center justify-between border-t border-hairline px-4 py-2">
+                <span className="text-[10px] text-ink-muted">
+                  MP4書き出し済み — セールスページ（LP）の動画スロットにも掲載中
+                </span>
+                <a
+                  href={sample ? SAMPLE_CM_VIDEO : (videoUrl as string)}
+                  download
+                  className="rounded-full border border-hairline px-3 py-1 text-[11px] hover:border-ink"
+                >
+                  MP4をダウンロード
+                </a>
+              </div>
+            )}
             <div className="border-t border-hairline p-4">
               <p className="text-[11px] font-semibold text-ink-muted">
                 30秒CM ナレーション原稿（動画レンダラーの入力）
