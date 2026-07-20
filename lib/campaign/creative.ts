@@ -30,6 +30,12 @@ export const LLM_MODEL = MODEL;
 export const LLM_PROVIDER = "OpenAI API";
 export const LLM_ENGINE = `OpenAI API（Chat Completions + structured outputs / ${MODEL}）`;
 
+// Bound every LLM call so a stalled connection fails fast instead of hanging
+// the (detached) generation job forever. The SDK default is 10 min × retries;
+// a campaign stage that hasn't answered in 2 min is stuck, not slow.
+const LLM_TIMEOUT_MS = 120_000;
+const openai = (): OpenAI => new OpenAI({ timeout: LLM_TIMEOUT_MS, maxRetries: 2 });
+
 // Pricing (USD per 1M tokens) — for the cost line in the process log.
 // GPT-5.6 family GA 2026-07-09: sol $5/$30, terra $2.50/$15, luna $1/$6.
 // Update if the model or its pricing changes.
@@ -129,7 +135,7 @@ function imagePart(mediaType: string, base64: string): ContentPart {
 export async function generateBrandKit(
   input: CreativeInput
 ): Promise<{ kit: BrandKit; usage: LlmUsage }> {
-  const client = new OpenAI();
+  const client = openai();
 
   const content: ContentPart[] = [];
   for (const file of input.files.slice(0, 5)) {
@@ -291,7 +297,7 @@ export async function adjudicatePalette(input: {
     rationale: z.string().describe("1-3 sentences: why these roles, citing the evidence"),
   });
 
-  const client = new OpenAI();
+  const client = openai();
   const content: ContentPart[] = [];
   const shots: [string, string | null][] = [
     ["Desktop above-the-fold (1440px)", input.capture.screenshots.desktop],
@@ -371,7 +377,7 @@ export async function judgeBrandMatch(input: {
     reason: z.string().describe("1-2 sentences in Japanese"),
   });
 
-  const client = new OpenAI();
+  const client = openai();
   const response = await client.chat.completions.parse({
     model: MODEL,
     max_completion_tokens: 2000,

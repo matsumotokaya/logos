@@ -89,6 +89,26 @@ export function appendCampaignStep(id: string, step: PipelineProgress): void {
   writeJob(job);
 }
 
+// A detached generation run lives in the Node process, not the HTTP request.
+// If that process is restarted (or an LLM call hangs past its timeout) while a
+// run is in flight, the job is left "running" with no writer ever finishing
+// it — the UI would poll forever. A run that hasn't written a step in this
+// long is treated as dead and auto-failed on the next read.
+const STALE_RUNNING_MS = 6 * 60 * 1000; // > the 2-min LLM timeout, with margin
+
+/** Fail a job that's been "running" with no progress past the stale window.
+ *  Returns the (possibly updated) job so callers can respond with fresh state. */
+export function failStaleCampaignJob(job: CampaignJob): CampaignJob {
+  if (job.status !== "running") return job;
+  const age = Date.now() - new Date(job.updatedAt).getTime();
+  if (age < STALE_RUNNING_MS) return job;
+  job.status = "error";
+  job.error =
+    "生成が途中で停止しました（サーバー再起動、または応答タイムアウトの可能性）。もう一度作成してください。";
+  writeJob(job);
+  return job;
+}
+
 /** Merge stage artifacts into the running job (progressive UI). */
 export function updateCampaignPartial(id: string, patch: CampaignPartial): void {
   const job = getCampaignJob(id);

@@ -13,10 +13,13 @@ import {
   latestCampaignJobForUser,
   listCampaignJobsForUser,
   readCampaignJobHtml,
+  failStaleCampaignJob,
   type CampaignJob,
 } from "@/lib/campaign/jobs";
 
-function jobResponse(job: CampaignJob) {
+function jobResponse(rawJob: CampaignJob) {
+  // Auto-fail a run whose process died mid-generation so the UI stops polling.
+  const job = failStaleCampaignJob(rawJob);
   const done = job.status === "done";
   return Response.json(
     {

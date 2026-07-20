@@ -15,6 +15,7 @@
 - **生成LPのヒーローに背景写真（2026-07-20）**: `public/campaigns/bg/` の抽象ガラス写真5枚を**テーマに固定割当**（tech-glass=simon-nilsen / minimal-light=milad-fakurian / corporate-trust=pramod-tiwari / care-warm=hassaan-here / luxury-serif=philip-oroni。friendly-pop / food-casual は専用背景ができるまで写真なし）。ヒーローは減光スクリム+白文字で描画し、本文はテーマ本来のキャンバスを維持する。写真は同一オリジンの `/campaigns/bg/*` を参照（LPを単体ファイルとして持ち出すと画像は外れる——テーマ別専用背景の用意と合わせて今後の課題）
 - **Campaigns UI（管理画面）は白のまま**: `/campaigns` のフルスクリーンヒーロー（背景は simon-nilsen 固定+ソース入力のグラスカード）だけが例外で、ヒーロー以下の一覧・ダイジェスト・詳細ページ `/campaigns/[id]` は通常の白いツールUI。背景写真セットは管理UIの装飾ではなく**生成LPのヒーロー用**
 - **API・ジョブ基盤は現行のまま**: `/api/labs/campaign/*`（Labsゲート継続。公開ファネル化はPhase 1）、ジョブ永続化は `var/campaign-lab/jobs/`
+- **ハング/孤児ジョブ対策（2026-07-20）**: 生成はdetachedジョブ（HTTPリクエストと切り離してNodeプロセス内で走る）なので、生成中に開発サーバーが再起動されるとジョブが `running` のまま孤児化しUIが無限にポーリングする問題があった。対策として (a) LLM呼び出しに**2分タイムアウト**（`creative.ts` の `openai()`。SDK既定の10分×リトライだと体感で止まって見える）、(b) **ストール検知**（`failStaleCampaignJob`）——`running` のまま6分以上進捗が無いジョブは、jobs API が次のポーリング時に自動で `error` にして「途中で停止／再作成を」と表示。孤児ジョブが自己回復する。※CM音声の孤児ラン（`job.cm.status` 側）は今後同様の対策が必要
 - ナビ: ハンバーガーの `Campaigns`（Labsロール保持者のみ、Phase 1で一般公開）
 
 ## 1. いま何ができるか（現在地）
