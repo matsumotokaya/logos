@@ -66,3 +66,30 @@ body {
   animation: fill-in-rise 0.45s ease-out both, fill-in-flash 1.1s ease-out both;
   border-radius: 6px;
 }
+
+/* Hero scroll cue: a bright segment travels down a faint vertical track,
+   the common "there is more below" hint. Used on the top-page hero. */
+@keyframes scroll-cue {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(320%); }
+}
+.scroll-cue-run {
+  animation: scroll-cue 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-cue-run { animation: none; }
+}
+
+/* Indeterminate progress bar: a segment sweeps across the track while an async
+   step (logo parse → save → navigation) is in flight. */
+@keyframes progress-indeterminate {
+  0%   { left: -45%; width: 45%; }
+  50%  { left: 30%;  width: 55%; }
+  100% { left: 100%; width: 45%; }
+}
+.progress-indeterminate {
+  animation: progress-indeterminate 1.15s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-indeterminate { animation: none; left: 0; width: 100%; opacity: 0.6; }
+}

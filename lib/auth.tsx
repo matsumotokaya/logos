@@ -131,20 +131,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     }
     let active = true;
-    (async () => {
-      await ensureSession();
-      const { data } = await supabase.auth.getUser();
-      if (active) {
-        setUser(toUser(data.user));
-        setLoading(false);
-      }
-    })();
+
+    // Guest or account? That is answered by the stored session — a local read.
+    // Registering the listener emits INITIAL_SESSION with it, so the header
+    // settles without a round trip and keeps settling when Supabase is
+    // unreachable. Waiting on the network here is what left the header showing
+    // its pulsing placeholder while a request hung.
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (!active) return;
       setUser(toUser(session?.user ?? null));
+      setLoading(false);
     });
+
+    // Last resort. A stored-but-expired token makes auth-js refresh it before
+    // emitting anything, and that refresh is a network call: if it hangs, fall
+    // back to the guest control rather than the placeholder. The listener above
+    // still corrects the header once the session actually resolves.
+    const settleTimer = window.setTimeout(() => {
+      if (active) setLoading(false);
+    }, 3000);
+
+    // Guests browse on an anonymous session (docs/account-design.md §1-5).
+    // Creating one is a round trip, and the header shows the same "sign in"
+    // control whether the visitor has no session or an anonymous one — so it
+    // runs behind the resolved header instead of in front of it.
+    void ensureSession().catch(() => {});
+
     return () => {
       if (callbackErrorFrame !== null) window.cancelAnimationFrame(callbackErrorFrame);
       active = false;
+      window.clearTimeout(settleTimer);
       sub.subscription.unsubscribe();
     };
   }, []);

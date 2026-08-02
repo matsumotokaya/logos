@@ -28,11 +28,18 @@ export async function ensureSession(): Promise<string | null> {
   if (!hasSupabase) return null;
   const { data } = await supabase.auth.getSession();
   if (data.session) return data.session.user.id;
-  anonInFlight ??= supabase.auth.signInAnonymously().then(({ error }) => {
-    anonInFlight = null;
-    if (error) throw new Error(error.message);
-  });
-  await anonInFlight;
+  // Clearing the latch in `finally` matters: settling it only on success leaves
+  // every later call awaiting the same rejected promise, so one network blip
+  // disables anonymous sessions for the lifetime of the page.
+  const inFlight = (anonInFlight ??= supabase.auth
+    .signInAnonymously()
+    .then(({ error }) => {
+      if (error) throw new Error(error.message);
+    })
+    .finally(() => {
+      anonInFlight = null;
+    }));
+  await inFlight;
   const { data: after } = await supabase.auth.getSession();
   return after.session?.user.id ?? null;
 }
