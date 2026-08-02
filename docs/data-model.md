@@ -1,12 +1,75 @@
-# ロゴデータモデルとコンテンツ構造
+# ブランド階層・ロゴ・キャンペーンのデータモデル
 
-最終更新: 2026-07-18
-ステータス: **主要スキーマ・正本編集・プレゼン編集を実装済み。候補比較UIと汎用CDNは未実装**
-前提: アカウント・権限・URL設計は [account-design.md](account-design.md) を正本とする。本書はその上に載る**ロゴそのもののデータ設計**を定める。
+最終更新: 2026-07-22
+ステータス: **Organization → Brand → Assetsモデルへの段階移行中。migration 0019/0020は旧構造として稼働中**
+前提: アカウント・権限・URL設計は [account-design.md](account-design.md) を正本とする。本書はその上に載る**現実世界のOrganization、ブランド、ブランドプロフィール、ロゴ、生成アセット**のデータ設計を定める。
 
 ## 位置づけ: 権威ある正本(canonical record)
 
-このサービスは単なるプレゼン生成ではなく、**本格的なロゴ資産管理ツール**を目指す。「ここに登録されている情報がそのロゴの正本」と言える状態を作るため、事実情報(マスターデータ・制作クレジット・商標情報・作業履歴)をすべて構造化して登録可能にする。
+このサービスはロゴ単体ではなく、会社・事業の情報を手軽に埋めながら、そこからLP・動画・モックアップ・ブランド資産を作る**ブランドアセット管理・生成基盤**を目指す。ロゴ正本は重要な構成要素だが、最上位の単位ではない。
+
+## 0. Organization → Brand → Assets
+
+### 0.1 2種類の「組織」を混同しない
+
+- `public.organizations`: Logos内のメンバー、権限、所有、課金を管理する内部ワークスペース
+- `public.brand_organizations`: 現実世界の会社、個人事業体、非営利組織、企業グループを束ねるコンテナ
+- `public.brand_entities`: 市場に見せるブランド主体。企業・事業・対象別は`brand_kind`の違いであり、同じ機能を持つ
+
+管理ワークスペースと現実世界のOrganizationは`brand_organizations.linked_org_id`で任意に接続する。URLから気軽に始めた個人ユーザーは、現実組織を`created_by`で仮登録でき、後から管理ワークスペースへ接続できる。
+
+### 0.2 現実世界側のツリー
+
+```text
+brand_organization（会社・個人・企業グループを表すコンテナ）
+├── brand(kind=corporate) 企業ブランド
+│   ├── brand_profile / corporate logo / guideline
+│   └── assets(LP / video / banner / mockup ...)
+├── brand(kind=business) 事業・サービスブランド
+│   ├── brand_profile / service logo / guideline
+│   └── assets
+└── brand(kind=audience) 対象別ブランド
+    ├── Personal / Business / Enterprise等の差分profile / logo
+    └── assets
+```
+
+Organizationは所属・会社構造・管理情報をまとめる箱に専念し、`brand_profile`、ロゴ、ガイドライン、LP、動画などを直接所有しない。企業ブランドと事業ブランドは本質的に同じ`brand_entities`であり、詳細ページと所有できるアセットも共通とする。
+
+各Brandは`parent_brand_id`を任意に持つ。`inherits_parent=true`なら親Brandのカラー、フォント、トーン、デザインルールを継承し、子側に値があるフィールドだけ上書きする。一事業しかなく企業とサービスのアイデンティティが同一でも、レコードは分離し、値の重複コピーではなく継承で一対一相当を表す。
+
+ロゴは`logos.subject_entity_id`、生成アセットは`brand_assets.brand_id`で必ずBrandに属する。Organizationをこれらの参照先にはしない。別OrganizationのBrandからプロフィールやロゴを継承・選択することも禁止する。
+
+### 0.3 Campaignを必須階層にしない
+
+公式LP、事業紹介動画、バナー、モックアップはBrandが恒常的に持つアセットであり、Campaignを必須の親にしない。入力、処理ログ、モデル、コスト、生成日時は`brand_generation_runs`へ保存し、その出力を`brand_assets`として登録する。
+
+将来Campaignが必要になった場合は、期間・目的・対象・オファーを持つ任意のアセットコレクションとして追加する。通常アセットとCampaignの二択にはせず、Campaign、商品ローンチ、SNS運用、地域・年度などを同じ汎用Collection機構で整理できるようにする。
+
+### 0.4 どこから始めても同じ構造へ収斂する
+
+- 企業URL起点: Organizationと企業Brandを同時に作り、ブランド情報と生成物は企業Brandへ登録する
+- 事業URL起点: Organization、未確認の企業Brand、事業Brandを作る。取得情報を事業Brandへ登録し、企業Brandへ誤ってコピーしない
+- 企業と事業が一体のURL: Organization、企業Brand、主事業Brandを作り、主事業Brandは企業Brandを継承する
+- ロゴ起点: Organizationと「未整理のブランドアセット」Brandを自動作成して一時収容し、あとから正式なBrandへ移す
+- 既存Brand起点: Brandを選んでLP・動画などを生成し、既存プロフィールとロゴを再利用する
+
+自動抽出・AI推定は確度が高くても`inferred`であり、ユーザーが明示的に確認して初めて`confirmed`になる。各フィールドは`provenance`に由来と確度を持つ。
+
+URLから新規生成するときは、生成開始前にそのページを「企業・組織」「事業・サービス」「企業と事業の両方」から選ぶ。これは取得した情報を企業Brand、事業Brand、または両方のどこへ登録するかを決める`registrationScope`である。
+
+- `business`: カラー、デザイントークン、仮ロゴ、生成物を事業Brandへ登録する
+- `organization`: 同じ情報を自動作成した企業Brandへ登録する
+- `both`: 企業Brandと主事業Brandを分け、主事業Brandは企業Brandを継承する
+
+既存Brandを選んで生成する場合はこの確認を省略し、選択済みBrandへアセットと生成履歴を追加する。確認済み`brand_profile`はURL由来の推定値で自動上書きしない。
+
+直接アップロードなどで主体情報がまだないロゴも未所属にはしない。同じ所有者または管理ワークスペースごとに「名称未設定のOrganization → 未整理のブランドアセットBrand」を作り、そこへ一時収容する。後から正式なBrandを設定したときにロゴの`subject_entity_id`を移す。
+
+migration 0019/0020で作成済みのOrganization直下プロフィール・ロゴは、各Organizationへ自動作成する企業Brandへ移す。既存business/audienceは同じIDのBrandとして保持し、既存Campaignの入力・実行履歴・成果物は`brand_generation_runs`と`brand_assets`へ移してから旧台帳を縮退させる。
+
+Organization詳細は法人種別、法的名称、所在地、公式URL、所属Brandなどのコンテナ情報を扱う。市場向けの説明、カラー、フォント、ロゴ、ガイドラインは企業Brand詳細で扱う。URLから再取得した値はその場で保存せず、現在値との差分を表示してユーザー確認後に保存する。
+
+Brandはカテゴリーにかかわらず同じ詳細画面で名称、種別、URL、業種、説明、プロフィール、ロゴ、生成アセットを編集する。別Organizationへ移す場合もBrand IDと配下アセットは保持し、継承元Brandだけを移動先Organization内から選び直す。重複Brandのマージは所属先変更とは別工程とする。
 
 ---
 
@@ -32,7 +95,7 @@
 
 ```
 logo(アイデンティティ: 名前・商標・クレジット・プレゼンは1つ)
- └── candidates: A / B / C …(それぞれがマスターSVGを持つ。1つが primary)
+ └── candidates: A / B / C …(正式SVGまたは仮ラスターを持つ。1つが primary)
 ```
 
 - アップロード時に候補が1つ(primary)自動作成される。**上書き更新 = primary候補のファイル置換**(行は増えない、履歴も残さない)
@@ -44,21 +107,21 @@ logo(アイデンティティ: 名前・商標・クレジット・プレゼン�
 
 現行UIはアップロード時のprimary候補作成と、そのprimaryファイルの差し替えまで対応する。候補B/Cの追加、primary切替、比較タブは設計済みだが未実装。
 
-### 2.2 ロゴ間の関係(コーポレート / ブランド / サービス / 子会社)
+### 2.2 ロゴ間の関係とブランド階層を分ける
 
-「シリーズもので一部パーツだけ違う」「グループ企業のロゴ群」を構造化するため、ロゴは**自己参照ツリー**を組める:
+会社→事業→対象別ブランドの関係は`brand_entities.parent_entity_id`が正本であり、ロゴの親子関係で会社構造を表現しない。各階層のロゴは`logos.subject_entity_id`で所属する。
+
+`logos.parent_logo_id`は「同じアイデンティティ系列の一部パーツ違い」「旧ロゴと派生ロゴ」など、純粋なロゴ系列が必要な場合だけ使う:
 
 ```
-ACME Holdings(corporate)
- ├── ACME(brand)
- │    ├── ACME Cloud(service)     ← シリーズ: パーツ違いの兄弟
- │    └── ACME Analytics(service) ←
- └── ACME Logistics(subsidiary)
+ACME Service primary logo
+ ├── ACME Service Personal variant
+ └── ACME Service Business variant
 ```
 
-- `logos.parent_logo_id`(自己FK)+ `role` で表現。role の語彙を拡張: `brand / corporate / service / subsidiary / other`
-- シリーズ(一部パーツ違いの一群)= 同じ親を持つ兄弟として表現。専用の関係タイプが必要になったら関係テーブルを後付け(未決定事項)
-- 管理画面のロゴ一覧はこのツリーで構造化表示できる
+- コーポレート／サービスという用途は`logos.role`で示す
+- どの会社・事業に属するかは`subject_entity_id`で示す
+- 組織のコーポレートロゴは子事業から継承候補として参照できるため、同じファイルを事業ごとに複製しない
 
 ## 3. 制作者・更新者・作業履歴
 
@@ -94,9 +157,17 @@ ACME Holdings(corporate)
 ### 6.1 エンティティ図
 
 ```
+public.organizations(管理ワークスペース。現実の会社とは別)
+public.brand_organizations(現実世界の会社・グループを表すコンテナ)
+  └── public.brand_entities(すべてBrand。kind = corporate / business / audience)
+        ├── parent_brand_id(同じOrganization内の任意の継承元)
+        ├── brand_profiles(親Brandから継承可能なブランドルール+provenance)
+        ├── public.logos(Brandのロゴ正本)
+        ├── brand_generation_runs(入力・生成履歴・コスト・エラー)
+        └── brand_assets(LP / narration / audio / video / banner / mockup / document)
 presentation_asset_definitions(Labsにある全asset。draft / productionと不変versionを持つ)
 public.logos(アイデンティティ)── parent_logo_id で自己参照ツリー
-  ├── logo_candidates(A/B/C案。1つが primary。マスターSVGはここ)
+  ├── logo_candidates(A/B/C案。1つが primary。正式SVGまたはR2上の仮ラスター)
   │     ├── logo_variants(mono_black 等の派生・追加バリエーション)
   │     ├── logo_asset_runs(asset定義versionごとの実行状態・履歴)
   │     └── logo_mockups(成功した現在成果物の索引。定義・runを参照)
@@ -130,7 +201,10 @@ create table public.logo_candidates (
   logo_id    text not null references public.logos(id) on delete cascade,
   label      text not null default 'A',        -- 'A' | 'B' | 'C' | 任意名
   is_primary boolean not null default false,
-  svg        text not null,                    -- マスターSVG。現行はDBに直持ち
+  svg        text,                             -- 正式SVGはDBに直持ち
+  media_type text not null,
+  file_path  text,                             -- 仮PNG/JPEG/WebP等のR2キー
+  asset_status text not null,                  -- provisional | official | generated
   analysis   jsonb,                            -- 色・パス解析結果(LogoData相当)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -187,6 +261,7 @@ create table public.presentation_asset_definitions (
 - `release_stage` は運営・制作者側のリリース判定。presentation resolverは必ず `production` だけを受け付け、draft IDがlayoutに残っていても表示しない
 - `id` は定義versionを特定する。新しい版は同じ `family_id` と増加した `definition_version` を持つ別行にし、既存プレゼンが暗黙に新しい挙動へ変わるのを防ぐ
 - `allowed_placements` が「productionになった場合にどのプレゼン配置へ差し込めるか」、`default_mappings` が「初期状態ではどこに何番で有効にするか」を表す。draftも昇格前にplacement互換性を検証できる
+- 端末モックアップは`web.device`を使用する。LP・動画・バナー・ガイドラインなどプレゼン本編以外も含む出力互換性は、当面`config.supportedOutputs`（`lp / video / banner / guideline`）に持たせ、各出力アダプターが同じasset definitionと画面素材を解決する
 - `config.parameters` はassetが提供する設定項目と既定値を持つ。黒/白、素材、比率など利用者が選んだ値はlayout mappingの `params` に保存する
 - 現在は一部の定義をコード/`template.json`から供給している。DBカタログとの同期経路は未実装
 - Workflow Lab の file template は `template.json` の `presentation.allowedPlacements` / `presentation.defaultMappings` を正本にし、旧 `presentationScene` / `presentationAdopted` / `presentationOrder` は後方互換フィールドとして残す
@@ -403,7 +478,7 @@ logo_* の子テーブルは「SELECTは親ロゴの閲覧権限に準ずる」�
 
 ## 8. アセットの保存先
 
-**2026-07-14 実装判断(R2移行時)**: SVGは数KB程度と小さいため、**マスターSVG・バリエーションはDBに直持ち**(`logo_candidates.svg` / `logo_variants.svg`)を維持し、**生成モックアップ画像(大きい)は Cloudflare R2**(`logo_mockups.image_path`)へ置く。CDN/配信ルート(§7)はDBの `image_path` とアプリの中継URL(`/api/mockups/...`)で解決する。
+**2026-07-21 実装判断(R2移行時)**: 正式SVGは数KB程度と小さいため、**マスターSVG・バリエーションはDBに直持ち**(`logo_candidates.svg` / `logo_variants.svg`)を維持する。URL解析で得た仮PNG/JPEG/WebPと生成モックアップ画像はCloudflare R2へ置き、前者は`logo_candidates.file_path`、後者は`logo_mockups.image_path`で参照する。
 
 - 将来、SVG自体もR2オブジェクト化するかは、その時点のCDN要件で判断する(スキーマ上は svg カラム→パス参照への変更のみ)
 - 適用済みスキーマの正本は [../supabase/migrations/](../supabase/migrations/)

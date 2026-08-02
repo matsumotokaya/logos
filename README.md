@@ -1,6 +1,6 @@
 # logos(仮称)
 
-SVGロゴを1つアップロードすると、Behance品質のブランドプレゼンテーションがゼロタッチで生成されるサービスのPoC。
+URL・資料・ロゴを起点に、Organizationと企業・事業ブランドの情報を補完しながら、LP・動画・モックアップ・ブランド資産を一体管理するサービスのPoC。Organizationはコンテナ、企業／事業／対象別は同じBrandのカテゴリーとして扱う。
 
 サービス名は仮。[lib/config.ts](lib/config.ts) の `SERVICE_NAME` を変更すれば全体に反映される。
 
@@ -16,9 +16,10 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 |---|---|
 | [PRODUCT.md](PRODUCT.md) | 事業構想・3層のプロダクト構想・収益モデル・差別化戦略 |
 | [docs/account-design.md](docs/account-design.md) | アカウント・権限・URL体系・RLS方針(Supabase設計) |
-| [docs/data-model.md](docs/data-model.md) | ロゴの正本(canonical record)・3層分離・CDN URL・サイト構造 |
+| [docs/data-model.md](docs/data-model.md) | **ブランドデータの正本**: 管理ワークスペースと現実のOrganizationの分離、Organization→Brand→Assets、プロフィール・ロゴ・生成履歴 |
 | [docs/logo-entity-lab-integration.md](docs/logo-entity-lab-integration.md) | Labs↔ロゴ正本エンティティ統合の現行仕様・残課題・ランタイムassetの暫定手動運用 |
 | [docs/launch-plan.md](docs/launch-plan.md) | ベータローンチ準備のマイルストーン(セキュリティ・会員・法務・課金・品質・運用)と進捗チェックリスト |
+| [docs/costs.md](docs/costs.md) | **運営コストの正本**: API・動画レンダリング・ライセンス・保存/配信費の単価、実測、試算、未調査項目 |
 | [labs/README.md](labs/README.md) | **研究所群の入り口**: モード分類(保証/探索/統合)・体験レイヤー=課金の階段・ラボ一覧と現在地・ラボ追加手順 |
 | [labs/motion/README.md](labs/motion/README.md) | Motion Lab: 16実験カタログ・美的原則・使用技術とLottie比較 |
 | [AGENTS.md](AGENTS.md) | AIエージェント向けの開発上の注意(CLAUDE.md はこれを参照するだけ) |
@@ -29,21 +30,25 @@ SVGロゴを1つアップロードすると、Behance品質のブランドプレ
 
 | パス | 内容 |
 |---|---|
-| `/` | ロゴ投稿UI(メイン導線)+ ギャラリー(「あなたのロゴ」+ 全ユーザーの公開ロゴの図鑑)。カードから各プレゼンへ |
+| `/` | **トップ=すべての入口(旧 `/campaigns` を統合)**。ソース(URL・PDF・画像・テキスト)を渡すとブランド・LP・動画を生成する導線。**アップロードしたものの種別で遷移先が分岐する**: 画像(SVG/PNG/JPEG等)はロゴとして扱い、**SVGはブランドプレゼン `/p/[id]` へ**、raster画像はロゴ認識するが専用プレゼンは準備中(「準備中」表示)。URL/PDFはキャンペーン生成(企業/製品を確認)へ。ヒーローは画面高100%・透明ヘッダー・ヒーロー全域D&D対応。下部にブランドカタログとサンプル。管理サイドバーは付かない(管理は `/brands`) |
 | `/p/[id]` | 生成されたブランドプレゼンテーション(共有可能な固有URL)。所有者と共有`manager`/`editor`はヘッダーの「Edit」からキャッチコピー・ストーリー・各シーンのリード文、各プレゼン配置に採用するassetを編集し、明示的に保存できる。`/p/sample` はサンプル(編集不可) |
-| `/brand` | **Brand Manager**(旧称 Admin)。導入企業が**自社のブランド資産**(ロゴ・物品在庫・組織メンバー・公開ハンドル)を管理するハブ。プラットフォーム運営側の管理画面ではなく、そのブランドを持つ組織のための画面 |
+| `/brand` | **管理ワークスペース**。メンバー、権限、所有、公開ハンドル、在庫・発注を管理する。現実世界のOrganizationとBrandは`/brands`で扱い、管理主体とブランド主体を混同しない |
 | `/assets` | アセットライブラリ。自分/所属組織が管理するロゴアセットを一覧し、各アセット詳細へ入る |
 | `/assets/[id]` | アセット詳細ページ。現時点ではロゴ正本の編集(正式名称・主体entity・ロゴ形式・役割・親子関係・公開範囲・公開スラッグ・コンタクト表示・タグ・制作クレジット・商標情報・マスターファイル差し替え・**組織への所有移管**・作業履歴)。あわせて**このロゴで現在どのプレゼン asset が採用されているか**、candidate配下のlockup / colorway階層も確認できる。旧 `/brand/logos/[id]` は同じ画面を指す互換URL |
-| `/campaigns` | **CM Maker のトップ**(旧 Campaign Lab、2026-07-20格上げ)。画面高100%のヒーロー(青いガラス質背景に、左: タイトル+解説、右: ソース入力のグラスカード)だけがダークで、以下はロゴス本体と同じ白いUI: サンプル(CM Maker自身のセールスページ)の展開表示+自分のキャンペーンのカード一覧。**生成を開始すると `/campaigns/[id]` へ遷移**する。当面は生成APIがLabsゲート下のため `platform_admin` / `labs_member` 向け |
-| `/campaigns/[id]` | キャンペーン詳細(管理UI)。**左カラム=キャンペーン一覧+「新しいキャンペーン」、右ペイン=選択キャンペーンの展開表示**(Service Brand Kit・LPプレビュー・**製品紹介動画(30秒CM)**・ナレーション・処理ログ)。「製品紹介動画を生成」でTTS音声→`@remotion/player`のブラウザ内即時再生が可能になり、**続けて同ジョブがMP4をローカル書き出しし、LPの動画スロットにも自動掲載される**(ダウンロードリンク付き)。生成中は**成果物が届いた順に画面へ段階的に埋まる**(サービス概要→ロゴ→パレット→分析/コピー/LPの順。各ブロックはfill-in演出で入る)+ログポップアップで追従する。`/campaigns/sample` はサンプルの詳細(CM動画も再生可) |
+| `/campaigns` | 旧CM Maker入口。現在は **`/` へリダイレクト**(トップに統合済み)。生成処理中・旧リンク向けの詳細は `/campaigns/[id]` に残る |
+| `/brands` | **ブランド管理の主要画面**。共通の左ペインにOrganization→Brand→ロゴ／LP／動画を表示し、右ペインだけをURL単位で切り替える。旧`/businesses`は互換リダイレクト |
+| `/brands/[id]` | 企業・事業・対象別で共通のブランド詳細。概要、プロフィール、継承、ロゴ、生成アセットを管理する |
+| `/brands/[id]/lp/[jobId]` | Brand配下のLP詳細。プレビューと公開先を管理する |
+| `/brands/[id]/video/[jobId]` | Brand配下の動画詳細。ブラウザプレビュー、ナレーション、MP4作成・ダウンロードを管理する |
+| `/campaigns/[id]` | 生成処理中および旧リンク向けの互換詳細。完成したLP・動画の正規管理導線はBrand配下のURLを使う |
 | `/c/[id]` | 生成されたセールスページの正規URL(`/p/[id]` と対称の opaque ID・所有者を含まない)。LPは `kit.theme` の**デザインテーマ(7種・業種からLLMが自動選択、正本は [lib/campaign/themes.ts](lib/campaign/themes.ts))**で描画され、ヒーローにはテーマ固定割当の背景写真([public/campaigns/bg/](public/campaigns/bg/))が入る。テーマはkitに保存されるため後から変更・再レンダリングできる。`/c/sample` はサンプル(公開・tech-glassテーマ)。ジョブ由来のページは暫定的に署名URL経由(campaignsテーブル導入後にRLSベースへ移行) |
 | `/settings` | Accountページ。ユーザー情報表示・プロフィール編集枠・登録アカウントの退会導線。退会時は個人所有データとR2成果物を削除し、共同組織の資産は残す |
 | `/[handle]/[slug]` | バニティURL。組織ハンドル+ロゴスラッグを正規パーマリンク `/p/[id]` に解決(公開ロゴのみ)。将来はキャンペーン(`/c/[id]`)も同じ共有名前空間で解決する |
-| `/labs` | **研究所インデックス**(noindex)。表現R&Dを保証/探索/統合モードで分類する。稼働中は [Motion Lab](labs/motion/README.md)、[Workflow Lab](labs/workflow/README.md)、[Generative Lab](labs/generative/README.md)。[Campaign Lab](labs/campaign/README.md) は `/campaigns`(CM Maker)へ卒業済み。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow`、旧 `/labs/campaign` → `/campaigns` へリダイレクト |
+| `/labs` | **研究所インデックス**(noindex)。表現R&Dを保証/探索/統合モードで分類する。稼働中は [Motion Lab](labs/motion/README.md)、[Workflow Lab](labs/workflow/README.md)、[Generative Lab](labs/generative/README.md)。[Campaign Lab](labs/campaign/README.md) は CM Maker(トップ `/`)へ卒業済み。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow`、旧 `/labs/campaign` → `/`(旧 `/campaigns` も `/` へ)リダイレクト |
 
 URL体系の設計意図(所有者を含まない壊れないパーマリンク等)は [docs/account-design.md](docs/account-design.md) を参照。
 
-ヘッダーのハンバーガーメニューは、未登録ユーザーには`Home`だけを表示する。本登録ユーザーには`Assets`と`Brand Manager`も表示し、`platform_admin`または`labs_member`を持つ場合だけ`Campaigns`と`Labs`を追加する(CampaignsはPhase 1の公開ファネル化までLabsと同じ対象者)。アバターメニューはメールアドレス、`Account`、`Sign out`だけを表示し、プロダクト内ナビゲーションと分離する。
+ヘッダーのハンバーガーメニューは、未登録ユーザーには`Home`だけを表示する。本登録ユーザーには`Brand Manager`も表示し、`platform_admin`または`labs_member`を持つ場合だけ`Labs`を追加する。生成導線(CM Maker)はトップ`/`=`Home`そのものなので、独立した`Campaigns`項目は持たない。トップ全域が透明ヘッダーでヒーローに馴染み、ヘッダーは非stickyでスクロールとともに退く。アバターメニューはメールアドレス、`Account`、`Sign out`だけを表示し、プロダクト内ナビゲーションと分離する。
 
 ## プレゼン構成モデル
 
@@ -55,11 +60,11 @@ URL体系の設計意図(所有者を含まない壊れないパーマリンク�
 - ラボは未完成・完成済みを含む全assetを置き、productionへ昇格できる品質かを判断する場である
 - 将来的には利用者自身がこの catalog から構成を選び、プレゼンを後編集できる。現行実装もその前提で設計している
 
-現時点での presentation placement は `splash.hero` / `social.primary` / `onsite.primary` / `merch.primary` / `generated.tile`。このうち特にラボとの接続が強いのは後半の mockup / generated 系 section で、現在は **07 Social / 08 On-site / 09 Merchandise / 10 Generated** が asset catalog から描画される。
+現時点での presentation placement は `splash.hero` / `web.device` / `social.primary` / `onsite.primary` / `merch.primary` / `generated.tile`。`web.device` はWorkflow LabのPC・モバイル端末モックアップ用で、現在はDraftとして手動作成を検証中。特にラボとの接続が強いのは後半の mockup / generated 系 section で、Production assetは **07 Social / 08 On-site / 09 Merchandise / 10 Generated** が asset catalog から描画する。Webの端末モックアップは品質判定と出力アダプター接続後に本編へ昇格する。
 
 ## 生成されるプレゼンテーション(`/p/[id]`)
 
-SVGをアップロードすると、以下が1本のガイドラインドキュメントとして生成される。冒頭に Splash(オープニングアニメーション)と Contents(目次)、続いて番号付きの10シーンが並ぶ。
+**トップ `/` でSVGロゴをアップロードする**(ヒーロー全域へのドラッグ&ドロップ、またはカードから選択)と、以下が1本のガイドラインドキュメントとして生成され、この画面へ遷移する。アップロード受理からプレゼンが開くまではローディングバーで橋渡しする。冒頭に Splash(オープニングアニメーション)と Contents(目次)、続いて番号付きの10シーンが並ぶ。(PNG/JPEG等のraster画像もロゴとして認識するが、raster向けプレゼンは準備中。)
 
 | # | シーン | 内容 |
 |---|--------|------|
@@ -76,7 +81,7 @@ SVGをアップロードすると、以下が1本のガイドラインドキュ�
 | 09 | Merchandise | Merchandise placement に採用された asset 群。既定ではTシャツへのmultiply合成(コードベースの精密配置)。Workflow Lab で作った名刺・トート等もここへ採用可能 |
 | 10 | Generated | Generated placement に採用された asset 群。既定では Gemini API(Nano Banana)によるマグカップ/トート/キャップの写実モックアップ生成。**手動生成**——各タイルの「生成」ボタンで1枚ずつ(APIコストが発生するため自動生成はしない)。生成済みはロゴ単位でキャッシュされ再生成されない |
 
-ロゴが手元になくても、ランディングの「サンプルを見る」からサンプルプレゼンを確認できる。
+ロゴが手元になくても、`/p/sample` でサンプルプレゼンを確認できる。
 
 ### プレゼン編集
 
@@ -91,21 +96,23 @@ SVGをアップロードすると、以下が1本のガイドラインドキュ�
 
 UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh-Hans の5言語**に対応。ヘッダーの `LanguageSwitcher` で切り替え、選択は永続化され `<html lang>` にも反映される。英語を正本の型([lib/i18n/dictionaries.ts](lib/i18n/dictionaries.ts) の `Dict`)とし、全ロケールが完全な辞書を持つ(実行時フォールバックの穴を作らない)。
 
-## Brand Manager(`/brand`)
+## 管理ワークスペース(`/brand`)
 
-白ベースのビジネスSaaS風ダッシュボード。KPI(登録アセット数・在庫アイテム数・要発注アイテム数・入荷待ち発注)、会社情報編集、**組織メンバーの招待・ロール管理(オーナー/管理者/編集者/購買担当/閲覧のみ)**、**公開URLハンドルの設定**、登録アセットの一覧・役割設定・削除、ロゴアイテムの在庫管理と発注(ダミーデータ)を表示する。ビジネスモデル(フェーズ3の物販事業)を体現する画面。メール招待は相手がそのメールで登録した瞬間に自動でメンバー化される(SMTP不要)。組織ロール名の「管理者(admin)」はこの画面名とは別物(組織メンバーの権限)。
+白ベースのビジネスSaaS風ダッシュボード。KPI、管理ワークスペース情報、**メンバーの招待・ロール管理(オーナー/管理者/編集者/購買担当/閲覧のみ)**、**公開URLハンドルの設定**、登録アセット、在庫・発注を表示する。ここでいう`public.organizations`はアクセス管理主体であり、現実世界の会社・個人事業体を表す`public.brand_organizations`とは別物。メール招待は相手がそのメールで登録した瞬間に自動でメンバー化される(SMTP不要)。
 
 各アセットの詳細(`/assets/[id]`、旧 `/brand/logos/[id]`)では、正本編集だけでなく**そのロゴのプレゼン構成の現在値**も確認する。つまり Brand Manager は「ロゴファイルを持つ場所」だけでなく、**そのロゴがどんなブランドドキュメントとして出力されるか**を見るハブでもある。
 
-## CM Maker(`/campaigns`)
+## CM Maker(トップ `/`)
 
-最小限のソース(URL・PDF・画像・テキスト)から、サービス紹介の**セールスページ(LP)と30秒CM動画(Phase 0b予定)**を自動生成するプロダクト面。旧 Campaign Lab の卒業先で、**詳細な引き継ぎ資料・パイプライン解説の正本は [labs/campaign/README.md](labs/campaign/README.md)**。2026-07-20時点の骨子:
+最小限のソース(URL・PDF・テキスト)から、サービス紹介の**セールスページ(LP)と30秒CM動画(Phase 0b予定)**を自動生成するプロダクト面で、**トップページ `/` そのもの**(旧 `/campaigns` を統合)。旧 Campaign Lab の卒業先で、**詳細な引き継ぎ資料・パイプライン解説の正本は [labs/campaign/README.md](labs/campaign/README.md)**。2026-07-20時点の骨子:
+
+- **入力の種別で分岐する**: URL/PDF はキャンペーン生成(このセクション)へ。**画像をアップロードした場合はロゴ**として扱い、SVGはブランドプレゼン `/p/[id]`、raster画像は準備中の別モードへ回す(生成パイプラインには入れない)
 
 - **Service Brand Kit が核**: ソースから「サービス分析+ブランド(証拠ベースで抽出したパレット・実ロゴ・デザイントークン)+LP全文コピー+CMナレーション」の中間表現を1回生成し、全レンダラー(LP・動画・バナー)がこれを消費する
 - **デザインテーマ7種**([lib/campaign/themes.ts](lib/campaign/themes.ts) が正本): tech-glass / minimal-light / corporate-trust / care-warm / friendly-pop / food-casual / luxury-serif。各テーマは対象業種・LP描画パラメータ(glass/flatバリアント・ヒーロー背景写真)・**全レンダラー共通のトーン&マナー指示文(`direction`)**を持つ。生成時にLLMが業種からenumで自動選択し、`kit.theme` として保存されるため**後から変更して再レンダリングできる**
 - **生成LPのヒーローは背景写真でリッチに**: [public/campaigns/bg/](public/campaigns/bg/) の抽象ガラス写真5枚をテーマに固定割当(スクリム+白文字、本文はテーマ本来のキャンバス)。テーマ別の専用背景に将来差し替える
-- **UI**: `/campaigns` トップは画面高100%のヒーロー(青いガラス質背景+ソース入力のグラスカード)、それ以外の管理UI(一覧・ダイジェスト・詳細 `/campaigns/[id]`)はロゴス本体と同じ白いツールUI。生成は非同期ジョブで、ページを閉じても継続する
-- **30秒CM動画(Phase 0b・ローカル実装済み)**: ナレーションは5シーン構造(`cm_script`)で生成され、シーンごとのTTS(Gemini)→タイミングJSON→**Remotion**で組み立てる。プレビューはブラウザ内 `@remotion/player`(無料・即時)。**MP4は同じ生成ジョブが自動でローカル書き出しし、LP(`/c/[id]`)の動画スロットへ配信時に署名URLで差し込まれる**(Chromiumが動かないホストでは書き出しをスキップしプレビューのみ)。クラウド化はRemotion Lambda(AWS)採用予定=課金ポイント。`CAMPAIGN_TTS_MOCK=1` でAPIキーなし開発可
+- **UI**: トップ `/` は画面高100%のヒーロー(青いガラス質背景+ソース入力のグラスカード)+透明ヘッダー。**ヒーロー全域がドラッグ&ドロップ対応**で、ドラッグ中は50%白の半透明ヴェールと「ここにドロップ」を表示する。管理UI(詳細 `/campaigns/[id]`)はロゴス本体と同じ白いツールUI(管理サイドバー付き)。生成は非同期ジョブで、ページを閉じても継続する
+- **30秒CM動画(Phase 0b・ローカル実装済み)**: ナレーションは5シーン構造(`cm_script`)で生成され、シーンごとのTTS(Gemini)→タイミングJSON→**Remotion**で組み立てる。プレビューはブラウザ内 `@remotion/player`(即時)。**MP4は「MP4ファイルを作成してダウンロード」を押したときだけローカル書き出しし、完成後にダウンロードを開始して、LP(`/c/[id]`)の動画スロットへも配信時に署名URLで差し込まれる**(Chromiumが動かないホストでは作成不可)。クラウド化はRemotion Lambda(AWS)採用予定=課金ポイント。`CAMPAIGN_TTS_MOCK=1` でAPIキーなし開発可
 
 ## Platform Admin / Labs権限
 
@@ -115,7 +122,7 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 - `labs_member`: Labsのみアクセス
 - `support`: 将来のサポート担当。現時点ではLabsアクセスなし
 
-Labsのページ、生成・集計・テンプレートAPIは `platform_admin` または `labs_member` を要求する。`/campaigns`(CM Maker)の生成・ジョブAPI(`/api/labs/campaign/*`)も当面同じゲート下にある。公開プレゼンが利用する `/api/labs/workflow/compose` と `/api/labs/workflow/runs`、および公開サンプル `/c/sample` はこのゲートの対象外。
+Labsのページ、生成・集計・テンプレートAPIは `platform_admin` または `labs_member` を要求する。CM Maker(トップ `/`)の生成・ジョブAPI(`/api/labs/campaign/*`)も当面同じゲート下にある(そのためトップでURL/PDFから生成できるのは `platform_admin` / `labs_member`。SVGロゴ→プレゼンは登録ユーザー全員が利用できる)。公開プレゼンが利用する `/api/labs/workflow/compose` と `/api/labs/workflow/runs`、および公開サンプル `/c/sample` はこのゲートの対象外。
 
 ## アーキテクチャ
 
@@ -200,9 +207,9 @@ R2バケットはpublic access(`r2.dev`と公開custom domain)を無効にする
 
 ### Supabase
 
-スキーマの正本は [supabase/migrations/](supabase/migrations/) の連番migration。現行のリモートプロジェクトには`0001`〜`0018`まで適用済み。新規環境のセットアップ手順:
+スキーマの正本は [supabase/migrations/](supabase/migrations/) の連番migration。現行のリモートプロジェクトには`0022_private_brand_generation_data`まで適用済み。新規環境のセットアップ手順:
 
-1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0018、いずれも冪等・再実行可)
+1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0022)
 2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(公開ページ閲覧時のセッション初期化用。アップロードは本登録ユーザーのみ)
 3. `.env.local` に以下を追加:
 
@@ -249,7 +256,7 @@ Vercelにデプロイする場合は同じ環境変数を Settings → Environme
 
 ## 制約(PoC段階)
 
-- 入力はSVGのみ。PNG/AI対応はロードマップ上(一般普及には必須)
+- トップ `/` でロゴをアップロードしてプレゼンまで生成できるのは**SVGのみ**。PNG/JPEG等のraster画像もロゴとして認識するが、専用プレゼンは準備中(現状は「準備中」表示のみで、`/p/[id]` は生成しない)。将来はraster用の別モードを用意する。CM MakerのURL解析で得たPNG/JPEG/WebPは`provisional`な仮ロゴとしてR2へ登録し、後から正式SVGへ差し替える
 - 発注ボタンはlocalStorageに記録するのみで、実際の物品発注には連携していない
 - Supabase未設定時は会社・ユーザーごとの分離やログインがない(localStorageモード)
 
@@ -261,6 +268,7 @@ Vercelにデプロイする場合は同じ環境変数を Settings → Environme
 - **図鑑の検索・タグ絞り込みは未実装**: 公開ロゴは新着順48件のグリッド表示のみ。タグはデータとして保存済み
 - **個人ハンドルは未対応**: バニティURLのハンドルは組織のみ(設計上は共有名前空間で個人も可能)。`/[handle]` 単体のプロフィールページも未実装
 - **ロゴ単位共有の付与UIが未実装**: `logo_access_grants`とメール招待用`logo_access_invites`はリモートDBへ適用済みだが、招待・付与・解除UIが未完
+- **raster画像ロゴのプレゼンが未実装**: トップでPNG/JPEG等をアップロードするとロゴ認識はするが「準備中」モーダルを出すのみ。専用アニメーション/データ経路(`LogoData`はSVG前提)を用意し、実プレゼンへ差し替える follow-up が残る
 
 ## デプロイ
 
