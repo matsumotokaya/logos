@@ -69,6 +69,7 @@ type BrandEntityRow = {
   id: string;
   name: string;
   entity_type: string;
+  parent_entity_id: string | null;
   website: string;
   industry: string;
   location: string;
@@ -186,6 +187,7 @@ function mapBrandEntity(row: BrandEntityRow): BrandEntity {
     id: row.id,
     name: row.name,
     entityType: row.entity_type as BrandEntity["entityType"],
+    parentId: row.parent_entity_id,
     website: row.website,
     industry: row.industry,
     location: row.location,
@@ -658,7 +660,7 @@ export class SupabaseRepo implements BrandRepo {
       subjectId
         ? supabase
             .from("brand_entities")
-            .select("id, name, entity_type, website, industry, location, description")
+            .select("id, name, entity_type, parent_entity_id, website, industry, location, description")
             .eq("id", subjectId)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
@@ -738,21 +740,30 @@ export class SupabaseRepo implements BrandRepo {
     const currentSubjectId = (logoRow.subject_entity_id as string | null) ?? null;
     const now = new Date().toISOString();
     if (!subject) {
-      throwOn(
-        (
-          await supabase
-            .from("logos")
-            .update({ subject_entity_id: null, updated_at: now, updated_by: uid })
-            .eq("id", logoId)
-        ).error
-      );
+      const reassigned = await supabase
+        .from("logos")
+        .update({ subject_entity_id: null, updated_at: now, updated_by: uid })
+        .eq("id", logoId)
+        .select("subject_entity_id")
+        .single();
+      throwOn(reassigned.error);
+
+      const placeholderId = reassigned.data?.subject_entity_id as string | null;
+      if (!placeholderId) throw new Error("ロゴの仮Organizationを作成できませんでした");
+      const placeholder = await supabase
+        .from("brand_entities")
+        .select("id, name, entity_type, parent_entity_id, website, industry, location, description")
+        .eq("id", placeholderId)
+        .single();
+      throwOn(placeholder.error);
       await this.logActivity(logoId, "info_updated");
-      return null;
+      return mapBrandEntity(placeholder.data as BrandEntityRow);
     }
 
     const row = {
       name: subject.name,
       entity_type: subject.entityType,
+      parent_entity_id: subject.parentId,
       website: subject.website,
       industry: subject.industry,
       location: subject.location,
@@ -764,12 +775,12 @@ export class SupabaseRepo implements BrandRepo {
           .from("brand_entities")
           .update(row)
           .eq("id", currentSubjectId)
-          .select("id, name, entity_type, website, industry, location, description")
+          .select("id, name, entity_type, parent_entity_id, website, industry, location, description")
           .single()
       : await supabase
           .from("brand_entities")
           .insert({ ...row, created_by: uid })
-          .select("id, name, entity_type, website, industry, location, description")
+          .select("id, name, entity_type, parent_entity_id, website, industry, location, description")
           .single();
     throwOn(saveErr);
 

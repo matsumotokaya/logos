@@ -235,6 +235,26 @@ export async function runCampaignPipeline(
           favicon_url: raw?.faviconUrl ?? null,
           og_image_url: raw?.ogImage ?? null,
           source_url: raw?.url ?? input.url,
+          screens: {
+            desktop: capture
+              ? {
+                  source: "capture",
+                  data: capture.screenshots.desktop,
+                  media_type: "image/jpeg",
+                  width: 1024,
+                  height: 640,
+                }
+              : null,
+            mobile: capture?.screenshots.mobile
+              ? {
+                  source: "capture",
+                  data: capture.screenshots.mobile,
+                  media_type: "image/jpeg",
+                  width: 390,
+                  height: 844,
+                }
+              : null,
+          },
         }
       : null;
   const designTokens = capture?.designTokens ?? null;

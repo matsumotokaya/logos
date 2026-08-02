@@ -1,4 +1,8 @@
-import type { BrandKit, CampaignBrandKit } from "./schema";
+import type {
+  BrandKit,
+  CampaignBrandKit,
+  CampaignScreenAsset,
+} from "./schema";
 import { resolveTheme } from "./themes";
 
 // Stage LP: render a Brand Kit into a standalone SaaS-style sales page
@@ -89,62 +93,92 @@ const pxOf = (v: string | null | undefined): number | null => {
 
 // ---------- inline SVG artwork (inherits the brand via CSS variables) ----------
 
-// Abstract product-UI mock for the hero: a browser window assembling a page.
-// Everything is var(--primary)/var(--accent)/currentColor, so it adapts to
-// any palette without shipping raster assets.
-function heroMockSvg(serviceName: string): string {
-  return `<svg viewBox="0 0 560 420" role="img" aria-label="${esc(serviceName)} の画面イメージ" style="width:100%;height:auto;display:block">
-  <defs>
-    <linearGradient id="hm-hero" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="var(--primary)"/>
-      <stop offset="1" stop-color="var(--accent)"/>
-    </linearGradient>
-  </defs>
-  <rect x="8" y="8" width="544" height="404" rx="18" fill="var(--surface)" stroke="var(--line)"/>
-  <rect x="8" y="8" width="544" height="40" rx="18" fill="var(--line-soft)"/>
-  <rect x="8" y="30" width="544" height="18" fill="var(--line-soft)"/>
-  <circle cx="34" cy="28" r="5" fill="var(--primary)" opacity=".55"/>
-  <circle cx="52" cy="28" r="5" fill="var(--accent)" opacity=".55"/>
-  <circle cx="70" cy="28" r="5" fill="var(--text)" opacity=".2"/>
-  <rect x="150" y="19" width="260" height="18" rx="9" fill="var(--bg)" stroke="var(--line)"/>
-  <!-- page being assembled -->
-  <rect x="36" y="72" width="300" height="26" rx="6" fill="var(--text)" opacity=".85"/>
-  <rect x="36" y="106" width="230" height="12" rx="6" fill="var(--text)" opacity=".35"/>
-  <rect x="36" y="126" width="190" height="12" rx="6" fill="var(--text)" opacity=".25"/>
-  <rect x="36" y="154" width="120" height="34" rx="17" fill="url(#hm-hero)"/>
-  <rect x="166" y="154" width="110" height="34" rx="17" fill="none" stroke="var(--line)"/>
-  <!-- key visual card -->
-  <rect x="368" y="70" width="156" height="120" rx="12" fill="url(#hm-hero)" opacity=".92"/>
-  <circle cx="446" cy="118" r="26" fill="var(--bg)" opacity=".92"/>
-  <path d="M439 105 l22 13 -22 13 z" fill="var(--primary)"/>
-  <rect x="384" y="160" width="124" height="9" rx="4.5" fill="var(--bg)" opacity=".8"/>
-  <!-- three feature cards -->
-  <g>
-    <rect x="36" y="216" width="152" height="104" rx="12" fill="var(--bg)" stroke="var(--line)"/>
-    <circle cx="60" cy="244" r="12" fill="var(--primary)" opacity=".18"/>
-    <circle cx="60" cy="244" r="5" fill="var(--primary)"/>
-    <rect x="50" y="268" width="98" height="9" rx="4.5" fill="var(--text)" opacity=".5"/>
-    <rect x="50" y="284" width="120" height="8" rx="4" fill="var(--text)" opacity=".22"/>
-    <rect x="50" y="298" width="86" height="8" rx="4" fill="var(--text)" opacity=".22"/>
-  </g>
-  <g>
-    <rect x="204" y="216" width="152" height="104" rx="12" fill="var(--bg)" stroke="var(--line)"/>
-    <circle cx="228" cy="244" r="12" fill="var(--accent)" opacity=".2"/>
-    <circle cx="228" cy="244" r="5" fill="var(--accent)"/>
-    <rect x="218" y="268" width="98" height="9" rx="4.5" fill="var(--text)" opacity=".5"/>
-    <rect x="218" y="284" width="120" height="8" rx="4" fill="var(--text)" opacity=".22"/>
-    <rect x="218" y="298" width="86" height="8" rx="4" fill="var(--text)" opacity=".22"/>
-  </g>
-  <g>
-    <rect x="372" y="216" width="152" height="104" rx="12" fill="var(--bg)" stroke="var(--line)"/>
-    <polyline points="388,300 412,278 436,288 462,254 492,262 508,240" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="508" cy="240" r="5" fill="var(--accent)"/>
-    <rect x="388" y="234" width="60" height="8" rx="4" fill="var(--text)" opacity=".35"/>
-  </g>
-  <rect x="36" y="342" width="488" height="46" rx="12" fill="var(--primary)" opacity=".08"/>
-  <rect x="56" y="358" width="180" height="12" rx="6" fill="var(--primary)" opacity=".55"/>
-  <rect x="404" y="352" width="100" height="26" rx="13" fill="var(--primary)"/>
+type DeviceMockupKind = "laptop" | "mobile" | "duo";
+
+// Brand-colored fallback screen. It deliberately contains no device chrome:
+// the screen is the portable asset, while laptop/phone frames are renderers.
+function fallbackScreenSvg(viewport: "desktop" | "mobile"): string {
+  if (viewport === "mobile") {
+    return `<svg viewBox="0 0 390 844" aria-hidden="true" preserveAspectRatio="xMidYMin slice">
+  <rect width="390" height="844" fill="var(--bg)"/>
+  <rect width="390" height="70" fill="var(--surface)"/>
+  <circle cx="38" cy="35" r="15" fill="var(--primary)"/>
+  <rect x="64" y="25" width="116" height="20" rx="10" fill="var(--text)" opacity=".72"/>
+  <rect x="24" y="104" width="260" height="30" rx="10" fill="var(--text)" opacity=".88"/>
+  <rect x="24" y="148" width="326" height="14" rx="7" fill="var(--text)" opacity=".28"/>
+  <rect x="24" y="174" width="274" height="14" rx="7" fill="var(--text)" opacity=".2"/>
+  <rect x="24" y="220" width="152" height="46" rx="23" fill="var(--primary)"/>
+  <rect x="24" y="306" width="342" height="210" rx="24" fill="var(--primary)" opacity=".14"/>
+  <circle cx="195" cy="400" r="58" fill="var(--accent)" opacity=".8"/>
+  <rect x="24" y="552" width="342" height="112" rx="22" fill="var(--surface)" stroke="var(--line)"/>
+  <rect x="48" y="580" width="190" height="16" rx="8" fill="var(--text)" opacity=".6"/>
+  <rect x="48" y="612" width="270" height="11" rx="5.5" fill="var(--text)" opacity=".2"/>
+  <rect x="24" y="688" width="342" height="112" rx="22" fill="var(--surface)" stroke="var(--line)"/>
 </svg>`;
+  }
+
+  return `<svg viewBox="0 0 1440 900" aria-hidden="true" preserveAspectRatio="xMidYMin slice">
+  <rect width="1440" height="900" fill="var(--bg)"/>
+  <rect width="1440" height="78" fill="var(--surface)"/>
+  <circle cx="54" cy="39" r="16" fill="var(--primary)"/>
+  <rect x="84" y="27" width="180" height="24" rx="12" fill="var(--text)" opacity=".72"/>
+  <rect x="1060" y="24" width="150" height="30" rx="15" fill="var(--text)" opacity=".12"/>
+  <rect x="1232" y="19" width="164" height="40" rx="20" fill="var(--primary)"/>
+  <rect x="80" y="156" width="680" height="58" rx="16" fill="var(--text)" opacity=".88"/>
+  <rect x="80" y="238" width="570" height="22" rx="11" fill="var(--text)" opacity=".28"/>
+  <rect x="80" y="278" width="490" height="22" rx="11" fill="var(--text)" opacity=".2"/>
+  <rect x="80" y="340" width="220" height="62" rx="31" fill="var(--primary)"/>
+  <rect x="850" y="142" width="510" height="332" rx="34" fill="var(--primary)" opacity=".14"/>
+  <circle cx="1105" cy="308" r="106" fill="var(--accent)" opacity=".8"/>
+  <rect x="80" y="550" width="392" height="250" rx="28" fill="var(--surface)" stroke="var(--line)"/>
+  <rect x="524" y="550" width="392" height="250" rx="28" fill="var(--surface)" stroke="var(--line)"/>
+  <rect x="968" y="550" width="392" height="250" rx="28" fill="var(--surface)" stroke="var(--line)"/>
+  <circle cx="136" cy="612" r="24" fill="var(--primary)" opacity=".7"/>
+  <circle cx="580" cy="612" r="24" fill="var(--accent)" opacity=".7"/>
+  <rect x="1020" y="590" width="210" height="20" rx="10" fill="var(--text)" opacity=".42"/>
+</svg>`;
+}
+
+function screenHtml(
+  screen: CampaignScreenAsset | null | undefined,
+  viewport: "desktop" | "mobile"
+): string {
+  if (!screen) return fallbackScreenSvg(viewport);
+  return `<img src="data:${screen.media_type};base64,${screen.data}" alt="" loading="eager" decoding="async">`;
+}
+
+// Deterministic, reusable device renderers. A future model-viewer/GLB renderer
+// consumes the same screens and only replaces this outer frame layer.
+function deviceMockupHtml(
+  kind: DeviceMockupKind,
+  screens: { desktop?: CampaignScreenAsset | null; mobile?: CampaignScreenAsset | null },
+  serviceName: string,
+  decorative = false
+): string {
+  const a11y = decorative
+    ? `aria-hidden="true"`
+    : `role="img" aria-label="${esc(serviceName)} のPC・モバイル画面イメージ"`;
+  const laptop = `<div class="device-laptop">
+    <div class="device-laptop-lid"><span class="device-camera"></span><div class="device-screen">${screenHtml(screens.desktop, "desktop")}</div></div>
+    <div class="device-laptop-base"><span></span></div>
+  </div>`;
+  const mobile = `<div class="device-phone">
+    <div class="device-phone-shell"><span class="device-speaker"></span><div class="device-screen">${screenHtml(screens.mobile, "mobile")}</div></div>
+  </div>`;
+
+  return `<div class="device-mockup device-${kind}" ${a11y}>${
+    kind === "laptop" ? laptop : kind === "mobile" ? mobile : `${laptop}${mobile}`
+  }</div>`;
+}
+
+function heroModelHtml(
+  screens: { desktop?: CampaignScreenAsset | null; mobile?: CampaignScreenAsset | null },
+  serviceName: string
+): string {
+  return `<div class="hero-model-stage">
+    <div class="hero-model-fallback">${deviceMockupHtml("duo", screens, serviceName)}</div>
+    <model-viewer class="hero-model" src="/campaigns/models/device-duo-v1.glb" alt="${esc(serviceName)} のPC・モバイル3Dモックアップ" camera-controls touch-action="pan-y" disable-zoom interaction-prompt="none" camera-orbit="-8deg 67deg 6.4m" field-of-view="30deg" shadow-intensity="1.1" shadow-softness=".85" exposure="1.05" tone-mapping="neutral"></model-viewer>
+  </div>`;
 }
 
 // Feature illustrations, cycled by index. Consistent 4:3 stroke-based style.
@@ -221,6 +255,11 @@ export function cmVideoEmbed(src: string): string {
   return `<video controls playsinline preload="metadata" src="${esc(src)}"></video>`;
 }
 
+/** Owner-facing action shown in a generated LP until its CM is available. */
+export function cmVideoAction(href: string): string {
+  return `<div class="video-empty"><a class="video-generate" href="${esc(href)}">製品紹介動画を生成</a></div>`;
+}
+
 /**
  * Swap the LP's video-slot placeholder for the real CM embed at serve time.
  * Stored job HTML predates the MP4, and signed video URLs expire, so the
@@ -234,6 +273,17 @@ export function injectCmVideo(html: string, src: string): string {
   if (marked.test(html)) return html.replace(marked, embed);
   // Job HTML stored before the marker existed: replace the bare placeholder.
   return html.replace(/<div class="video-slot"><span>[^<]*<\/span><\/div>/, embed);
+}
+
+/** Add the authenticated generation entry point to an unrendered LP slot. */
+export function injectCmVideoAction(html: string, href: string): string {
+  const action = `<!--cm-video-slot--><div class="video-slot">${cmVideoAction(href)}</div><!--/cm-video-slot-->`;
+  const marked = /<!--cm-video-slot-->[\s\S]*?<!--\/cm-video-slot-->/;
+  if (marked.test(html)) return html.replace(marked, action);
+  return html.replace(
+    /<div class="video-slot"><span>[^<]*<\/span><\/div>/,
+    `<div class="video-slot">${cmVideoAction(href)}</div>`
+  );
 }
 
 export function renderLandingPage(
@@ -252,6 +302,7 @@ export function renderLandingPage(
   const assets = "assets" in kit ? kit.assets : null;
   const logoSvg = assets?.logo_svg ?? null;
   const logo = assets?.logo ?? null;
+  const screens = assets?.screens ?? { desktop: null, mobile: null };
   const logoHtml = logoSvg
     ? `<img src="data:image/svg+xml;base64,${Buffer.from(logoSvg).toString("base64")}" alt="${esc(service.name)}" style="height:30px;width:auto;display:block">`
     : logo
@@ -331,6 +382,7 @@ export function renderLandingPage(
 <title>${esc(service.name)} — ${esc(service.tagline)}</title>
 <meta name="description" content="${esc(service.description)}">
 <meta name="theme-color" content="${brand.primary}">${fontLinks}
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.2.0/model-viewer.min.js"></script>
 <style>
 :root{
   --primary:${brand.primary};
@@ -367,6 +419,33 @@ header{position:sticky;top:0;z-index:10;background:color-mix(in srgb, var(--bg) 
 .hero .cta{margin-top:36px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
 .tagline{display:inline-block;margin-bottom:18px;padding:.35em 1.1em;border:1px solid color-mix(in srgb, var(--accent) 60%, transparent);color:var(--accent);border-radius:999px;font-size:.85rem;font-weight:600;letter-spacing:.05em}
 .hero-visual{filter:drop-shadow(0 24px 48px color-mix(in srgb, var(--text) 18%, transparent))}
+.hero-model-stage{position:relative;width:100%;min-height:360px}
+.hero-model-fallback,.hero-model{position:absolute;inset:0;width:100%;height:100%;transition:opacity .18s ease-out}
+.hero-model{display:block;opacity:0;--poster-color:transparent}
+.hero-model-stage.model-ready .hero-model{opacity:1}
+.hero-model-stage.model-ready .hero-model-fallback{opacity:0;pointer-events:none}
+.device-mockup{position:relative;width:100%;margin:auto;color:#111827}
+.device-screen{position:relative;width:100%;height:100%;overflow:hidden;background:var(--bg)}
+.device-screen::after{content:"";position:absolute;inset:0;background:linear-gradient(118deg,rgba(255,255,255,.2),transparent 28%,transparent 72%,rgba(255,255,255,.08));pointer-events:none}
+.device-screen img,.device-screen svg{width:100%;height:100%;display:block;object-fit:cover;object-position:top center}
+.device-laptop{position:relative;width:100%;padding-bottom:5.5%}
+.device-laptop-lid{position:relative;width:92%;aspect-ratio:16/10;margin:0 auto;padding:2.4% 2.2% 2.8%;border-radius:18px 18px 8px 8px;background:#20242b;border:1px solid rgba(255,255,255,.24);box-shadow:inset 0 0 0 1px rgba(0,0,0,.28)}
+.device-laptop-lid .device-screen{border-radius:8px}
+.device-camera{position:absolute;top:.85%;left:50%;width:4px;height:4px;border-radius:50%;background:#06070a;transform:translateX(-50%);z-index:1}
+.device-laptop-base{position:absolute;left:0;right:0;bottom:0;height:7.4%;border-radius:3px 3px 18px 18px;background:linear-gradient(180deg,#eef0f2,#9ca3aa 70%,#717780);box-shadow:0 10px 16px rgba(0,0,0,.22)}
+.device-laptop-base::before{content:"";position:absolute;inset:0 4%;border-top:1px solid rgba(255,255,255,.9)}
+.device-laptop-base span{position:absolute;top:0;left:43%;width:14%;height:36%;border-radius:0 0 8px 8px;background:#8e949b}
+.device-phone{position:relative;width:34%;margin:auto}
+.device-phone-shell{position:relative;aspect-ratio:390/844;padding:5.8% 4.5%;border-radius:12% / 5.8%;background:#171a20;border:1px solid rgba(255,255,255,.32);box-shadow:inset 0 0 0 1px rgba(0,0,0,.45),0 14px 24px rgba(0,0,0,.24)}
+.device-phone-shell .device-screen{border-radius:9% / 4.4%}
+.device-speaker{position:absolute;top:2.2%;left:50%;width:24%;height:.7%;border-radius:999px;background:#050609;transform:translateX(-50%);z-index:1}
+.device-duo{min-height:330px;padding:5% 3% 0 0}
+.device-duo>.device-laptop{width:94%;margin:0 auto 0 0}
+.device-duo>.device-phone{position:absolute;right:0;bottom:0;width:25%;z-index:1}
+.f-visual .device-mockup{max-width:440px}
+.f-visual .device-duo{min-height:250px}
+@media (max-width:520px){.device-laptop-lid{border-radius:12px 12px 5px 5px}.device-duo{min-height:220px}.device-duo>.device-phone{width:28%}}
+@media (prefers-reduced-motion:reduce){.hero-model-fallback,.hero-model{transition:none}}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-top:64px;position:relative}
 .stat{background:var(--surface);padding:26px 20px;text-align:center}
 .stat .v{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;color:var(--primary);line-height:1.2}
@@ -398,6 +477,10 @@ section{padding:${sectionPad}px 0}
 .video-slot{max-width:800px;margin:0 auto;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:var(--surface);display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
 .video-slot span{opacity:.5;font-size:.95rem}
 .video-slot video{width:100%;height:100%;object-fit:cover;display:block}
+.video-empty{display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:24px;text-align:center}
+.video-generate{display:inline-block;padding:.8em 2em;border-radius:${btnRadius};background:var(--primary);color:#fff;text-decoration:none;font-weight:700;transition:opacity .15s ease}
+.video-generate:hover{opacity:.85}
+.video-generate:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .quotes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px}
 .quote{display:flex;flex-direction:column;gap:18px;padding:30px 28px;border-radius:18px;background:var(--surface);border:1px solid var(--line-soft)}
 .alt .quote{background:var(--bg)}
@@ -487,7 +570,7 @@ header{background:color-mix(in srgb, var(--bg) 62%, transparent)}
             <a class="btn ghost" href="#how">使い方を見る</a>
           </div>
         </div>
-        <div class="hero-visual">${heroMockSvg(service.name)}</div>
+        <div class="hero-visual">${heroModelHtml(screens, service.name)}</div>
       </div>
       ${
         proof
@@ -549,7 +632,15 @@ header{background:color-mix(in srgb, var(--bg) 62%, transparent)}
           <h3>${esc(f.title)}</h3>
           <p>${esc(f.description)}</p>
         </div>
-        <div class="f-visual">${featureSvg(i)}</div>
+        <div class="f-visual">${
+          i === 1
+            ? deviceMockupHtml("laptop", screens, service.name, true)
+            : i === 2
+              ? deviceMockupHtml("duo", screens, service.name, true)
+              : i === 3
+                ? deviceMockupHtml("mobile", screens, service.name, true)
+                : featureSvg(i)
+        }</div>
       </div>`
         )
         .join("\n      ")}
@@ -657,6 +748,99 @@ ${
 <footer>
   <div class="container">© ${new Date().getFullYear()} ${esc(service.name)}</div>
 </footer>
+<script type="module">
+customElements.whenDefined("model-viewer").then(function () {
+  document.querySelectorAll(".hero-model-stage").forEach(function (stage) {
+    var viewer = stage.querySelector("model-viewer");
+    if (!viewer) return;
+    var compact = window.matchMedia("(max-width:860px)");
+    function syncCamera() {
+      viewer.setAttribute("camera-orbit", compact.matches ? "-8deg 67deg 8.7m" : "-8deg 67deg 6.4m");
+    }
+    syncCamera();
+    compact.addEventListener("change", syncCamera);
+
+    viewer.addEventListener("load", async function () {
+      function color(name, fallback) {
+        var value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return value || fallback;
+      }
+
+      function canvasTexture(viewport) {
+        var texture = viewer.createCanvasTexture();
+        var canvas = texture.source.element;
+        var mobile = viewport === "mobile";
+        canvas.width = mobile ? 390 : 1024;
+        canvas.height = mobile ? 844 : 640;
+        var ctx = canvas.getContext("2d");
+        var primary = color("--primary", "#5b35f5");
+        var accent = color("--accent", "#7c3aed");
+        var bg = color("--bg", "#111827");
+        var surface = color("--surface", "#24263d");
+        var textColor = color("--text", "#f8fafc");
+        var w = canvas.width;
+        var h = canvas.height;
+
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = surface;
+        ctx.fillRect(0, 0, w, mobile ? 70 : 58);
+        ctx.fillStyle = primary;
+        ctx.beginPath();
+        ctx.arc(mobile ? 38 : 36, mobile ? 35 : 29, mobile ? 15 : 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = .78;
+        ctx.fillStyle = textColor;
+        ctx.fillRect(mobile ? 64 : 58, mobile ? 25 : 21, mobile ? 116 : 132, mobile ? 20 : 16);
+        ctx.globalAlpha = 1;
+
+        var pad = mobile ? 24 : 56;
+        var heroY = mobile ? 108 : 108;
+        ctx.fillStyle = textColor;
+        ctx.fillRect(pad, heroY, mobile ? 260 : 440, mobile ? 30 : 38);
+        ctx.globalAlpha = .28;
+        ctx.fillRect(pad, heroY + (mobile ? 44 : 58), mobile ? 326 : 360, mobile ? 14 : 14);
+        ctx.fillRect(pad, heroY + (mobile ? 70 : 84), mobile ? 274 : 300, mobile ? 14 : 14);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = primary;
+        ctx.fillRect(pad, heroY + (mobile ? 116 : 132), mobile ? 152 : 150, mobile ? 46 : 40);
+        ctx.globalAlpha = .18;
+        ctx.fillStyle = primary;
+        ctx.fillRect(mobile ? 24 : 610, mobile ? 306 : 96, mobile ? 342 : 350, mobile ? 210 : 250);
+        ctx.globalAlpha = .82;
+        ctx.fillStyle = accent;
+        ctx.beginPath();
+        ctx.arc(mobile ? 195 : 785, mobile ? 400 : 220, mobile ? 58 : 82, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        texture.source.update();
+        return texture;
+      }
+
+      async function applyScreen(materialName, selector, viewport) {
+        var material = viewer.model.getMaterialByName(materialName);
+        if (!material) return;
+        var image = stage.querySelector(selector);
+        var texture = image && image.src
+          ? await viewer.createTexture(image.currentSrc || image.src)
+          : canvasTexture(viewport);
+        material.pbrMetallicRoughness.baseColorTexture.setTexture(texture);
+        material.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+      }
+
+      try {
+        await Promise.all([
+          applyScreen("LaptopScreen", ".hero-model-fallback .device-laptop .device-screen img", "desktop"),
+          applyScreen("PhoneScreen", ".hero-model-fallback .device-phone .device-screen img", "mobile")
+        ]);
+        stage.classList.add("model-ready");
+      } catch (error) {
+        console.warn("3D mockup texture failed; keeping the HTML fallback", error);
+      }
+    }, { once: true });
+  });
+});
+</script>
 </body>
 </html>
 `;

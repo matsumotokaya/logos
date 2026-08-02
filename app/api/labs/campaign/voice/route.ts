@@ -1,8 +1,8 @@
 // POST: generate the CM voice track (TTS + timing) for a finished campaign
 // job, as a detached run — same reload-safe pattern as /generate. Progress
 // lines land in the job's step log; the result (scene/caption timings) is
-// stored on the job, the WAV next to it. The video itself is not rendered
-// here: the Player composes it in the browser from kit + track + audio.
+// stored on the job, the WAV next to it. The Player composes the preview in
+// the browser; MP4 export is a separate explicit action.
 //
 // Explicit user action by design (TTS costs money), mirroring scene 10's
 // manual mockup generation.
@@ -11,7 +11,6 @@ import { NextResponse } from "next/server";
 import { guardLabsRequest } from "@/lib/labs-access";
 import { requireUser } from "@/lib/supabase/server";
 import { generateCmVoice, cmVoiceAvailable } from "@/lib/campaign/voice";
-import { renderCmMp4 } from "@/lib/campaign/render-video";
 import {
   getCampaignJob,
   appendCampaignStep,
@@ -72,41 +71,25 @@ export async function POST(req: Request) {
 
   const kit = job.kit;
   startCampaignCm(jobId);
-  appendCampaignStep(jobId, { message: "video: 製品紹介動画の生成を開始", level: "info" });
+  appendCampaignStep(jobId, { message: "製品紹介動画の生成を開始しました", level: "info" });
 
-  // Detached chain: voice (TTS) → browser preview becomes available → MP4
-  // render (local-first; skipped with a warn where Chromium can't run) → the
-  // LP's video slot picks the MP4 up on next serve.
+  // Detached voice generation. MP4 export is intentionally separate so a
+  // background render cannot interrupt someone watching the Player preview.
   void generateCmVoice(kit, (message, level) =>
     appendCampaignStep(jobId, { message, level: level ?? "info" })
   )
     .then(async (result) => {
       saveCampaignCmVoice(jobId, result);
+      finishCampaignCm(jobId, { mp4: false });
       appendCampaignStep(jobId, {
-        message: "video: プレビュー再生が可能になりました — MP4を書き出し中…（数分かかります）",
+        message: "製品紹介動画のプレビューが完成しました",
         level: "success",
       });
-      try {
-        await renderCmMp4(jobId);
-        finishCampaignCm(jobId, { mp4: true });
-        appendCampaignStep(jobId, {
-          message: "video: MP4書き出し完了 — セールスページ（LP）の動画スロットにも掲載されます",
-          level: "success",
-        });
-      } catch (e) {
-        console.error("Campaign MP4 render failed:", e);
-        finishCampaignCm(jobId, { mp4: false });
-        appendCampaignStep(jobId, {
-          message:
-            "video: MP4書き出しはこの環境では実行できませんでした（ブラウザ内プレビューは利用できます）",
-          level: "warn",
-        });
-      }
     })
     .catch((e) => {
       console.error("Campaign voice failed:", e);
       const message = e instanceof Error ? e.message : "音声生成に失敗しました";
-      appendCampaignStep(jobId, { message: `video: ${message}`, level: "warn" });
+      appendCampaignStep(jobId, { message, level: "warn" });
       failCampaignCm(jobId, message);
     });
 

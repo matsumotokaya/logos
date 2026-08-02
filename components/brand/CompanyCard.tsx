@@ -3,19 +3,17 @@
 // Company profile editor card for the admin console.
 
 import { useState } from "react";
-import type { Company, StoredLogo } from "@/lib/store";
-import { svgToDataUri } from "@/lib/svg";
+import type { Company } from "@/lib/store";
 
 type Props = {
   company: Company;
-  primaryLogo: StoredLogo | null;
   onSave: (c: Company) => void;
 };
 
 const inputClass =
   "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-900 focus:outline-none";
 
-export default function CompanyCard({ company, primaryLogo, onSave }: Props) {
+export default function CompanyCard({ company, onSave }: Props) {
   const [draft, setDraft] = useState<Company>(company);
   const [saved, setSaved] = useState(false);
 
@@ -29,26 +27,10 @@ export default function CompanyCard({ company, primaryLogo, onSave }: Props) {
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6">
-      <div className="flex flex-col gap-6 sm:flex-row">
-        {/* Logo preview tile */}
-        <div className="flex size-20 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F1F3F4]">
-          {primaryLogo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={svgToDataUri(primaryLogo.data.svg)}
-              alt={draft.name}
-              className="max-h-[70%] max-w-[70%] object-contain"
-            />
-          ) : (
-            <span className="text-[10px] text-gray-400">No logo</span>
-          )}
-        </div>
-
-        {/* Profile form */}
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-3">
           <div>
             <label htmlFor="company-name" className="mb-1 block text-xs text-gray-500">
-              会社名
+              ワークスペース名
             </label>
             <input
               id="company-name"
@@ -101,7 +83,7 @@ export default function CompanyCard({ company, primaryLogo, onSave }: Props) {
 
           <div>
             <label htmlFor="company-description" className="mb-1 block text-xs text-gray-500">
-              会社概要
+              管理メモ
             </label>
             <textarea
               id="company-description"
@@ -122,7 +104,6 @@ export default function CompanyCard({ company, primaryLogo, onSave }: Props) {
             </button>
             {saved && <span className="text-xs text-green-600">保存しました</span>}
           </div>
-        </div>
       </div>
     </div>
   );

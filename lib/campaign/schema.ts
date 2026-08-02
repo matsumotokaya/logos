@@ -120,6 +120,27 @@ export const CopySchema = z.object({
 // single source. One scene = one TTS section = one visual sequence.
 export const CM_SCENE_ROLES = ["hook", "problem", "solution", "features", "cta"] as const;
 
+export const OrganizationSchema = z.object({
+  name: z
+    .string()
+    .describe("Legal or commonly used name of the company/person operating the service"),
+  organization_kind: z
+    .enum(["company", "individual", "nonprofit", "other"])
+    .describe("Real-world operator type, not the service account/workspace"),
+  website: z.string().nullable().describe("Corporate/operator website when evidenced, else null"),
+  description: z.string().describe("Short factual description grounded in source material"),
+  relationship: z
+    .enum(["same_identity", "operated_by", "parent_group", "unknown"])
+    .describe("How the service relates to this organization"),
+  confidence: z
+    .enum(["high", "medium", "low"])
+    .describe("Confidence based on footer, legal notice, JSON-LD, or source documents"),
+  evidence: z
+    .string()
+    .nullable()
+    .describe("Short source-grounded reason for the operator inference, else null"),
+});
+
 export const CmSceneSchema = z.object({
   role: z
     .enum(CM_SCENE_ROLES)
@@ -136,6 +157,7 @@ export const CmSceneSchema = z.object({
 export type CmScene = z.infer<typeof CmSceneSchema>;
 
 export const BrandKitSchema = z.object({
+  organization: OrganizationSchema,
   service: z.object({
     name: z.string(),
     tagline: z.string().describe("<= 25 chars, appears next to the logo"),
@@ -193,6 +215,16 @@ export type Brand = z.infer<typeof BrandSchema>;
 // ---------- deterministic parts merged in by the pipeline (not LLM output) ----------
 
 /** Visual assets collected from the real site (Stage 1 capture / ingest). */
+export interface CampaignScreenAsset {
+  /** How this screen entered the campaign. More sources can be added without
+   * changing the device-mockup renderers. */
+  source: "capture" | "upload" | "generated";
+  data: string;
+  media_type: "image/png" | "image/jpeg" | "image/webp";
+  width: number;
+  height: number;
+}
+
 export interface BrandAssets {
   /** Header logo element screenshot (or favicon fallback), base64 PNG. */
   logo: { data: string; media_type: "image/png" } | null;
@@ -202,6 +234,13 @@ export interface BrandAssets {
   favicon_url: string | null;
   og_image_url: string | null;
   source_url: string | null;
+  /** Product screens are stored independently from their laptop/phone frame.
+   * This lets HTML/SVG, Blender and future GLB renderers consume the same
+   * canonical screen image. Absent on records created before mockup v1. */
+  screens?: {
+    desktop: CampaignScreenAsset | null;
+    mobile: CampaignScreenAsset | null;
+  };
 }
 
 /** Best-effort design guideline hints read from computed CSS. */
@@ -216,7 +255,10 @@ export interface DesignTokens {
 }
 
 /** The full portable artifact: LLM-generated kit + deterministic evidence. */
-export type CampaignBrandKit = Omit<BrandKit, "theme" | "cm_script"> & {
+export type CampaignBrandKit = Omit<BrandKit, "theme" | "cm_script" | "organization"> & {
+  /** Optional only for compatibility with kits generated before the
+   * organization/business hierarchy was introduced. */
+  organization?: BrandKit["organization"];
   /** Absent on kits stored before themes existed; resolveTheme() falls back. */
   theme?: BrandKit["theme"];
   /** Absent on kits stored before the structured CM script (2026-07-20).

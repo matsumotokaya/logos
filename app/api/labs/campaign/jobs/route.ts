@@ -64,6 +64,15 @@ export async function GET(req: Request) {
       tagline: job.kit?.service.tagline ?? null,
       primary: job.kit?.brand.primary ?? null,
       accent: job.kit?.brand.accent ?? null,
+      organizationName:
+        job.input.registrationScope === "organization"
+          ? job.kit?.service.name ?? null
+          : job.kit?.organization?.name ?? null,
+      businessName: job.kit?.service.name ?? job.input.name ?? null,
+      organizationId: job.catalog?.organizationId ?? null,
+      businessId: job.catalog?.businessId ?? job.input.brandEntityId ?? null,
+      registrationScope: job.input.registrationScope ?? "business",
+      catalogError: job.catalogError ?? null,
     }));
     return Response.json({ jobs }, { headers: { "Cache-Control": "no-store" } });
   }

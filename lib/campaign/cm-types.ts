@@ -32,13 +32,13 @@ export interface CmVoiceTrack {
 }
 
 /** CM state stored on a campaign job (WAV/MP4 live next to the job file).
- *  `track` appears as soon as the voice stage finishes (the Player can start
- *  immediately) while `status` stays "running" through the MP4 render. */
+ *  `track` appears as soon as voice generation finishes. A later explicit
+ *  MP4 export reuses it without changing the browser-preview contract. */
 export interface CampaignCmState {
   status: "running" | "done" | "error";
   error: string | null;
   track: CmVoiceTrack | null;
-  /** true when <id>.cm.mp4 was rendered (local-first; false on hosts without
-   *  Chromium — the browser Player still works, only the LP embed is absent). */
+  /** true when <id>.cm.mp4 was rendered (local-first; false until requested,
+   *  or on hosts without Chromium). */
   mp4?: boolean;
 }

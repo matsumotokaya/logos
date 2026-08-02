@@ -38,7 +38,10 @@ export default function LogoSection({ logos, onChangeRole, onDelete }: Props) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {logos.map((logo) => (
-        <div key={logo.id} className="rounded-xl border border-gray-200 bg-white">
+        <div
+          key={logo.id}
+          className="rounded-xl border border-gray-200 bg-white"
+        >
           <div className="flex aspect-[4/3] items-center justify-center rounded-t-xl bg-[#F1F3F4]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -57,7 +60,9 @@ export default function LogoSection({ logos, onChangeRole, onDelete }: Props) {
             <select
               aria-label="ロゴの役割"
               value={logo.role}
-              onChange={(e) => onChangeRole(logo.id, e.target.value as LogoRole)}
+              onChange={(e) =>
+                onChangeRole(logo.id, e.target.value as LogoRole)
+              }
               className="w-fit rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
             >
               {(Object.entries(LOGO_ROLE_LABELS) as [LogoRole, string][]).map(
@@ -65,12 +70,12 @@ export default function LogoSection({ logos, onChangeRole, onDelete }: Props) {
                   <option key={role} value={role}>
                     {label}
                   </option>
-                )
+                ),
               )}
             </select>
             <div className="flex items-center gap-4">
               <Link
-                href={`/assets/${logo.id}`}
+                href={`/logos/${logo.id}`}
                 className="text-xs font-medium text-gray-900 underline underline-offset-2"
               >
                 アセット詳細

@@ -142,17 +142,17 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Company profile */}
+        {/* Access-management workspace. Real-world organizations and their
+            brand identities live in the brand catalog under /campaigns. */}
         <section className="flex flex-col gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">会社情報</h2>
+            <h2 className="text-sm font-semibold text-gray-900">管理ワークスペース</h2>
             <p className="text-pretty text-xs text-gray-500">
-              プレゼンテーションに表示される会社プロフィールを編集します。
+              メンバー、権限、所有、在庫を管理する単位です。会社・事業のブランド情報は「あなたのブランド」で管理します。
             </p>
           </div>
           <CompanyCard
             company={company}
-            primaryLogo={logos[0] ?? null}
             onSave={handleSaveCompany}
           />
         </section>

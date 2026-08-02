@@ -32,16 +32,10 @@ export function createServerSupabaseForToken(accessToken: string): SupabaseClien
     requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
     requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
     {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-      global: {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
+      // Use the SDK's token provider rather than a static global header.
+      // Without an auth session, the SDK may otherwise resolve its internal
+      // token to the publishable key during long-running detached jobs.
+      accessToken: async () => accessToken,
     },
   );
 }

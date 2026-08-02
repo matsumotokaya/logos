@@ -118,6 +118,7 @@ Given raw information about a service (scraped page text, meta info, brand color
 
 Rules:
 - All user-facing copy (headlines, descriptions, narration) must be in natural, punchy Japanese. Avoid literal-translation tone.
+- organization is the real-world company, sole proprietor, nonprofit, or person operating the service. It is NOT the Logos account/workspace. Use footer text, legal notices, JSON-LD, and source documents as evidence. Never silently treat the service name as a legal company name when the operator is unknown; use relationship="unknown" and low confidence instead.
 - Copy is benefit-driven: lead with what the audience gains, not feature lists.
 - service.industry / business_type / offering / audience are ANALYSIS results, not marketing copy: state factually what kind of business this is and what it primarily provides, grounded in the source material.
 - Colors: when the prompt provides an adjudicated palette extracted from the real site, reproduce it EXACTLY and set palette_source to "extracted". Never invent colors when evidence exists. Only when no palette evidence is provided may you propose a palette that fits the service genre and personality — in that case set palette_source to "generated". Ensure text/background contrast is readable (WCAG AA-ish).
@@ -203,6 +204,10 @@ function buildUserPrompt(input: CreativeInput): string {
     if (raw.headings.length)
       parts.push(`Headings:\n${raw.headings.map((h) => `- ${h}`).join("\n")}`);
     if (raw.bodyText) parts.push(`Page text (truncated):\n${raw.bodyText}`);
+    if (raw.footerText) parts.push(`Footer / legal text:\n${raw.footerText}`);
+    if (raw.organizationHints.length) {
+      parts.push(`Possible organization names found mechanically:\n${raw.organizationHints.map((name) => `- ${name}`).join("\n")}`);
+    }
   }
   if (input.pastedText) {
     parts.push(`Pasted source text:\n${input.pastedText.slice(0, 12_000)}`);

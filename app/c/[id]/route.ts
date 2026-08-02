@@ -16,6 +16,7 @@ import { campaignCmMp4Exists, readCampaignJobHtml } from "@/lib/campaign/jobs";
 import {
   cmVideoEmbed,
   injectCmVideo,
+  injectCmVideoAction,
   renderLandingPage,
 } from "@/lib/campaign/render-lp";
 import {
@@ -71,6 +72,11 @@ export async function GET(
       html,
       signedLabsUrl(`/api/labs/campaign/video/${id}`, `campaign-video:${id}`)
     );
+  } else {
+    // Keep the paid generation endpoint behind the authenticated management
+    // surface. The detail page consumes this one-shot intent and starts the
+    // same CM job used by its own button.
+    html = injectCmVideoAction(html, `/campaigns/${id}?generateVideo=1`);
   }
   return htmlResponse(html, "private, no-store");
 }

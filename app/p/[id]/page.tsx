@@ -7,7 +7,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { requestAuthDialog, useAuth } from "@/lib/auth";
-import { analyzeSvg, type LogoData } from "@/lib/svg";
+import { analyzeSvg, normalizeLogoData, type LogoData } from "@/lib/svg";
 import { SAMPLE_SVG, SAMPLE_NAME } from "@/lib/sample";
 import { emptyPresentation, repo, type LogoPresentation } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
@@ -28,8 +28,10 @@ type State =
 
 export default function PresentationPage({
   params,
+  embedded = false,
 }: {
   params: Promise<{ id: string }>;
+  embedded?: boolean;
 }) {
   const { id } = use(params);
   const router = useRouter();
@@ -67,7 +69,7 @@ export default function PresentationPage({
             : null;
           next = {
             status: "ready",
-            logo: stored.data,
+            logo: normalizeLogoData(stored.data, stored.title),
             name: stored.title,
             mockupCandidateId: stored.primaryCandidateId ?? null,
             stored: true,
@@ -102,7 +104,8 @@ export default function PresentationPage({
     const presentationChanged =
       presentation.catchphrase !== base.catchphrase ||
       presentation.story !== base.story ||
-      JSON.stringify(presentation.sceneTexts) !== JSON.stringify(base.sceneTexts) ||
+      JSON.stringify(presentation.sceneTexts) !==
+        JSON.stringify(base.sceneTexts) ||
       JSON.stringify(presentation.layout) !== JSON.stringify(base.layout);
 
     if (!nameChanged && !presentationChanged) return;
@@ -111,8 +114,12 @@ export default function PresentationPage({
     setPres(presentation);
 
     await Promise.all([
-      nameChanged ? repo.updateLogo(id, { title: nextName }) : Promise.resolve(),
-      presentationChanged ? repo.savePresentation(id, presentation) : Promise.resolve(),
+      nameChanged
+        ? repo.updateLogo(id, { title: nextName })
+        : Promise.resolve(),
+      presentationChanged
+        ? repo.savePresentation(id, presentation)
+        : Promise.resolve(),
     ]);
   };
 
@@ -146,7 +153,7 @@ export default function PresentationPage({
       name={state.name}
       mockupLogoId={id === "sample" ? undefined : id}
       mockupCandidateId={state.mockupCandidateId ?? undefined}
-      onReset={() => router.push("/")}
+      onReset={() => router.push(embedded ? "/logos" : "/")}
       contactEmail={state.contactEmail}
       presentation={pres}
       canEdit={state.stored && state.canEdit}
@@ -157,6 +164,7 @@ export default function PresentationPage({
           ? (payload) => void handleCommitEdits(payload)
           : undefined
       }
+      embedded={embedded}
     />
   );
 }

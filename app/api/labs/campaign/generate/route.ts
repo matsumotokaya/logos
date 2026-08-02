@@ -12,10 +12,18 @@
 // Labs is local-first, and Phase 1 moves this to a real queue.
 
 import { NextResponse } from "next/server";
+import {
+  isUrlRegistrationScope,
+  type UrlRegistrationScope,
+} from "@/lib/brand-registration";
 import { guardLabsRequest } from "@/lib/labs-access";
-import { requireUser } from "@/lib/supabase/server";
+import {
+  createServerSupabaseForToken,
+  requireUser,
+} from "@/lib/supabase/server";
 import type { SourceFile } from "@/lib/campaign/creative";
 import { runCampaignPipeline } from "@/lib/campaign/pipeline";
+import { persistCampaignCatalog } from "@/lib/campaign/catalog";
 import {
   createCampaignJob,
   appendCampaignStep,
@@ -23,6 +31,8 @@ import {
   saveCampaignJobDraft,
   completeCampaignJob,
   failCampaignJob,
+  getCampaignJob,
+  saveCampaignCatalog,
 } from "@/lib/campaign/jobs";
 
 export const maxDuration = 300;
@@ -38,6 +48,8 @@ type GenerateBody = {
   description?: string;
   pastedText?: string;
   files?: { kind?: string; mediaType?: string; data?: string }[];
+  brandEntityId?: string;
+  registrationScope?: UrlRegistrationScope;
 };
 
 function parseFiles(raw: GenerateBody["files"]): SourceFile[] {
@@ -85,10 +97,30 @@ export async function POST(req: Request) {
   let url: string | null;
   let files: SourceFile[];
   let body: GenerateBody;
+  let brandEntityId: string | null = null;
+  let registrationScope: UrlRegistrationScope = "business";
   try {
     body = (await req.json()) as GenerateBody;
     url = parseUrl(body.url);
     files = parseFiles(body.files);
+    if (typeof body.brandEntityId === "string" && body.brandEntityId.trim()) {
+      const candidateId = body.brandEntityId.trim();
+      const supabase = createServerSupabaseForToken(user.token);
+      const { data: entity, error: entityError } = await supabase
+        .from("brand_entities")
+        .select("id, entity_type")
+        .eq("id", candidateId)
+        .in("entity_type", ["business", "audience"])
+        .maybeSingle();
+      if (entityError || !entity) throw new Error("選択した事業を利用できません");
+      brandEntityId = entity.id as string;
+    }
+    if (url && !brandEntityId) {
+      if (!isUrlRegistrationScope(body.registrationScope)) {
+        throw new Error("URLが企業・事業・その両方のどれに当たるか選択してください");
+      }
+      registrationScope = body.registrationScope;
+    }
     if (typeof body.pastedText === "string" && body.pastedText.length > MAX_TEXT_LENGTH)
       throw new Error("貼り付けテキストが長すぎます（2万字上限）");
     if (!url && files.length === 0 && !body.pastedText?.trim() && !body.name?.trim())
@@ -104,7 +136,10 @@ export async function POST(req: Request) {
     url,
     name: body.name?.trim() || null,
     files: files.length,
+    fileKinds: files.map((file) => file.kind),
     hasText: Boolean(body.pastedText?.trim()),
+    brandEntityId,
+    registrationScope,
   });
 
   // Detached run: progress and result live in the job store, not in this
@@ -123,7 +158,7 @@ export async function POST(req: Request) {
       onDraft: (kit, html) => saveCampaignJobDraft(job.id, { kit, html }),
     }
   )
-    .then((result) =>
+    .then(async (result) => {
       completeCampaignJob(job.id, {
         kit: result.kit,
         html: result.html,
@@ -133,8 +168,32 @@ export async function POST(req: Request) {
           verification: result.meta.verification,
           usage: result.meta.usage,
         },
-      })
-    )
+      });
+
+      const completedJob = getCampaignJob(job.id);
+      if (!completedJob) return;
+      try {
+        const catalog = await persistCampaignCatalog({
+          accessToken: user.token,
+          userId: user.id,
+          job: completedJob,
+          kit: result.kit,
+        });
+        saveCampaignCatalog(job.id, catalog);
+        appendCampaignStep(job.id, {
+          message: `catalog: ${result.kit.organization?.name ?? "運営組織（未確認）"} / ${result.kit.service.name} に登録`,
+          level: "success",
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "ブランド台帳への登録に失敗しました";
+        console.error("Campaign catalog persistence failed:", error);
+        saveCampaignCatalog(job.id, { error: message });
+        appendCampaignStep(job.id, {
+          message: "catalog: キャンペーンは完成しましたが、ブランド台帳への登録は保留されています",
+          level: "warn",
+        });
+      }
+    })
     .catch((e) => {
       console.error("Campaign generate failed:", e);
       failCampaignJob(job.id, e instanceof Error ? e.message : "生成に失敗しました");

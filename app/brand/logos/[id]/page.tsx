@@ -54,13 +54,16 @@ import {
 import AppHeader from "@/components/AppHeader";
 
 // Nice classes are edited as free text ("9, 35, 42") and parsed on save.
-type TrademarkDraft = Omit<LogoTrademark, "niceClasses"> & { niceClasses: string };
+type TrademarkDraft = Omit<LogoTrademark, "niceClasses"> & {
+  niceClasses: string;
+};
 type SubjectDraft = BrandEntityDraft;
 
 function emptySubjectDraft(name = ""): SubjectDraft {
   return {
     name,
-    entityType: "company",
+    entityType: "organization",
+    parentId: null,
     website: "",
     industry: "",
     location: "",
@@ -68,11 +71,15 @@ function emptySubjectDraft(name = ""): SubjectDraft {
   };
 }
 
-function subjectToDraft(subject: LogoAssetRegistry["subject"], fallbackName: string): SubjectDraft {
+function subjectToDraft(
+  subject: LogoAssetRegistry["subject"],
+  fallbackName: string,
+): SubjectDraft {
   return subject
     ? {
         name: subject.name,
         entityType: subject.entityType,
+        parentId: subject.parentId,
         website: subject.website,
         industry: subject.industry,
         location: subject.location,
@@ -115,7 +122,9 @@ function Card({
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-5">
       <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
-      {note && <p className="mt-0.5 text-pretty text-xs text-gray-500">{note}</p>}
+      {note && (
+        <p className="mt-0.5 text-pretty text-xs text-gray-500">{note}</p>
+      )}
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -137,16 +146,20 @@ export default function LogoInfoPage({
   const [tmDraft, setTmDraft] = useState<TrademarkDraft[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
-  const [presentation, setPresentation] = useState<LogoPresentation>(emptyPresentation());
+  const [presentation, setPresentation] =
+    useState<LogoPresentation>(emptyPresentation());
   const [assetRegistry, setAssetRegistry] =
     useState<LogoAssetRegistry>(emptyAssetRegistry());
-  const [subjectDraft, setSubjectDraft] = useState<SubjectDraft>(emptySubjectDraft());
+  const [subjectDraft, setSubjectDraft] =
+    useState<SubjectDraft>(emptySubjectDraft());
   const [subjectSaving, setSubjectSaving] = useState(false);
   const [subjectError, setSubjectError] = useState<string | null>(null);
-  const [assetCatalog, setAssetCatalog] = useState<PresentationCatalogResponse>({
-    definitions: [],
-    brokenItems: [],
-  });
+  const [assetCatalog, setAssetCatalog] = useState<PresentationCatalogResponse>(
+    {
+      definitions: [],
+      brokenItems: [],
+    },
+  );
   // Orgs the viewer can transfer this logo into (owner/admin roles).
   const [adminOrgs, setAdminOrgs] = useState<Organization[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -158,11 +171,16 @@ export default function LogoInfoPage({
         repo.getLogo(id),
         repo.listLogos(),
         hasSupabase
-          ? listMyOrgs().then((os) => os.filter((o) => o.myRole === "owner" || o.myRole === "admin"))
+          ? listMyOrgs().then((os) =>
+              os.filter((o) => o.myRole === "owner" || o.myRole === "admin"),
+            )
           : Promise.resolve([]),
         repo.getPresentation(id).catch(() => emptyPresentation()),
         repo.getAssetRegistry(id).catch(() => emptyAssetRegistry()),
-        fetchPresentationCatalog().catch(() => ({ definitions: [], brokenItems: [] })),
+        fetchPresentationCatalog().catch(() => ({
+          definitions: [],
+          brokenItems: [],
+        })),
       ]);
       if (cancelled) return;
       setLogo(l);
@@ -188,13 +206,21 @@ export default function LogoInfoPage({
   const transfer = async (orgId: string) => {
     const target = adminOrgs.find((o) => o.id === orgId);
     if (!target) return;
-    if (!window.confirm(`このロゴの所有を「${target.name || "（無名の組織）"}」に移管しますか？`)) return;
+    if (
+      !window.confirm(
+        `このロゴの所有を「${target.name || "（無名の組織）"}」に移管しますか？`,
+      )
+    )
+      return;
     await transferLogoToOrg(id, orgId);
     setLogo(await repo.getLogo(id));
   };
 
   const presentationMappings = useMemo(() => {
-    return resolvePresentationAssets(assetCatalog.definitions, presentation.layout);
+    return resolvePresentationAssets(
+      assetCatalog.definitions,
+      presentation.layout,
+    );
   }, [assetCatalog.definitions, presentation.layout]);
 
   // Persist a patch and refresh the record (activities, updatedAt) without
@@ -222,7 +248,7 @@ export default function LogoInfoPage({
         <AppHeader section="Asset Detail" />
         <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-4">
           <p className="text-sm text-gray-500">ロゴが見つかりません。</p>
-          <Link href="/assets" className="text-sm underline underline-offset-2">
+          <Link href="/logos" className="text-sm underline underline-offset-2">
             Assets へ戻る
           </Link>
         </div>
@@ -235,8 +261,10 @@ export default function LogoInfoPage({
       <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
         <AppHeader section="Asset Detail" />
         <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-4">
-          <p className="text-sm text-gray-500">このロゴを管理する権限がありません。</p>
-          <Link href="/assets" className="text-sm underline underline-offset-2">
+          <p className="text-sm text-gray-500">
+            このロゴを管理する権限がありません。
+          </p>
+          <Link href="/logos" className="text-sm underline underline-offset-2">
             Assets へ戻る
           </Link>
         </div>
@@ -258,7 +286,7 @@ export default function LogoInfoPage({
     return false;
   };
   const parentCandidates = allLogos.filter(
-    (l) => l.id !== id && !isDescendantOfSelf(l)
+    (l) => l.id !== id && !isDescendantOfSelf(l),
   );
 
   const commitTitle = () => {
@@ -355,19 +383,28 @@ export default function LogoInfoPage({
 
       <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <Link href="/assets" className="text-sm text-gray-500 hover:text-gray-900">
+          <Link
+            href="/logos"
+            className="text-sm text-gray-500 hover:text-gray-900"
+          >
             ← Assets
           </Link>
-          <a href={`/p/${logo.id}`} className="text-sm text-gray-500 hover:text-gray-900">
+          <a
+            href={`/p/${logo.id}`}
+            className="text-sm text-gray-500 hover:text-gray-900"
+          >
             プレゼンを見る →
           </a>
         </div>
 
         <div>
           <p className="text-xs text-gray-500">アセット詳細（ロゴ正本）</p>
-          <h1 className="mt-1 text-balance text-2xl font-semibold">{logo.title}</h1>
+          <h1 className="mt-1 text-balance text-2xl font-semibold">
+            {logo.title}
+          </h1>
           <p className="mt-1 text-xs text-gray-500 tabular-nums">
-            登録 {formatDateTime(logo.createdAt)} ・ 最終更新 {formatDateTime(logo.updatedAt)}
+            登録 {formatDateTime(logo.createdAt)} ・ 最終更新{" "}
+            {formatDateTime(logo.updatedAt)}
           </p>
         </div>
 
@@ -386,7 +423,9 @@ export default function LogoInfoPage({
               <span className={labelCls}>役割</span>
               <select
                 value={logo.role}
-                onChange={(e) => void patch({ role: e.target.value as LogoRole })}
+                onChange={(e) =>
+                  void patch({ role: e.target.value as LogoRole })
+                }
                 className={inputCls}
               >
                 {(Object.entries(LOGO_ROLE_LABELS) as [LogoRole, string][]).map(
@@ -394,7 +433,7 @@ export default function LogoInfoPage({
                     <option key={v} value={v}>
                       {label}
                     </option>
-                  )
+                  ),
                 )}
               </select>
             </label>
@@ -403,7 +442,9 @@ export default function LogoInfoPage({
               <select
                 value={logo.logoType ?? ""}
                 onChange={(e) =>
-                  void patch({ logoType: (e.target.value || null) as LogoType | null })
+                  void patch({
+                    logoType: (e.target.value || null) as LogoType | null,
+                  })
                 }
                 className={inputCls}
               >
@@ -413,7 +454,7 @@ export default function LogoInfoPage({
                     <option key={v} value={v}>
                       {label}
                     </option>
-                  )
+                  ),
                 )}
               </select>
             </label>
@@ -421,7 +462,9 @@ export default function LogoInfoPage({
               <span className={labelCls}>親ロゴ（グループ・シリーズ構造）</span>
               <select
                 value={logo.parentId ?? ""}
-                onChange={(e) => void patch({ parentId: e.target.value || null })}
+                onChange={(e) =>
+                  void patch({ parentId: e.target.value || null })
+                }
                 className={inputCls}
               >
                 <option value="">なし（最上位）</option>
@@ -456,7 +499,10 @@ export default function LogoInfoPage({
                 className={`${inputCls} sm:w-1/2`}
               >
                 {(
-                  Object.entries(VISIBILITY_LABELS) as [LogoVisibility, string][]
+                  Object.entries(VISIBILITY_LABELS) as [
+                    LogoVisibility,
+                    string,
+                  ][]
                 ).map(([v, label]) => (
                   <option key={v} value={v}>
                     {label}
@@ -501,7 +547,8 @@ export default function LogoInfoPage({
         >
           <div className="flex items-center justify-between gap-4">
             <p className="max-w-2xl text-sm leading-relaxed text-pretty text-gray-500">
-              Splash / Social / On-site / Merchandise / Generated に入る asset は、プレゼン本編の編集モードで切り替えられます。ここでは現在の採用状態を確認します。
+              Splash / Social / On-site / Merchandise / Generated に入る asset
+              は、プレゼン本編の編集モードで切り替えられます。ここでは現在の採用状態を確認します。
             </p>
             <a
               href={`/p/${logo.id}`}
@@ -512,21 +559,34 @@ export default function LogoInfoPage({
           </div>
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             {Object.entries(
-              presentationMappings.reduce<Record<string, string[]>>((acc, entry) => {
-                const label = getPresentationPlacement(entry.mapping.placementId).label;
-                acc[label] ??= [];
-                acc[label].push(entry.definition.title);
-                return acc;
-              }, {}),
+              presentationMappings.reduce<Record<string, string[]>>(
+                (acc, entry) => {
+                  const label = getPresentationPlacement(
+                    entry.mapping.placementId,
+                  ).label;
+                  acc[label] ??= [];
+                  acc[label].push(entry.definition.title);
+                  return acc;
+                },
+                {},
+              ),
             ).map(([placement, titles]) => (
-              <div key={placement} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <p className="font-mono text-[11px] uppercase text-gray-500">{placement}</p>
-                <p className="mt-1 text-sm text-gray-900">{titles.join(" / ")}</p>
+              <div
+                key={placement}
+                className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+              >
+                <p className="font-mono text-[11px] uppercase text-gray-500">
+                  {placement}
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {titles.join(" / ")}
+                </p>
               </div>
             ))}
             {presentationMappings.length === 0 && (
               <div className="rounded-lg border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-500">
-                まだ採用 asset がありません。プレゼン本編の編集モードで placement ごとの採用を決めてください。
+                まだ採用 asset がありません。プレゼン本編の編集モードで
+                placement ごとの採用を決めてください。
               </div>
             )}
           </div>
@@ -568,7 +628,13 @@ export default function LogoInfoPage({
                         string,
                       ][]
                     ).map(([value, label]) => (
-                      <option key={value} value={value}>
+                      <option
+                        key={value}
+                        value={value}
+                        disabled={
+                          value !== "organization" && !subjectDraft.parentId
+                        }
+                      >
                         {label}
                       </option>
                     ))}
@@ -579,7 +645,10 @@ export default function LogoInfoPage({
                   <input
                     value={subjectDraft.website}
                     onChange={(e) =>
-                      setSubjectDraft((d) => ({ ...d, website: e.target.value }))
+                      setSubjectDraft((d) => ({
+                        ...d,
+                        website: e.target.value,
+                      }))
                     }
                     className={inputCls}
                   />
@@ -589,7 +658,10 @@ export default function LogoInfoPage({
                   <input
                     value={subjectDraft.industry}
                     onChange={(e) =>
-                      setSubjectDraft((d) => ({ ...d, industry: e.target.value }))
+                      setSubjectDraft((d) => ({
+                        ...d,
+                        industry: e.target.value,
+                      }))
                     }
                     className={inputCls}
                   />
@@ -599,7 +671,10 @@ export default function LogoInfoPage({
                   <input
                     value={subjectDraft.location}
                     onChange={(e) =>
-                      setSubjectDraft((d) => ({ ...d, location: e.target.value }))
+                      setSubjectDraft((d) => ({
+                        ...d,
+                        location: e.target.value,
+                      }))
                     }
                     className={inputCls}
                   />
@@ -689,14 +764,16 @@ export default function LogoInfoPage({
                       </div>
                     ) : (
                       <p className="mt-3 text-xs text-gray-500">
-                        追加colorwayは未登録です。現在はcandidateのmaster SVGがこのlockupのoriginalです。
+                        追加colorwayは未登録です。現在はcandidateのmaster
+                        SVGがこのlockupのoriginalです。
                       </p>
                     )}
                   </div>
                 ))}
                 {assetRegistry.lockups.length === 0 && (
                   <p className="rounded-lg border border-dashed border-gray-300 bg-white p-3 text-sm text-gray-500">
-                    lockupがありません。migration後に作成されたcandidateには自動でprimary lockupが作られます。
+                    lockupがありません。migration後に作成されたcandidateには自動でprimary
+                    lockupが作られます。
                   </p>
                 )}
               </div>
@@ -714,7 +791,8 @@ export default function LogoInfoPage({
                 現在の所有:{" "}
                 <span className="font-medium text-gray-900">
                   {logo.ownerOrgId
-                    ? adminOrgs.find((o) => o.id === logo.ownerOrgId)?.name || "組織"
+                    ? adminOrgs.find((o) => o.id === logo.ownerOrgId)?.name ||
+                      "組織"
                     : "個人（あなた）"}
                 </span>
               </p>
@@ -724,7 +802,9 @@ export default function LogoInfoPage({
                   <select
                     aria-label="移管先の組織"
                     defaultValue=""
-                    onChange={(e) => e.target.value && void transfer(e.target.value)}
+                    onChange={(e) =>
+                      e.target.value && void transfer(e.target.value)
+                    }
                     className={`${inputCls} sm:w-2/3`}
                   >
                     <option value="" disabled>
@@ -789,7 +869,10 @@ export default function LogoInfoPage({
                 SVGをダウンロード
               </a>
               {fileError && (
-                <p aria-live="polite" className="text-pretty text-sm text-red-600">
+                <p
+                  aria-live="polite"
+                  className="text-pretty text-sm text-red-600"
+                >
                   {fileError}
                 </p>
               )}
@@ -859,19 +942,21 @@ export default function LogoInfoPage({
                   onChange={(e) =>
                     setCreditsDraft((d) =>
                       d.map((x, j) =>
-                        j === i ? { ...x, role: e.target.value as CreditRole } : x
-                      )
+                        j === i
+                          ? { ...x, role: e.target.value as CreditRole }
+                          : x,
+                      ),
                     )
                   }
                   className={inputCls}
                 >
-                  {(Object.entries(CREDIT_ROLE_LABELS) as [CreditRole, string][]).map(
-                    ([v, label]) => (
-                      <option key={v} value={v}>
-                        {label}
-                      </option>
-                    )
-                  )}
+                  {(
+                    Object.entries(CREDIT_ROLE_LABELS) as [CreditRole, string][]
+                  ).map(([v, label]) => (
+                    <option key={v} value={v}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
                 <input
                   value={c.name}
@@ -879,7 +964,9 @@ export default function LogoInfoPage({
                   aria-label="クレジットの名前"
                   onChange={(e) =>
                     setCreditsDraft((d) =>
-                      d.map((x, j) => (j === i ? { ...x, name: e.target.value } : x))
+                      d.map((x, j) =>
+                        j === i ? { ...x, name: e.target.value } : x,
+                      ),
                     )
                   }
                   className={inputCls}
@@ -891,15 +978,17 @@ export default function LogoInfoPage({
                   onChange={(e) =>
                     setCreditsDraft((d) =>
                       d.map((x, j) =>
-                        j === i ? { ...x, contact: e.target.value } : x
-                      )
+                        j === i ? { ...x, contact: e.target.value } : x,
+                      ),
                     )
                   }
                   className={inputCls}
                 />
                 <button
                   type="button"
-                  onClick={() => setCreditsDraft((d) => d.filter((_, j) => j !== i))}
+                  onClick={() =>
+                    setCreditsDraft((d) => d.filter((_, j) => j !== i))
+                  }
                   className="justify-self-start text-xs text-red-600 hover:text-red-800 sm:justify-self-auto"
                 >
                   削除
@@ -912,7 +1001,12 @@ export default function LogoInfoPage({
                 onClick={() =>
                   setCreditsDraft((d) => [
                     ...d,
-                    { id: crypto.randomUUID(), role: "designer", name: "", contact: "" },
+                    {
+                      id: crypto.randomUUID(),
+                      role: "designer",
+                      name: "",
+                      contact: "",
+                    },
                   ])
                 }
                 className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:border-gray-900"
@@ -940,15 +1034,22 @@ export default function LogoInfoPage({
             )}
             {tmDraft.map((t, i) => {
               const set = (p: Partial<TrademarkDraft>) =>
-                setTmDraft((d) => d.map((x, j) => (j === i ? { ...x, ...p } : x)));
+                setTmDraft((d) =>
+                  d.map((x, j) => (j === i ? { ...x, ...p } : x)),
+                );
               return (
-                <div key={t.id} className="rounded-lg border border-gray-200 p-3">
+                <div
+                  key={t.id}
+                  className="rounded-lg border border-gray-200 p-3"
+                >
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                     <label className="flex flex-col gap-1">
                       <span className={labelCls}>ステータス</span>
                       <select
                         value={t.status}
-                        onChange={(e) => set({ status: e.target.value as TrademarkStatus })}
+                        onChange={(e) =>
+                          set({ status: e.target.value as TrademarkStatus })
+                        }
                         className={inputCls}
                       >
                         {(
@@ -969,14 +1070,18 @@ export default function LogoInfoPage({
                         value={t.trademarkType ?? ""}
                         onChange={(e) =>
                           set({
-                            trademarkType: (e.target.value || null) as TrademarkType | null,
+                            trademarkType: (e.target.value ||
+                              null) as TrademarkType | null,
                           })
                         }
                         className={inputCls}
                       >
                         <option value="">未設定</option>
                         {(
-                          Object.entries(TRADEMARK_TYPE_LABELS) as [TrademarkType, string][]
+                          Object.entries(TRADEMARK_TYPE_LABELS) as [
+                            TrademarkType,
+                            string,
+                          ][]
                         ).map(([v, label]) => (
                           <option key={v} value={v}>
                             {label}
@@ -998,7 +1103,9 @@ export default function LogoInfoPage({
                       <input
                         value={t.registrationNo}
                         placeholder="第0000000号"
-                        onChange={(e) => set({ registrationNo: e.target.value })}
+                        onChange={(e) =>
+                          set({ registrationNo: e.target.value })
+                        }
                         className={inputCls}
                       />
                     </label>
@@ -1023,7 +1130,9 @@ export default function LogoInfoPage({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setTmDraft((d) => d.filter((_, j) => j !== i))}
+                    onClick={() =>
+                      setTmDraft((d) => d.filter((_, j) => j !== i))
+                    }
                     className="mt-2 text-xs text-red-600 hover:text-red-800"
                   >
                     この商標情報を削除
@@ -1063,7 +1172,10 @@ export default function LogoInfoPage({
           </div>
         </Card>
 
-        <Card title="作業履歴" note="このロゴに対する操作の記録です（担当者の記録はアカウント機能で有効になります）。">
+        <Card
+          title="作業履歴"
+          note="このロゴに対する操作の記録です（担当者の記録はアカウント機能で有効になります）。"
+        >
           {logo.activities.length === 0 ? (
             <p className="text-sm text-gray-400">履歴はまだありません。</p>
           ) : (

@@ -17,9 +17,9 @@ export interface SiteCapture {
   url: string;
   /** base64 JPEG screenshots for the VLM adjudicator */
   screenshots: {
-    desktop: string; // 1440px above-the-fold
+    desktop: string; // 1440×900 viewport, stored as 1024×640 JPEG
     fullPage: string | null; // top of the page, downscaled
-    mobile: string | null; // 390px above-the-fold
+    mobile: string | null; // 390×844 above-the-fold JPEG
   };
   evidence: CaptureEvidence;
   /** header logo element screenshot (or favicon fallback), base64 PNG */

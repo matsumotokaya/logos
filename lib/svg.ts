@@ -23,6 +23,91 @@ export type LogoData = {
   fileName?: string;
 };
 
+const FALLBACK_LOGO_COLOR = "#101012";
+const FALLBACK_VIEW_BOX: ViewBox = { x: 0, y: 0, w: 960, h: 320 };
+
+function fallbackLogoSvg(name: string): string {
+  const label = (name.trim() || "Brand")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 320"><text x="480" y="160" text-anchor="middle" dominant-baseline="middle" fill="${FALLBACK_LOGO_COLOR}" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="700">${label}</text></svg>`;
+}
+
+function validViewBox(value: ViewBox | undefined): value is ViewBox {
+  return Boolean(
+    value &&
+    Number.isFinite(value.x) &&
+    Number.isFinite(value.y) &&
+    Number.isFinite(value.w) &&
+    Number.isFinite(value.h) &&
+    value.w > 0 &&
+    value.h > 0,
+  );
+}
+
+function fallbackBrandColor(hex = FALLBACK_LOGO_COLOR): BrandColor {
+  const normalized = /^#[0-9a-f]{6}$/i.test(hex)
+    ? hex.toUpperCase()
+    : FALLBACK_LOGO_COLOR;
+  const rgb = hexToRgb(normalized);
+  return { hex: normalized, rgb, cmyk: rgbToCmyk(rgb), share: 1 };
+}
+
+function validBrandColor(value: BrandColor | undefined): value is BrandColor {
+  return Boolean(
+    value &&
+    typeof value.hex === "string" &&
+    /^#[0-9a-f]{6}$/i.test(value.hex) &&
+    Number.isFinite(value.rgb?.r) &&
+    Number.isFinite(value.rgb?.g) &&
+    Number.isFinite(value.rgb?.b) &&
+    Array.isArray(value.cmyk) &&
+    value.cmyk.length === 4,
+  );
+}
+
+/**
+ * Complete legacy or provisional logo records before rendering the presentation.
+ * Campaign-created candidates can have an SVG without the browser analysis that
+ * normal uploads persist, while raster-only candidates can have neither.
+ */
+export function normalizeLogoData(
+  raw: Partial<LogoData> | null | undefined,
+  fallbackName = "Brand",
+): LogoData {
+  const svg =
+    typeof raw?.svg === "string" && raw.svg.trim()
+      ? raw.svg
+      : fallbackLogoSvg(fallbackName);
+  const complete =
+    validViewBox(raw?.viewBox) &&
+    Array.isArray(raw?.colors) &&
+    raw.colors.length > 0 &&
+    raw.colors.every((color) => validBrandColor(color)) &&
+    Array.isArray(raw?.anchors) &&
+    Array.isArray(raw?.handles);
+  if (complete) return { ...(raw as LogoData), svg };
+
+  try {
+    return analyzeSvg(svg, raw?.fileName);
+  } catch {
+    const firstHex = Array.isArray(raw?.colors)
+      ? raw.colors[0]?.hex
+      : undefined;
+    return {
+      svg,
+      viewBox: validViewBox(raw?.viewBox) ? raw.viewBox : FALLBACK_VIEW_BOX,
+      colors: [fallbackBrandColor(firstHex)],
+      anchors: Array.isArray(raw?.anchors) ? raw.anchors : [],
+      handles: Array.isArray(raw?.handles) ? raw.handles : [],
+      fileName: raw?.fileName,
+    };
+  }
+}
+
 const SHAPE_SELECTOR =
   "path, rect, circle, ellipse, polygon, polyline, line, text";
 
@@ -37,7 +122,10 @@ function matrixApply(m: DOMMatrix, p: Pt): Pt {
 /** Parse, normalize and analyze an SVG source string. Throws with a user-facing message. */
 export function analyzeSvg(source: string, fileName?: string): LogoData {
   const doc = new DOMParser().parseFromString(source, "image/svg+xml");
-  if (doc.querySelector("parsererror") || doc.documentElement.tagName.toLowerCase() !== "svg") {
+  if (
+    doc.querySelector("parsererror") ||
+    doc.documentElement.tagName.toLowerCase() !== "svg"
+  ) {
     throw new Error("This file could not be parsed as SVG.");
   }
 
@@ -84,10 +172,16 @@ export function analyzeSvg(source: string, fileName?: string): LogoData {
       } else {
         const bb = live.getBBox();
         const pad = Math.max(bb.width, bb.height) * 0.05 || 10;
-        vb = { x: bb.x - pad, y: bb.y - pad, w: bb.width + pad * 2, h: bb.height + pad * 2 };
+        vb = {
+          x: bb.x - pad,
+          y: bb.y - pad,
+          w: bb.width + pad * 2,
+          h: bb.height + pad * 2,
+        };
       }
     }
-    if (vb.w <= 0 || vb.h <= 0) throw new Error("This SVG has no drawable area.");
+    if (vb.w <= 0 || vb.h <= 0)
+      throw new Error("This SVG has no drawable area.");
     live.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
     live.removeAttribute("width");
     live.removeAttribute("height");
@@ -181,7 +275,7 @@ export function analyzeSvg(source: string, fileName?: string): LogoData {
         const sk = parsePathD(d);
         sk.anchors.forEach((p) => anchors.push(matrixApply(m, p)));
         sk.handles.forEach((h) =>
-          handles.push({ a: matrixApply(m, h.a), c: matrixApply(m, h.c) })
+          handles.push({ a: matrixApply(m, h.a), c: matrixApply(m, h.c) }),
         );
       }
     }

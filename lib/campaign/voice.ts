@@ -26,7 +26,7 @@ import type { CmVoiceTrack } from "./cm-types";
 
 const TTS_PROVIDER = "gemini";
 const TTS_MODEL = "gemini-3.1-flash-tts-preview";
-const TTS_VOICE = "Kore"; // clear, trustworthy — the default CM narrator
+const TTS_VOICE = "Schedar"; // even delivery — the default CM narrator
 const TTS_PERSONA =
   "明るく信頼感のあるCMナレーター。テンポよく、聞き取りやすく読み上げます。";
 const MIX_SAMPLE_RATE = 24000; // Gemini TTS native rate; no resampling needed
@@ -50,11 +50,11 @@ export async function generateCmVoice(
   }
 
   const mock = process.env.CAMPAIGN_TTS_MOCK === "1";
-  if (mock) progress("voice: CAMPAIGN_TTS_MOCK=1 — プレースホルダー音声で実行", "warn");
+  if (mock) progress("開発用の音声を使用しています", "warn");
 
   const sections: { f32: Float32Array; sampleRate: number }[] = [];
   for (const [i, scene] of scenes.entries()) {
-    progress(`voice: シーン${i + 1}/${scenes.length}（${scene.role}）を音声合成中…`);
+    progress(`シーン${i + 1}/${scenes.length}のナレーションを作成中…`);
     const { pcm, sampleRate } = await synthesizeSection({
       text: speechText(scene.text),
       voice: TTS_VOICE,
@@ -111,7 +111,7 @@ export async function generateCmVoice(
   };
 
   progress(
-    `voice: 音声トラック完成（${(mix.totalMs / 1000).toFixed(1)}秒・${scenes.length}シーン・字幕${track.captions.length}件）`,
+    "ナレーションが完成しました",
     "success"
   );
 

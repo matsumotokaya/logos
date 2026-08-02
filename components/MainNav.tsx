@@ -11,7 +11,11 @@ import { useI18n } from "@/lib/i18n";
 import { usePlatformAccess } from "@/lib/use-platform-access";
 import { cn } from "@/lib/cn";
 
-export default function MainNav({ tone = "dark" }: { tone?: "dark" | "light" }) {
+export default function MainNav({
+  tone = "dark",
+}: {
+  tone?: "dark" | "light";
+}) {
   const { dict } = useI18n();
   const { enabled, loading, isSignedIn } = useAuth();
   const { canAccessLabs } = usePlatformAccess();
@@ -38,18 +42,12 @@ export default function MainNav({ tone = "dark" }: { tone?: "dark" | "light" }) 
 
   // localStorage mode has no registered identity, so it follows guest nav.
   if (enabled && !loading && isSignedIn) {
-    items.push(
-      { href: "/assets", label: dict.header.assets },
-      { href: "/brand", label: dict.header.brandManager },
-    );
+    items.push({ href: "/brands", label: "ブランド管理" });
     if (canAccessLabs) {
       // Campaigns (CM Maker) is a product surface, but generation still runs
       // on labs-gated APIs — expose it to the same audience until the public
       // funnel (Phase 1) opens.
-      items.push(
-        { href: "/campaigns", label: dict.header.campaigns },
-        { href: "/labs", label: dict.header.labs },
-      );
+      items.push({ href: "/labs", label: dict.header.labs });
     }
   }
 
@@ -63,11 +61,23 @@ export default function MainNav({ tone = "dark" }: { tone?: "dark" | "light" }) 
         onClick={() => setOpen((o) => !o)}
         className={cn(
           "flex size-8 items-center justify-center rounded-full transition-colors",
-          tone === "dark" ? "text-ink-muted hover:bg-ink/5 hover:text-ink" : "text-white/70 hover:bg-white/10 hover:text-white",
+          tone === "dark"
+            ? "text-ink-muted hover:bg-ink/5 hover:text-ink"
+            : "text-white/70 hover:bg-white/10 hover:text-white",
         )}
       >
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="size-5">
-          <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+          className="size-5"
+        >
+          <path
+            d="M4 7h16M4 12h16M4 17h16"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
         </svg>
       </button>
 

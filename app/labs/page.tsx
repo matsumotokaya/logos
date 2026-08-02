@@ -44,7 +44,7 @@ export default function LabsIndexPage() {
                   <Link
                     key={lab.slug}
                     // Graduated labs link to the product surface they became.
-                    href={lab.status === "graduated" ? "/campaigns" : `/labs/${lab.slug}`}
+                    href={lab.status === "graduated" ? "/" : `/labs/${lab.slug}`}
                     className={cn(
                       "group flex flex-col rounded-xl border bg-white p-6 transition",
                       lab.status === "active" || lab.status === "graduated"
@@ -89,7 +89,7 @@ export default function LabsIndexPage() {
                       {lab.status === "active"
                         ? "ラボに入る →"
                         : lab.status === "graduated"
-                          ? "/campaigns を開く →"
+                          ? "CM Maker を開く →"
                           : "計画を見る →"}
                     </span>
                   </Link>

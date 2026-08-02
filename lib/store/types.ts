@@ -298,20 +298,19 @@ export type AssetRun = {
   finishedAt: string | null;
 };
 
-export type BrandEntityType = "company" | "brand" | "product" | "service" | "other";
+export type BrandEntityType = "organization" | "business" | "audience";
 
 export const BRAND_ENTITY_TYPE_LABELS: Record<BrandEntityType, string> = {
-  company: "会社",
-  brand: "ブランド",
-  product: "製品",
-  service: "サービス",
-  other: "その他",
+  organization: "オーガニゼーション",
+  business: "事業・サービス",
+  audience: "対象別ブランド",
 };
 
 export type BrandEntity = {
   id: string;
   name: string;
   entityType: BrandEntityType;
+  parentId: string | null;
   website: string;
   industry: string;
   location: string;

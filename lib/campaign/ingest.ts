@@ -1,6 +1,7 @@
 import "server-only";
 
 import * as cheerio from "cheerio";
+import { fetchPublicUrl } from "@/lib/public-url";
 
 // Campaign ingest — turn a URL into raw service info for the creative stage.
 // Only what the LLM needs: text content, meta info, brand color hints.
@@ -15,15 +16,18 @@ export interface RawServiceInfo {
   colorHints: string[];
   headings: string[];
   bodyText: string;
+  /** Footer and structured organization hints are kept separately because
+   * the visible body copy often names the service but not its operator. */
+  footerText: string;
+  organizationHints: string[];
 }
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
 export async function scrapeUrl(url: string): Promise<RawServiceInfo> {
-  const res = await fetch(url, {
+  const res = await fetchPublicUrl(url, {
     headers: { "User-Agent": UA, "Accept-Language": "ja,en;q=0.8" },
-    redirect: "follow",
     signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) {
@@ -71,6 +75,13 @@ export async function scrapeUrl(url: string): Promise<RawServiceInfo> {
     if (t && t.length <= 120) headings.push(t);
   });
 
+  const footerText = $("footer")
+    .text()
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 3000);
+  const organizationHints = extractOrganizationHints($, footerText);
+
   $("script, style, noscript, svg, nav, footer").remove();
   const bodyText = $("body").text().replace(/\s+/g, " ").trim().slice(0, 8000);
 
@@ -84,7 +95,47 @@ export async function scrapeUrl(url: string): Promise<RawServiceInfo> {
     colorHints: extractColorHints(html, themeColor),
     headings: headings.slice(0, 30),
     bodyText,
+    footerText,
+    organizationHints,
   };
+}
+
+function extractOrganizationHints(
+  $: cheerio.CheerioAPI,
+  footerText: string
+): string[] {
+  const hints = new Set<string>();
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const raw = $(el).html();
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as unknown;
+      const entries = Array.isArray(parsed) ? parsed : [parsed];
+      for (const entry of entries) {
+        if (!entry || typeof entry !== "object") continue;
+        const value = entry as Record<string, unknown>;
+        const type = value["@type"];
+        const types = Array.isArray(type) ? type : [type];
+        if (!types.some((item) => typeof item === "string" && /Organization|Corporation|LocalBusiness|Person/i.test(item))) continue;
+        if (typeof value.name === "string" && value.name.trim()) {
+          hints.add(value.name.trim());
+        }
+        if (typeof value.legalName === "string" && value.legalName.trim()) {
+          hints.add(value.legalName.trim());
+        }
+      }
+    } catch {
+      // Invalid JSON-LD is common and should not block page ingestion.
+    }
+  });
+
+  for (const match of footerText.matchAll(
+    /(?:株式会社|合同会社|有限会社|一般社団法人|一般財団法人|NPO法人)[^｜|・·©]{1,60}|[^｜|・·©]{1,60}(?:株式会社|合同会社|有限会社)/g
+  )) {
+    const value = match[0].replace(/\s+/g, " ").trim();
+    if (value.length <= 80) hints.add(value);
+  }
+  return [...hints].slice(0, 8);
 }
 
 function resolveMaybe(href: string | null | undefined, base: URL): string | null {
@@ -123,7 +174,7 @@ export type FetchedImage = {
 // Fetch an image (e.g. og:image) as base64 for passing to Claude vision.
 export async function fetchImageAsBase64(url: string): Promise<FetchedImage | null> {
   try {
-    const res = await fetch(url, {
+    const res = await fetchPublicUrl(url, {
       headers: { "User-Agent": UA },
       signal: AbortSignal.timeout(15_000),
     });

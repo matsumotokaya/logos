@@ -39,6 +39,15 @@ const sampleCmScript: CmScene[] = [
 ];
 
 export const sampleCampaignKit: CampaignBrandKit = {
+  organization: {
+    name: "Logos",
+    organization_kind: "company",
+    website: null,
+    description: "ブランド情報とマーケティング成果物を一体で管理するサービスの運営主体。",
+    relationship: "same_identity",
+    confidence: "high",
+    evidence: "プロジェクト内で管理している公式サンプル",
+  },
   service: {
     name: "CM Maker",
     tagline: "URLひとつで、LPと30秒CM。",
@@ -48,7 +57,7 @@ export const sampleCampaignKit: CampaignBrandKit = {
     business_type: "saas",
     offering: "URL・資料からセールスページと紹介動画を自動生成するサービス",
     audience: "新規事業・スタートアップの立ち上げ期チーム、サービスを量産するAI開発者",
-    url: "/campaigns",
+    url: "/",
   },
   theme: "tech-glass",
   brand: {

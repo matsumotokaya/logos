@@ -3,9 +3,67 @@
 // an Authorization header). Supports single-range requests so browsers can
 // seek. The sample campaign's MP4 is a static file under public/campaigns/.
 
-import { labsDisabledResponse, labsEnabled } from "@/lib/labs-access";
+import {
+  guardLabsRequest,
+  labsDisabledResponse,
+  labsEnabled,
+} from "@/lib/labs-access";
 import { verifyLabsSignature } from "@/lib/labs-output-sign";
-import { readCampaignCmMp4 } from "@/lib/campaign/jobs";
+import { requireUser } from "@/lib/supabase/server";
+import { renderCmMp4 } from "@/lib/campaign/render-video";
+import {
+  appendCampaignStep,
+  campaignCmMp4Exists,
+  failCampaignCm,
+  finishCampaignCm,
+  getCampaignJob,
+  readCampaignCmMp4,
+  startCampaignCmRender,
+} from "@/lib/campaign/jobs";
+
+export const maxDuration = 300;
+
+// POST: explicitly export an existing browser-preview track as MP4. Keeping
+// this separate from TTS prevents a background completion from replacing the
+// Player's inputs while the owner is watching it.
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const denied = await guardLabsRequest(req);
+  if (denied) return denied;
+  const user = await requireUser(req);
+  const { id } = await params;
+  const job = getCampaignJob(id);
+
+  if (!job || job.userId !== user.id)
+    return Response.json({ error: "キャンペーンが見つかりません" }, { status: 404 });
+  if (!job.cm?.track)
+    return Response.json(
+      { error: "先に製品紹介動画を生成してください" },
+      { status: 409 }
+    );
+  if (campaignCmMp4Exists(id)) return Response.json({ jobId: id }, { status: 200 });
+  if (job.cm.status === "running")
+    return Response.json({ jobId: id }, { status: 202 });
+
+  startCampaignCmRender(id);
+  appendCampaignStep(id, { message: "MP4ファイルを作成中…", level: "info" });
+
+  void renderCmMp4(id)
+    .then(() => {
+      finishCampaignCm(id, { mp4: true });
+      appendCampaignStep(id, { message: "MP4ファイルが完成しました", level: "success" });
+    })
+    .catch((e) => {
+      console.error("Campaign MP4 render failed:", e);
+      const message = e instanceof Error ? e.message : "MP4ファイルを作成できませんでした";
+      failCampaignCm(id, message);
+      appendCampaignStep(id, { message: "MP4ファイルを作成できませんでした", level: "warn" });
+    });
+
+  return Response.json({ jobId: id }, { status: 202 });
+}
 
 export async function GET(
   req: Request,

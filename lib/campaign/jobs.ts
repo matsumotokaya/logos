@@ -7,6 +7,8 @@ import type { CampaignBrandKit, CampaignPartial } from "./schema";
 import type { CampaignCmState, CmVoiceTrack } from "./cm-types";
 import type { PipelineProgress, LlmUsageSummary } from "./pipeline";
 import type { BrandMatchJudgment } from "./creative";
+import type { CampaignCatalogLink } from "./catalog";
+import type { UrlRegistrationScope } from "@/lib/brand-registration";
 
 // Campaign job store — generation runs server-side detached from the HTTP
 // request, so closing the tab or losing the connection never loses the run:
@@ -32,7 +34,17 @@ export interface CampaignJob {
   createdAt: string;
   updatedAt: string;
   status: "running" | "done" | "error";
-  input: { url: string | null; name: string | null; files: number; hasText: boolean };
+  input: {
+    url: string | null;
+    name: string | null;
+    files: number;
+    fileKinds?: Array<"pdf" | "image">;
+    hasText: boolean;
+    /** Existing business/audience selected from the brand catalog. */
+    brandEntityId?: string | null;
+    /** Where a newly supplied URL should contribute its inferred brand data. */
+    registrationScope?: UrlRegistrationScope;
+  };
   steps: CampaignJobStep[];
   kit: CampaignBrandKit | null;
   meta: CampaignJobMeta | null;
@@ -42,6 +54,25 @@ export interface CampaignJob {
   /** Stage-by-stage artifacts while running — the UI fills the result layout
    *  progressively from these. Cleared when the final kit lands. */
   partial?: CampaignPartial | null;
+  /** Links into the canonical organization/business/logo catalog. Absent on
+   * jobs created before the brand hierarchy migration. */
+  catalog?: CampaignCatalogLink | null;
+  catalogError?: string | null;
+}
+
+export function saveCampaignCatalog(
+  id: string,
+  result: CampaignCatalogLink | { error: string }
+): void {
+  const job = getCampaignJob(id);
+  if (!job) return;
+  if ("error" in result) {
+    job.catalogError = result.error;
+  } else {
+    job.catalog = result;
+    job.catalogError = null;
+  }
+  writeJob(job);
 }
 
 const JOBS_DIR = path.join(process.cwd(), "var", "campaign-lab", "jobs");
@@ -177,6 +208,19 @@ export function saveCampaignCmVoice(
   if (!job) return;
   fs.writeFileSync(cmWavPath(id), result.wav);
   job.cm = { status: "running", error: null, track: result.track, mp4: false };
+  writeJob(job);
+}
+
+/** Start an explicit MP4 export without replacing the playable voice track. */
+export function startCampaignCmRender(id: string): void {
+  const job = getCampaignJob(id);
+  if (!job?.cm?.track) return;
+  job.cm = {
+    status: "running",
+    error: null,
+    track: job.cm.track,
+    mp4: false,
+  };
   writeJob(job);
 }
 
