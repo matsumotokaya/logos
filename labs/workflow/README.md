@@ -30,6 +30,18 @@
 - 同じ表現の改良版は同じfamilyの新versionとして並べ、各ロゴの処理状態はversionごとに判定する
 - runtime assetの暫定手動運用では、詳細ページからLogo ID・Candidate ID・asset definition ID・version・paramsをコピーし、同じworkspaceを操作できるエージェントへ渡す。Run IDは処理履歴が必要な場合だけ作成する
 
+### Device Mockups（2026-07-21）
+
+Workflow Labの`06 Web`に、端末モックアップ6定義をDraft登録した。ロゴを選択しただけでは処理せず、各カードの「作成」を押したときだけクライアント側で組み立てる。
+
+- **Parametric**: PC / Mobile / Duo。HTML・CSS・SVGで決定論的に描画し、外部APIコストなし。LP説明セクション、バナー、動画内静止画、ガイドライン向け
+- **Interactive 3D**: PC / Mobile / Duo。`model-viewer`とGLBをボタン操作後に遅延読込し、`LaptopScreen` / `PhoneScreen`へブランド画面をCanvas textureとして適用する。LPヒーロー、動画のカメラ演出、高品質静止画向け
+- placementは新設した`web.device`。全定義は`releaseStage='draft'`かつ`defaultMappings=[]`なので、Labには表示するが利用者のガイドラインへ自動採用しない
+- 各定義の`config.supportedOutputs`は`lp / video / banner / guideline`。現時点で実接続済みなのはCampaign LPで、その他は出力アダプターの接続待ち
+- 生成結果は現時点ではLab画面内だけの一時プレビュー。保存・PNG/WebP書き出し・動画フレーム化は次段階で、Production昇格前に実装する
+
+GLBは`node labs/campaign/scripts/generate-device-model.mjs`で再生成し、`public/campaigns/models/device-laptop-v1.glb` / `device-mobile-v1.glb` / `device-duo-v1.glb`へ出力する。Campaign LPとWorkflow Labが同じ原盤を使う。
+
 ### Runtime assetの暫定手動運用
 
 永続ワーカー導入前の正本手順は [Labs↔ロゴ正本エンティティ統合 §4](../../docs/logo-entity-lab-integration.md#4-ランタイムassetの暫定手動運用)。ネオンv1では `/labs/workflow/workflow-neon-sign-v1` で正本ロゴを選び、`依頼情報をコピー`した全文を新しいローカルエージェントセッションへ渡す。

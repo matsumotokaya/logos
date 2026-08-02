@@ -2,8 +2,12 @@
 
 import { darken, hairlineOn, isDark, luminance } from "@/lib/color";
 import { svgToDataUri } from "@/lib/svg";
-import type { BuiltinMockupKind } from "@/lib/presentation-mockups";
+import {
+  isDeviceMockupKind,
+  type BuiltinMockupKind,
+} from "@/lib/presentation-mockups";
 import { slugify, type SceneProps } from "@/components/scenes/shared";
+import DeviceMockupBuilder from "@/components/mockups/DeviceMockupBuilder";
 
 const TSHIRT_PRINT = { left: 41.5, top: 36, width: 16 };
 
@@ -24,6 +28,10 @@ export default function BuiltinMockupArt({
   scene: SceneProps;
   className?: string;
 }) {
+  if (isDeviceMockupKind(kind)) {
+    return <DeviceMockupBuilder kind={kind} scene={scene} className={className} />;
+  }
+
   switch (kind) {
     case "social-card":
       return <SocialCardArt scene={scene} className={className} />;

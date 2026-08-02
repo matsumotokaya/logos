@@ -5,19 +5,44 @@ import { useI18n } from "@/lib/i18n";
 import Reveal from "./Reveal";
 import { SectionIntro, type SceneProps } from "./shared";
 
-const MAX_MARKS = 800;
+// Every mark of a normal logo is drawn. Only pathological files (tens of
+// thousands of points) reach this DOM-node ceiling — an anchor costs 1 node,
+// a handle 2 (line + control circle) — that keeps the browser from choking on,
+// say, a 100k-point trace. Well above any real logo (the dense "BOMB squad"
+// sample is ~16k nodes), so in practice nothing is dropped.
+const MAX_NODES = 24000;
 
 // Drafting marks on the white sheet, all derived from the ink scale.
 const GRID_LINE = "rgba(16,16,18,0.05)";
 const HANDLE_LINE = "rgba(16,16,18,0.28)";
+
+// Take at most `max` items spread evenly across the array, so when the ceiling
+// bites the whole mark stays represented instead of being cut off partway.
+function sampleEven<T>(items: T[], max: number): T[] {
+  if (items.length <= max) return items;
+  const step = items.length / max;
+  const out: T[] = [];
+  for (let i = 0; i < max; i++) out.push(items[Math.floor(i * step)]);
+  return out;
+}
 
 export default function Construction({ logo }: SceneProps) {
   const { dict, format } = useI18n();
   const { viewBox } = logo;
   const s = Math.max(viewBox.w, viewBox.h);
   const hasSkeleton = logo.anchors.length > 0;
-  const handles = logo.handles.slice(0, MAX_MARKS);
-  const anchors = logo.anchors.slice(0, MAX_MARKS);
+  // Draw everything unless the combined node count exceeds the ceiling; then
+  // scale both sets down by the same ratio and sample each evenly.
+  const totalNodes = logo.anchors.length + logo.handles.length * 2;
+  const ratio = totalNodes > MAX_NODES ? MAX_NODES / totalNodes : 1;
+  const handles = sampleEven(
+    logo.handles,
+    Math.floor(logo.handles.length * ratio),
+  );
+  const anchors = sampleEven(
+    logo.anchors,
+    Math.floor(logo.anchors.length * ratio),
+  );
 
   return (
     <section className="flex min-h-dvh flex-col justify-center bg-paper">

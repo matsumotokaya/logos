@@ -19,6 +19,12 @@ export type BuiltinMockupKind =
   | "social-card"
   | "staff-badge"
   | "tshirt"
+  | "device-laptop-parametric"
+  | "device-mobile-parametric"
+  | "device-duo-parametric"
+  | "device-laptop-3d"
+  | "device-mobile-3d"
+  | "device-duo-3d"
   | "generated-mug"
   | "generated-tote"
   | "generated-cap";
@@ -76,6 +82,144 @@ export const BUILTIN_PRESENTATION_MOCKUPS: BuiltinPresentationMockup[] = [
     impressions: ["公式", "親しみ"],
     presentationAdopted: true,
     presentationOrder: 10,
+  },
+  {
+    id: "workflow-device-laptop-parametric-v1",
+    familyId: "workflow-device-laptop-parametric",
+    version: 1,
+    releaseStage: "draft",
+    assetKind: "mockup",
+    rendererKind: "device-parametric",
+    kind: "builtin",
+    builtinKind: "device-laptop-parametric",
+    title: "PCモックアップ",
+    scene: "web",
+    templateCategory: "screen",
+    category: "スクリーン",
+    sourceLab: "workflow",
+    allowedPlacements: ["web.device"],
+    defaultMappings: [],
+    config: deviceMockupConfig("laptop", "parametric"),
+    notesJa:
+      "選択中のロゴとブランドカラーから、軽量なPC画面を手動で組み立てる。LP説明、バナー、動画内静止画、ガイドラインへの書き出しを想定。",
+    impressions: ["軽量", "汎用", "PC"],
+    presentationAdopted: false,
+    presentationOrder: 10,
+  },
+  {
+    id: "workflow-device-mobile-parametric-v1",
+    familyId: "workflow-device-mobile-parametric",
+    version: 1,
+    releaseStage: "draft",
+    assetKind: "mockup",
+    rendererKind: "device-parametric",
+    kind: "builtin",
+    builtinKind: "device-mobile-parametric",
+    title: "モバイルモックアップ",
+    scene: "web",
+    templateCategory: "screen",
+    category: "スクリーン",
+    sourceLab: "workflow",
+    allowedPlacements: ["web.device"],
+    defaultMappings: [],
+    config: deviceMockupConfig("mobile", "parametric"),
+    notesJa:
+      "選択中のロゴとブランドカラーから、軽量なモバイル画面を手動で組み立てる。縦長バナーや動画、ガイドラインへの書き出しを想定。",
+    impressions: ["軽量", "汎用", "モバイル"],
+    presentationAdopted: false,
+    presentationOrder: 20,
+  },
+  {
+    id: "workflow-device-duo-parametric-v1",
+    familyId: "workflow-device-duo-parametric",
+    version: 1,
+    releaseStage: "draft",
+    assetKind: "mockup",
+    rendererKind: "device-parametric",
+    kind: "builtin",
+    builtinKind: "device-duo-parametric",
+    title: "PC＋モバイルモックアップ",
+    scene: "web",
+    templateCategory: "screen",
+    category: "スクリーン",
+    sourceLab: "workflow",
+    allowedPlacements: ["web.device"],
+    defaultMappings: [],
+    config: deviceMockupConfig("duo", "parametric"),
+    notesJa:
+      "PCとモバイルを重ねた汎用キービジュアル。軽量なためLPの説明セクション、バナー、動画、ガイドラインへ展開しやすい。",
+    impressions: ["軽量", "キービジュアル", "レスポンシブ"],
+    presentationAdopted: false,
+    presentationOrder: 30,
+  },
+  {
+    id: "workflow-device-laptop-3d-v1",
+    familyId: "workflow-device-laptop-3d",
+    version: 1,
+    releaseStage: "draft",
+    assetKind: "mockup",
+    rendererKind: "model-viewer",
+    kind: "builtin",
+    builtinKind: "device-laptop-3d",
+    title: "PCモックアップ（3D）",
+    scene: "web",
+    templateCategory: "screen",
+    category: "スクリーン",
+    sourceLab: "workflow",
+    allowedPlacements: ["web.device"],
+    defaultMappings: [],
+    config: deviceMockupConfig("laptop", "3d"),
+    notesJa:
+      "画面テクスチャをGLBへ差し替える操作可能なPCモックアップ。LPヒーロー、動画カメラ演出、高品質静止画を想定。",
+    impressions: ["3D", "金属", "インタラクティブ"],
+    presentationAdopted: false,
+    presentationOrder: 40,
+  },
+  {
+    id: "workflow-device-mobile-3d-v1",
+    familyId: "workflow-device-mobile-3d",
+    version: 1,
+    releaseStage: "draft",
+    assetKind: "mockup",
+    rendererKind: "model-viewer",
+    kind: "builtin",
+    builtinKind: "device-mobile-3d",
+    title: "モバイルモックアップ（3D）",
+    scene: "web",
+    templateCategory: "screen",
+    category: "スクリーン",
+    sourceLab: "workflow",
+    allowedPlacements: ["web.device"],
+    defaultMappings: [],
+    config: deviceMockupConfig("mobile", "3d"),
+    notesJa:
+      "画面テクスチャをGLBへ差し替える操作可能なモバイルモックアップ。縦型動画、アプリ紹介、静止画出力を想定。",
+    impressions: ["3D", "モバイル", "インタラクティブ"],
+    presentationAdopted: false,
+    presentationOrder: 50,
+  },
+  {
+    id: "workflow-device-duo-3d-v1",
+    familyId: "workflow-device-duo-3d",
+    version: 1,
+    releaseStage: "draft",
+    assetKind: "mockup",
+    rendererKind: "model-viewer",
+    kind: "builtin",
+    builtinKind: "device-duo-3d",
+    title: "PC＋モバイルモックアップ（3D）",
+    scene: "web",
+    templateCategory: "screen",
+    category: "スクリーン",
+    sourceLab: "workflow",
+    allowedPlacements: ["web.device"],
+    defaultMappings: [],
+    config: deviceMockupConfig("duo", "3d"),
+    notesJa:
+      "PCとモバイルを同一シーンに置いた操作可能な3Dキービジュアル。LPヒーローと動画の主要カットを想定。",
+    impressions: ["3D", "キービジュアル", "インタラクティブ"],
+    presentationAdopted: false,
+    presentationOrder: 60,
   },
   {
     id: "staff-badge",
@@ -183,6 +327,28 @@ export const BUILTIN_PRESENTATION_MOCKUPS: BuiltinPresentationMockup[] = [
     presentationOrder: 30,
   },
 ];
+
+const DEVICE_MOCKUP_KIND_SET = new Set<BuiltinMockupKind>([
+  "device-laptop-parametric",
+  "device-mobile-parametric",
+  "device-duo-parametric",
+  "device-laptop-3d",
+  "device-mobile-3d",
+  "device-duo-3d",
+]);
+
+export function isDeviceMockupKind(kind: BuiltinMockupKind): boolean {
+  return DEVICE_MOCKUP_KIND_SET.has(kind);
+}
+
+function deviceMockupConfig(device: "laptop" | "mobile" | "duo", renderer: "parametric" | "3d") {
+  return {
+    manual: true,
+    device,
+    renderer,
+    supportedOutputs: ["lp", "video", "banner", "guideline"],
+  };
+}
 
 export const RUNTIME_PRESENTATION_MOCKUPS: RuntimePresentationMockup[] = [
   {

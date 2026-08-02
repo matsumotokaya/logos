@@ -102,11 +102,12 @@ function placementIdForScene(scene: PresentationScene): PresentationPlacementId 
       return "generated.tile";
     case "identity":
       return "splash.hero";
+    case "web":
+      return "web.device";
     case "construction":
     case "color":
     case "usage":
     case "appIcon":
-    case "web":
     case "merch":
     default:
       return "merch.primary";

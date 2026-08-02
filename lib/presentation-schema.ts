@@ -14,6 +14,7 @@ export const PRESENTATION_ASSET_RELEASE_LABELS: Record<
 
 export type PresentationPlacementId =
   | "splash.hero"
+  | "web.device"
   | "social.primary"
   | "onsite.primary"
   | "merch.primary"
@@ -35,6 +36,12 @@ export const PRESENTATION_PLACEMENTS: Record<
     scene: "identity",
     label: "Splash hero",
     multiple: false,
+  },
+  "web.device": {
+    id: "web.device",
+    scene: "web",
+    label: "Device mockup",
+    multiple: true,
   },
   "social.primary": {
     id: "social.primary",
@@ -64,6 +71,7 @@ export const PRESENTATION_PLACEMENTS: Record<
 
 const PRESENTATION_PLACEMENT_ORDER: PresentationPlacementId[] = [
   "splash.hero",
+  "web.device",
   "social.primary",
   "onsite.primary",
   "merch.primary",

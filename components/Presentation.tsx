@@ -5,7 +5,6 @@ import { recolorSvg, type LogoData } from "@/lib/svg";
 import { SERVICE_NAME } from "@/lib/config";
 import { emptyPresentation, type LogoPresentation } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
-import { cn } from "@/lib/cn";
 import {
   fetchPresentationCatalog,
   type PresentationCatalogResponse,
@@ -49,6 +48,8 @@ type Props = {
     name: string;
     presentation: LogoPresentation;
   }) => void | Promise<void>;
+  /** Hide the product header when rendered inside the management shell. */
+  embedded?: boolean;
 };
 
 function applyPresentationPatch(
@@ -80,6 +81,7 @@ export default function Presentation({
   isSignedIn = false,
   onRequestSignIn,
   onCommitEdits,
+  embedded = false,
 }: Props) {
   const { dict, format } = useI18n();
   const [editing, setEditing] = useState(false);
@@ -88,13 +90,14 @@ export default function Presentation({
   const [draftPresentation, setDraftPresentation] = useState<LogoPresentation>(
     presentation ?? emptyPresentation(),
   );
-  const [assetCatalog, setAssetCatalog] = useState<PresentationCatalogResponse | null>(null);
+  const [assetCatalog, setAssetCatalog] =
+    useState<PresentationCatalogResponse | null>(null);
   const variants = useMemo<Variants>(
     () => ({
       white: recolorSvg(logo.svg, "#F4F4F2"),
       black: recolorSvg(logo.svg, "#101012"),
     }),
-    [logo.svg]
+    [logo.svg],
   );
 
   const sourcePresentation = presentation ?? emptyPresentation();
@@ -117,12 +120,14 @@ export default function Presentation({
         Object.entries(activePresentation.sceneTexts ?? {}).map(([slug, t]) => [
           slug,
           t.lead,
-        ])
+        ]),
       ),
       save: (patch: PresentationPatch) =>
-        setDraftPresentation((current) => applyPresentationPatch(current, patch)),
+        setDraftPresentation((current) =>
+          applyPresentationPatch(current, patch),
+        ),
     }),
-    [activePresentation, editable, editing]
+    [activePresentation, editable, editing],
   );
 
   useEffect(() => {
@@ -150,9 +155,15 @@ export default function Presentation({
 
   const assetDefinitions = assetCatalog?.definitions ?? [];
 
-  const socialEntries = mockupEntries.filter((entry) => entry.placement.scene === "social");
-  const onsiteEntries = mockupEntries.filter((entry) => entry.placement.scene === "onsite");
-  const merchEntries = mockupEntries.filter((entry) => entry.placement.scene === "merch");
+  const socialEntries = mockupEntries.filter(
+    (entry) => entry.placement.scene === "social",
+  );
+  const onsiteEntries = mockupEntries.filter(
+    (entry) => entry.placement.scene === "onsite",
+  );
+  const merchEntries = mockupEntries.filter(
+    (entry) => entry.placement.scene === "merch",
+  );
   const generatedEntries = mockupEntries.filter(
     (entry) => entry.placement.scene === "generated",
   );
@@ -184,122 +195,129 @@ export default function Presentation({
     }
   };
 
+  const presentationActions = (
+    <>
+      {editable ? (
+        <button
+          type="button"
+          onClick={() => void handleEditButton()}
+          aria-pressed={editing}
+          className="bg-ink px-4 py-1.5 text-sm font-medium text-paper hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:pointer-events-none disabled:opacity-60"
+          disabled={saving}
+        >
+          {editing ? dict.header.editDone : dict.header.edit}
+        </button>
+      ) : null}
+      {editing ? (
+        <input
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          aria-label={dict.header.brandName}
+          className="w-40 border-b border-hairline bg-transparent px-1 py-1.5 text-sm focus:border-ink focus:outline-none"
+        />
+      ) : (
+        <p className="max-w-40 truncate font-mono text-xs uppercase text-ink-muted">
+          {activeName}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={onReset}
+        className="bg-ink px-4 py-1.5 text-sm font-medium text-paper hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+      >
+        {embedded ? "ロゴ一覧" : dict.header.newLogo}
+      </button>
+    </>
+  );
+
   return (
     <main className="bg-paper text-ink">
-      <AppHeader
-        sticky
-        section={`${dict.doc.brandGuidelines} — ${name}`}
-        actions={
-          <>
-            {editable && (
-              <button
-                type="button"
-                onClick={() => void handleEditButton()}
-                aria-pressed={editing}
-                className={cn(
-                  "bg-ink px-4 py-1.5 text-sm font-medium text-paper transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-60",
-                )}
-                disabled={saving}
-              >
-                {editing ? dict.header.editDone : dict.header.edit}
-              </button>
-            )}
-            {editing ? (
-              <input
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-                aria-label={dict.header.brandName}
-                className="w-40 border-b border-hairline bg-transparent px-1 py-1.5 text-sm focus:border-ink focus:outline-none"
-              />
-            ) : (
-              <p className="max-w-40 truncate font-mono text-xs uppercase text-ink-muted">
-                {activeName}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={onReset}
-              className="bg-ink px-4 py-1.5 text-sm font-medium text-paper transition-colors hover:bg-accent"
-            >
-              {dict.header.newLogo}
-            </button>
-          </>
-        }
-      />
+      {!embedded ? (
+        <AppHeader
+          sticky
+          section={`${dict.doc.brandGuidelines} — ${name}`}
+          actions={presentationActions}
+        />
+      ) : null}
+      {embedded ? (
+        <div className="sticky top-0 z-20 flex flex-wrap items-center justify-end gap-3 border-b border-hairline bg-paper px-6 py-2.5 md:px-10">
+          {presentationActions}
+        </div>
+      ) : null}
 
       <PresentationEditProvider value={editCtx}>
-      {editable && editing && (
-        <PresentationLayoutEditor
-          definitions={assetDefinitions}
-          layout={activePresentation.layout ?? emptyPresentation().layout}
-          onSaveLayout={(layout) =>
-            setDraftPresentation((current) =>
-              applyPresentationPatch(current, { layout }),
-            )
-          }
-        />
-      )}
-      <Splash {...scene} />
-      <Contents />
-      {/* Anchor wrappers for the table of contents; offset for the sticky header. */}
-      <div id="s01" className="scroll-mt-16">
-        <Identity {...scene} />
-      </div>
-      <div id="s02" className="scroll-mt-16">
-        <Construction {...scene} />
-      </div>
-      <div id="s03" className="scroll-mt-16">
-        <Palette {...scene} />
-      </div>
-      <div id="s04" className="scroll-mt-16">
-        <UsageGrid {...scene} />
-      </div>
-      <div id="s05" className="scroll-mt-16">
-        <AppIcons {...scene} />
-      </div>
-      <div id="s06" className="scroll-mt-16">
-        <Browser {...scene} />
-      </div>
-      <div id="s07" className="scroll-mt-16">
-        <MockupScene
-          n="07"
-          title={dict.scenes.social}
-          lead={dict.sections.social.lead}
-          slug="social"
-          scene={scene}
-          entries={socialEntries}
-        />
-      </div>
-      <div id="s08" className="scroll-mt-16">
-        <MockupScene
-          n="08"
-          title={dict.scenes.onsite}
-          lead={dict.sections.onsite.lead}
-          slug="onsite"
-          scene={scene}
-          entries={onsiteEntries}
-        />
-      </div>
-      <div id="s09" className="scroll-mt-16">
-        <MockupScene
-          n="09"
-          title={dict.scenes.merch}
-          lead={dict.sections.merch.lead}
-          slug="merch"
-          scene={scene}
-          entries={merchEntries}
-        />
-      </div>
-      <div id="s10" className="scroll-mt-16">
-        <MockupScene
-          n="10"
-          title={dict.scenes.generated}
-          lead={dict.sections.generated.lead}
-          slug="generated"
-          scene={scene}
-          entries={generatedEntries}
-        />
-      </div>
+        {editable && editing && (
+          <PresentationLayoutEditor
+            definitions={assetDefinitions}
+            layout={activePresentation.layout ?? emptyPresentation().layout}
+            onSaveLayout={(layout) =>
+              setDraftPresentation((current) =>
+                applyPresentationPatch(current, { layout }),
+              )
+            }
+          />
+        )}
+        <Splash {...scene} />
+        <Contents />
+        {/* Anchor wrappers for the table of contents; offset for the sticky header. */}
+        <div id="s01" className="scroll-mt-16">
+          <Identity {...scene} />
+        </div>
+        <div id="s02" className="scroll-mt-16">
+          <Construction {...scene} />
+        </div>
+        <div id="s03" className="scroll-mt-16">
+          <Palette {...scene} />
+        </div>
+        <div id="s04" className="scroll-mt-16">
+          <UsageGrid {...scene} />
+        </div>
+        <div id="s05" className="scroll-mt-16">
+          <AppIcons {...scene} />
+        </div>
+        <div id="s06" className="scroll-mt-16">
+          <Browser {...scene} />
+        </div>
+        <div id="s07" className="scroll-mt-16">
+          <MockupScene
+            n="07"
+            title={dict.scenes.social}
+            lead={dict.sections.social.lead}
+            slug="social"
+            scene={scene}
+            entries={socialEntries}
+          />
+        </div>
+        <div id="s08" className="scroll-mt-16">
+          <MockupScene
+            n="08"
+            title={dict.scenes.onsite}
+            lead={dict.sections.onsite.lead}
+            slug="onsite"
+            scene={scene}
+            entries={onsiteEntries}
+          />
+        </div>
+        <div id="s09" className="scroll-mt-16">
+          <MockupScene
+            n="09"
+            title={dict.scenes.merch}
+            lead={dict.sections.merch.lead}
+            slug="merch"
+            scene={scene}
+            entries={merchEntries}
+          />
+        </div>
+        <div id="s10" className="scroll-mt-16">
+          <MockupScene
+            n="10"
+            title={dict.scenes.generated}
+            lead={dict.sections.generated.lead}
+            slug="generated"
+            scene={scene}
+            entries={generatedEntries}
+          />
+        </div>
       </PresentationEditProvider>
 
       <footer className="flex items-center justify-between border-t border-hairline px-6 py-10 md:px-12">

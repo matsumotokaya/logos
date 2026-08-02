@@ -18,6 +18,7 @@ import {
 } from "@/labs/motion/core/notes-store";
 import type { WorkflowCatalogItem } from "@/labs/workflow/core/catalog";
 import { scenePropsFromLabLogo } from "@/labs/workflow/core/scene-props";
+import { isDeviceMockupKind } from "@/lib/presentation-mockups";
 import { noteKey } from "./TemplateCard";
 
 export default function WorkflowMockupCard({
@@ -48,6 +49,8 @@ export default function WorkflowMockupCard({
   }
 
   const definition = item.definition;
+  const hasInteractivePreview =
+    definition.kind === "builtin" && isDeviceMockupKind(definition.builtinKind);
   const content = (
     <article
       className={cn(
@@ -65,7 +68,7 @@ export default function WorkflowMockupCard({
         <BuiltinMockupArt
           kind={definition.builtinKind}
           scene={scene}
-          className="flex min-h-[20rem] flex-col justify-center"
+          className={hasInteractivePreview ? undefined : "flex min-h-[20rem] flex-col justify-center"}
         />
       ) : (
         <WorkflowTemplateArt
@@ -92,7 +95,16 @@ export default function WorkflowMockupCard({
                 {"★".repeat(note.rating)}
               </span>
             ) : null}
-            <span className="mt-2 block text-xs text-accent">詳細を見る →</span>
+            {hasInteractivePreview ? (
+              <Link
+                href={`/labs/workflow/${item.id}`}
+                className="mt-2 block text-xs text-accent hover:underline"
+              >
+                詳細を見る →
+              </Link>
+            ) : (
+              <span className="mt-2 block text-xs text-accent">詳細を見る →</span>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5 text-[10px] text-ink-muted">
@@ -129,6 +141,8 @@ export default function WorkflowMockupCard({
       </div>
     </article>
   );
+
+  if (hasInteractivePreview) return content;
 
   return (
     <Link

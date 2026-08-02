@@ -99,6 +99,8 @@ function sceneTitle(
   switch (scene) {
     case "social":
       return dict.scenes.social;
+    case "web":
+      return dict.scenes.web;
     case "onsite":
       return dict.scenes.onsite;
     case "merch":
@@ -117,6 +119,8 @@ function sceneLead(
   switch (scene) {
     case "social":
       return dict.sections.social.lead;
+    case "web":
+      return dict.sections.web.lead;
     case "onsite":
       return dict.sections.onsite.lead;
     case "merch":
