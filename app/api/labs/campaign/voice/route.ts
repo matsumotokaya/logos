@@ -2,7 +2,8 @@
 // job, as a detached run — same reload-safe pattern as /generate. Progress
 // lines land in the job's step log; the result (scene/caption timings) is
 // stored on the job, the WAV next to it. The Player composes the preview in
-// the browser; MP4 export is a separate explicit action.
+// the browser, and the MP4 export follows in the same run so that every
+// surface outside this app has a video to show.
 //
 // Explicit user action by design (TTS costs money), mirroring scene 10's
 // manual mockup generation.
@@ -19,6 +20,7 @@ import {
   finishCampaignCm,
   failCampaignCm,
 } from "@/lib/campaign/jobs";
+import { renderCmMp4 } from "@/lib/campaign/render-video";
 
 export const maxDuration = 300;
 
@@ -73,18 +75,43 @@ export async function POST(req: Request) {
   startCampaignCm(jobId);
   appendCampaignStep(jobId, { message: "製品紹介動画の生成を開始しました", level: "info" });
 
-  // Detached voice generation. MP4 export is intentionally separate so a
-  // background render cannot interrupt someone watching the Player preview.
+  // Detached voice generation, then the MP4 without a second button press.
+  // The Player preview and the MP4 are two representations of one video: the
+  // Player runs only where React runs (this app), so every other surface — the
+  // LP embed, downloads — needs the file. Splitting them behind separate
+  // actions is what let the management screen call a CM "done" while its LP
+  // still offered to generate one.
   void generateCmVoice(kit, (message, level) =>
     appendCampaignStep(jobId, { message, level: level ?? "info" })
   )
     .then(async (result) => {
+      // Leaves cm.track in place, so the Player is watchable from here on and
+      // the render below never disturbs someone already watching it.
       saveCampaignCmVoice(jobId, result);
-      finishCampaignCm(jobId, { mp4: false });
       appendCampaignStep(jobId, {
         message: "製品紹介動画のプレビューが完成しました",
         level: "success",
       });
+
+      appendCampaignStep(jobId, { message: "MP4ファイルを作成中…", level: "info" });
+      try {
+        await renderCmMp4(jobId);
+        finishCampaignCm(jobId, { mp4: true });
+        appendCampaignStep(jobId, {
+          message: "MP4ファイルが完成しました",
+          level: "success",
+        });
+      } catch (e) {
+        // A host without headless Chrome (Vercel serverless) cannot export.
+        // That is not a failed CM — the preview stands on its own, so the job
+        // completes and only the MP4-dependent surfaces keep waiting.
+        console.error("Campaign MP4 render failed:", e);
+        finishCampaignCm(jobId, { mp4: false });
+        appendCampaignStep(jobId, {
+          message: "MP4ファイルは作成できませんでした（プレビューはご覧いただけます）",
+          level: "warn",
+        });
+      }
     })
     .catch((e) => {
       console.error("Campaign voice failed:", e);

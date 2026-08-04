@@ -171,14 +171,39 @@ function deviceMockupHtml(
   }</div>`;
 }
 
-function heroModelHtml(
+// SSOT: one device mockup implementation, used by every surface that shows
+// "this service on a laptop and a phone" — the LP hero, the feature visuals,
+// and the management thumbnail (which iframes this same HTML).
+//
+// There used to be a second one here: a model-viewer/GLB hero that only ran
+// where scripts are allowed. The thumbnail's sandboxed iframe silently fell
+// back to the markup below, so the same page rendered two different key
+// visuals and only the 3D one carried the bugs (inverted screens, the phone
+// intersecting the laptop, corners cropped on rotation). Do not reintroduce a
+// script-dependent hero: whatever renders here must render identically in a
+// sandboxed iframe. The 3D device work continues in Workflow Lab as a Draft
+// asset (docs/device-mockup-fixes.md).
+function heroVisualHtml(
   screens: { desktop?: CampaignScreenAsset | null; mobile?: CampaignScreenAsset | null },
   serviceName: string
 ): string {
-  return `<div class="hero-model-stage">
-    <div class="hero-model-fallback">${deviceMockupHtml("duo", screens, serviceName)}</div>
-    <model-viewer class="hero-model" src="/campaigns/models/device-duo-v1.glb" alt="${esc(serviceName)} のPC・モバイル3Dモックアップ" camera-controls touch-action="pan-y" disable-zoom interaction-prompt="none" camera-orbit="-8deg 67deg 6.4m" field-of-view="30deg" shadow-intensity="1.1" shadow-softness=".85" exposure="1.05" tone-mapping="neutral"></model-viewer>
-  </div>`;
+  return `<div class="hero-model-stage">${deviceMockupHtml("duo", screens, serviceName)}</div>`;
+}
+
+// "120+" / "3秒" / "約3分" — separate the figure from the characters around it
+// so each can be sized on its own. The Latin figures and the Japanese unit come
+// from different families in the captured font stack; at one size and weight
+// that reads as a rendering fault rather than as typography.
+// Values with no figure at all pass through untouched.
+export function statValueHtml(value: string): string {
+  // Lazy prefix so "約3分" splits into 約 / 3 / 分 rather than leaving the
+  // kanji to fight the figure at the same size and weight.
+  const match = /^(\D*?)([+-]?[\d０-９][\d０-９.,]*)(.*)$/.exec(value.trim());
+  if (!match) return `<span class="n">${esc(value.trim())}</span>`;
+  const [, prefix, figure, suffix] = match;
+  const unit = (part: string) =>
+    part.trim() ? `<span class="u">${esc(part.trim())}</span>` : "";
+  return `${unit(prefix)}<span class="n">${esc(figure)}</span>${unit(suffix)}`;
 }
 
 // Feature illustrations, cycled by index. Consistent 4:3 stroke-based style.
@@ -255,35 +280,36 @@ export function cmVideoEmbed(src: string): string {
   return `<video controls playsinline preload="metadata" src="${esc(src)}"></video>`;
 }
 
-/** Owner-facing action shown in a generated LP until its CM is available. */
-export function cmVideoAction(href: string): string {
-  return `<div class="video-empty"><a class="video-generate" href="${esc(href)}">製品紹介動画を生成</a></div>`;
-}
+const VIDEO_SLOT = /<!--cm-video-slot-->[\s\S]*?<!--\/cm-video-slot-->/;
+// Job HTML stored before the marker existed still carries the bare placeholder.
+const LEGACY_VIDEO_SLOT = /<div class="video-slot">(?:<span>[^<]*<\/span>|[\s\S]*?)<\/div>/;
 
 /**
  * Swap the LP's video-slot placeholder for the real CM embed at serve time.
  * Stored job HTML predates the MP4, and signed video URLs expire, so the
  * embed can never be baked into the stored document — /c/[id] injects it on
- * every response instead. HTML from before the marker existed is returned
- * unchanged.
+ * every response instead.
  */
 export function injectCmVideo(html: string, src: string): string {
   const embed = `<div class="video-slot">${cmVideoEmbed(src)}</div>`;
-  const marked = /<!--cm-video-slot-->[\s\S]*?<!--\/cm-video-slot-->/;
-  if (marked.test(html)) return html.replace(marked, embed);
-  // Job HTML stored before the marker existed: replace the bare placeholder.
-  return html.replace(/<div class="video-slot"><span>[^<]*<\/span><\/div>/, embed);
+  if (VIDEO_SLOT.test(html))
+    return html.replace(VIDEO_SLOT, `<!--cm-video-slot-->${embed}<!--/cm-video-slot-->`);
+  return html.replace(LEGACY_VIDEO_SLOT, embed);
 }
 
-/** Add the authenticated generation entry point to an unrendered LP slot. */
-export function injectCmVideoAction(html: string, href: string): string {
-  const action = `<!--cm-video-slot--><div class="video-slot">${cmVideoAction(href)}</div><!--/cm-video-slot-->`;
-  const marked = /<!--cm-video-slot-->[\s\S]*?<!--\/cm-video-slot-->/;
-  if (marked.test(html)) return html.replace(marked, action);
-  return html.replace(
-    /<div class="video-slot"><span>[^<]*<\/span><\/div>/,
-    `<div class="video-slot">${cmVideoAction(href)}</div>`
-  );
+/**
+ * Leave no video section at all while the MP4 does not exist yet.
+ *
+ * The LP is one source of truth about the video: it shows the CM when there is
+ * an MP4 to show, and otherwise says nothing. It must never offer to *generate*
+ * one — generation belongs to the authenticated management surface, and an LP
+ * button for it made the same CM look ungenerated here while the management
+ * screen already called it done.
+ */
+export function removeCmVideoSlot(html: string): string {
+  if (VIDEO_SLOT.test(html))
+    return html.replace(VIDEO_SLOT, "<!--cm-video-slot--><!--/cm-video-slot-->");
+  return html.replace(LEGACY_VIDEO_SLOT, "");
 }
 
 export function renderLandingPage(
@@ -382,7 +408,6 @@ export function renderLandingPage(
 <title>${esc(service.name)} — ${esc(service.tagline)}</title>
 <meta name="description" content="${esc(service.description)}">
 <meta name="theme-color" content="${brand.primary}">${fontLinks}
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.2.0/model-viewer.min.js"></script>
 <style>
 :root{
   --primary:${brand.primary};
@@ -419,11 +444,7 @@ header{position:sticky;top:0;z-index:10;background:color-mix(in srgb, var(--bg) 
 .hero .cta{margin-top:36px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
 .tagline{display:inline-block;margin-bottom:18px;padding:.35em 1.1em;border:1px solid color-mix(in srgb, var(--accent) 60%, transparent);color:var(--accent);border-radius:999px;font-size:.85rem;font-weight:600;letter-spacing:.05em}
 .hero-visual{filter:drop-shadow(0 24px 48px color-mix(in srgb, var(--text) 18%, transparent))}
-.hero-model-stage{position:relative;width:100%;min-height:360px}
-.hero-model-fallback,.hero-model{position:absolute;inset:0;width:100%;height:100%;transition:opacity .18s ease-out}
-.hero-model{display:block;opacity:0;--poster-color:transparent}
-.hero-model-stage.model-ready .hero-model{opacity:1}
-.hero-model-stage.model-ready .hero-model-fallback{opacity:0;pointer-events:none}
+.hero-model-stage{position:relative;width:100%;display:flex;align-items:center}
 .device-mockup{position:relative;width:100%;margin:auto;color:#111827}
 .device-screen{position:relative;width:100%;height:100%;overflow:hidden;background:var(--bg)}
 .device-screen::after{content:"";position:absolute;inset:0;background:linear-gradient(118deg,rgba(255,255,255,.2),transparent 28%,transparent 72%,rgba(255,255,255,.08));pointer-events:none}
@@ -445,11 +466,16 @@ header{position:sticky;top:0;z-index:10;background:color-mix(in srgb, var(--bg) 
 .f-visual .device-mockup{max-width:440px}
 .f-visual .device-duo{min-height:250px}
 @media (max-width:520px){.device-laptop-lid{border-radius:12px 12px 5px 5px}.device-duo{min-height:220px}.device-duo>.device-phone{width:28%}}
-@media (prefers-reduced-motion:reduce){.hero-model-fallback,.hero-model{transition:none}}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-top:64px;position:relative}
 .stat{background:var(--surface);padding:26px 20px;text-align:center}
-.stat .v{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;color:var(--primary);line-height:1.2}
-.stat .l{margin-top:4px;font-size:.85rem;opacity:.7}
+/* Figures and their Japanese unit are set separately. At one size and weight
+   the Latin numerals and the kanji come from different families in the stack
+   and collide; a smaller, baseline-aligned unit makes that contrast read as
+   typography instead of as a rendering fault. */
+.stat .v{display:flex;align-items:baseline;justify-content:center;gap:.1em;font-size:clamp(1.9rem,3.4vw,2.6rem);font-weight:800;color:var(--primary);line-height:1.15}
+.stat .v .n{letter-spacing:-.035em;font-variant-numeric:tabular-nums lining-nums;font-feature-settings:"tnum" 1}
+.stat .v .u{display:inline-block;font-size:.46em;font-weight:700;letter-spacing:.04em;transform:translateY(-.1em)}
+.stat .l{margin-top:8px;font-size:.82rem;letter-spacing:.02em;opacity:.65}
 .clients{padding:44px 0 8px;text-align:center}
 .clients .cap{font-size:.78rem;letter-spacing:.14em;opacity:.5;text-transform:uppercase}
 .client-row{margin-top:18px;display:flex;flex-wrap:wrap;justify-content:center;gap:18px 44px;font-size:1.05rem;opacity:.55}
@@ -477,10 +503,6 @@ section{padding:${sectionPad}px 0}
 .video-slot{max-width:800px;margin:0 auto;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:var(--surface);display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
 .video-slot span{opacity:.5;font-size:.95rem}
 .video-slot video{width:100%;height:100%;object-fit:cover;display:block}
-.video-empty{display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:24px;text-align:center}
-.video-generate{display:inline-block;padding:.8em 2em;border-radius:${btnRadius};background:var(--primary);color:#fff;text-decoration:none;font-weight:700;transition:opacity .15s ease}
-.video-generate:hover{opacity:.85}
-.video-generate:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .quotes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px}
 .quote{display:flex;flex-direction:column;gap:18px;padding:30px 28px;border-radius:18px;background:var(--surface);border:1px solid var(--line-soft)}
 .alt .quote{background:var(--bg)}
@@ -570,14 +592,14 @@ header{background:color-mix(in srgb, var(--bg) 62%, transparent)}
             <a class="btn ghost" href="#how">使い方を見る</a>
           </div>
         </div>
-        <div class="hero-visual">${heroModelHtml(screens, service.name)}</div>
+        <div class="hero-visual">${heroVisualHtml(screens, service.name)}</div>
       </div>
       ${
         proof
           ? `<div class="stats">
         ${proof.stats
           .map(
-            (s) => `<div class="stat"><div class="v">${esc(s.value)}</div><div class="l">${esc(s.label)}</div></div>`
+            (s) => `<div class="stat"><div class="v">${statValueHtml(s.value)}</div><div class="l">${esc(s.label)}</div></div>`
           )
           .join("\n        ")}
       </div>`
@@ -604,9 +626,7 @@ header{background:color-mix(in srgb, var(--bg) 62%, transparent)}
   <section>
     <div class="container">
       <!--cm-video-slot-->${
-        opts.videoEmbed
-          ? `<div class="video-slot">${opts.videoEmbed}</div>`
-          : `<div class="video-slot"><span>▶ 紹介動画</span></div>`
+        opts.videoEmbed ? `<div class="video-slot">${opts.videoEmbed}</div>` : ""
       }<!--/cm-video-slot-->
     </div>
   </section>
@@ -748,99 +768,6 @@ ${
 <footer>
   <div class="container">© ${new Date().getFullYear()} ${esc(service.name)}</div>
 </footer>
-<script type="module">
-customElements.whenDefined("model-viewer").then(function () {
-  document.querySelectorAll(".hero-model-stage").forEach(function (stage) {
-    var viewer = stage.querySelector("model-viewer");
-    if (!viewer) return;
-    var compact = window.matchMedia("(max-width:860px)");
-    function syncCamera() {
-      viewer.setAttribute("camera-orbit", compact.matches ? "-8deg 67deg 8.7m" : "-8deg 67deg 6.4m");
-    }
-    syncCamera();
-    compact.addEventListener("change", syncCamera);
-
-    viewer.addEventListener("load", async function () {
-      function color(name, fallback) {
-        var value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-        return value || fallback;
-      }
-
-      function canvasTexture(viewport) {
-        var texture = viewer.createCanvasTexture();
-        var canvas = texture.source.element;
-        var mobile = viewport === "mobile";
-        canvas.width = mobile ? 390 : 1024;
-        canvas.height = mobile ? 844 : 640;
-        var ctx = canvas.getContext("2d");
-        var primary = color("--primary", "#5b35f5");
-        var accent = color("--accent", "#7c3aed");
-        var bg = color("--bg", "#111827");
-        var surface = color("--surface", "#24263d");
-        var textColor = color("--text", "#f8fafc");
-        var w = canvas.width;
-        var h = canvas.height;
-
-        ctx.fillStyle = bg;
-        ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = surface;
-        ctx.fillRect(0, 0, w, mobile ? 70 : 58);
-        ctx.fillStyle = primary;
-        ctx.beginPath();
-        ctx.arc(mobile ? 38 : 36, mobile ? 35 : 29, mobile ? 15 : 12, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = .78;
-        ctx.fillStyle = textColor;
-        ctx.fillRect(mobile ? 64 : 58, mobile ? 25 : 21, mobile ? 116 : 132, mobile ? 20 : 16);
-        ctx.globalAlpha = 1;
-
-        var pad = mobile ? 24 : 56;
-        var heroY = mobile ? 108 : 108;
-        ctx.fillStyle = textColor;
-        ctx.fillRect(pad, heroY, mobile ? 260 : 440, mobile ? 30 : 38);
-        ctx.globalAlpha = .28;
-        ctx.fillRect(pad, heroY + (mobile ? 44 : 58), mobile ? 326 : 360, mobile ? 14 : 14);
-        ctx.fillRect(pad, heroY + (mobile ? 70 : 84), mobile ? 274 : 300, mobile ? 14 : 14);
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = primary;
-        ctx.fillRect(pad, heroY + (mobile ? 116 : 132), mobile ? 152 : 150, mobile ? 46 : 40);
-        ctx.globalAlpha = .18;
-        ctx.fillStyle = primary;
-        ctx.fillRect(mobile ? 24 : 610, mobile ? 306 : 96, mobile ? 342 : 350, mobile ? 210 : 250);
-        ctx.globalAlpha = .82;
-        ctx.fillStyle = accent;
-        ctx.beginPath();
-        ctx.arc(mobile ? 195 : 785, mobile ? 400 : 220, mobile ? 58 : 82, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        texture.source.update();
-        return texture;
-      }
-
-      async function applyScreen(materialName, selector, viewport) {
-        var material = viewer.model.getMaterialByName(materialName);
-        if (!material) return;
-        var image = stage.querySelector(selector);
-        var texture = image && image.src
-          ? await viewer.createTexture(image.currentSrc || image.src)
-          : canvasTexture(viewport);
-        material.pbrMetallicRoughness.baseColorTexture.setTexture(texture);
-        material.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
-      }
-
-      try {
-        await Promise.all([
-          applyScreen("LaptopScreen", ".hero-model-fallback .device-laptop .device-screen img", "desktop"),
-          applyScreen("PhoneScreen", ".hero-model-fallback .device-phone .device-screen img", "mobile")
-        ]);
-        stage.classList.add("model-ready");
-      } catch (error) {
-        console.warn("3D mockup texture failed; keeping the HTML fallback", error);
-      }
-    }, { once: true });
-  });
-});
-</script>
 </body>
 </html>
 `;

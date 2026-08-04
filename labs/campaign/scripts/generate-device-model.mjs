@@ -67,6 +67,16 @@ const phoneScreen = new MeshStandardMaterial({
   roughness: 0.58,
 });
 
+// Screen planes carry the screenshot / canvas texture. Their vertical
+// orientation is still wrong in model-viewer (docs/device-mockup-fixes.md).
+// Flipping the V coordinate here was tried and did not correct it, which
+// points at the texture-upload side (createCanvasTexture vs createTexture)
+// rather than the geometry — fix it there, with a rendered check, before
+// changing these UVs again.
+function screenPlane(width, height) {
+  return new PlaneGeometry(width, height);
+}
+
 function mesh(geometry, material, name, position) {
   const item = new Mesh(geometry, material);
   item.name = name;
@@ -89,7 +99,7 @@ laptop.add(
 );
 
 const laptopDisplay = mesh(
-  new PlaneGeometry(3.42, 2.03),
+  screenPlane(3.42, 2.03),
   laptopScreen,
   "LaptopDisplay",
   [0, 1.18, -0.792]
@@ -108,15 +118,19 @@ for (let row = 0; row < 5; row += 1) {
 scene.add(laptop);
 
 const phone = new Group();
+// Up and to the front-right of the laptop. The phone is 2.22 tall, so its
+// bottom edge sits at y = 1.32 - 1.11 = 0.21 — clear of the laptop base top
+// (y = -0.125). Lowering this back below ~1.24 makes the phone intersect the
+// laptop body again, which reads as "stuck into the keyboard" at every angle.
 phone.name = "Phone";
-phone.position.set(1.62, 0.62, 0.64);
+phone.position.set(1.98, 1.32, 1.02);
 phone.rotation.y = -0.24;
 phone.rotation.z = -0.025;
 phone.add(
   mesh(new RoundedBoxGeometry(1.06, 2.22, 0.14, 6, 0.14), edge, "PhoneShell", [0, 0, 0])
 );
 const phoneDisplay = mesh(
-  new PlaneGeometry(0.92, 2.02),
+  screenPlane(0.92, 2.02),
   phoneScreen,
   "PhoneDisplay",
   [0, 0, 0.076]

@@ -9,6 +9,7 @@ import type { PipelineProgress, LlmUsageSummary } from "./pipeline";
 import type { BrandMatchJudgment } from "./creative";
 import type { CampaignCatalogLink } from "./catalog";
 import type { UrlRegistrationScope } from "@/lib/brand-registration";
+import { renderLandingPage } from "./render-lp";
 
 // Campaign job store — generation runs server-side detached from the HTTP
 // request, so closing the tab or losing the connection never loses the run:
@@ -80,10 +81,6 @@ const JOBS_DIR = path.join(process.cwd(), "var", "campaign-lab", "jobs");
 function jobPath(id: string): string {
   return path.join(JOBS_DIR, `${id}.json`);
 }
-function htmlPath(id: string): string {
-  return path.join(JOBS_DIR, `${id}.html`);
-}
-
 function writeJob(job: CampaignJob): void {
   fs.mkdirSync(JOBS_DIR, { recursive: true });
   job.updatedAt = new Date().toISOString();
@@ -148,22 +145,22 @@ export function updateCampaignPartial(id: string, patch: CampaignPartial): void 
   writeJob(job);
 }
 
-/** Creative stage done, verify still running: publish the kit + LP early so
- *  the digest fills while the self-verification loop finishes. */
+/** Creative stage done, verify still running: publish the kit early so the
+ *  digest fills while the self-verification loop finishes. Storing the kit
+ *  stores the LP — readCampaignJobHtml derives it. */
 export function saveCampaignJobDraft(
   id: string,
-  result: { kit: CampaignBrandKit; html: string }
+  result: { kit: CampaignBrandKit }
 ): void {
   const job = getCampaignJob(id);
   if (!job || job.status !== "running") return;
   job.kit = result.kit;
-  fs.writeFileSync(htmlPath(id), result.html);
   writeJob(job);
 }
 
 export function completeCampaignJob(
   id: string,
-  result: { kit: CampaignBrandKit; meta: CampaignJobMeta; html: string }
+  result: { kit: CampaignBrandKit; meta: CampaignJobMeta }
 ): void {
   const job = getCampaignJob(id);
   if (!job) return;
@@ -171,7 +168,6 @@ export function completeCampaignJob(
   job.kit = result.kit;
   job.meta = result.meta;
   job.partial = null; // superseded by the kit
-  fs.writeFileSync(htmlPath(id), result.html);
   writeJob(job);
 }
 
@@ -279,13 +275,23 @@ export function getCampaignJob(id: string): CampaignJob | null {
   }
 }
 
+/**
+ * The LP of a job, derived from its kit on every read.
+ *
+ * The kit is the single source of truth; the HTML is a pure function of it
+ * (`renderLandingPage`). Freezing that output to disk at generation time is
+ * what let one job's page drift: every renderer fix reached only pages
+ * generated afterwards, so an LP served today could still carry markup the
+ * codebase had already removed — and the management preview and /c/[id],
+ * reading that same frozen file, could render it two different ways.
+ *
+ * Deriving here costs a string template per request and can never go stale.
+ */
 export function readCampaignJobHtml(id: string): string | null {
   if (!SAFE_ID.test(id)) return null;
-  try {
-    return fs.readFileSync(htmlPath(id), "utf8");
-  } catch {
-    return null;
-  }
+  const job = getCampaignJob(id);
+  if (!job?.kit) return null;
+  return renderLandingPage(job.kit);
 }
 
 /** Most recent job for a user (reload/reconnect recovery). */

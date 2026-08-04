@@ -8,7 +8,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { refreshBrandTree } from "@/lib/brand-events";
 import { sampleCampaignKit, SAMPLE_CAMPAIGN_ID } from "@/lib/campaign/sample";
@@ -34,19 +33,16 @@ type Status = "loading" | "running" | "done" | "error" | "missing";
 export default function CampaignDetail({
   id,
   sampleHtml,
-  autoGenerateCm,
   embedded = false,
   view = "catalog",
   brandId = null,
 }: {
   id: string;
   sampleHtml: string | null;
-  autoGenerateCm: boolean;
   embedded?: boolean;
   view?: "catalog" | "lp" | "video";
   brandId?: string | null;
 }) {
-  const router = useRouter();
   const isSample = id === SAMPLE_CAMPAIGN_ID;
   const [status, setStatus] = useState<Status>(isSample ? "done" : "loading");
   const [kit, setKit] = useState<CampaignBrandKit | null>(null);
@@ -71,7 +67,6 @@ export default function CampaignDetail({
   // (e.g. the CM voice generation) on an already-settled job.
   const [pollEpoch, setPollEpoch] = useState(0);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const autoGenerateHandled = useRef(false);
   const trackGeneratedAt = useRef<string | null>(null);
   const catalogTreeVersion = useRef<string | null>(null);
   const catalogRecovery = useRef<{
@@ -308,50 +303,6 @@ export default function CampaignDetail({
     link.click();
     setDownloadWhenReady(false);
   }, [downloadWhenReady, videoUrl]);
-
-  // The LP's empty video slot links back with a one-shot intent. Starting the
-  // run here keeps authentication and ownership checks identical to the
-  // detail-page button instead of exposing a paid endpoint from public HTML.
-  useEffect(() => {
-    if (
-      !autoGenerateCm ||
-      isSample ||
-      status !== "done" ||
-      autoGenerateHandled.current
-    ) {
-      return;
-    }
-
-    let cancelled = false;
-    autoGenerateHandled.current = true;
-    const cleanPath = brandId
-      ? view === "video"
-        ? `/brands/${brandId}/video/${id}`
-        : `/brands/${brandId}/lp/${id}`
-      : view === "video"
-        ? `/campaigns/${id}/video`
-        : `/campaigns/${id}`;
-    router.replace(cleanPath, { scroll: false });
-    if (cm?.status !== "running" && !cm?.track && !videoUrl) {
-      void Promise.resolve().then(() => {
-        if (!cancelled) void generateCm();
-      });
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    autoGenerateCm,
-    brandId,
-    cm,
-    generateCm,
-    id,
-    isSample,
-    router,
-    status,
-    videoUrl,
-    view,
-  ]);
 
   const digestKit = isSample ? sampleCampaignKit : kit;
   const digestHtml = isSample ? sampleHtml : html;

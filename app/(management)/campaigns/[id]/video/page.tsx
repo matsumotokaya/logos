@@ -8,15 +8,12 @@ export const metadata: Metadata = {
 
 export default function CampaignVideoPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ generateVideo?: string | string[] }>;
 }) {
   return (
     <CampaignManagementPage
       params={params}
-      searchParams={searchParams}
       view="video"
     />
   );

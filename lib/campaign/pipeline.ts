@@ -54,8 +54,9 @@ export interface PipelineOptions {
   /** Stage artifacts as soon as each stage finishes — drives the progressive
    *  result UI (logo pops in at ~20s instead of everything at 2-4min). */
   onPartial?: (patch: import("./schema").CampaignPartial) => void;
-  /** Creative done, verify still ahead: the full kit + LP, published early. */
-  onDraft?: (kit: CampaignBrandKit, html: string) => void;
+  /** Creative done, verify still ahead: the kit, published early. The LP is
+   *  derived from it on read, so there is nothing else to hand over. */
+  onDraft?: (kit: CampaignBrandKit) => void;
   /** Stage 4 self-verification (needs capture + Chromium). Default true. */
   verify?: boolean;
 }
@@ -287,7 +288,7 @@ export async function runCampaignPipeline(
   );
   let html = renderLandingPage(kit);
   // Publish early: the digest fills completely while verify still runs.
-  opts.onDraft?.(kit, html);
+  opts.onDraft?.(kit);
 
   // Stage 4: self-verification loop (one retry).
   let verification: (BrandMatchJudgment & { retried: boolean }) | null = null;

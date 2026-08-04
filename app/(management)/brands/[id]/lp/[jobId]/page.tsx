@@ -8,16 +8,13 @@ export const metadata: Metadata = {
 
 export default async function BrandLpPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string; jobId: string }>;
-  searchParams: Promise<{ generateVideo?: string | string[] }>;
 }) {
   const { id, jobId } = await params;
   return (
     <CampaignManagementPage
       params={Promise.resolve({ id: jobId })}
-      searchParams={searchParams}
       view="lp"
       brandId={id}
     />

@@ -155,13 +155,12 @@ export async function POST(req: Request) {
     {
       onProgress: (event) => appendCampaignStep(job.id, event),
       onPartial: (patch) => updateCampaignPartial(job.id, patch),
-      onDraft: (kit, html) => saveCampaignJobDraft(job.id, { kit, html }),
+      onDraft: (kit) => saveCampaignJobDraft(job.id, { kit }),
     }
   )
     .then(async (result) => {
       completeCampaignJob(job.id, {
         kit: result.kit,
-        html: result.html,
         meta: {
           captured: result.meta.captured,
           adjudicated: result.meta.adjudicated,

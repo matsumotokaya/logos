@@ -426,10 +426,13 @@ async function drawProductScreen(
   ctx.globalAlpha = 1;
 }
 
+// Percentages of model-viewer's auto-framing distance. The lab keeps free
+// rotation (it is an inspection surface), so the head-room has to hold at every
+// angle — fixed metre radii cropped the corners as soon as the model turned.
 function cameraOrbit(variant: DeviceVariant): string {
-  if (variant === "mobile") return "-10deg 70deg 115%";
-  if (variant === "laptop") return "-8deg 67deg 5.2m";
-  return "-8deg 67deg 6.7m";
+  if (variant === "mobile") return "-10deg 70deg 120%";
+  if (variant === "laptop") return "-8deg 67deg 125%";
+  return "-8deg 68deg 128%";
 }
 
 function deviceLabel(variant: DeviceVariant): string {

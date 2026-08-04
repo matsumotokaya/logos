@@ -16,7 +16,7 @@ import { campaignCmMp4Exists, readCampaignJobHtml } from "@/lib/campaign/jobs";
 import {
   cmVideoEmbed,
   injectCmVideo,
-  injectCmVideoAction,
+  removeCmVideoSlot,
   renderLandingPage,
 } from "@/lib/campaign/render-lp";
 import {
@@ -65,18 +65,16 @@ export async function GET(
   let html = readCampaignJobHtml(id);
   if (!html) return Response.json({ error: "LPが見つかりません" }, { status: 404 });
 
-  // The stored HTML predates the CM; once the MP4 exists, swap the video-slot
-  // placeholder for the real embed with a freshly signed URL on every serve.
-  if (campaignCmMp4Exists(id)) {
-    html = injectCmVideo(
-      html,
-      signedLabsUrl(`/api/labs/campaign/video/${id}`, `campaign-video:${id}`)
-    );
-  } else {
-    // Keep the paid generation endpoint behind the authenticated management
-    // surface. The detail page consumes this one-shot intent and starts the
-    // same CM job used by its own button.
-    html = injectCmVideoAction(html, `/campaigns/${id}?generateVideo=1`);
-  }
+  // The MP4 is the single fact this page reads about the video: present, the
+  // slot carries the embed with a freshly signed URL on every serve; absent,
+  // the page shows no video section at all. The MP4 is rendered automatically
+  // once the CM voice stage finishes, so "absent" means "not ready yet", never
+  // "the visitor should press something".
+  html = campaignCmMp4Exists(id)
+    ? injectCmVideo(
+        html,
+        signedLabsUrl(`/api/labs/campaign/video/${id}`, `campaign-video:${id}`)
+      )
+    : removeCmVideoSlot(html);
   return htmlResponse(html, "private, no-store");
 }

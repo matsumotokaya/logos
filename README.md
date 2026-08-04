@@ -112,7 +112,7 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 - **デザインテーマ7種**([lib/campaign/themes.ts](lib/campaign/themes.ts) が正本): tech-glass / minimal-light / corporate-trust / care-warm / friendly-pop / food-casual / luxury-serif。各テーマは対象業種・LP描画パラメータ(glass/flatバリアント・ヒーロー背景写真)・**全レンダラー共通のトーン&マナー指示文(`direction`)**を持つ。生成時にLLMが業種からenumで自動選択し、`kit.theme` として保存されるため**後から変更して再レンダリングできる**
 - **生成LPのヒーローは背景写真でリッチに**: [public/campaigns/bg/](public/campaigns/bg/) の抽象ガラス写真5枚をテーマに固定割当(スクリム+白文字、本文はテーマ本来のキャンバス)。テーマ別の専用背景に将来差し替える
 - **UI**: トップ `/` は画面高100%のヒーロー(青いガラス質背景+ソース入力のグラスカード)+透明ヘッダー。**ヒーロー全域がドラッグ&ドロップ対応**で、ドラッグ中は50%白の半透明ヴェールと「ここにドロップ」を表示する。管理UI(詳細 `/campaigns/[id]`)はロゴス本体と同じ白いツールUI(管理サイドバー付き)。生成は非同期ジョブで、ページを閉じても継続する
-- **30秒CM動画(Phase 0b・ローカル実装済み)**: ナレーションは5シーン構造(`cm_script`)で生成され、シーンごとのTTS(Gemini)→タイミングJSON→**Remotion**で組み立てる。プレビューはブラウザ内 `@remotion/player`(即時)。**MP4は「MP4ファイルを作成してダウンロード」を押したときだけローカル書き出しし、完成後にダウンロードを開始して、LP(`/c/[id]`)の動画スロットへも配信時に署名URLで差し込まれる**(Chromiumが動かないホストでは作成不可)。クラウド化はRemotion Lambda(AWS)採用予定=課金ポイント。`CAMPAIGN_TTS_MOCK=1` でAPIキーなし開発可
+- **30秒CM動画(Phase 0b・ローカル実装済み)**: ナレーションは5シーン構造(`cm_script`)で生成され、シーンごとのTTS(Gemini)→タイミングJSON→**Remotion**で組み立てる。プレビューはブラウザ内 `@remotion/player`(即時)。**MP4はナレーション生成に続けて自動でローカル書き出しされる**(1920×1080/30fps・約34秒のCMで実測30秒、CPUのみでAPI課金なし)。プレビューとMP4は同じ動画の2つの表現で、Playerが動くのはこのアプリ内だけなので、LP(`/c/[id]`)など**アプリ外の面はすべてMP4を使う**。LPの動画スロットはMP4の有無だけを見て、あるときは配信時に署名URLで差し込み、ないときは動画セクションごと出さない(LPから生成を促すことはしない)。Chromiumが動かないホスト(Vercelのサーバーレス)ではMP4を作成できず、プレビューだけが残る。クラウド化はRemotion Lambda(AWS)採用予定=課金ポイント。`CAMPAIGN_TTS_MOCK=1` でAPIキーなし開発可
 
 ## Platform Admin / Labs権限
 
