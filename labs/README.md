@@ -67,6 +67,7 @@
 | [Workflow Lab](workflow/README.md) | `/labs/workflow` | 保証 | ✅ 稼働中(Phase 1) | 決定論的合成+プロツール連携(旧称 Image Lab。旧URL `/labs/image` はリダイレクト) |
 | [Generative Lab](generative/README.md) | `/labs/generative` | 探索 | ✅ 稼働中(Phase E1) | 生成AIハーネス: 3エンジン・表現テンプレート・ダイヤル4軸・逸脱スコアボード・ショートビデオ |
 | [Campaign Lab](campaign/README.md) | `/campaigns` へ卒業(旧URLはリダイレクト) | 統合 | 🎓 卒業(2026-07-20) | 複数ソース → Service Brand Kit → セールスページ。30秒CM動画は `/campaigns` 上で開発継続 |
+| Event PV | `/labs/event`(正規の置き場所は `/brands/[id]/video/[videoId]`) | 統合 | ✅ 稼働中(v1) | イベント・セミナー軸の30秒PV。ナレーションなし・BGMとタイポで成立させ、**素材ゼロでも完成品が出る**ことを要件にしたテンプレート。詳細は[ルートREADMEの「イベントPVテンプレート」](../README.md#イベントpvテンプレートevent-promo) |
 
 ## ディレクトリ構成
 
@@ -79,6 +80,7 @@ labs/
   workflow/          # Workflow Lab 本体(core / engine / templates / components)
   generative/        # Generative Lab 本体(core / engine / templates / components)
   campaign/          # Campaign Lab の引き継ぎ資料・CLI・音声パイプライン
+  event/             # イベントPVの素材整形スクリプト(決定論。ロゴのノックアウト等)
   <slug>/            # 新しいラボはここに独立したディレクトリを作る
 app/labs/page.tsx        # 研究所インデックス(モード別グルーピング)
 app/labs/motion/page.tsx # 稼働中ラボの薄いルート(workflow / generative も同様)

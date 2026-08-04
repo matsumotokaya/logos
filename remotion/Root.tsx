@@ -17,6 +17,14 @@ import {
 // the "@/" tsconfig alias.
 import type { CampaignBrandKit } from "../lib/campaign/schema";
 import type { CmVoiceTrack } from "../lib/campaign/cm-types";
+import {
+  EventComposition,
+  EVENT_FPS,
+  EVENT_WIDTH,
+  EVENT_HEIGHT,
+  EVENT_DURATION_FRAMES,
+} from "./event/EventComposition";
+import { sake2026Brief } from "./event/briefs/sake-2026";
 
 type NullableProps = {
   kit: CampaignBrandKit | null;
@@ -34,6 +42,7 @@ const CmOrEmpty: React.FC<NullableProps> = ({ kit, track, audioSrc, bgmSrc }) =>
 
 export const RemotionRoot: React.FC = () => {
   return (
+    <>
     <Composition
       id="cm"
       component={CmOrEmpty}
@@ -52,5 +61,18 @@ export const RemotionRoot: React.FC = () => {
         props,
       })}
     />
+    {/* Event promo template. The bundled sake-2026 brief doubles as default
+        props so `remotion studio` / `remotion render` work with no --props;
+        a per-event render passes its own brief the same way the CM does. */}
+    <Composition
+      id="event"
+      component={EventComposition}
+      fps={EVENT_FPS}
+      width={EVENT_WIDTH}
+      height={EVENT_HEIGHT}
+      durationInFrames={EVENT_DURATION_FRAMES}
+      defaultProps={{ brief: sake2026Brief }}
+    />
+    </>
   );
 };

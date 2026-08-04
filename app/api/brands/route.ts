@@ -9,6 +9,7 @@ import type {
 } from "@/lib/brand-hierarchy";
 import { campaignCmMp4Exists, getCampaignJob } from "@/lib/campaign/jobs";
 import { signedLabsUrl } from "@/lib/labs-output-sign";
+import { resolveCampaignJobId } from "@/lib/video/job-id";
 import {
   createServerSupabaseForToken,
   requireUser,
@@ -106,19 +107,6 @@ function paletteFrom(value: Record<string, unknown>): {
     accent: typeof row.accent === "string" ? row.accent : null,
     fontStyle: typeof row.font_style === "string" ? row.font_style : null,
   };
-}
-
-function jobIdForAsset(
-  asset: AssetRow,
-  runs: Map<string, GenerationRunRow>,
-): string | null {
-  const run = asset.generation_run_id
-    ? runs.get(asset.generation_run_id)
-    : undefined;
-  if (run?.external_job_id) return run.external_job_id;
-  if (asset.legacy_campaign_id) return asset.legacy_campaign_id;
-  const publicMatch = asset.public_path?.match(/^\/c\/([^/?#]+)/);
-  return publicMatch?.[1] ?? null;
 }
 
 function campaignStatus(
@@ -255,7 +243,7 @@ export async function GET(req: Request) {
       status: row.status,
       publicPath: row.public_path,
       generationRunId: row.generation_run_id,
-      jobId: jobIdForAsset(row, runs),
+      jobId: resolveCampaignJobId(row, runs),
       createdAt: row.created_at,
     });
     assets.set(row.brand_id, current);

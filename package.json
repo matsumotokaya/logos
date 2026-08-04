@@ -10,7 +10,9 @@
     "test": "tsx --test \"lib/**/*.test.ts\"",
     "campaign": "NODE_OPTIONS=--conditions=react-server tsx labs/campaign/scripts/generate.ts",
     "campaign:sample-voice": "NODE_OPTIONS=--conditions=react-server tsx --env-file-if-exists=.env.local labs/campaign/scripts/sample-voice.ts",
-    "campaign:render": "node labs/campaign/scripts/render-cm.mjs"
+    "campaign:render": "node labs/campaign/scripts/render-cm.mjs",
+    "event:render": "remotion render remotion/index.ts event var/event-lab/sake-2026.mp4",
+    "event:studio": "remotion studio remotion/index.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1086.0",

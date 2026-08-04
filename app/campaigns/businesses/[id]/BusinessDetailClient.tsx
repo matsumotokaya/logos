@@ -507,9 +507,12 @@ export default function BusinessDetailClient({ id }: { id: string }) {
                 className="mt-4 flex flex-wrap gap-2"
                 aria-label="ブランドカラー"
               >
-                {colors.map((color) => (
+                {/* Index in the key: a palette legitimately repeats a colour
+                    (e.g. background and surface both #ffffff), and the hex
+                    alone made React warn about duplicate keys. */}
+                {colors.map((color, i) => (
                   <span
-                    key={color}
+                    key={`${color}-${i}`}
                     className="size-8 rounded-full border border-hairline"
                     style={{ backgroundColor: color }}
                     title={color}
@@ -560,6 +563,21 @@ export default function BusinessDetailClient({ id }: { id: string }) {
                 まだありません。
               </p>
             )}
+          </section>
+
+          <section className="rounded-2xl border border-hairline p-5">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-balance text-sm font-semibold">動画</h2>
+              <Link
+                href={`/brands/${id}/video`}
+                className="text-[11px] text-accent hover:underline"
+              >
+                管理する →
+              </Link>
+            </div>
+            <p className="mt-3 text-pretty text-xs text-ink-muted">
+              製品紹介動画は既定で用意されています。イベント動画などは「管理する」から追加できます。
+            </p>
           </section>
 
           {detail.audiences.length > 0 ? (

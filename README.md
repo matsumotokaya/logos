@@ -39,7 +39,8 @@ URL・資料・ロゴを起点に、Organizationと企業・事業ブランド�
 | `/brands` | **ブランド管理の主要画面**。共通の左ペインにOrganization→Brand→ロゴ／LP／動画を表示し、右ペインだけをURL単位で切り替える。旧`/businesses`は互換リダイレクト |
 | `/brands/[id]` | 企業・事業・対象別で共通のブランド詳細。概要、プロフィール、継承、ロゴ、生成アセットを管理する |
 | `/brands/[id]/lp/[jobId]` | Brand配下のLP詳細。プレビューと公開先を管理する |
-| `/brands/[id]/video/[jobId]` | Brand配下の動画詳細。ブラウザプレビュー、ナレーション、MP4作成・ダウンロードを管理する |
+| `/brands/[id]/video` | **動画ポータル**。このブランドが持つ動画の一覧と「＋動画を追加」。1件目は全ブランド共通の既定アセット=製品紹介動画で、未生成・未公開でも常に並ぶ |
+| `/brands/[id]/video/[videoId]` | Brand配下の動画詳細。`videoId`は動画アセットIDまたは(既定の製品紹介動画の)キャンペーンjob IDのどちらでもよく、APIが判別する。製品動画は従来のCM画面(ナレーション・MP4)、イベント動画はプレビュー+素材スロットを表示する |
 | `/campaigns/[id]` | 生成処理中および旧リンク向けの互換詳細。完成したLP・動画の正規管理導線はBrand配下のURLを使う |
 | `/c/[id]` | 生成されたセールスページの正規URL(`/p/[id]` と対称の opaque ID・所有者を含まない)。LPは `kit.theme` の**デザインテーマ(7種・業種からLLMが自動選択、正本は [lib/campaign/themes.ts](lib/campaign/themes.ts))**で描画され、ヒーローにはテーマ固定割当の背景写真([public/campaigns/bg/](public/campaigns/bg/))が入る。テーマはkitに保存されるため後から変更・再レンダリングできる。`/c/sample` はサンプル(公開・tech-glassテーマ)。ジョブ由来のページは暫定的に署名URL経由(campaignsテーブル導入後にRLSベースへ移行) |
 | `/settings` | Accountページ。ユーザー情報表示・プロフィール編集枠・登録アカウントの退会導線。退会時は個人所有データとR2成果物を削除し、共同組織の資産は残す |
@@ -113,6 +114,39 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 - **生成LPのヒーローは背景写真でリッチに**: [public/campaigns/bg/](public/campaigns/bg/) の抽象ガラス写真5枚をテーマに固定割当(スクリム+白文字、本文はテーマ本来のキャンバス)。テーマ別の専用背景に将来差し替える
 - **UI**: トップ `/` は画面高100%のヒーロー(青いガラス質背景+ソース入力のグラスカード)+透明ヘッダー。**ヒーロー全域がドラッグ&ドロップ対応**で、ドラッグ中は50%白の半透明ヴェールと「ここにドロップ」を表示する。管理UI(詳細 `/campaigns/[id]`)はロゴス本体と同じ白いツールUI(管理サイドバー付き)。生成は非同期ジョブで、ページを閉じても継続する
 - **30秒CM動画(Phase 0b・ローカル実装済み)**: ナレーションは5シーン構造(`cm_script`)で生成され、シーンごとのTTS(Gemini)→タイミングJSON→**Remotion**で組み立てる。プレビューはブラウザ内 `@remotion/player`(即時)。**MP4はナレーション生成に続けて自動でローカル書き出しされる**(1920×1080/30fps・約34秒のCMで実測30秒、CPUのみでAPI課金なし)。プレビューとMP4は同じ動画の2つの表現で、Playerが動くのはこのアプリ内だけなので、LP(`/c/[id]`)など**アプリ外の面はすべてMP4を使う**。LPの動画スロットはMP4の有無だけを見て、あるときは配信時に署名URLで差し込み、ないときは動画セクションごと出さない(LPから生成を促すことはしない)。Chromiumが動かないホスト(Vercelのサーバーレス)ではMP4を作成できず、プレビューだけが残る。クラウド化はRemotion Lambda(AWS)採用予定=課金ポイント。`CAMPAIGN_TTS_MOCK=1` でAPIキーなし開発可
+
+## 動画は一等アセット(テンプレート制)
+
+動画は**`brand_assets` の `asset_kind='video'` の行**であり、1ブランドが複数の動画を持てる。テンプレートの正本は [lib/video/templates.ts](lib/video/templates.ts)、`metadata` の契約は [lib/video/asset.ts](lib/video/asset.ts)。
+
+- **テンプレートは作成時に決まり、あとから変更できない**。シーン構成と素材スロットが変わり、将来の構造化プロンプトも変わるため(slide-factoryが物件の`deliverable`を固定するのと同じ契約)。現在は `product-cm`(製品紹介動画・課題解決型30秒CM)と `event-promo`(イベント動画・30秒PV)
+- **既定の製品紹介動画は行を作らない**。全ブランドに1本提供されるが、未生成のプレースホルダー行でテーブルを埋めないため、ポータルが常に1件目として合成して見せる。パブリッシュは任意で、既定は未公開
+- **`metadata` が作成後の正本**。`event-promo` は `metadata.brief` に `EventBrief` を持つ。バンドル済みブリーフ([remotion/event/briefs/](remotion/event/briefs/))は**seedであり、作成時に複製される**——以後の編集がリポジトリのコードに影響しない
+- `videoId` はアセットIDでもキャンペーンjob IDでもよく、`/api/brands/[id]/videos/[videoId]` が判別して返す。両方UUIDで形では区別できないため、判別は1箇所に置く
+- 生成物の元になったキャンペーンjob IDの解決順(`external_job_id` → `legacy_campaign_id` → 公開パス)は [lib/video/job-id.ts](lib/video/job-id.ts) が正本。取り違えると「未作成」に見えるだけで無症状なので、実装を分散させない
+
+## イベントPVテンプレート(event promo)
+
+CM Makerが**製品・サービス軸**の課題解決型CMを作るのに対し、こちらは**イベント・セミナー軸**のプロモーション動画テンプレート。ナレーションを持たず、BGMとタイポグラフィで成立させる(SNSのミュート再生が主戦場のため)。1本目の実案件は「世界が恋する日本酒」(レオパレス21 × WealthPark Lab)。
+
+- **データ契約は [remotion/event/types.ts](remotion/event/types.ts) の `EventBrief`**。文言・日時・ゲスト・プログラム・ロゴ・写真スロットを持つ構造化データで、現時点では手書き(Slackの雑文+フライヤーから起こす)。将来は抽出・構造化パイプラインが生成する
+- **設計原則: スタイルは決めつけ、事実は捏造しない**。アートディレクション(和モダン・ラグジュアリー=墨黒×金×明朝)、配色、モーション、コピーの圧縮は勝手に決めて**作りきる**。一方で日時・会場・料金・人名は捏造せず、未定なら**ダミー枠ではなくデザインされた省略**として扱う(`schedule.venue: null` は画面から消える)
+- **すべての素材スロットに設計済みフォールバックがある**。ロゴなし→明朝のクレジット表記、人物写真なし→姓一文字の金縁モノグラム、写真なし→墨背景+金粒子。**素材ゼロでも完成した動画が出る**のがこのテンプレートの要件
+- **素材の整形は [labs/event/scripts/prepare-assets.mjs](labs/event/scripts/prepare-assets.mjs)** が決定論で行う(LLM不使用)。巨大ストックフォトの縮小、landscape人物写真の焦点指定、そして**暗背景用のロゴ正規化**——不透明な白地JPEGの`knockout`、白プレートから抜かれたロゴの`alphaInvert`、単色SVGの実行時`invert`。パートナーサイトから取得するロゴは取得元URLをこのスクリプトに記録して出自を残す
+- 尺は固定タイムライン([remotion/event/palette.ts](remotion/event/palette.ts) の `EVENT_SCENES`)で6シーン30秒。**15秒版はシーン尺の再配分で派生**させる
+- **正規の置き場所はBrand配下の `/brands/[id]/video/[videoId]`**。ポータルから「＋動画を追加 → イベント動画」で作る。画面はゴール(動画)を常時表示し、その下に**素材スロットの現在地**——各スロットが素材で描かれているか設計フォールバックで成立しているか——を並べる([components/video/EventVideoWorkspace.tsx](components/video/EventVideoWorkspace.tsx))。スロット導出は [remotion/event/slots.ts](remotion/event/slots.ts) で、これは**充足率スコアではない**(フォールバックは欠陥ではないため)
+- `/labs/event` はバンドル済みブリーフの検証台として残る(動画アセットを作らずコンポジションを詰めるため)。**同じワークスペースコンポーネントを描くので二重実装にならない**
+- 素材投入→抽出→構造化をドロワーで開く編集体験と、Webからの再レンダーは次段。現状ブリーフの編集はDBの`metadata`更新API(`PATCH`)まで用意し、UIは公開切り替えのみ
+
+```bash
+npm run event:render   # var/event-lab/sake-2026.mp4 へ書き出し
+npm run event:studio   # Remotion Studio でシーン単位に確認・調整
+
+# 素材ドロップフォルダ → public/event/<slug>/ へ整形
+node labs/event/scripts/prepare-assets.mjs --src <dir> --slug sake-2026
+```
+
+**素材はリポジトリに入っていない**(`.gitignore` 参照)。ライセンス写真・実在人物のポートレート・支給BGMをgit履歴へ載せると後から取り消せないため、`public/event/*/photos/` `art/` `bgm.mp3` は除外し、**パートナーロゴ(`logos/`)だけコミットしている**。新しい環境では先に `prepare-assets.mjs` を実行する。sake-2026のブリーフはこれらのファイル名を指しているため、未実行のまま `event:render` すると失敗する(Remotionは画像の欠落でレンダーを止める。「素材が無い」と「ブリーフが null」を区別したいので、この挙動が正しい)。
 
 ## Platform Admin / Labs権限
 

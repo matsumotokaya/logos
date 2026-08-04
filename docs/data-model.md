@@ -45,6 +45,22 @@ Organizationは所属・会社構造・管理情報をまとめる箱に専念�
 
 将来Campaignが必要になった場合は、期間・目的・対象・オファーを持つ任意のアセットコレクションとして追加する。通常アセットとCampaignの二択にはせず、Campaign、商品ローンチ、SNS運用、地域・年度などを同じ汎用Collection機構で整理できるようにする。
 
+### 0.3.1 動画は一等アセットであり、テンプレートを持つ(2026-08-04)
+
+**動画は `brand_assets` の `asset_kind='video'` の行**である。1つのBrandは動画を複数持てる。
+
+それ以前は動画がエンティティとして存在せず、LPキャンペーンごとに「ローカルにCM音声トラックが在るか」を見て派生させていた。そのため1ブランドが持てる動画は1本だけで、必ず製品CMにしかならず、作り直しの概念も無かった。この節はその置き換えを正本として記録する。
+
+- **テンプレートは作成時に決まり、以後変更しない**。シーン構成・素材スロット・将来の構造化プロンプトがテンプレートで決まるため、後から変えると入力済みの内容が無効になる。テンプレート定義の正本はコード側 [lib/video/templates.ts](../lib/video/templates.ts)(現在 `product-cm` / `event-promo`)
+- **`metadata` が作成後の正本**。契約は [lib/video/asset.ts](../lib/video/asset.ts) の `VideoAssetMetadata`:
+  - `template`: テンプレートID
+  - `published`: 既定 `false`。既定アセットを「用意はするが公開は強制しない」ために必要
+  - `brief`: `event-promo` の `EventBrief`。バンドル済みブリーフは**seedであり作成時に複製される**ので、以後の編集がリポジトリのコードに影響しない
+  - `campaignJobId`: `product-cm` が参照するキャンペーンジョブ。Brand Kit・ナレーション・MP4はキャンペーン側の実装を唯一の実装として残すため、コピーせずリンクする
+- **既定の製品紹介動画は行を作らない**。全Brandに1本提供されるが、未生成のプレースホルダー行でテーブルを埋めないため、動画ポータルが常に1件目として合成して表示する。実体が要るのは生成物が発生してからでよい
+- **URLの`videoId`は動画アセットIDでもキャンペーンジョブIDでもよい**。両方UUIDで形では区別できないため、判別は `/api/brands/[id]/videos/[videoId]` の1箇所に置き、UIでは推測しない
+- 生成物の元になったキャンペーンジョブIDの解決順(`brand_generation_runs.external_job_id` → `brand_assets.legacy_campaign_id` → 公開パス `/c/<id>`)は [lib/video/job-id.ts](../lib/video/job-id.ts) が正本。**取り違えても「未作成」に見えるだけで無症状**なので、実装を複数箇所に分散させない
+
 ### 0.4 どこから始めても同じ構造へ収斂する
 
 - 企業URL起点: Organizationと企業Brandを同時に作り、ブランド情報と生成物は企業Brandへ登録する

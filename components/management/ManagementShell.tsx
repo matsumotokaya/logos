@@ -155,6 +155,11 @@ function BrandTree({
   const lpAssets = brand.assets.filter(
     (asset) => asset.kind === "lp" && asset.jobId,
   );
+  // Videos are their own assets now. The campaign-derived entries stay
+  // alongside them for brands whose product CM was generated before videos
+  // became rows — the detail route resolves either id (see
+  // app/api/brands/[id]/videos/[videoId]).
+  const videoAssets = brand.assets.filter((asset) => asset.kind === "video");
   const videoCampaigns = brand.campaigns.filter(
     (campaign) => campaign.videoStatus !== "not_created",
   );
@@ -222,6 +227,22 @@ function BrandTree({
           );
         })}
 
+        {videoAssets.map((asset) => {
+          const videoPath = `/brands/${brand.id}/video/${asset.id}`;
+          return (
+            <li key={`video-asset-${asset.id}`}>
+              <TreeLink
+                href={videoPath}
+                active={pathname === videoPath}
+                depth={1}
+                onNavigate={onNavigate}
+              >
+                動画：{asset.title}
+              </TreeLink>
+            </li>
+          );
+        })}
+
         {videoCampaigns.map((campaign) => {
           const videoPath = `/brands/${brand.id}/video/${campaign.id}`;
           return (
@@ -238,13 +259,18 @@ function BrandTree({
           );
         })}
 
-        {ownedLogos.length === 0 &&
-        lpAssets.length === 0 &&
-        videoCampaigns.length === 0 ? (
-          <li className="px-7 py-1.5 text-pretty text-xs text-ink-faint">
-            アセットはまだありません
-          </li>
-        ) : null}
+        {/* Always present: the portal is where a video gets added, so it must
+            be reachable even when the brand has no assets at all. */}
+        <li>
+          <TreeLink
+            href={`/brands/${brand.id}/video`}
+            active={pathname === `/brands/${brand.id}/video`}
+            depth={1}
+            onNavigate={onNavigate}
+          >
+            ＋ 動画を管理
+          </TreeLink>
+        </li>
       </ul>
     </li>
   );

@@ -28,6 +28,22 @@
 # image lab job log (cost metering, runtime data)
 /var/
 
+# Event promo material. Licensed stock photography, client-supplied portraits
+# of real people, and supplied music stay out of the repository: pushing them
+# would publish licensed and personal media into git history, which cannot be
+# undone by a later delete. Partner logos (logos/) ARE committed — they are
+# small, and the client cleared their use for this project.
+#
+# Regenerate from the material drop folder before rendering:
+#   node labs/event/scripts/prepare-assets.mjs --src <dir> --slug <slug>
+# Note that sake-2026's brief names these files, so a clone must run the script
+# (or null the slots) before `npm run event:render` — Remotion fails a render on
+# a missing image rather than silently dropping it, which is the behaviour we
+# want: a slot is only "empty by design" when the brief says null.
+/public/event/*/photos/
+/public/event/*/art/
+/public/event/*/bgm.mp3
+
 # debug
 npm-debug.log*
 yarn-debug.log*
