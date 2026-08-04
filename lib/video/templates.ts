@@ -1,16 +1,26 @@
-// Video template catalog — the source of truth for "which kinds of video can
-// this product make". Adding a template means adding an entry here plus its
-// renderer; the portal's add dialog and the video detail screen both read
-// this list, so neither hardcodes a template name.
+// Video templates, projected from the one catalog.
 //
-// A template is chosen once, when the video is created, and is not changed
-// afterwards: it decides the scene structure, what material slots exist, and
-// which structuring prompt will eventually fill them. Same reason
-// slide-factory fixes a property's `deliverable` at creation time.
+// This file used to BE the catalog. It is now a view over lib/templates, which
+// covers every tool kind (LP, video, banner, guideline…) with the same shape,
+// because the pivot made the template — not the video — the unit the product
+// grows by (docs/schema-v2.md §8).
+//
+// The exports below are unchanged so the portal and the video detail screen
+// keep working; what changed is that there is no second place to edit.
+//
+// A template is still chosen once, at creation, and never changed afterwards:
+// it decides the scene structure, the material slots, and the brief schema the
+// collection pipeline has to fill.
 
-export const VIDEO_TEMPLATE_IDS = ["product-cm", "event-promo"] as const;
+import { templatesForTool, type TemplateEntry } from "@/lib/templates/catalog";
 
-export type VideoTemplateId = (typeof VIDEO_TEMPLATE_IDS)[number];
+const VIDEO_TEMPLATE_ENTRIES = templatesForTool("video");
+
+export const VIDEO_TEMPLATE_IDS = VIDEO_TEMPLATE_ENTRIES.map(
+  (template) => template.id,
+) as readonly string[];
+
+export type VideoTemplateId = string;
 
 export interface VideoTemplate {
   id: VideoTemplateId;
@@ -28,38 +38,27 @@ export interface VideoTemplate {
   isBrandDefault: boolean;
 }
 
-export const VIDEO_TEMPLATES: Record<VideoTemplateId, VideoTemplate> = {
-  "product-cm": {
-    id: "product-cm",
-    name: "製品紹介動画",
-    summary:
-      "課題解決型の30秒CM。Service Brand Kitのコピーとナレーションから、ロゴ・配色をそのまま使って組み立てます。",
-    requires: "ソース（URL・PDF・テキスト）から生成したService Brand Kit",
-    duration: "30秒",
-    narration: true,
-    // The product CM is the slot every brand starts with, whether or not it
-    // has been generated — the portal always shows it, unpublished.
-    isBrandDefault: true,
-  },
-  "event-promo": {
-    id: "event-promo",
-    name: "イベント動画",
-    summary:
-      "イベント・セミナー告知の30秒PV。和モダンの固定タイムラインで、ナレーションを持たずBGMとタイポグラフィで成立させます。素材が無いスロットは設計済みのフォールバックで描かれます。",
-    requires: "イベントの文言・日時・登壇者（EventBrief）",
-    duration: "30秒",
-    narration: false,
-    isBrandDefault: false,
-  },
-};
+const toVideoTemplate = (template: TemplateEntry): VideoTemplate => ({
+  id: template.id,
+  name: template.name,
+  summary: template.summary,
+  requires: template.requires,
+  duration: template.duration ?? "",
+  narration: template.narration ?? false,
+  isBrandDefault: template.isBrandDefault,
+});
+
+export const VIDEO_TEMPLATES: Record<VideoTemplateId, VideoTemplate> =
+  Object.fromEntries(
+    VIDEO_TEMPLATE_ENTRIES.map((template) => [template.id, toVideoTemplate(template)]),
+  );
 
 export const videoTemplate = (id: string): VideoTemplate | null =>
-  (VIDEO_TEMPLATES as Record<string, VideoTemplate>)[id] ?? null;
+  VIDEO_TEMPLATES[id] ?? null;
 
 export const isVideoTemplateId = (id: string): id is VideoTemplateId =>
   Object.hasOwn(VIDEO_TEMPLATES, id);
 
 /** Templates offered in the "add a video" dialog, in display order. */
-export const ADDABLE_VIDEO_TEMPLATES: VideoTemplate[] = VIDEO_TEMPLATE_IDS.map(
-  (id) => VIDEO_TEMPLATES[id],
-);
+export const ADDABLE_VIDEO_TEMPLATES: VideoTemplate[] =
+  VIDEO_TEMPLATE_ENTRIES.map(toVideoTemplate);
