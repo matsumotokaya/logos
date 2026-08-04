@@ -16,6 +16,7 @@ URL・資料・ロゴを起点に、Organizationと企業・事業ブランド�
 |---|---|
 | [PRODUCT.md](PRODUCT.md) | 事業構想・3層のプロダクト構想・収益モデル・差別化戦略 |
 | [docs/deliverable-architecture.md](docs/deliverable-architecture.md) | **ピボット後の全体アーキテクチャ要件定義の正本**(2026-08-04 第2版・外部レビュー反映): マーケティングツール生成への再定義、Organization(ネスト)/Brand/Work のエンティティモデル、ブランドアセットとマーケティングツールの2系統、BrandKnowledge(主張モデル)・3段素材スコープ・版固定Template・Take/Run/Render/Artifact・Publication、段階移行の手順。依頼者の原文と未決定事項を含む。**次にアーキテクチャを触るセッションの出発点** |
+| [docs/schema-v2.md](docs/schema-v2.md) | **v2スキーマ概念設計の正本**(2026-08-04): 上の要件を実際のテーブル・列・不変条件・RLS・migration段へ落としたもの。既存 `brand_organizations`/`brand_entities` を継承し、Knowledge(主張+確定値)・3段スコープ素材・Work・Take/Run/Render/Artifact・Publication・canonicalスロット・Template版台帳を並行追加する。実DBの棚卸しと着手順を含む。**切替完了後はdata-model.mdへ統合して廃止** |
 | [docs/account-design.md](docs/account-design.md) | アカウント・権限・URL体系・RLS方針(Supabase設計) |
 | [docs/data-model.md](docs/data-model.md) | **ブランドデータの正本**: 管理ワークスペースと現実のOrganizationの分離、Organization→Brand→Assets、プロフィール・ロゴ・生成履歴 |
 | [docs/logo-entity-lab-integration.md](docs/logo-entity-lab-integration.md) | Labs↔ロゴ正本エンティティ統合の現行仕様・残課題・ランタイムassetの暫定手動運用 |
