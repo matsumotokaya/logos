@@ -15,7 +15,7 @@ URL・資料・ロゴを起点に、Organizationと企業・事業ブランド�
 | ドキュメント | 正本として扱う内容 |
 |---|---|
 | [PRODUCT.md](PRODUCT.md) | 事業構想・3層のプロダクト構想・収益モデル・差別化戦略 |
-| [docs/deliverable-architecture.md](docs/deliverable-architecture.md) | **成果物アーキテクチャの要望要件**: 全成果物(ロゴプレゼン・LP・動画・バナー・ガイドライン)に共通する「テイク+テンプレート+パイプライン+共有素材」構造。設計前の合意用 |
+| [docs/deliverable-architecture.md](docs/deliverable-architecture.md) | **成果物アーキテクチャの要望要件+引き継ぎ**: 全成果物(ロゴプレゼン・LP・動画・バナー・ガイドライン)に共通する「テイク+テンプレート+パイプライン+スコープ付き素材」構造。依頼者の原文・定義できていないこと・繰り越し課題を含む。**次にこのテーマを触るセッションの出発点** |
 | [docs/account-design.md](docs/account-design.md) | アカウント・権限・URL体系・RLS方針(Supabase設計) |
 | [docs/data-model.md](docs/data-model.md) | **ブランドデータの正本**: 管理ワークスペースと現実のOrganizationの分離、Organization→Brand→Assets、プロフィール・ロゴ・生成履歴 |
 | [docs/logo-entity-lab-integration.md](docs/logo-entity-lab-integration.md) | Labs↔ロゴ正本エンティティ統合の現行仕様・残課題・ランタイムassetの暫定手動運用 |
