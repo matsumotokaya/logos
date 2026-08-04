@@ -125,6 +125,9 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 - **`metadata` が作成後の正本**。`event-promo` は `metadata.brief` に `EventBrief` を持つ。バンドル済みブリーフ([remotion/event/briefs/](remotion/event/briefs/))は**seedであり、作成時に複製される**——以後の編集がリポジトリのコードに影響しない
 - `videoId` はアセットIDでもキャンペーンjob IDでもよく、`/api/brands/[id]/videos/[videoId]` が判別して返す。両方UUIDで形では区別できないため、判別は1箇所に置く
 - 生成物の元になったキャンペーンjob IDの解決順(`external_job_id` → `legacy_campaign_id` → 公開パス)は [lib/video/job-id.ts](lib/video/job-id.ts) が正本。取り違えると「未作成」に見えるだけで無症状なので、実装を分散させない
+- **書き出したMP4の正本はR2**(`brands/<brandId>/takes/<takeId>/output/video-<timestamp>.mp4`)。ローカルフォールバックを持たない——経路が2本あると「どちらが正本か」が実行環境で変わるため。キー設計と入出力は [lib/video/storage.ts](lib/video/storage.ts)、レンダーは [lib/video/render-event.ts](lib/video/render-event.ts)(R2へ直接アップロードし、ローカルの一時ファイルは破棄する)
+- 配信は `GET /api/brands/[id]/videos/[videoId]/output`。`<video>` はAuthorizationヘッダーを送れないため**署名付き同一オリジンURL**で、**Range要求に対応**する(シークのため)。**署名はオブジェクトキーごと**署名するので、このルートはDBを読まない——署名リクエストはユーザートークンを持たず `brand_assets` はRLSで読めないため、キーを引きに行く実装は「配信すべきリクエストで必ず404になる」。署名がキーを含むので他テイクのオブジェクトへ向け替えることもできない。本番では `LABS_OUTPUT_URL_SECRET` が必須
+- レンダーは `POST .../render` で非同期。進捗と結果(`mp4Key`)はテイクの `metadata.render` に持つので、リロードしても別マシンからでも状態が分かる。**S3は使わない**(現時点でAWS S3は未使用。将来Remotion Lambdaを採用してもS3は一時領域とし、R2へ写す)
 
 ## イベントPVテンプレート(event promo)
 

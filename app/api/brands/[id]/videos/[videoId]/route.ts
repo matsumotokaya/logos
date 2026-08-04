@@ -12,9 +12,11 @@
 
 import { guardLabsRequest } from "@/lib/labs-access";
 import { campaignCmMp4Exists, getCampaignJob } from "@/lib/campaign/jobs";
+import { signedLabsUrl } from "@/lib/labs-output-sign";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
-import { parseVideoMetadata, type VideoState } from "@/lib/video/asset";
+import { parseVideoMetadata, type EventRenderState, type VideoState } from "@/lib/video/asset";
 import { VIDEO_TEMPLATES } from "@/lib/video/templates";
+import { outputSignatureToken } from "./output/route";
 
 const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -55,9 +57,24 @@ export async function GET(
     if (!meta) {
       return Response.json({ error: "動画の構成を読み取れませんでした" }, { status: 500 });
     }
+    // The MP4 lives in R2 and is played through a signed same-origin URL —
+    // <video> cannot send an Authorization header, so the URL is minted here,
+    // where the caller is already authenticated.
+    const render = (row.metadata as { render?: EventRenderState } | null)?.render ?? null;
+    const mp4Url =
+      render?.status === "done" && render.mp4Key
+        ? signedLabsUrl(
+            `/api/brands/${brandId}/videos/${videoId}/output?key=${encodeURIComponent(render.mp4Key)}`,
+            outputSignatureToken(videoId, render.mp4Key),
+          )
+        : null;
     return Response.json({
       kind: "asset" as const,
       video: {
+        render: render
+          ? { status: render.status, error: render.error ?? null, renderedAt: render.renderedAt ?? null }
+          : null,
+        mp4Url,
         id: row.id,
         brandId: row.brand_id,
         title: row.title,

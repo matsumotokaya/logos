@@ -14,6 +14,21 @@
 import type { EventBrief } from "@/remotion/event/types";
 import type { VideoTemplateId } from "./templates";
 
+/**
+ * MP4 render state, stored on the take rather than in server memory so a
+ * reload — or a different machine — still sees what happened. `mp4Key` is an
+ * R2 object key; there is no local copy (see lib/video/storage.ts).
+ */
+export interface EventRenderState {
+  status: "running" | "done" | "error";
+  mp4Key?: string;
+  bytes?: number;
+  renderedAt?: string;
+  error?: string;
+  startedAt?: string;
+  failedAt?: string;
+}
+
 /** `brand_assets.metadata` for asset_kind='video'. */
 export interface VideoAssetMetadata {
   template: VideoTemplateId;

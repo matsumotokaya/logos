@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { authedFetch } from "@/app/campaigns/campaign-ui";
+import { videoFetch } from "@/lib/video/client";
 import CampaignDetail from "@/app/campaigns/[id]/CampaignDetail";
 import EventVideoWorkspace from "@/components/video/EventVideoWorkspace";
 import { VIDEO_STATE_LABEL, type VideoState } from "@/lib/video/asset";
@@ -32,7 +32,13 @@ type VideoAsset = {
   campaignJobId: string | null;
   state: VideoState;
   createdAt: string;
+  render: { status: "running" | "done" | "error"; error: string | null; renderedAt: string | null } | null;
+  /** Signed same-origin URL of the MP4 in R2, when one has been rendered. */
+  mp4Url: string | null;
 };
+
+/** A render takes minutes; poll while one is in flight. */
+const RENDER_POLL_MS = 5000;
 
 type Resolved =
   | { kind: "asset"; video: VideoAsset }
@@ -51,7 +57,7 @@ export default function BrandVideoDetail({
 
   const load = useCallback(async () => {
     try {
-      const res = await authedFetch(`/api/brands/${brandId}/videos/${videoId}`);
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}`);
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(json?.error ?? "動画を取得できませんでした");
@@ -76,11 +82,37 @@ export default function BrandVideoDetail({
     };
   }, [load]);
 
+  // Keep polling while the MP4 render runs, so the player appears on its own.
+  const rendering = resolved?.kind === "asset" && resolved.video.render?.status === "running";
+  useEffect(() => {
+    if (!rendering) return;
+    const timer = setInterval(() => void load(), RENDER_POLL_MS);
+    return () => clearInterval(timer);
+  }, [rendering, load]);
+
+  async function startRender() {
+    setSaving(true);
+    try {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/render`, {
+        method: "POST",
+      });
+      if (!res.ok && res.status !== 202) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "MP4の作成を開始できませんでした");
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "MP4の作成を開始できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function togglePublished(next: boolean) {
     if (resolved?.kind !== "asset") return;
     setSaving(true);
     try {
-      const res = await authedFetch(`/api/brands/${brandId}/videos/${videoId}`, {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ published: next }),
@@ -171,15 +203,64 @@ export default function BrandVideoDetail({
             {video.briefSlug ? ` ・ ブリーフ: ${video.briefSlug}` : ""}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void togglePublished(!video.published)}
-          disabled={saving}
-          className="rounded-full border border-ink px-4 py-2 text-xs font-semibold transition hover:bg-ink hover:text-paper disabled:opacity-50"
-        >
-          {saving ? "更新中…" : video.published ? "公開をやめる" : "公開する"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void startRender()}
+            disabled={saving || video.render?.status === "running" || !video.brief}
+            className="rounded-full border border-hairline px-4 py-2 text-xs font-semibold transition hover:border-ink disabled:opacity-50"
+          >
+            {video.render?.status === "running"
+              ? "MP4を作成中…"
+              : video.mp4Url
+                ? "MP4を作り直す"
+                : "MP4を作成"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void togglePublished(!video.published)}
+            disabled={saving}
+            className="rounded-full border border-ink px-4 py-2 text-xs font-semibold transition hover:bg-ink hover:text-paper disabled:opacity-50"
+          >
+            {saving ? "更新中…" : video.published ? "公開をやめる" : "公開する"}
+          </button>
+        </div>
       </header>
+
+      {video.render?.status === "running" ? (
+        <p className="flex items-center gap-2 rounded-xl border border-hairline bg-ink/5 px-4 py-2.5 text-[12px] text-ink-muted">
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ink-faint border-t-ink" />
+          MP4を作成中（数分）— このページを離れても処理は続き、完成するとここに表示されます
+        </p>
+      ) : null}
+      {video.render?.status === "error" && video.render.error ? (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-[12px] text-red-700">
+          MP4の作成に失敗しました: {video.render.error}
+        </p>
+      ) : null}
+      {video.mp4Url ? (
+        <section className="rounded-2xl border border-hairline p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold">書き出したMP4</h2>
+            <a href={video.mp4Url} download className="text-[11px] text-accent hover:underline">
+              ダウンロード
+            </a>
+          </div>
+          {/* Served from R2 through a signed same-origin route with Range
+              support, so this is the same file any other machine would get. */}
+          <video
+            src={video.mp4Url}
+            controls
+            className="mt-3 w-full rounded-xl bg-[#0b0d13]"
+            style={{ aspectRatio: "16 / 9" }}
+          />
+          {video.render?.renderedAt ? (
+            <p className="mt-2 text-[11px] text-ink-faint">
+              書き出し: {new Date(video.render.renderedAt).toLocaleString("ja-JP")}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {video.brief ? (
         <EventVideoWorkspace brief={video.brief} />

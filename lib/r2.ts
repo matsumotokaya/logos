@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   NoSuchKey,
   PutObjectCommand,
   S3Client,
@@ -104,6 +105,62 @@ export async function getR2Object(key: string): Promise<Buffer | null> {
     if (error instanceof NoSuchKey) return null;
     throw error;
   }
+}
+
+export interface R2ObjectStat {
+  size: number;
+  contentType: string | null;
+}
+
+/** Size and type without transferring the body — for a video route that has to
+ *  answer a Range request with a Content-Range header. */
+export async function headR2Object(key: string): Promise<R2ObjectStat | null> {
+  const config = readConfig();
+  if (!config) return null;
+  try {
+    const res = await client().send(
+      new HeadObjectCommand({ Bucket: config.bucketName, Key: key }),
+    );
+    return { size: res.ContentLength ?? 0, contentType: res.ContentType ?? null };
+  } catch (error) {
+    if (error instanceof NoSuchKey || isNotFound(error)) return null;
+    throw error;
+  }
+}
+
+/**
+ * Byte range of an object, so a browser can seek in a video without the server
+ * pulling the whole file into memory first. `end` is inclusive, matching both
+ * the HTTP Range header and S3's Range parameter.
+ */
+export async function getR2ObjectRange(
+  key: string,
+  start: number,
+  end: number,
+): Promise<Buffer | null> {
+  const config = readConfig();
+  if (!config) return null;
+  try {
+    const res = await client().send(
+      new GetObjectCommand({
+        Bucket: config.bucketName,
+        Key: key,
+        Range: `bytes=${start}-${end}`,
+      }),
+    );
+    if (!res.Body) return null;
+    return Buffer.from(await res.Body.transformToByteArray());
+  } catch (error) {
+    if (error instanceof NoSuchKey || isNotFound(error)) return null;
+    throw error;
+  }
+}
+
+/** HeadObject reports a missing key as a bare 404 rather than NoSuchKey. */
+function isNotFound(error: unknown): boolean {
+  const status = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata
+    ?.httpStatusCode;
+  return status === 404;
 }
 
 export async function deleteR2Object(key: string): Promise<void> {
