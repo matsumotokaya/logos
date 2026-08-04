@@ -1,7 +1,7 @@
 # v2スキーマ概念設計(マーケティングツール生成)
 
-最終更新: 2026-08-04
-ステータス: **概念設計。migrationは未作成・未適用**
+最終更新: 2026-08-05
+ステータス: **migration 0023〜0031 をリモート(`xhbdfzceyfrxsmaixkne`)へ適用済み。アプリ側の読み書きはまだ1行も移していない**
 
 要件の正本は [deliverable-architecture.md](deliverable-architecture.md)。本書はその §10-2「新スキーマ概念設計」の成果物であり、**テーブル・列・不変条件・RLS・移行段の正本**である。現行(v1)の稼働構造は [data-model.md](data-model.md)、アカウント・URL・RLSの原則は [account-design.md](account-design.md) が正本のまま。切り替え完了後、本書の内容は data-model.md へ統合して本書を廃止する。
 
@@ -27,7 +27,7 @@ project ref `xhbdfzceyfrxsmaixkne`。移行設計は**この実測値**を前提
 | テーブル | 行数 | 内訳・注意 |
 |---|---|---|
 | `brand_organizations` | 17 | うち11が `system_key='unassigned_logo_organization'`(ロゴ単体投入で自動生成された「名称未設定のOrganization」)。`parent_organization_id` はまだ無い |
-| `brand_entities` | 約50 | **legacy Organization行(17) が同居**(`brand_kind is null`、`entity_type='organization'`)。corporate 16 / business 15。`brand_kind='audience'` は**0** |
+| `brand_entities` | 53 | **legacy Organization行 16 が同居**(`brand_kind is null`、`entity_type='organization'`)。Brandは corporate 17 / business 20。`brand_kind='audience'` は**0** |
 | `brand_profiles` | 14 | jsonbのキーは `palette` / `theme` / `service` / `design_tokens` / `organization` の5系統。これが BrandKnowledge の field_path の出発点 |
 | `logos` | 25 | 多くが placeholder Brand(`未整理のブランドアセット`)配下。public 2件、unlisted 1件 |
 | `brand_assets` | 12 | LP 11件 + `event-promo` 動画1件(`世界が恋する日本酒`)。`asset_kind='video'` はこの1件だけ |
@@ -38,7 +38,7 @@ project ref `xhbdfzceyfrxsmaixkne`。移行設計は**この実測値**を前提
 読み取れること:
 
 - **データ量は移行の制約ではない。** 制約は「動いている導線を止めないこと」だけ(要件 §8)。冪等ポートの対象は実質 LP 11件 + 動画1件
-- **`brand_entities` の legacy Organization行が最大のゴミ。** contract 段でこの17行を削除するまで、`brand_kind is null` を「Brandではない」と読み分ける分岐がコード全体に残る
+- **`brand_entities` の legacy Organization行が最大のゴミ。** contract 段でこの16行を削除するまで、`brand_kind is null` を「Brandではない」と読み分ける分岐がコード全体に残る
 - **`campaigns` 系は空**なので、縮退は「readerを外して drop」だけで済む
 - placeholder Organization/Brand が11組ある。v2でも同じ導線(ロゴ1枚から始める)を保つため、この仕組みは残す
 
@@ -90,7 +90,9 @@ alter table public.brand_organizations
 
 - **循環と深さをトリガーで禁じる**(自己参照 / 祖先ループ / 深さ8超)。祖先を辿るクエリの上限を保証するため
 - 祖先判定は `private.organization_is_ancestor(p_ancestor, p_descendant)`(`brand_entity_is_ancestor` と同型)
-- **ネストは権限を継承しない。** `private.can_view_brand_organization` / `can_manage_brand_organization` は現行のまま(自分が作成した / linked workspace のロール)。現実世界側の構造と権限構造を混ぜない(要件 §2.2、§11-6は未決定のまま据え置き)
+- **権限は判定時に祖先を辿らない。** `private.can_view_brand_organization` / `can_manage_brand_organization` は自行の `linked_org_id` だけを見る(2026-08-04決定、§11-6を解決)
+- **代わりに作成時にコピーする。** 子Organizationを作るとき、`linked_org_id` が未指定なら親の値をトリガーで書き写す。これで「URL投入で自動生成された子Orgが、親のWorkspaceメンバーから見えない」落とし穴を防ぎつつ、**子会社を売却して親子関係を切っても保存済みの権限が黙って変わらない**。要件 §2.4「継承はOrganization構造から導出しない」と同じ思想を権限にも適用する
+- 判定で祖先を辿らないので、RLSヘルパーに再帰CTEが入らない(全SELECTのコストが一定に保たれる)
 - ネストが使われるのは2箇所だけ:
   1. 左ペインのツリー表示
   2. **継承元Brandの既定候補の探索**(要件 §2.4: 同Org の corporate → 祖先Org の corporate → なし)。これは候補提示であり、権限判定に使わない
@@ -485,29 +487,77 @@ create table public.brand_access_grants (
 );
 ```
 
-- `logo_access_grants` / `private.has_logo_grant` の一般化(0015と同型)。既存 enum `logo_access_role` を再利用する
-- `private.can_view_brand_entity` / `can_manage_brand_entity` に `private.has_brand_grant(...)` を OR で足す。素材・テイク・成果物の共有はすべてこの1経路に集約する
+- `logo_access_grants` / `private.has_logo_grant` の一般化(0015と同型)。**既存 enum `logo_access_role`(manager / editor / viewer)を再利用**し、enumを増やさない
+- 各ロールが何をできるかは §14.1 の梯子で定義する。**grantでは公開・削除・再共有はできない**(所有主体側のowner/adminに限る)
 - **資本関係のない共同ブランドは継承ではなくこの許可で表す**(要件 §2.4)。`parent_brand_id` を「見せたいから」設定させない
+- **Brandを管理できることは、そのBrandのロゴを編集できることを意味しない。** `logos.subject_entity_id` は「何を表すロゴか」であって所有ではない(デザイナーが所有し、企業がBrandを管理する形が成立する)。ロゴの編集権は従来どおり `logos.owner_*` と `logo_access_grants` だけで決まる。Take からロゴを**使う**ことはできる
 
-## 14. RLS まとめ
+## 14. 権限とRLS
+
+### 14.1 4段の梯子(2026-08-04決定)
+
+ロールを列挙する代わりに、**4つの述語**で全テーブルを説明する。新規ヘルパーはこの4つと補助関数だけ。
+
+| 述語 | 満たす人 | 何ができるか |
+|---|---|---|
+| `can_view_brand_entity` | owner / admin / editor / purchaser / viewer、grant の manager / editor / viewer、作成者 | **成果物の閲覧**(Take / Render / Artifact / 素材 / Knowledge確定値) |
+| `can_edit_brand_output` | 上記のうち owner / admin / editor、grant の manager / editor | Take・brief・Render の作成と編集、素材の投入、生成の起動 |
+| `can_edit_brand_core` | owner / admin / editor、grant の **manager のみ** | Brand正本(名前・種別・継承元)、**Knowledge確定値の採用**、**素材のブランド昇格** |
+| `can_admin_brand` | owner / admin、個人所有なら作成者。**grantは含まない** | **Publication(公開)**、Take / Work の削除、共有の付与と解除 |
+
+決定の根拠:
+
+- **公開は owner / admin のみ。** 現行のロゴ `visibility` 変更と同じ線引きに揃える。外向きで不可逆な操作で「作る」と「出す」を分ける
+- **成果物の閲覧は viewer / purchaser にも開く。** 現行(0022)は `brand_assets` ごと editor 以上に閉じているため、viewer は自分のブランドの動画一覧すら見えない。閲覧専用ロールの存在意義がそこにあるので開く。ただし `take_runs`(出典URL・LLMコスト・エラー)は閉じたまま
+- **Knowledge確定値の採用と素材の昇格は editor 以上。** admin限定にすると「確認待ちの仮情報」が永遠に溜まり、ブランド素材が手作業の重複アップロードで埋まる。採用は `decided_by` / `decided_at` / `adopted_claim_id` に記録され、主張(claims)は消えないので後から辿れる
+- **削除は owner / admin、かつ live な Publication があれば拒否。** editor はアーカイブ(`status='archived'`)までできる。削除は素材の唯一のコピーを失い得る不可逆操作
+- **運営(platform_admin / support)にRLSの抜け道を作らない。** Labsゲートは「自分のブランドで生成できる」権限であって他人のデータを読む権限ではない。サポートが必要なときは利用者から `brand_access_grants` で招待してもらう。「運営でも覗き見できない」は法人利用で説明しやすい強い特性
+
+### 14.2 テーブル別
 
 | テーブル | SELECT | INSERT / UPDATE | DELETE |
 |---|---|---|---|
 | `brand_organizations` | `can_view_brand_organization` | `can_manage_brand_organization` | 同左 |
-| `brand_entities` | `can_view_brand_entity` | `can_manage_brand_entity` | 同左 |
-| `brand_variants` | `can_view_brand_entity(brand_id)` | `can_manage_brand_entity` | 同左 |
-| `brand_knowledge_claims` | `can_manage_brand_entity`(authenticated) | INSERT のみ | **ポリシーなし** |
-| `brand_knowledge_values` | `can_manage_brand_entity`(authenticated) | 同左 | 同左 |
-| `brand_materials` | `can_view_brand_entity` | `can_manage_brand_entity` | 同左 |
-| `works` / `takes` | `can_view_brand_entity(brand_id)` | `can_manage_brand_entity` | **ポリシーなし**(RPC経由) |
-| `take_runs` / `take_renders` / `render_artifacts` | `can_manage_take`(authenticated) | 同左 | 同左 |
-| `publications` | `can_manage_take`(authenticated) | 同左 | 同左 |
-| `canonical_slots` | 対象の view 権限 | 対象の manage 権限 | 同左 |
-| `template_versions` | 全員(定義カタログ) | service_role のみ | なし |
-| `brand_access_grants` | 付与元admin または 被付与者 | 付与元admin | 同左 |
+| `brand_entities` | `can_view_brand_entity` | `can_edit_brand_core` | `can_admin_brand` |
+| `brand_variants` | `can_view_brand_entity` | `can_edit_brand_core` | 同左 |
+| `brand_knowledge_claims` | `can_view_brand_entity` | **INSERT のみ**(`can_edit_brand_output`) | **ポリシーなし** |
+| `brand_knowledge_values` | `can_view_brand_entity` | `can_edit_brand_core` | 同左 |
+| `brand_materials` | `can_view_brand_entity` | `can_edit_brand_output`(scope拡大は `can_edit_brand_core`) | `can_edit_brand_core` |
+| `works` / `takes` | `can_view_brand_entity` | `can_edit_brand_output` | **ポリシーなし**(RPC経由・§14.3) |
+| `take_renders` / `render_artifacts` | `can_view_brand_entity` | `can_edit_brand_output` | `can_edit_brand_output` |
+| `take_runs` | **`can_edit_brand_output`** | 同左 | 同左 |
+| `publications` | `can_view_brand_entity` | **`can_admin_brand`** | 同左 |
+| `canonical_slots` | `can_view_brand_entity` / ロゴのview権限 | `can_edit_brand_core` / ロゴのadmin権限 | 同左 |
+| `template_versions` | authenticated 全員(定義カタログ) | service_role のみ | なし |
+| `brand_access_grants` | `can_admin_brand` または被付与者 | `can_admin_brand` | 同左 |
 
-- 新規ヘルパー: `private.can_view_take(uuid)` / `private.can_manage_take(uuid)` / `private.has_brand_grant(uuid, logo_access_role[], org_role[])` / `private.organization_is_ancestor(uuid, uuid)`
-- **公開面は1つもRLSで開けない。** LP・動画・画像は既存の署名付き同一オリジンルート([../lib/labs-output-sign.ts](../lib/labs-output-sign.ts) / [../lib/mockup-sign.ts](../lib/mockup-sign.ts))で配信する。`take_runs` は出典URL・コスト・エラーを含むため特に厳しく閉じる(0022の判断を踏襲)
+- v2の全テーブルは `to authenticated` + `private.is_registered_user()`。**匿名セッションには1行も見せない**(§14.4)
+- 新規ヘルパー: `private.has_brand_grant(uuid, logo_access_role[], org_role[])` / `can_edit_brand_output(uuid)` / `can_edit_brand_core(uuid)` / `can_admin_brand(uuid)` / `take_brand_id(uuid)` / `render_brand_id(uuid)` / `organization_is_ancestor(uuid, uuid)`
+
+### 14.3 削除はRPC経由
+
+`takes` / `works` に DELETE ポリシーを作らない。`public.delete_take(uuid)` / `public.delete_work(uuid)` が1トランザクションで:
+
+1. `can_admin_brand` を確認する
+2. **live な Publication があれば拒否する**(先に非公開にする必要がある)
+3. 唯一のコピーになる素材を退避(work/brandへ昇格)または削除対象として提示する
+4. R2キーを参照カウントし、0になるものだけ `private.r2_deletion_queue` へ入れる
+
+理由: この4つを別々のクエリでやると、途中で失敗したときに「行は消えたがR2に残る」「素材だけ残って親が無い」が起きる。0013 の退会RPCと同じ構造にする。
+
+### 14.4 公開面はRLSで開けない
+
+- **v2の新テーブルは anon に一切開かない。** 公開判定の正本は `publications.status='live'` だけで、RLSに二重化しない(公開を止めたときに直す場所が2つになるのを避ける)
+- 公開ページはサーバー側で解決して描画する。LP・動画・モックアップはすでにこの形([../lib/labs-output-sign.ts](../lib/labs-output-sign.ts) / [../lib/mockup-sign.ts](../lib/mockup-sign.ts))
+- 現行の `/p/[id]` はクライアントが匿名セッションで `logos` を直読みしている(RLSの `unlisted`/`public` 経路)。**これは壊さず維持**し、ロゴプレゼンのTake化(着手順の最後)でサーバー解決へ移す
+- `take_runs` は出典URL・コスト・エラーを含むため、閲覧ロールにも見せない(0022の判断を踏襲)
+
+### 14.5 生成の実行者は当面Labsゲートのまま
+
+コストの発生する操作(`take_runs` の起動)は、現行どおり `platform_admin` / `labs_member` だけが実行できる([../lib/labs-access.ts](../lib/labs-access.ts) の `guardLabsRequest`)。SVGロゴ→プレゼンは全登録ユーザーのまま。
+
+- **課金は当面設計しない(フリー)。** ただし `take_runs.usage` へのコスト記録は最初から行う。将来クレジット制にする場合、残高チェックを差し込む場所は生成起動の1箇所だけで済む
+- DBのRLS上は `can_edit_brand_output` があれば書けるので、ゲートはアプリ層の1関数に集約する(RLSに運営ロールを持ち込まない §14.1 の帰結)
 
 ## 15. 退会・削除への追随(必須)
 
@@ -524,20 +574,24 @@ create table public.brand_access_grants (
 
 各段は**既存を壊さない追加のみ**。番号は連番の続き。
 
+**権限の梯子(§14.1)を先に作る。** 後続の全テーブルのポリシーがそれを参照するため。
+
 | # | 内容 | 依存 | 検証 |
 |---|---|---|---|
-| 0023 | Org ネスト(`parent_organization_id` + 循環/深さトリガー + 祖先関数)、`brand_kind` 拡張、`brand_variants` | — | 循環INSERTが失敗する / 既存50行が制約を通る |
-| 0024 | `template_versions` | — | production 昇格前は `published_at is null` |
-| 0025 | `works`、`takes`、`take_inputs`(+ 不変トリガー) | 0024 | template版を持たないTakeを作れない |
-| 0026 | `take_runs`、`take_renders`、`render_artifacts` | 0025 | 同一 (take, locale, ratio, theme, format) が2行にならない |
-| 0027 | `brand_materials`(3スコープ + 昇格トリガー) | 0025, 0026 | scope縮小が失敗する / 実体なし行が作れない |
-| 0028 | `brand_knowledge_claims` / `_values` | 0026(run_id) | `layer='fact'` + `source_kind='llm_generation'` が失敗する |
-| 0029 | `publications`、`canonical_slots` | 0025 | live な同一パスが2行にならない |
-| 0030 | `brand_access_grants` + `can_view/manage_brand_entity` へのOR追加 + `can_view/manage_take` | 0025 | 付与前は他人が読めない |
-| 0031 | 退会RPC拡張(§15) | 0026, 0027 | 新テーブルのキーがプレビューに出る |
+| 0023 | Org ネスト(`parent_organization_id` + 循環/深さトリガー + `linked_org_id` の作成時コピー + 祖先関数)、`brand_kind` 拡張、`brand_variants` | — | 循環INSERTが失敗する / 既存50行が制約を通る |
+| 0024 | `brand_access_grants` + 4段の梯子(`has_brand_grant` / `can_edit_brand_output` / `can_edit_brand_core` / `can_admin_brand`)+ `can_view_brand_entity` へのgrant追加 | 0023 | 付与前は他人が読めない / grantでadminにならない |
+| 0025 | `template_versions`(`(template_id, version, tool_kind)` の一意索引つき) | — | production 昇格前は `published_at is null` |
+| 0026 | `works`、`takes`(+ 版の不変トリガー) | 0024, 0025 | template版を持たないTakeを作れない / tool_kind不一致が失敗する |
+| 0027 | `take_runs`、`take_renders`、`render_artifacts` | 0026 | 同一 (take, locale, ratio, theme, format) が2行にならない |
+| 0028 | `brand_materials`(3スコープ + 昇格トリガー)、`take_inputs` | 0026, 0027 | scope縮小が失敗する / 実体なし行が作れない |
+| 0029 | `brand_knowledge_claims` / `_values` | 0027(run_id) | `layer='fact'` + `source_kind='llm_generation'` が失敗する |
+| 0030 | `publications`、`canonical_slots` | 0026 | live な同一パスが2行にならない / 公開はadminのみ |
+| 0031 | `delete_take` / `delete_work` RPC(§14.3)+ 退会RPC拡張(§15) | 0028, 0030 | live公開中は削除できない / 新テーブルのキーがプレビューに出る |
 | 0032 | **ポート1: event-promo 動画1件**を `takes` + `take_renders` + `render_artifacts` へ複製(冪等) | 上記全部 | 件数1 / R2キー一致 |
 | 0033 | **ポート2: LP 11件**を `takes`(template=`campaign-lp`)へ複製。`brand_profiles` 14行を claims + values へ複製(`inferred` として) | 0032 | 件数・`/c/<id>` パス一致 / values が profile のキーを網羅 |
-| 0040+ | **contract**: legacy Organization行(17)削除、`entity_type` / `parent_entity_id` / `organization_kind` 列と旧トリガー削除、`brand_kind` を not null 化、`campaigns` / `campaign_*` drop、`brand_assets` / `brand_generation_runs` 縮退 | 読み取り切替の完了後 | `brand_kind is null` が0行 / 旧テーブル参照コードが無い |
+| 0040+ | **contract**: legacy Organization行(16)削除、`entity_type` / `parent_entity_id` / `organization_kind` 列と旧トリガー削除、`brand_kind` を not null 化、`campaigns` / `campaign_*` drop、`brand_assets` / `brand_generation_runs` 縮退 | 読み取り切替の完了後 | `brand_kind is null` が0行 / 旧テーブル参照コードが無い |
+
+0032/0033 はテンプレートID(コード側)が決まってから書く。**0023〜0031 は追加のみで、既存の読み書き経路に一切触らない**ため、適用してもプロダクトの挙動は変わらない。
 
 0032/0033 は**冪等**(再実行可能)にし、`provenance`/`metadata` に `migrated_from` を刻む(0021の規約)。
 
@@ -553,10 +607,9 @@ create table public.brand_access_grants (
 
 ## 18. この設計で残る未決定
 
-要件 §11 のうち、本書で潰したのは 1(Brand種別・audience)・2(Work境界)・3(briefSchema共通部分 = §7.3の語彙)。残るもの:
+要件 §11 のうち、本書で潰したのは 1(Brand種別・audience)・2(Work境界)・3(briefSchema共通部分 = §7.3の語彙)・**4(課金)**・**6(ネストと権限)**。残るもの:
 
-- **§11-4 課金の単位**: `take_runs.usage` にコストを記録するところまでは決定。価格設計は `spec.costProfile` と [costs.md](costs.md) の接続後
-- **§11-6 Workspaceとネストの権限関係**: 本書は「ネストは権限を継承しない」で据え置いた(§5)。子Organizationのメンバー権限を親Workspaceがどこまで管理するかは未決定
+- **§11-4 課金**: **当面フリーで運用する**と決定(2026-08-04)。クレジット制は将来の検討事項で、今回は設計しない。コスト記録(`take_runs.usage`)と差し込み地点の一元化(§14.5)だけ用意する
 - **§11-7 旧README残タスクとの合流順**: raster画像ロゴのプレゼン / 個人ハンドル / ロゴ単位共有UI
 - **placeholder Organization/Brand の整理**: 実DBに11組ある「名称未設定のOrganization → 未整理のブランドアセット」を、v2で利用者にどう畳ませるか(仕組みは残すが、UIの導線は未設計)
 - **`presentation_asset_definitions` と `template_versions` の統合時期**: 併存で始め、ロゴプレゼンのTake化と同時に寄せる(§8)

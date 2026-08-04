@@ -246,9 +246,9 @@ R2バケットはpublic access(`r2.dev`と公開custom domain)を無効にする
 
 ### Supabase
 
-スキーマの正本は [supabase/migrations/](supabase/migrations/) の連番migration。現行のリモートプロジェクトには`0022_private_brand_generation_data`まで適用済み。新規環境のセットアップ手順:
+スキーマの正本は [supabase/migrations/](supabase/migrations/) の連番migration。現行のリモートプロジェクトには`0031_deletion_rpcs`まで適用済み(`0023`〜`0031`はv2アーキテクチャの土台で、既存の読み書き経路には触れていない。設計は [docs/schema-v2.md](docs/schema-v2.md))。新規環境のセットアップ手順:
 
-1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0022)
+1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0031)
 2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(公開ページ閲覧時のセッション初期化用。アップロードは本登録ユーザーのみ)
 3. `.env.local` に以下を追加:
 
