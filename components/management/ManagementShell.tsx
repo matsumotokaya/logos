@@ -166,7 +166,7 @@ function BrandTree({
         : "事業";
 
   return (
-    <li>
+    <li className="py-2 first:pt-1 last:pb-1">
       <div className="flex min-w-0 items-center gap-1">
         <button
           type="button"
@@ -271,12 +271,14 @@ function ManagementTree({
 }) {
   return (
     <nav aria-label="Organization、事業、ブランドアセット">
-      <ul className="space-y-3">
+      {/* Rules between organizations, and again between the brands inside one:
+          without them the flattened tree reads as a single run of links. */}
+      <ul className="divide-y divide-hairline">
         {organizations.map((organization) => {
           const open = expandedOrganizations.has(organization.id);
           const regionId = `${prefix}-organization-${organization.id}`;
           return (
-            <li key={organization.id}>
+            <li key={organization.id} className="py-3 first:pt-0 last:pb-0">
               <div className="flex min-w-0 items-center gap-1">
                 <button
                   type="button"
@@ -299,7 +301,11 @@ function ManagementTree({
                 </div>
               </div>
 
-              <ul id={regionId} hidden={!open} className="mt-1 space-y-2 pl-3">
+              <ul
+                id={regionId}
+                hidden={!open}
+                className="mt-1 divide-y divide-hairline/70 border-l border-hairline pl-3"
+              >
                 {organization.brands.map((brand) => (
                   <BrandTree
                     key={brand.id}

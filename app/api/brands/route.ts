@@ -139,7 +139,9 @@ export async function GET(req: Request) {
   const organizationResult = await supabase
     .from("brand_organizations")
     .select("id, name, organization_kind, website, description, status")
-    .order("created_at", { ascending: true });
+    // Newest first: the left pane is a work surface, so what was just
+    // registered has to be at the top instead of scrolling off the bottom.
+    .order("created_at", { ascending: false });
   if (organizationResult.error) {
     return Response.json(
       { error: "Organizationを取得できませんでした" },
@@ -163,7 +165,7 @@ export async function GET(req: Request) {
     )
     .in("brand_organization_id", organizationIds)
     .in("brand_kind", ["corporate", "business", "audience"])
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false });
   if (brandResult.error) {
     return Response.json(
       { error: "ブランドを取得できませんでした" },
