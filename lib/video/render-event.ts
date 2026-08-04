@@ -13,11 +13,11 @@ import "server-only";
 // longer only exists where the render happened. The cloud renderer replaces the
 // spawn below and keeps the same contract: bytes in, R2 key out.
 
-import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { EventBrief } from "@/remotion/event/types";
+import { renderRemotionComposition } from "./remotion-cli";
 import { putTakeOutput, renderedKey } from "./storage";
 
 export interface EventRenderResult {
@@ -36,7 +36,7 @@ export async function renderEventTake(
   const outPath = path.join(dir, "out.mp4");
   try {
     await writeFile(propsPath, JSON.stringify({ brief }));
-    await runRemotion(propsPath, outPath);
+    await renderRemotionComposition("event", propsPath, outPath);
     const bytes = await readFile(outPath);
     const renderedAt = new Date().toISOString();
     const key = await putTakeOutput(
@@ -50,41 +50,4 @@ export async function renderEventTake(
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-}
-
-function runRemotion(propsPath: string, outPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      "npx",
-      [
-        "remotion",
-        "render",
-        "remotion/index.ts",
-        "event",
-        outPath,
-        `--props=${propsPath}`,
-        // Materials still live under public/ and are referenced by
-        // staticFile(); moving them into the material library is a separate
-        // step (see docs/deliverable-architecture.md R4/R5).
-        "--public-dir=public",
-      ],
-      {
-        cwd: process.cwd(),
-        stdio: ["ignore", "ignore", "pipe"],
-        // The parent may run under --conditions=react-server; Remotion's CJS
-        // build cannot load under it.
-        env: { ...process.env, NODE_OPTIONS: "" },
-      },
-    );
-    let stderr = "";
-    child.stderr.on("data", (d) => {
-      stderr += String(d);
-      if (stderr.length > 4000) stderr = stderr.slice(-4000);
-    });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(stderr.trim().slice(-500) || `render exited with ${code}`));
-    });
-  });
 }

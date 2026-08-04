@@ -12,6 +12,7 @@
     "campaign:sample-voice": "NODE_OPTIONS=--conditions=react-server tsx --env-file-if-exists=.env.local labs/campaign/scripts/sample-voice.ts",
     "campaign:render": "node labs/campaign/scripts/render-cm.mjs",
     "templates:sync": "NODE_OPTIONS=--conditions=react-server tsx --env-file-if-exists=.env.local scripts/sync-templates.ts",
+    "takes:event": "NODE_OPTIONS=--conditions=react-server tsx --env-file-if-exists=.env.local scripts/run-event-take.ts",
     "event:render": "remotion render remotion/index.ts event var/event-lab/sake-2026.mp4",
     "event:studio": "remotion studio remotion/index.ts"
   },
