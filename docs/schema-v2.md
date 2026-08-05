@@ -1,7 +1,7 @@
 # v2スキーマ概念設計(マーケティングツール生成)
 
 最終更新: 2026-08-05
-ステータス: **migration 0023〜0031 をリモート(`xhbdfzceyfrxsmaixkne`)へ適用済み。アプリ側の読み書きはまだ1行も移していない**
+ステータス: **migration 0023〜0031 適用済み。event-promo が新構造だけで1本通った(§17-2)。画面の読み書きはまだ1行も移していない**
 
 要件の正本は [deliverable-architecture.md](deliverable-architecture.md)。本書はその §10-2「新スキーマ概念設計」の成果物であり、**テーブル・列・不変条件・RLS・移行段の正本**である。現行(v1)の稼働構造は [data-model.md](data-model.md)、アカウント・URL・RLSの原則は [account-design.md](account-design.md) が正本のまま。切り替え完了後、本書の内容は data-model.md へ統合して本書を廃止する。
 
@@ -597,13 +597,30 @@ create table public.brand_access_grants (
 
 ## 17. 着手順(要件 §10 の具体化)
 
-1. **0023〜0031 を書いて適用**(既存導線は無傷。UIはまだ触らない)
-2. **event-promo を1本、新構造だけで通す**(作成 → brief編集 → render → artifact → publication)。要件 §9-3
+1. ~~**0023〜0031 を書いて適用**~~ **完了(2026-08-05)**。既存導線は無傷
+2. ~~**event-promo を1本、新構造だけで通す**~~ **完了(2026-08-05)**。下記の実測を参照。publication だけは意図的に作っていない(配信ルートが無い状態で `live` 行を作ると「公開したのに開けない」ため)
 3. **BrandKnowledge の実体化**: Brand Kit生成を claims 追加へ。`var/campaign-lab/jobs/*.json` 依存の解消はここで直る
 4. **LP を通し、Work内で動画と素材を共有できるかを確認**(要件 §9-4 = §4.2 の機能判定)
 5. **ポート(0032/0033) → 照合 → 読み取り切替**
 6. **退会RPCの追随を確認**(§15。チェックリスト: `brand_materials.r2_key` / `render_artifacts.r2_key` / 参照カウント / 削除順序)
 7. **ロゴプレゼンのTake化**(canonicalスロットが動いてから。最後)
+
+### 17.1 event-promo 1本通しの実測(2026-08-05)
+
+`npm run templates:sync` → `npm run takes:event`([../scripts/run-event-take.ts](../scripts/run-event-take.ts))。ハーネスは**既存v1アセットの実briefを読む**ので、合成データでは分からない「スキーマが手持ちのデータと合っているか」も同時に確かめている。
+
+| 段 | 結果 |
+|---|---|
+| 台帳 | `event-promo@1` / `product-cm@1` / `campaign-lp@1` の3行。コード側カタログのハッシュ付き |
+| brief | 実データ(`brand_assets.metadata.brief`)が `EventBriefSchema` を通過。**未充足は `schedule.venue` の1件だけ**で、これは設計上「画面から消える null」 |
+| Take | `event-promo@1` / brief schema v1 に版を固定して作成。既定Renderを同時に作成 |
+| Render | `ja / 16:9 / sumi / mp4`、`status=ready`、`latest_artifact_id` がArtifactを指す |
+| Artifact | 9,308,518 bytes、R2キーは `brands/<brandId>/takes/<takeId>/renders/<renderId>/video-<ts>.mp4` |
+| 読み戻し | R2から `HeadObject` でサイズ一致を確認 |
+| 同一性 | **sha256 が v1レンダー(`var/event-lab/sake-2026.mp4`)と完全一致**(`e7bb93dc…`)。v2経路が同じ出力を作っている |
+| 副作用 | v1の `brand_assets` 行は無傷。`publications` 0件、`brand_materials` 0件 |
+
+**分かった穴**: 素材(`public/event/sake-2026/`)はまだ `staticFile()` 参照のままで `brand_materials` に1行も無い。つまり**3段スコープの素材はまだ1度も使われていない**。§9-4(LP + Work共有の検証)は、この素材の移行と同時にやる必要がある。
 
 ## 18. この設計で残る未決定
 
