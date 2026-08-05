@@ -39,8 +39,17 @@ export interface CampaignTheme {
   direction: string;
   /** LP rendering parameters. */
   lp: {
-    /** "glass" = dark frosted-glass template, "flat" = light flat template. */
-    variant: "glass" | "flat";
+    /**
+     * Which LP template renders this theme. The first three are separate
+     * designs (own type system, own section structure), not skins:
+     *
+     *   "noir"      cinematic dark — US AI/robotics product page
+     *   "lumen"     bright premium SaaS — trust-first, inverted closing band
+     *   "editorial" ink & metal, serif — art / luxury / hospitality
+     *   "glass"     dark frosted skin of the original flat template
+     *   "flat"      the original light SaaS template
+     */
+    variant: "noir" | "lumen" | "editorial" | "glass" | "flat";
     /**
      * Hero-section background photo (public URL path + rgba scrim). The hero
      * renders white text over the dimmed photo; the rest of the page keeps
@@ -60,11 +69,10 @@ export const CAMPAIGN_THEMES: Record<CampaignThemeId, CampaignTheme> = {
     selection:
       "テック系・ソフトウェア・AI・スタートアップ全般。先進性やスピード感を打ち出したいサービス",
     direction:
-      "ダークトーンにガラス質感（フロストグラス）の近未来的な世界観。深い夜色の背景にブランドカラーが発光するように差す。余白は広く、コピーは短く自信のある断定調。BGMはミニマルなエレクトロニカ、ナレーションは落ち着いた低めのトーン。",
-    lp: {
-      variant: "glass",
-      heroBackground: { src: "/campaigns/bg/simon-nilsen.jpg", scrim: "rgba(6,11,34,0.45)" },
-    },
+      "漆黒に近いキャンバスにブランドカラーがオーロラのように発光する、最先端AI企業の製品ページの世界観。巨大なタイポグラフィと英語のマイクロラベル、広い余白、精密なヘアライン。コピーは短く自信のある断定調。BGMはミニマルなエレクトロニカ、ナレーションは落ち着いた低めのトーン。",
+    // The noir template is design-complete on its own canvas (aurora +
+    // grain), so it takes no hero photo.
+    lp: { variant: "noir" },
   },
   "minimal-light": {
     id: "minimal-light",
@@ -73,11 +81,9 @@ export const CAMPAIGN_THEMES: Record<CampaignThemeId, CampaignTheme> = {
     selection:
       "汎用のデフォルト。誠実さと分かりやすさを優先する業務サービス、または他のテーマに当てはまらない場合",
     direction:
-      "白ベースのクリーンなSaaSスタイル。ブランドカラーをアクセントとして要所にだけ使い、情報の分かりやすさを最優先する。コピーは丁寧で具体的、BGMは軽快なコーポレートポップ、ナレーションは明るく信頼感のあるトーン。",
-    lp: {
-      variant: "flat",
-      heroBackground: { src: "/campaigns/bg/milad-fakurian.jpg", scrim: "rgba(10,14,26,0.5)" },
-    },
+      "白ベースのクリーンなSaaSスタイル。大きく詰めた見出しと細いヘアラインで構成し、ブランドカラーは要所だけに効かせる。最後は反転した黒帯で締めてコントラストを残す。コピーは丁寧で具体的、BGMは軽快なコーポレートポップ、ナレーションは明るく信頼感のあるトーン。",
+    // The lumen template ships its own light canvas; no hero photo.
+    lp: { variant: "lumen" },
   },
   "corporate-trust": {
     id: "corporate-trust",
@@ -87,10 +93,7 @@ export const CAMPAIGN_THEMES: Record<CampaignThemeId, CampaignTheme> = {
       "信頼・実績・堅実さが第一の業種。金融、不動産、法務・会計、企業向けコンサルなど",
     direction:
       "ネイビーやチャコールを基調にした端正で構造的なデザイン。装飾を抑え、数字と実績を大きく見せる。コピーは敬体で堅実、誇張しない。BGMは弦楽やピアノの落ち着いた曲、ナレーションは重厚で信頼感のある声。",
-    lp: {
-      variant: "flat",
-      heroBackground: { src: "/campaigns/bg/pramod-tiwari.jpg", scrim: "rgba(8,14,30,0.55)" },
-    },
+    lp: { variant: "lumen" },
   },
   "care-warm": {
     id: "care-warm",
@@ -99,11 +102,8 @@ export const CAMPAIGN_THEMES: Record<CampaignThemeId, CampaignTheme> = {
     selection:
       "人に寄り添う業種。福祉、介護、医療・ヘルスケア、保育・教育、地域サービスなど",
     direction:
-      "グリーンやオレンジなどのあたたかい中間色と丸みのある形。安心感と親しみやすさを最優先し、写真やイラストは人の表情を感じさせるものを想定する。コピーはやわらかい語りかけ調。BGMはアコースティック、ナレーションはあたたかく穏やかなトーン。",
-    lp: {
-      variant: "flat",
-      heroBackground: { src: "/campaigns/bg/hassaan-here.jpg", scrim: "rgba(6,20,26,0.5)" },
-    },
+      "グリーンやオレンジなどのあたたかい中間色を、明るく清潔なホワイトキャンバスに乗せる。現代のヘルスケア・ウェルネスブランドの佇まいで、安心感と誠実さを最優先する。コピーはやわらかい語りかけ調。BGMはアコースティック、ナレーションはあたたかく穏やかなトーン。",
+    lp: { variant: "lumen" },
   },
   "friendly-pop": {
     id: "friendly-pop",
@@ -132,16 +132,24 @@ export const CAMPAIGN_THEMES: Record<CampaignThemeId, CampaignTheme> = {
     selection:
       "高価格帯・上質さが価値の業態。高級レストラン、ホテル・旅館、美容、ジュエリー、ハイブランドなど",
     direction:
-      "深い黒に近い背景に金や生成りを効かせた静かな高級感。セリフ体（明朝体）を主役にし、余白を贅沢に使う。コピーは寡黙で詩的、説明しすぎない。BGMはジャズやクラシック、ナレーションはささやくように上品なトーン。",
-    lp: {
-      variant: "glass",
-      heroBackground: { src: "/campaigns/bg/philip-oroni.jpg", scrim: "rgba(4,6,14,0.45)" },
-    },
+      "深い墨色の紙にアクセントカラーを金のように一色だけ差した、作品集のような静けさ。セリフ体（明朝体）を大きく細く組み、角丸も発光も使わず、罫線と余白だけで構成する。コピーは寡黙で詩的、説明しすぎない。BGMはジャズやクラシック、ナレーションはささやくように上品なトーン。",
+    lp: { variant: "editorial" },
   },
 };
 
 /** Fallback for kits generated before themes existed (keeps their current look). */
 export const DEFAULT_THEME_ID: CampaignThemeId = "minimal-light";
+
+/**
+ * Whether this theme's LP renders on a dark canvas. Consumers outside the LP
+ * — the management preview frame, the CM video palette — must match the page
+ * they sit next to, and "which variants are dark" is a fact about the
+ * templates, so it is answered here rather than re-derived per call site.
+ */
+export function isDarkTheme(theme: CampaignTheme): boolean {
+  const v = theme.lp.variant;
+  return v === "noir" || v === "editorial" || v === "glass";
+}
 
 function isThemeId(v: unknown): v is CampaignThemeId {
   return (

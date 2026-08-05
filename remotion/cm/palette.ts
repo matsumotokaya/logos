@@ -2,7 +2,7 @@
 // the persistent background and the equalizer.
 
 import type { CampaignBrandKit } from "../../lib/campaign/schema";
-import { resolveTheme } from "../../lib/campaign/themes";
+import { isDarkTheme, resolveTheme } from "../../lib/campaign/themes";
 
 export const CM_FPS = 30;
 export const CM_WIDTH = 1920;
@@ -31,8 +31,8 @@ export function hexLuminance(hex: string): number {
 
 export function buildPalette(kit: CampaignBrandKit): CmPalette {
   const theme = resolveTheme(kit);
-  const glass = theme.lp.variant === "glass";
-  // Glass themes get the dark cinematic canvas; flat themes keep the brand's
+  const glass = isDarkTheme(theme);
+  // Dark themes get the dark cinematic canvas; light ones keep the brand's
   // own background so the CM matches the LP.
   const canvas = glass ? "#0a0f1e" : kit.brand.background;
   const dark = glass || hexLuminance(canvas) < 0.45;

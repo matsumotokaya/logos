@@ -11,7 +11,7 @@ import { ensureSession, supabase } from "@/lib/supabase/client";
 import type { CampaignBrandKit, CampaignPartial } from "@/lib/campaign/schema";
 import type { CampaignCmState, CmVoiceTrack } from "@/lib/campaign/cm-types";
 import type { UrlRegistrationScope } from "@/lib/brand-registration";
-import { resolveTheme } from "@/lib/campaign/themes";
+import { isDarkTheme, resolveTheme } from "@/lib/campaign/themes";
 import { SAMPLE_CM_AUDIO, SAMPLE_CM_VIDEO } from "@/lib/campaign/sample";
 import sampleCmTrackJson from "@/lib/campaign/sample-cm-track.json";
 import {
@@ -253,8 +253,8 @@ export function ResultDigest({
   const logoSvg = kit?.assets?.logo_svg ?? partial?.logo?.logo_svg ?? null;
   const logoPng = kit?.assets?.logo ?? partial?.logo?.logo ?? null;
   const theme = kit ? resolveTheme(kit) : null;
-  // Dark-canvas LPs (glass variant) need a dark preview frame and fade.
-  const glassLp = theme?.lp.variant === "glass";
+  // Dark-canvas LPs need a dark preview frame and fade.
+  const glassLp = theme != null && isDarkTheme(theme);
 
   const brandColors = kit?.brand ?? partial?.palette ?? null;
   const swatches = brandColors

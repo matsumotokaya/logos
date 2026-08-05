@@ -18,8 +18,55 @@ import {
   statValueHtml,
 } from "./render-lp";
 import { sampleCampaignKit } from "./sample";
+import { CAMPAIGN_THEME_IDS, CAMPAIGN_THEMES } from "./themes";
 
 const html = renderLandingPage(sampleCampaignKit);
+
+// Every theme must satisfy these, not just the sample kit's theme. The
+// templates are separate designs (noir / lumen / editorial / classic), so a
+// new one can silently drop an invariant that only the default theme covers.
+test("すべてのテーマでテンプレートの不変条件が成り立つ", () => {
+  for (const id of CAMPAIGN_THEME_IDS) {
+    const page = renderLandingPage({ ...sampleCampaignKit, theme: id });
+    const where = `theme=${id} (variant=${CAMPAIGN_THEMES[id].lp.variant})`;
+
+    // No scripts: the management thumbnail iframes this with sandbox="".
+    assert.doesNotMatch(page, /<script/, `${where} がscriptを埋め込んでいる`);
+    // The hero key visual is the shared device mockup markup.
+    assert.match(page, /class="device-mockup device-duo"/, `${where} のヒーローにデバイスがない`);
+    // The video slot markers must survive so /c/[id] can inject or strip.
+    assert.match(
+      page,
+      /<!--cm-video-slot--><!--\/cm-video-slot-->/,
+      `${where} の動画スロットマーカーが欠けている`
+    );
+    // The client wall renders a mark + wordmark per name, never bare strings.
+    for (const name of sampleCampaignKit.copy.proof.client_names) {
+      assert.match(page, /<span class="cl"><svg /, `${where} のクライアント列にマークがない`);
+      assert.ok(page.includes(name), `${where} にクライアント名 ${name} がない`);
+    }
+    // Generated stats / quotes / prices are labelled as sample content.
+    assert.match(page, /自動生成された仮の内容/, `${where} にサンプル注記がない`);
+  }
+});
+
+test("テーマごとに別のテンプレートが選ばれる", () => {
+  const noir = renderLandingPage({ ...sampleCampaignKit, theme: "tech-glass" });
+  const lumen = renderLandingPage({ ...sampleCampaignKit, theme: "minimal-light" });
+  const editorial = renderLandingPage({ ...sampleCampaignKit, theme: "luxury-serif" });
+  const classic = renderLandingPage({ ...sampleCampaignKit, theme: "friendly-pop" });
+
+  // Each template's own structural signature.
+  assert.match(noir, /class="bento"/);
+  assert.match(lumen, /class="showcase rev"/);
+  assert.match(editorial, /PLATE 01/);
+  assert.match(classic, /class="feature-row"/);
+
+  // And they are not each other.
+  assert.doesNotMatch(lumen, /class="bento"/);
+  assert.doesNotMatch(editorial, /class="bento"/);
+  assert.doesNotMatch(classic, /class="showcase/);
+});
 
 test("ヒーローは共通のデバイスモックアップを使い、スクリプトに依存しない", () => {
   // The shared markup from deviceMockupHtml(), not a second implementation.

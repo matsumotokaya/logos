@@ -44,7 +44,7 @@ URL・資料・ロゴを起点に、Organizationと企業・事業ブランド�
 | `/brands/[id]/video` | **動画ポータル**。このブランドが持つ動画の一覧と「＋動画を追加」。1件目は全ブランド共通の既定アセット=製品紹介動画で、未生成・未公開でも常に並ぶ |
 | `/brands/[id]/video/[videoId]` | Brand配下の動画詳細。`videoId`は動画アセットIDまたは(既定の製品紹介動画の)キャンペーンjob IDのどちらでもよく、APIが判別する。製品動画は従来のCM画面(ナレーション・MP4)、イベント動画はプレビュー+素材スロットを表示する |
 | `/campaigns/[id]` | 生成処理中および旧リンク向けの互換詳細。完成したLP・動画の正規管理導線はBrand配下のURLを使う |
-| `/c/[id]` | 生成されたセールスページの正規URL(`/p/[id]` と対称の opaque ID・所有者を含まない)。LPは `kit.theme` の**デザインテーマ(7種・業種からLLMが自動選択、正本は [lib/campaign/themes.ts](lib/campaign/themes.ts))**で描画され、ヒーローにはテーマ固定割当の背景写真([public/campaigns/bg/](public/campaigns/bg/))が入る。テーマはkitに保存されるため後から変更・再レンダリングできる。`/c/sample` はサンプル(公開・tech-glassテーマ)。ジョブ由来のページは暫定的に署名URL経由(campaignsテーブル導入後にRLSベースへ移行) |
+| `/c/[id]` | 生成されたセールスページの正規URL(`/p/[id]` と対称の opaque ID・所有者を含まない)。LPは `kit.theme` の**デザインテーマ(7種・業種からLLMが自動選択、正本は [lib/campaign/themes.ts](lib/campaign/themes.ts))**で描画される。各テーマは**4つのLPテンプレート**のどれかに割り当てられ、テンプレートは互いにスキンではなく別デザイン(下記「LPテンプレート」参照)。テーマはkitに保存されるため後から変更・再レンダリングできる。`/c/sample` はサンプル(公開・tech-glass=noirテンプレート)。ジョブ由来のページは暫定的に署名URL経由(campaignsテーブル導入後にRLSベースへ移行) |
 | `/settings` | Accountページ。ユーザー情報表示・プロフィール編集枠・登録アカウントの退会導線。退会時は個人所有データとR2成果物を削除し、共同組織の資産は残す |
 | `/[handle]/[slug]` | バニティURL。組織ハンドル+ロゴスラッグを正規パーマリンク `/p/[id]` に解決(公開ロゴのみ)。将来はキャンペーン(`/c/[id]`)も同じ共有名前空間で解決する |
 | `/labs` | **研究所インデックス**(noindex)。表現R&Dを保証/探索/統合モードで分類する。稼働中は [Motion Lab](labs/motion/README.md)、[Workflow Lab](labs/workflow/README.md)、[Generative Lab](labs/generative/README.md)。[Campaign Lab](labs/campaign/README.md) は CM Maker(トップ `/`)へ卒業済み。全体像は [labs/README.md](labs/README.md)。旧 `/lab` → `/labs/motion`、旧 `/labs/image` → `/labs/workflow`、旧 `/labs/campaign` → `/`(旧 `/campaigns` も `/` へ)リダイレクト |
@@ -112,10 +112,29 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 - **入力の種別で分岐する**: URL/PDF はキャンペーン生成(このセクション)へ。**画像をアップロードした場合はロゴ**として扱い、SVGはブランドプレゼン `/p/[id]`、raster画像は準備中の別モードへ回す(生成パイプラインには入れない)
 
 - **Service Brand Kit が核**: ソースから「サービス分析+ブランド(証拠ベースで抽出したパレット・実ロゴ・デザイントークン)+LP全文コピー+CMナレーション」の中間表現を1回生成し、全レンダラー(LP・動画・バナー)がこれを消費する
-- **デザインテーマ7種**([lib/campaign/themes.ts](lib/campaign/themes.ts) が正本): tech-glass / minimal-light / corporate-trust / care-warm / friendly-pop / food-casual / luxury-serif。各テーマは対象業種・LP描画パラメータ(glass/flatバリアント・ヒーロー背景写真)・**全レンダラー共通のトーン&マナー指示文(`direction`)**を持つ。生成時にLLMが業種からenumで自動選択し、`kit.theme` として保存されるため**後から変更して再レンダリングできる**
-- **生成LPのヒーローは背景写真でリッチに**: [public/campaigns/bg/](public/campaigns/bg/) の抽象ガラス写真5枚をテーマに固定割当(スクリム+白文字、本文はテーマ本来のキャンバス)。テーマ別の専用背景に将来差し替える
+- **デザインテーマ7種**([lib/campaign/themes.ts](lib/campaign/themes.ts) が正本): tech-glass / minimal-light / corporate-trust / care-warm / friendly-pop / food-casual / luxury-serif。各テーマは対象業種・**どのLPテンプレートで描くか(`lp.variant`)**・**全レンダラー共通のトーン&マナー指示文(`direction`)**を持つ。生成時にLLMが業種からenumで自動選択し、`kit.theme` として保存されるため**後から変更して再レンダリングできる**。キャンバスが暗いテーマかどうかは `isDarkTheme()` が唯一の判定で、管理プレビュー枠とCM動画のパレットがこれに従う(呼び出し側で再計算しない)
+- **LPは背景写真に頼らない**: 旧テンプレートは各テーマにストック写真を固定割当していたが、現行の3テンプレート(noir / lumen / editorial)は自前のキャンバスで完結する。[public/campaigns/bg/](public/campaigns/bg/) を使うのは旧 flat/glass に残るテーマだけ
 - **UI**: トップ `/` は画面高100%のヒーロー(青いガラス質背景+ソース入力のグラスカード)+透明ヘッダー。**ヒーロー全域がドラッグ&ドロップ対応**で、ドラッグ中は50%白の半透明ヴェールと「ここにドロップ」を表示する。管理UI(詳細 `/campaigns/[id]`)はロゴス本体と同じ白いツールUI(管理サイドバー付き)。生成は非同期ジョブで、ページを閉じても継続する
 - **30秒CM動画(Phase 0b・ローカル実装済み)**: ナレーションは5シーン構造(`cm_script`)で生成され、シーンごとのTTS(Gemini)→タイミングJSON→**Remotion**で組み立てる。プレビューはブラウザ内 `@remotion/player`(即時)。**MP4はナレーション生成に続けて自動でローカル書き出しされる**(1920×1080/30fps・約34秒のCMで実測30秒、CPUのみでAPI課金なし)。プレビューとMP4は同じ動画の2つの表現で、Playerが動くのはこのアプリ内だけなので、LP(`/c/[id]`)など**アプリ外の面はすべてMP4を使う**。LPの動画スロットはMP4の有無だけを見て、あるときは配信時に署名URLで差し込み、ないときは動画セクションごと出さない(LPから生成を促すことはしない)。Chromiumが動かないホスト(Vercelのサーバーレス)ではMP4を作成できず、プレビューだけが残る。クラウド化はRemotion Lambda(AWS)採用予定=課金ポイント。`CAMPAIGN_TTS_MOCK=1` でAPIキーなし開発可
+
+## LPテンプレート(4種・デザイン優先)
+
+生成LPの見た目の正本は [lib/campaign/render-lp.ts](lib/campaign/render-lp.ts)(エントリとテンプレート選択)と各テンプレートファイル。**テーマは「どのテンプレートで描くか」を決めるだけで、テンプレート同士はスキンの差ではなく別デザイン**——独自のタイポグラフィ体系とセクション構造を持つ。
+
+| テンプレート | 実装 | 割り当てテーマ | 狙い |
+|---|---|---|---|
+| **noir** | [lib/campaign/lp-noir.ts](lib/campaign/lp-noir.ts) | tech-glass | 米国のAI・ロボティクス製品ページ。漆黒キャンバスにオーロラ状の発光とフィルムグレイン、巨大なグラデーション見出し、英字モノのマイクロラベル、bentoグリッド、ロゴマーキー |
+| **lumen** | [lib/campaign/lp-lumen.ts](lib/campaign/lp-lumen.ts) | minimal-light / corporate-trust / care-warm | 明るいプレミアムSaaS。白キャンバス+ヘアライン、左寄せ非対称ヒーロー、反転した黒帯のクロージング。信頼を先に立てる業種(業務ツール・金融・医療)向け |
+| **editorial** | [lib/campaign/lp-editorial.ts](lib/campaign/lp-editorial.ts) | luxury-serif | 作品集の佇まい。墨の紙面にアクセント1色を金として差し、Cormorant/しっぽり明朝を大きく細く組む。角丸・発光を一切使わず罫線と余白で構成。アート・ラグジュアリー・ホスピタリティ向け |
+| **classic** | [lib/campaign/render-lp.ts](lib/campaign/render-lp.ts) 内 | friendly-pop / food-casual | 従来の明るいSaaSレイアウト(`flat`)とそのダーク版(`glass`)。取得したデザイントークン(フォント・角丸・余白)を実際に適用する唯一のテンプレート |
+
+- **共通部品は [lib/campaign/lp-kit.ts](lib/campaign/lp-kit.ts) が正本**: デバイスモックアップ、クライアントロゴウォール、実績数値の桁分割、セクション有無の判定、サンプル注記。テンプレートが再実装してはいけないものはここに置く
+- **全テンプレートが守る不変条件**(テストは [lib/campaign/render-lp.test.ts](lib/campaign/render-lp.test.ts)):
+  - **`<script>` を出さない**。管理画面のサムネイルは同じHTMLを `sandbox=""` の iframe で描くため、スクリプト依存の演出は2つの面で違うものが表示され、片方しかテストされない。マーキーもスクロール演出もCSSだけで組む
+  - **ヒーローのキービジュアルは共通のデバイスモックアップ**([lib/campaign/lp-kit.ts](lib/campaign/lp-kit.ts))
+  - **動画スロットのマーカーを残す**。`/c/[id]` が配信時にMP4を差し込む/撤去するため
+- **デザイントークンは新テンプレートでは意図的に無視する**: ブランドから引き継ぐのは色(primary/accent)だけで、取得した14pxの本文フォントや角丸は継承しない。1顧客ごとに変わるべきなのは色であって組版ではないため
+- **クライアントロゴウォールは幾何マーク+書体の作り分け**: LLMが出す架空のクライアント名を素の文字列で並べると「ロゴの列」ではなく「単語の列」に見えるため、8種のマークと6種のワードマーク書体を名前ごとに割り当てる(画像は一切持たない)
 
 ## 動画は一等アセット(テンプレート制)
 

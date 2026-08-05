@@ -1,26 +1,50 @@
-import type {
-  BrandKit,
-  CampaignBrandKit,
-  CampaignScreenAsset,
-} from "./schema";
+import type { BrandKit, CampaignBrandKit } from "./schema";
 import { resolveTheme } from "./themes";
+import {
+  DEVICE_CSS,
+  SAMPLE_NOTE,
+  clientLogoHtml,
+  deviceMockupHtml,
+  esc,
+  featureSvg,
+  heroVisualHtml,
+  logoLockupHtml,
+  sectionData,
+  statValueHtml,
+} from "./lp-kit";
+import { renderNoirLandingPage } from "./lp-noir";
+import { renderLumenLandingPage } from "./lp-lumen";
+import { renderEditorialLandingPage } from "./lp-editorial";
 
-// Stage LP: render a Brand Kit into a standalone SaaS-style sales page
-// (inline CSS + inline SVG, no external dependencies). Quality lives in this
-// template; the LLM only supplies structured content, so bad input can't
-// break the layout.
+// Stage LP: render a Brand Kit into a standalone sales page (inline CSS +
+// inline SVG, no external dependencies except web fonts). Quality lives in
+// the templates; the LLM only supplies structured content, so bad input
+// can't break a layout.
 //
-// The kit's design theme (lib/campaign/themes.ts) selects the template
-// variant: "flat" is the original light SaaS layout; "glass" reskins the same
-// structure into a dark frosted-glass world — luminous brand-color washes on
-// a near-black canvas, translucent blurred cards (photography is not embedded
-// so the page stays self-contained). Industry-specific structural variants
-// can join later as further templates on the same axis.
+// The kit's design theme (lib/campaign/themes.ts) selects the template via
+// `theme.lp.variant`. Four templates exist today, and they are separate
+// designs rather than reskins of one structure:
 //
-// Sections: nav / hero (+product mock) / proof stats / client row / problem /
-// features (alternating rows with illustrations) / how-it-works / video /
-// testimonials / pricing / FAQ / closing / footer. Sections whose data is
-// missing (older Brand Kits) are skipped, so pre-extension kits still render.
+//   noir      — lib/campaign/lp-noir.ts      (cinematic dark, AI-product page)
+//   lumen     — lib/campaign/lp-lumen.ts     (bright premium SaaS)
+//   editorial — lib/campaign/lp-editorial.ts (serif, ink & gold, art/luxury)
+//   classic   — below: "flat" light SaaS, and "glass" (its dark frosted skin)
+//
+// Everything a template must not re-implement — the device mockup, the client
+// logo wall, stat figure splitting, section guards — lives in lp-kit.ts.
+//
+// Hard constraints shared by every template:
+//   - No <script>. The management thumbnail iframes the LP with sandbox="",
+//     so a script-dependent page renders differently there (render-lp.test.ts).
+//   - The hero key visual is the shared device mockup markup.
+//   - The video slot reflects one fact: whether an MP4 exists.
+//
+// Classic sections: nav / hero (+product mock) / proof stats / client row /
+// problem / features (alternating rows with illustrations) / how-it-works /
+// video / testimonials / pricing / FAQ / closing / footer. Sections whose data
+// is missing (older Brand Kits) are skipped.
+
+export { statValueHtml };
 
 const FONT_STACKS: Record<BrandKit["brand"]["font_style"], string> = {
   "modern-sans":
@@ -30,9 +54,6 @@ const FONT_STACKS: Record<BrandKit["brand"]["font_style"], string> = {
   "rounded-friendly":
     '"Hiragino Maru Gothic ProN", "Noto Sans JP", -apple-system, sans-serif',
 };
-
-const esc = (s: string) =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 // Fonts the captured design tokens may name that Google Fonts can serve.
 // The LP is otherwise self-contained; this is the one external request we
@@ -91,189 +112,7 @@ const pxOf = (v: string | null | undefined): number | null => {
   return m ? parseFloat(m[1]) : null;
 };
 
-// ---------- inline SVG artwork (inherits the brand via CSS variables) ----------
-
-type DeviceMockupKind = "laptop" | "mobile" | "duo";
-
-// Brand-colored fallback screen. It deliberately contains no device chrome:
-// the screen is the portable asset, while laptop/phone frames are renderers.
-function fallbackScreenSvg(viewport: "desktop" | "mobile"): string {
-  if (viewport === "mobile") {
-    return `<svg viewBox="0 0 390 844" aria-hidden="true" preserveAspectRatio="xMidYMin slice">
-  <rect width="390" height="844" fill="var(--bg)"/>
-  <rect width="390" height="70" fill="var(--surface)"/>
-  <circle cx="38" cy="35" r="15" fill="var(--primary)"/>
-  <rect x="64" y="25" width="116" height="20" rx="10" fill="var(--text)" opacity=".72"/>
-  <rect x="24" y="104" width="260" height="30" rx="10" fill="var(--text)" opacity=".88"/>
-  <rect x="24" y="148" width="326" height="14" rx="7" fill="var(--text)" opacity=".28"/>
-  <rect x="24" y="174" width="274" height="14" rx="7" fill="var(--text)" opacity=".2"/>
-  <rect x="24" y="220" width="152" height="46" rx="23" fill="var(--primary)"/>
-  <rect x="24" y="306" width="342" height="210" rx="24" fill="var(--primary)" opacity=".14"/>
-  <circle cx="195" cy="400" r="58" fill="var(--accent)" opacity=".8"/>
-  <rect x="24" y="552" width="342" height="112" rx="22" fill="var(--surface)" stroke="var(--line)"/>
-  <rect x="48" y="580" width="190" height="16" rx="8" fill="var(--text)" opacity=".6"/>
-  <rect x="48" y="612" width="270" height="11" rx="5.5" fill="var(--text)" opacity=".2"/>
-  <rect x="24" y="688" width="342" height="112" rx="22" fill="var(--surface)" stroke="var(--line)"/>
-</svg>`;
-  }
-
-  return `<svg viewBox="0 0 1440 900" aria-hidden="true" preserveAspectRatio="xMidYMin slice">
-  <rect width="1440" height="900" fill="var(--bg)"/>
-  <rect width="1440" height="78" fill="var(--surface)"/>
-  <circle cx="54" cy="39" r="16" fill="var(--primary)"/>
-  <rect x="84" y="27" width="180" height="24" rx="12" fill="var(--text)" opacity=".72"/>
-  <rect x="1060" y="24" width="150" height="30" rx="15" fill="var(--text)" opacity=".12"/>
-  <rect x="1232" y="19" width="164" height="40" rx="20" fill="var(--primary)"/>
-  <rect x="80" y="156" width="680" height="58" rx="16" fill="var(--text)" opacity=".88"/>
-  <rect x="80" y="238" width="570" height="22" rx="11" fill="var(--text)" opacity=".28"/>
-  <rect x="80" y="278" width="490" height="22" rx="11" fill="var(--text)" opacity=".2"/>
-  <rect x="80" y="340" width="220" height="62" rx="31" fill="var(--primary)"/>
-  <rect x="850" y="142" width="510" height="332" rx="34" fill="var(--primary)" opacity=".14"/>
-  <circle cx="1105" cy="308" r="106" fill="var(--accent)" opacity=".8"/>
-  <rect x="80" y="550" width="392" height="250" rx="28" fill="var(--surface)" stroke="var(--line)"/>
-  <rect x="524" y="550" width="392" height="250" rx="28" fill="var(--surface)" stroke="var(--line)"/>
-  <rect x="968" y="550" width="392" height="250" rx="28" fill="var(--surface)" stroke="var(--line)"/>
-  <circle cx="136" cy="612" r="24" fill="var(--primary)" opacity=".7"/>
-  <circle cx="580" cy="612" r="24" fill="var(--accent)" opacity=".7"/>
-  <rect x="1020" y="590" width="210" height="20" rx="10" fill="var(--text)" opacity=".42"/>
-</svg>`;
-}
-
-function screenHtml(
-  screen: CampaignScreenAsset | null | undefined,
-  viewport: "desktop" | "mobile"
-): string {
-  if (!screen) return fallbackScreenSvg(viewport);
-  return `<img src="data:${screen.media_type};base64,${screen.data}" alt="" loading="eager" decoding="async">`;
-}
-
-// Deterministic, reusable device renderers. A future model-viewer/GLB renderer
-// consumes the same screens and only replaces this outer frame layer.
-function deviceMockupHtml(
-  kind: DeviceMockupKind,
-  screens: { desktop?: CampaignScreenAsset | null; mobile?: CampaignScreenAsset | null },
-  serviceName: string,
-  decorative = false
-): string {
-  const a11y = decorative
-    ? `aria-hidden="true"`
-    : `role="img" aria-label="${esc(serviceName)} のPC・モバイル画面イメージ"`;
-  const laptop = `<div class="device-laptop">
-    <div class="device-laptop-lid"><span class="device-camera"></span><div class="device-screen">${screenHtml(screens.desktop, "desktop")}</div></div>
-    <div class="device-laptop-base"><span></span></div>
-  </div>`;
-  const mobile = `<div class="device-phone">
-    <div class="device-phone-shell"><span class="device-speaker"></span><div class="device-screen">${screenHtml(screens.mobile, "mobile")}</div></div>
-  </div>`;
-
-  return `<div class="device-mockup device-${kind}" ${a11y}>${
-    kind === "laptop" ? laptop : kind === "mobile" ? mobile : `${laptop}${mobile}`
-  }</div>`;
-}
-
-// SSOT: one device mockup implementation, used by every surface that shows
-// "this service on a laptop and a phone" — the LP hero, the feature visuals,
-// and the management thumbnail (which iframes this same HTML).
-//
-// There used to be a second one here: a model-viewer/GLB hero that only ran
-// where scripts are allowed. The thumbnail's sandboxed iframe silently fell
-// back to the markup below, so the same page rendered two different key
-// visuals and only the 3D one carried the bugs (inverted screens, the phone
-// intersecting the laptop, corners cropped on rotation). Do not reintroduce a
-// script-dependent hero: whatever renders here must render identically in a
-// sandboxed iframe. The 3D device work continues in Workflow Lab as a Draft
-// asset (docs/device-mockup-fixes.md).
-function heroVisualHtml(
-  screens: { desktop?: CampaignScreenAsset | null; mobile?: CampaignScreenAsset | null },
-  serviceName: string
-): string {
-  return `<div class="hero-model-stage">${deviceMockupHtml("duo", screens, serviceName)}</div>`;
-}
-
-// "120+" / "3秒" / "約3分" — separate the figure from the characters around it
-// so each can be sized on its own. The Latin figures and the Japanese unit come
-// from different families in the captured font stack; at one size and weight
-// that reads as a rendering fault rather than as typography.
-// Values with no figure at all pass through untouched.
-export function statValueHtml(value: string): string {
-  // Lazy prefix so "約3分" splits into 約 / 3 / 分 rather than leaving the
-  // kanji to fight the figure at the same size and weight.
-  const match = /^(\D*?)([+-]?[\d０-９][\d０-９.,]*)(.*)$/.exec(value.trim());
-  if (!match) return `<span class="n">${esc(value.trim())}</span>`;
-  const [, prefix, figure, suffix] = match;
-  const unit = (part: string) =>
-    part.trim() ? `<span class="u">${esc(part.trim())}</span>` : "";
-  return `${unit(prefix)}<span class="n">${esc(figure)}</span>${unit(suffix)}`;
-}
-
-// Feature illustrations, cycled by index. Consistent 4:3 stroke-based style.
-function featureSvg(i: number): string {
-  const frames = [
-    // 0 — sources funnel in
-    `<g fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="46" y="44" width="92" height="118" rx="10" fill="var(--bg)" stroke="var(--line)" stroke-width="2"/>
-      <rect x="62" y="66" width="60" height="7" rx="3.5" fill="var(--text)" opacity=".4"/>
-      <rect x="62" y="82" width="44" height="7" rx="3.5" fill="var(--text)" opacity=".25"/>
-      <rect x="62" y="98" width="52" height="7" rx="3.5" fill="var(--text)" opacity=".25"/>
-      <rect x="70" y="30" width="92" height="118" rx="10" fill="var(--surface)" stroke="var(--line)" stroke-width="2" transform="rotate(4 116 89)"/>
-      <rect x="88" y="52" width="56" height="7" rx="3.5" fill="var(--text)" opacity=".4" transform="rotate(4 116 89)"/>
-      <rect x="88" y="68" width="40" height="7" rx="3.5" fill="var(--text)" opacity=".25" transform="rotate(4 116 89)"/>
-      <path d="M180 96 h44" stroke="var(--text)" opacity=".35" stroke-width="2.5" stroke-dasharray="2 7"/>
-      <circle cx="258" cy="96" r="34" fill="var(--primary)" opacity=".14"/>
-      <circle cx="258" cy="96" r="34" stroke="var(--primary)" stroke-width="2.5"/>
-      <path d="M244 96 l10 10 20 -22" stroke="var(--primary)" stroke-width="3.5"/>
-      <circle cx="284" cy="58" r="4" fill="var(--accent)"/>
-      <circle cx="228" cy="140" r="3" fill="var(--accent)" opacity=".7"/>
-    </g>`,
-    // 1 — brand kit: swatches + type specimen
-    `<g fill="none" stroke-linecap="round">
-      <rect x="44" y="46" width="232" height="148" rx="14" fill="var(--bg)" stroke="var(--line)" stroke-width="2"/>
-      <circle cx="82" cy="86" r="16" fill="var(--primary)"/>
-      <circle cx="120" cy="86" r="16" fill="var(--accent)"/>
-      <circle cx="158" cy="86" r="16" fill="var(--text)" opacity=".8"/>
-      <circle cx="196" cy="86" r="16" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
-      <text x="66" y="140" font-family="Georgia,serif" font-size="34" fill="var(--text)">Aa</text>
-      <rect x="126" y="118" width="120" height="9" rx="4.5" fill="var(--text)" opacity=".35"/>
-      <rect x="126" y="136" width="90" height="9" rx="4.5" fill="var(--text)" opacity=".2"/>
-      <rect x="66" y="162" width="70" height="16" rx="8" fill="var(--primary)" opacity=".9"/>
-      <rect x="144" y="162" width="70" height="16" rx="8" fill="none" stroke="var(--line)" stroke-width="2"/>
-    </g>`,
-    // 2 — page wireframe rising
-    `<g fill="none" stroke-linecap="round">
-      <rect x="70" y="34" width="180" height="172" rx="12" fill="var(--bg)" stroke="var(--line)" stroke-width="2"/>
-      <rect x="70" y="34" width="180" height="30" rx="12" fill="var(--line-soft)"/>
-      <rect x="70" y="50" width="180" height="14" fill="var(--line-soft)"/>
-      <rect x="88" y="80" width="104" height="12" rx="6" fill="var(--text)" opacity=".6"/>
-      <rect x="88" y="100" width="140" height="8" rx="4" fill="var(--text)" opacity=".25"/>
-      <rect x="88" y="118" width="64" height="20" rx="10" fill="var(--primary)"/>
-      <rect x="88" y="152" width="42" height="36" rx="8" fill="var(--primary)" opacity=".15"/>
-      <rect x="138" y="152" width="42" height="36" rx="8" fill="var(--accent)" opacity=".18"/>
-      <rect x="188" y="152" width="42" height="36" rx="8" fill="var(--text)" opacity=".08"/>
-      <path d="M262 150 l22 -22 M284 150 v-22 h-22" stroke="var(--accent)" stroke-width="3"/>
-      <circle cx="52" cy="180" r="4" fill="var(--accent)" opacity=".7"/>
-    </g>`,
-    // 3 — video: play + timeline
-    `<g fill="none" stroke-linecap="round">
-      <rect x="52" y="42" width="216" height="126" rx="14" fill="var(--text)" opacity=".85"/>
-      <circle cx="160" cy="105" r="30" fill="var(--bg)" opacity=".95"/>
-      <path d="M152 90 l26 15 -26 15 z" fill="var(--primary)"/>
-      <rect x="52" y="184" width="216" height="14" rx="7" fill="var(--line-soft)"/>
-      <rect x="52" y="184" width="92" height="14" rx="7" fill="var(--primary)"/>
-      <circle cx="144" cy="191" r="10" fill="var(--bg)" stroke="var(--primary)" stroke-width="3"/>
-      <rect x="236" y="60" width="18" height="8" rx="4" fill="var(--accent)" opacity=".9"/>
-    </g>`,
-  ];
-  return `<svg viewBox="0 0 320 240" aria-hidden="true" style="width:100%;height:auto;display:block">${frames[i % frames.length]}</svg>`;
-}
-
-// Wordmark styles for the fictional client row — four voices so the names
-// read as different brands without shipping any images.
-const WORDMARK_STYLES = [
-  "font-weight:800;letter-spacing:.04em",
-  "font-weight:600;letter-spacing:.22em;text-transform:uppercase;font-size:.82em",
-  "font-family:Georgia,serif;font-style:italic;font-weight:600",
-  "font-family:'SF Mono',monospace;font-weight:700;letter-spacing:-.01em;font-size:.9em",
-];
+// ---------- video slot (shared by every template) ----------
 
 /** <video> markup for the LP's video slot (opts.videoEmbed / injectCmVideo). */
 export function cmVideoEmbed(src: string): string {
@@ -312,7 +151,22 @@ export function removeCmVideoSlot(html: string): string {
   return html.replace(LEGACY_VIDEO_SLOT, "");
 }
 
+// ---------- entry point ----------
+
 export function renderLandingPage(
+  kit: BrandKit | CampaignBrandKit,
+  opts: { videoEmbed?: string } = {}
+): string {
+  const variant = resolveTheme(kit).lp.variant;
+  if (variant === "noir") return renderNoirLandingPage(kit, opts);
+  if (variant === "lumen") return renderLumenLandingPage(kit, opts);
+  if (variant === "editorial") return renderEditorialLandingPage(kit, opts);
+  return renderClassicLandingPage(kit, opts);
+}
+
+// ---------- classic template (flat / glass) ----------
+
+function renderClassicLandingPage(
   kit: BrandKit | CampaignBrandKit,
   opts: { videoEmbed?: string } = {}
 ): string {
@@ -323,17 +177,9 @@ export function renderLandingPage(
   // Theme-assigned hero photo (served from this origin's public/campaigns/bg/).
   const heroBg = theme.lp.heroBackground;
 
-  // Real logo (captured from the source site) beats a typographic wordmark;
-  // the inline-SVG vector beats the element screenshot (transparent, crisp).
   const assets = "assets" in kit ? kit.assets : null;
-  const logoSvg = assets?.logo_svg ?? null;
-  const logo = assets?.logo ?? null;
   const screens = assets?.screens ?? { desktop: null, mobile: null };
-  const logoHtml = logoSvg
-    ? `<img src="data:image/svg+xml;base64,${Buffer.from(logoSvg).toString("base64")}" alt="${esc(service.name)}" style="height:30px;width:auto;display:block">`
-    : logo
-      ? `<img src="data:${logo.media_type};base64,${logo.data}" alt="${esc(service.name)}" style="height:30px;width:auto;display:block">`
-      : `${esc(service.name)}<span class="dot">.</span>`;
+  const logoHtml = logoLockupHtml(kit);
 
   // Captured design tokens are applied for real, not just displayed: the
   // rendered font leads the stack (loaded from Google Fonts when it is a
@@ -374,12 +220,7 @@ export function renderLandingPage(
   const sectionPad =
     sectionPx !== null ? Math.min(140, Math.max(56, Math.round(sectionPx))) : 84;
 
-  // Sections added by the SaaS-type extension — absent on older Brand Kits.
-  const proof = copy.proof?.stats?.length ? copy.proof : null;
-  const testimonials = copy.testimonials?.length ? copy.testimonials : null;
-  const pricing = copy.pricing?.plans?.length ? copy.pricing : null;
-  const faq = copy.faq?.length ? copy.faq : null;
-  const hasPlaceholderData = Boolean(proof || testimonials || pricing);
+  const { proof, testimonials, pricing, faq, hasPlaceholderData } = sectionData(kit);
 
   const navLinks = [
     `<a href="#features">機能</a>`,
@@ -417,6 +258,9 @@ export function renderLandingPage(
   --text:${glass ? glassText : brand.text};
   --line:${glass ? "rgba(255,255,255,0.16)" : "color-mix(in srgb, var(--text) 12%, transparent)"};
   --line-soft:${glass ? "rgba(255,255,255,0.09)" : "color-mix(in srgb, var(--text) 6%, transparent)"};
+  /* the shared artwork in lp-kit.ts paints on these */
+  --screen-bg:var(--bg);--screen-surface:var(--surface);--screen-text:var(--text);--screen-line:var(--line);
+  --art-bg:var(--bg);--art-surface:var(--surface);--art-ink:var(--text);--art-line:var(--line);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -445,27 +289,9 @@ header{position:sticky;top:0;z-index:10;background:color-mix(in srgb, var(--bg) 
 .tagline{display:inline-block;margin-bottom:18px;padding:.35em 1.1em;border:1px solid color-mix(in srgb, var(--accent) 60%, transparent);color:var(--accent);border-radius:999px;font-size:.85rem;font-weight:600;letter-spacing:.05em}
 .hero-visual{filter:drop-shadow(0 24px 48px color-mix(in srgb, var(--text) 18%, transparent))}
 .hero-model-stage{position:relative;width:100%;display:flex;align-items:center}
-.device-mockup{position:relative;width:100%;margin:auto;color:#111827}
-.device-screen{position:relative;width:100%;height:100%;overflow:hidden;background:var(--bg)}
-.device-screen::after{content:"";position:absolute;inset:0;background:linear-gradient(118deg,rgba(255,255,255,.2),transparent 28%,transparent 72%,rgba(255,255,255,.08));pointer-events:none}
-.device-screen img,.device-screen svg{width:100%;height:100%;display:block;object-fit:cover;object-position:top center}
-.device-laptop{position:relative;width:100%;padding-bottom:5.5%}
-.device-laptop-lid{position:relative;width:92%;aspect-ratio:16/10;margin:0 auto;padding:2.4% 2.2% 2.8%;border-radius:18px 18px 8px 8px;background:#20242b;border:1px solid rgba(255,255,255,.24);box-shadow:inset 0 0 0 1px rgba(0,0,0,.28)}
-.device-laptop-lid .device-screen{border-radius:8px}
-.device-camera{position:absolute;top:.85%;left:50%;width:4px;height:4px;border-radius:50%;background:#06070a;transform:translateX(-50%);z-index:1}
-.device-laptop-base{position:absolute;left:0;right:0;bottom:0;height:7.4%;border-radius:3px 3px 18px 18px;background:linear-gradient(180deg,#eef0f2,#9ca3aa 70%,#717780);box-shadow:0 10px 16px rgba(0,0,0,.22)}
-.device-laptop-base::before{content:"";position:absolute;inset:0 4%;border-top:1px solid rgba(255,255,255,.9)}
-.device-laptop-base span{position:absolute;top:0;left:43%;width:14%;height:36%;border-radius:0 0 8px 8px;background:#8e949b}
-.device-phone{position:relative;width:34%;margin:auto}
-.device-phone-shell{position:relative;aspect-ratio:390/844;padding:5.8% 4.5%;border-radius:12% / 5.8%;background:#171a20;border:1px solid rgba(255,255,255,.32);box-shadow:inset 0 0 0 1px rgba(0,0,0,.45),0 14px 24px rgba(0,0,0,.24)}
-.device-phone-shell .device-screen{border-radius:9% / 4.4%}
-.device-speaker{position:absolute;top:2.2%;left:50%;width:24%;height:.7%;border-radius:999px;background:#050609;transform:translateX(-50%);z-index:1}
-.device-duo{min-height:330px;padding:5% 3% 0 0}
-.device-duo>.device-laptop{width:94%;margin:0 auto 0 0}
-.device-duo>.device-phone{position:absolute;right:0;bottom:0;width:25%;z-index:1}
+${DEVICE_CSS}
 .f-visual .device-mockup{max-width:440px}
 .f-visual .device-duo{min-height:250px}
-@media (max-width:520px){.device-laptop-lid{border-radius:12px 12px 5px 5px}.device-duo{min-height:220px}.device-duo>.device-phone{width:28%}}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-top:64px;position:relative}
 .stat{background:var(--surface);padding:26px 20px;text-align:center}
 /* Figures and their Japanese unit are set separately. At one size and weight
@@ -478,7 +304,9 @@ header{position:sticky;top:0;z-index:10;background:color-mix(in srgb, var(--bg) 
 .stat .l{margin-top:8px;font-size:.82rem;letter-spacing:.02em;opacity:.65}
 .clients{padding:44px 0 8px;text-align:center}
 .clients .cap{font-size:.78rem;letter-spacing:.14em;opacity:.5;text-transform:uppercase}
-.client-row{margin-top:18px;display:flex;flex-wrap:wrap;justify-content:center;gap:18px 44px;font-size:1.05rem;opacity:.55}
+.client-row{margin-top:18px;display:flex;flex-wrap:wrap;justify-content:center;gap:18px 44px;font-size:1.05rem;opacity:.62}
+.client-row .cl{display:inline-flex;align-items:center;gap:9px}
+.client-row .cl svg{width:16px;height:16px;flex-shrink:0}
 section{padding:${sectionPad}px 0}
 .section-title{font-size:clamp(1.5rem, 3.5vw, 2.2rem);font-weight:800;text-align:center;margin-bottom:14px;line-height:1.4}
 .section-lead{max-width:620px;margin:0 auto 52px;text-align:center;font-size:.98rem;opacity:.75}
@@ -614,9 +442,7 @@ header{background:color-mix(in srgb, var(--bg) 62%, transparent)}
     <div class="container">
       <p class="cap">Trusted by teams</p>
       <div class="client-row">
-        ${proof.client_names
-          .map((n, i) => `<span style="${WORDMARK_STYLES[i % WORDMARK_STYLES.length]}">${esc(n)}</span>`)
-          .join("\n        ")}
+        ${proof.client_names.map((n, i) => clientLogoHtml(n, i)).join("\n        ")}
       </div>
     </div>
   </div>`
@@ -760,11 +586,7 @@ header{background:color-mix(in srgb, var(--bg) 62%, transparent)}
   </section>
 </main>
 
-${
-  hasPlaceholderData
-    ? `<p class="sample-note">※ 実績数値・クライアント名・利用者の声・料金は自動生成された仮の内容（サンプル）です。正式な情報に差し替えてご利用ください。</p>`
-    : ""
-}
+${hasPlaceholderData ? `<p class="sample-note">${SAMPLE_NOTE}</p>` : ""}
 <footer>
   <div class="container">© ${new Date().getFullYear()} ${esc(service.name)}</div>
 </footer>
