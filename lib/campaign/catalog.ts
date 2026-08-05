@@ -8,6 +8,7 @@ import { deleteR2Object, isR2Configured, putR2Object } from "@/lib/r2";
 import { createServerSupabaseForToken } from "@/lib/supabase/server";
 import type { CampaignJob } from "./jobs";
 import type { CampaignBrandKit } from "./schema";
+import { resolveSubjectPlacement, type BrandKind } from "./classification";
 import {
   normalizedCatalogWebsite,
   organizationCatalogSeed,
@@ -16,6 +17,9 @@ import {
 export type CampaignCatalogLink = {
   organizationId: string;
   brandId: string;
+  workId: string | null;
+  publishedLpTakeId?: string;
+  publishedLpPath?: string;
   /** @deprecated Kept while local job records and older clients are upgraded. */
   businessId: string;
   /** @deprecated The generation job ID, not a required Campaign container. */
@@ -37,7 +41,8 @@ type BrandTarget = {
   organizationId: string;
   corporateBrandId: string;
   brandId: string;
-  brandKind: "corporate" | "business" | "audience";
+  brandKind: BrandKind;
+  placement: "brand" | "work";
 };
 
 function throwOn(error: { message: string } | null): void {
@@ -116,7 +121,8 @@ async function findOrCreateOrganization(
     .maybeSingle();
   throwOn(existing.error);
 
-  const organizationId = (existing.data?.id as string | undefined) ?? randomUUID();
+  const organizationId =
+    (existing.data?.id as string | undefined) ?? randomUUID();
   if (!existing.data) {
     const inserted = await supabase.from("brand_organizations").insert({
       id: organizationId,
@@ -137,7 +143,7 @@ async function findOrCreateOrganization(
           confidence:
             seed.nameSource === "page_classification"
               ? "medium"
-              : inferred?.confidence ?? "low",
+              : (inferred?.confidence ?? "low"),
           evidence: inferred?.evidence ?? null,
         },
         website: { source: sourceUrl ? "source_url" : "unknown" },
@@ -159,20 +165,21 @@ async function findOrCreateOrganization(
   };
 }
 
-async function findOrCreateBusinessBrand(
+async function findOrCreateBrand(
   supabase: SupabaseClient,
   userId: string,
   organizationId: string,
   corporateBrandId: string,
   kit: CampaignBrandKit,
   sourceUrl: string | null,
+  brandKind: Exclude<BrandKind, "corporate">,
 ): Promise<string> {
   const existing = await supabase
     .from("brand_entities")
     .select("id")
     .eq("created_by", userId)
     .eq("brand_organization_id", organizationId)
-    .eq("brand_kind", "business")
+    .eq("brand_kind", brandKind)
     .eq("name", kit.service.name)
     .limit(1)
     .maybeSingle();
@@ -199,7 +206,7 @@ async function findOrCreateBusinessBrand(
     },
     created_by: userId,
     brand_organization_id: organizationId,
-    brand_kind: "business",
+    brand_kind: brandKind,
     parent_brand_id: corporateBrandId,
   });
   throwOn(inserted.error);
@@ -209,12 +216,20 @@ async function findOrCreateBusinessBrand(
 async function selectedBrandTarget(
   supabase: SupabaseClient,
   brandId: string,
+  placement: "brand" | "work",
 ): Promise<BrandTarget> {
   const selected = await supabase
     .from("brand_entities")
     .select("id, brand_organization_id, brand_kind")
     .eq("id", brandId)
-    .in("brand_kind", ["corporate", "business", "audience"])
+    .in("brand_kind", [
+      "corporate",
+      "business",
+      "service",
+      "product",
+      "media",
+      "event",
+    ])
     .maybeSingle();
   throwOn(selected.error);
   if (!selected.data?.brand_organization_id || !selected.data.brand_kind) {
@@ -239,7 +254,38 @@ async function selectedBrandTarget(
     corporateBrandId: corporate.data.id as string,
     brandId: selected.data.id as string,
     brandKind: selected.data.brand_kind as BrandTarget["brandKind"],
+    placement,
   };
+}
+
+async function findOrCreateWork(
+  supabase: SupabaseClient,
+  userId: string,
+  brandId: string,
+  job: CampaignJob,
+  kit: CampaignBrandKit,
+): Promise<string> {
+  const existing = await supabase
+    .from("works")
+    .select("id")
+    .eq("brand_id", brandId)
+    .eq("created_by", userId)
+    .eq("name", kit.service.name)
+    .limit(1)
+    .maybeSingle();
+  throwOn(existing.error);
+  if (existing.data) return existing.data.id as string;
+
+  const workId = randomUUID();
+  const inserted = await supabase.from("works").insert({
+    id: workId,
+    brand_id: brandId,
+    name: kit.service.name || `生成 ${job.id.slice(0, 8)}`,
+    status: "active",
+    created_by: userId,
+  });
+  throwOn(inserted.error);
+  return workId;
 }
 
 async function saveProfile(
@@ -267,7 +313,8 @@ async function saveProfile(
         ...profile,
       },
       provenance: {
-        ...((existing.data?.provenance as Record<string, unknown> | null) ?? {}),
+        ...((existing.data?.provenance as Record<string, unknown> | null) ??
+          {}),
         ...provenance,
       },
       created_by: userId,
@@ -283,6 +330,7 @@ async function findOrCreateLogo(
   userId: string,
   target: BrandTarget,
   kit: CampaignBrandKit,
+  allowCaptured = true,
 ): Promise<string> {
   const subjectIds = Array.from(
     new Set([target.brandId, target.corporateBrandId]),
@@ -309,7 +357,7 @@ async function findOrCreateLogo(
   let mediaType = "image/svg+xml";
   let svg: string | null = null;
 
-  const captured = kit.assets?.logo;
+  const captured = allowCaptured ? kit.assets?.logo : null;
   if (captured && isR2Configured()) {
     filePath = `logos/${logoId}/candidates/${candidateId}/master.png`;
     mediaType = captured.media_type;
@@ -322,7 +370,7 @@ async function findOrCreateLogo(
   } else {
     svg = provisionalWordmark(
       target.brandKind === "corporate"
-        ? kit.organization?.name ?? kit.service.name
+        ? (kit.organization?.name ?? kit.service.name)
         : kit.service.name,
       kit.brand.primary,
     );
@@ -336,7 +384,7 @@ async function findOrCreateLogo(
     subject_entity_id: target.brandId,
     title:
       target.brandKind === "corporate"
-        ? kit.organization?.name ?? kit.service.name
+        ? (kit.organization?.name ?? kit.service.name)
         : kit.service.name,
     role: target.brandKind === "corporate" ? "corporate" : "service",
     logo_type: "combination",
@@ -398,7 +446,8 @@ async function saveGenerationRun(
       has_text: job.input.hasText,
       file_count: job.input.files,
       file_kinds: job.input.fileKinds ?? [],
-      registration_scope: job.input.registrationScope ?? "business",
+      registration_scope: job.input.registrationScope ?? null,
+      subject_classification: kit.classification ?? null,
       selected_brand_id: job.input.brandEntityId ?? null,
     },
     steps: job.steps,
@@ -412,7 +461,9 @@ async function saveGenerationRun(
   };
   const saved = existing.data
     ? await supabase.from("brand_generation_runs").update(row).eq("id", runId)
-    : await supabase.from("brand_generation_runs").insert({ id: runId, ...row });
+    : await supabase
+        .from("brand_generation_runs")
+        .insert({ id: runId, ...row });
   throwOn(saved.error);
   return runId;
 }
@@ -470,11 +521,20 @@ export async function persistCampaignCatalog({
 }: PersistCatalogInput): Promise<CampaignCatalogLink> {
   const supabase = createServerSupabaseForToken(accessToken);
   const sourceUrl = job.input.url;
-  const registrationScope = job.input.registrationScope ?? "business";
+  const classification = resolveSubjectPlacement(
+    kit.classification,
+    job.input.registrationScope,
+  );
+  const registrationScope: UrlRegistrationScope =
+    classification.brandKind === "corporate" ? "organization" : "business";
 
   let target: BrandTarget;
   if (job.input.brandEntityId) {
-    target = await selectedBrandTarget(supabase, job.input.brandEntityId);
+    target = await selectedBrandTarget(
+      supabase,
+      job.input.brandEntityId,
+      classification.placement,
+    );
   } else {
     const base = await findOrCreateOrganization(
       supabase,
@@ -483,25 +543,30 @@ export async function persistCampaignCatalog({
       sourceUrl,
       registrationScope,
     );
-    const useCorporateBrand = registrationScope === "organization";
+    const useCorporateBrand =
+      classification.brandKind === "corporate" ||
+      classification.placement === "work";
     const brandId = useCorporateBrand
       ? base.corporateBrandId
-      : await findOrCreateBusinessBrand(
+      : await findOrCreateBrand(
           supabase,
           userId,
           base.organizationId,
           base.corporateBrandId,
           kit,
           sourceUrl,
+          classification.brandKind as Exclude<BrandKind, "corporate">,
         );
     target = {
       ...base,
       brandId,
-      brandKind: useCorporateBrand ? "corporate" : "business",
+      brandKind: useCorporateBrand ? "corporate" : classification.brandKind,
+      placement: classification.placement,
     };
   }
 
   const targetIsCorporate = target.brandId === target.corporateBrandId;
+  const isWork = target.placement === "work";
   await Promise.all([
     saveProfile(
       supabase,
@@ -509,7 +574,7 @@ export async function persistCampaignCatalog({
       target.corporateBrandId,
       {
         organization: kit.organization ?? null,
-        ...(targetIsCorporate
+        ...(targetIsCorporate && !isWork
           ? {
               palette: kit.brand,
               design_tokens: kit.design_tokens,
@@ -522,7 +587,7 @@ export async function persistCampaignCatalog({
           source: sourceUrl ? "scraped_inferred" : "uploaded_inferred",
           confidence: kit.organization?.confidence ?? "low",
         },
-        ...(targetIsCorporate
+        ...(targetIsCorporate && !isWork
           ? {
               palette: {
                 source:
@@ -537,7 +602,7 @@ export async function persistCampaignCatalog({
           : {}),
       },
     ),
-    ...(targetIsCorporate
+    ...(targetIsCorporate || isWork
       ? []
       : [
           saveProfile(
@@ -569,7 +634,10 @@ export async function persistCampaignCatalog({
         ]),
   ]);
 
-  const logoId = await findOrCreateLogo(supabase, userId, target, kit);
+  const workId = isWork
+    ? await findOrCreateWork(supabase, userId, target.brandId, job, kit)
+    : null;
+  const logoId = await findOrCreateLogo(supabase, userId, target, kit, !isWork);
   const generationRunId = await saveGenerationRun(
     supabase,
     userId,
@@ -590,6 +658,7 @@ export async function persistCampaignCatalog({
   return {
     organizationId: target.organizationId,
     brandId: target.brandId,
+    workId,
     businessId: target.brandId,
     campaignId: job.id,
     generationRunId,

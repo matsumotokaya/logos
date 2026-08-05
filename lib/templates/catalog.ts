@@ -146,10 +146,10 @@ export const TEMPLATES: TemplateEntry[] = [
   },
   {
     id: "campaign-lp",
-    version: 1,
+    version: 2,
     toolKind: "lp",
-    briefSchemaVersion: 1,
-    rendererRevision: "lib/campaign/render-lp@2026-07-22",
+    briefSchemaVersion: 2,
+    rendererRevision: "lib/campaign/render-lp@2026-08-05",
     name: "セールスページ",
     summary:
       "ソースから生成したService Brand Kitを、業種に合わせた7種のデザインテーマのいずれかで1枚のセールスページに描画します。テーマは後から変更して再レンダーできます。",

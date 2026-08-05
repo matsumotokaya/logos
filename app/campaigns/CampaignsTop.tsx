@@ -16,7 +16,6 @@ import type {
   BrandBusinessSummary,
   BrandOrganizationSummary,
 } from "@/lib/brand-hierarchy";
-import type { UrlRegistrationScope } from "@/lib/brand-registration";
 import { analyzeSvg } from "@/lib/svg";
 import { createStoredLogo, repo } from "@/lib/store";
 import { newLogoId } from "@/lib/id";
@@ -27,10 +26,12 @@ import {
   formatDate,
   type JobSummary,
 } from "./campaign-ui";
-import UrlRegistrationDialog from "./UrlRegistrationDialog";
 
 function nameFromFile(fileName: string): string {
-  const base = fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
+  const base = fileName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[-_]+/g, " ")
+    .trim();
   if (!base) return "Brand";
   return base.charAt(0).toUpperCase() + base.slice(1);
 }
@@ -64,7 +65,9 @@ function requestedBusiness(
   const id = params.get("brand") ?? params.get("business");
   if (!id) return null;
   for (const organization of organizations) {
-    const business = organization.brands.find((candidate) => candidate.id === id);
+    const business = organization.brands.find(
+      (candidate) => candidate.id === id,
+    );
     if (business) return { business, organizationName: organization.name };
   }
   return null;
@@ -135,9 +138,6 @@ export default function CampaignsTop() {
     business: BrandBusinessSummary;
     organizationName: string;
   } | null>(null);
-  const [registrationScope, setRegistrationScope] =
-    useState<UrlRegistrationScope>("business");
-  const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
   const [catalogMigrationError, setCatalogMigrationError] = useState<
     string | null
   >(null);
@@ -305,59 +305,55 @@ export default function CampaignsTop() {
     };
   }, []);
 
-  const generate = useCallback(
-    async (scope: UrlRegistrationScope) => {
-      setError(null);
-      setStarting(true);
-      try {
-        const res = await authedFetch("/api/labs/campaign/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            url: url.trim() || undefined,
-            pastedText: pastedText.trim() || undefined,
-            files: files.map((f) => ({
-              kind: f.kind,
-              mediaType: f.mediaType,
-              data: f.data,
-            })),
-            brandEntityId: selectedBusiness?.business.id,
-            registrationScope: scope,
-          }),
-        });
-        const json = ((await res.json().catch(() => null)) ?? {}) as {
-          jobId?: string;
-          error?: string;
-        };
-        if (!res.ok || !json.jobId) {
-          // Generation is still limited to approved accounts, and the endpoint
-          // answers 404 to keep itself undiscoverable. Say that in the
-          // visitor's terms rather than passing the endpoint's own wording
-          // ("Not found.") through to the page.
-          if (res.status === 401 || res.status === 403 || res.status === 404) {
-            throw new Error(
-              "このアカウントでは、まだ生成をご利用いただけません。",
-            );
-          }
+  const generate = useCallback(async () => {
+    setError(null);
+    setStarting(true);
+    try {
+      const res = await authedFetch("/api/labs/campaign/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: url.trim() || undefined,
+          pastedText: pastedText.trim() || undefined,
+          files: files.map((f) => ({
+            kind: f.kind,
+            mediaType: f.mediaType,
+            data: f.data,
+          })),
+          brandEntityId: selectedBusiness?.business.id,
+        }),
+      });
+      const json = ((await res.json().catch(() => null)) ?? {}) as {
+        jobId?: string;
+        error?: string;
+      };
+      if (!res.ok || !json.jobId) {
+        // Generation is still limited to approved accounts, and the endpoint
+        // answers 404 to keep itself undiscoverable. Say that in the
+        // visitor's terms rather than passing the endpoint's own wording
+        // ("Not found.") through to the page.
+        if (res.status === 401 || res.status === 403 || res.status === 404) {
           throw new Error(
-            json.error ?? `生成を開始できませんでした (HTTP ${res.status})`,
+            "このアカウントでは、まだ生成をご利用いただけません。",
           );
         }
-        // The run lives on its own page from here on.
-        router.push(`/campaigns/${json.jobId}`);
-      } catch (e) {
-        setStarting(false);
-        // No session at all: the next step is signing in, so open the dialog
-        // rather than report it. An error banner here would be a dead end.
-        if (e instanceof AuthRequiredError) {
-          requestAuthDialog("create");
-          return;
-        }
-        setError(e instanceof Error ? e.message : "生成に失敗しました");
+        throw new Error(
+          json.error ?? `生成を開始できませんでした (HTTP ${res.status})`,
+        );
       }
-    },
-    [url, pastedText, files, selectedBusiness, router],
-  );
+      // The run lives on its own page from here on.
+      router.push(`/campaigns/${json.jobId}`);
+    } catch (e) {
+      setStarting(false);
+      // No session at all: the next step is signing in, so open the dialog
+      // rather than report it. An error banner here would be a dead end.
+      if (e instanceof AuthRequiredError) {
+        requestAuthDialog("create");
+        return;
+      }
+      setError(e instanceof Error ? e.message : "生成に失敗しました");
+    }
+  }, [url, pastedText, files, selectedBusiness, router]);
 
   const requestGeneration = useCallback(() => {
     setError(null);
@@ -366,12 +362,8 @@ export default function CampaignsTop() {
     // — so the source they just typed is still there when it closes, and the
     // press that follows is the one that starts the run.
     if (requireAccount()) return;
-    if (url.trim() && !selectedBusiness) {
-      setRegistrationDialogOpen(true);
-      return;
-    }
-    void generate("business");
-  }, [requireAccount, url, selectedBusiness, generate]);
+    void generate();
+  }, [requireAccount, generate]);
 
   return (
     <main>
@@ -453,7 +445,9 @@ export default function CampaignsTop() {
             </p>
             <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight text-white md:text-4xl lg:text-[2.75rem] lg:leading-[1.2]">
               {/* inline-block per phrase: wrap between phrases, never mid-word */}
-              <span className="inline-block">あなたのためのセールスページと製品動画を、</span>
+              <span className="inline-block">
+                あなたのためのセールスページと製品動画を、
+              </span>
               <span className="inline-block">URLから瞬時に生成。</span>
             </h1>
             <p className="mt-5 max-w-xl text-sm leading-relaxed text-pretty text-white/70 md:text-base">
@@ -634,18 +628,6 @@ export default function CampaignsTop() {
                 アセット詳細へ移動します…
               </p>
             )}
-
-            <UrlRegistrationDialog
-              open={registrationDialogOpen}
-              url={url.trim()}
-              value={registrationScope}
-              onValueChange={setRegistrationScope}
-              onCancel={() => setRegistrationDialogOpen(false)}
-              onConfirm={() => {
-                setRegistrationDialogOpen(false);
-                void generate(registrationScope);
-              }}
-            />
           </section>
         </div>
 
@@ -669,346 +651,348 @@ export default function CampaignsTop() {
           landing ends at the hero and the footer for them. */}
       {showCatalog && (
         <div id="browse" className="mx-auto max-w-6xl px-6 py-12 md:px-10">
-        {/* The brand hierarchy is the primary navigation. Generated files are
+          {/* The brand hierarchy is the primary navigation. Generated files are
             assets inside each Brand, not another required container. */}
-        <section>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold text-ink-muted">
-                BRAND CATALOG
-              </p>
-              <h2 className="mt-1 text-balance font-display text-xl font-semibold">
-                あなたのブランド
-              </h2>
-            </div>
-            <div className="flex max-w-lg flex-wrap items-center justify-end gap-3">
-              <p className="text-pretty text-[11px] text-ink-muted">
-                Organizationの中に企業・事業ブランドと、ロゴ・LP・動画がまとまります。
-              </p>
-              <Link
-                href="/brands"
-                className="rounded-full border border-ink px-4 py-2 text-xs font-semibold hover:bg-ink hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-              >
-                ブランド管理を開く
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-5 grid items-start gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
-            <aside className="rounded-2xl border border-hairline bg-white p-3 lg:sticky lg:top-24">
-              <nav aria-label="ブランド階層">
-                <p className="px-2 py-1 text-[10px] font-semibold text-ink-faint">
-                  会社・組織
+          <section>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold text-ink-muted">
+                  BRAND CATALOG
                 </p>
-                {organizations === null ? (
-                  <div
-                    className="space-y-2 px-2 py-3"
-                    aria-label="ブランドを読み込み中"
-                  >
-                    <span className="block h-3 w-2/3 rounded bg-ink/10" />
-                    <span className="block h-3 w-1/2 rounded bg-ink/10" />
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {organizations.map((organization) => (
-                      <details key={organization.id} open className="group">
-                        <summary className="cursor-pointer rounded-lg px-2 py-2 text-sm font-semibold text-ink hover:bg-ink/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">
-                          <span className="text-pretty">
-                            {organization.name}
-                          </span>
-                        </summary>
-                        <ul className="mb-2 ml-3 border-l border-hairline pl-3">
-                          <li>
-                            <Link
-                              href={`/organizations/${organization.id}`}
-                              className="block rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                            >
-                              Organization概要
-                            </Link>
-                          </li>
-                          {organization.brands.map((business) => (
-                            <li key={business.id}>
+                <h2 className="mt-1 text-balance font-display text-xl font-semibold">
+                  あなたのブランド
+                </h2>
+              </div>
+              <div className="flex max-w-lg flex-wrap items-center justify-end gap-3">
+                <p className="text-pretty text-[11px] text-ink-muted">
+                  Organizationの中に企業・事業ブランドと、ロゴ・LP・動画がまとまります。
+                </p>
+                <Link
+                  href="/brands"
+                  className="rounded-full border border-ink px-4 py-2 text-xs font-semibold hover:bg-ink hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                >
+                  ブランド管理を開く
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-5 grid items-start gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+              <aside className="rounded-2xl border border-hairline bg-white p-3 lg:sticky lg:top-24">
+                <nav aria-label="ブランド階層">
+                  <p className="px-2 py-1 text-[10px] font-semibold text-ink-faint">
+                    会社・組織
+                  </p>
+                  {organizations === null ? (
+                    <div
+                      className="space-y-2 px-2 py-3"
+                      aria-label="ブランドを読み込み中"
+                    >
+                      <span className="block h-3 w-2/3 rounded bg-ink/10" />
+                      <span className="block h-3 w-1/2 rounded bg-ink/10" />
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {organizations.map((organization) => (
+                        <details key={organization.id} open className="group">
+                          <summary className="cursor-pointer rounded-lg px-2 py-2 text-sm font-semibold text-ink hover:bg-ink/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">
+                            <span className="text-pretty">
+                              {organization.name}
+                            </span>
+                          </summary>
+                          <ul className="mb-2 ml-3 border-l border-hairline pl-3">
+                            <li>
                               <Link
-                                href={`/brands/${business.id}`}
-                                className="block truncate rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                                href={`/organizations/${organization.id}`}
+                                className="block rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                               >
-                                {business.name}
+                                Organization概要
                               </Link>
                             </li>
-                          ))}
-                          {organization.brands.length === 0 ? (
-                            <li className="px-2 py-1.5 text-pretty text-[10px] text-ink-faint">
-                              ブランドはまだありません
-                            </li>
-                          ) : null}
-                        </ul>
-                      </details>
-                    ))}
-                    {catalogFallbackJobs.length > 0 ? (
-                      <details open>
-                        <summary className="cursor-pointer rounded-lg px-2 py-2 text-pretty text-sm font-semibold text-ink hover:bg-ink/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">
-                          名称未設定のOrganization
-                        </summary>
-                        <ul className="mb-2 ml-3 border-l border-hairline pl-3">
-                          {catalogFallbackJobs.map((job) => (
-                            <li key={job.id}>
-                              <a
-                                href={`#legacy-campaign-${job.id}`}
-                                className="block truncate rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                              >
-                                {job.businessName ?? job.name}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    ) : null}
-                  </div>
-                )}
-                <a
-                  href="#create"
-                  className="mt-2 block rounded-lg border border-dashed border-hairline px-3 py-2 text-center text-xs font-semibold text-ink-muted hover:border-ink hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                >
-                  ＋ URLから登録
-                </a>
-              </nav>
-            </aside>
+                            {organization.brands.map((business) => (
+                              <li key={business.id}>
+                                <Link
+                                  href={`/brands/${business.id}`}
+                                  className="block truncate rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                                >
+                                  {business.name}
+                                </Link>
+                              </li>
+                            ))}
+                            {organization.brands.length === 0 ? (
+                              <li className="px-2 py-1.5 text-pretty text-[10px] text-ink-faint">
+                                ブランドはまだありません
+                              </li>
+                            ) : null}
+                          </ul>
+                        </details>
+                      ))}
+                      {catalogFallbackJobs.length > 0 ? (
+                        <details open>
+                          <summary className="cursor-pointer rounded-lg px-2 py-2 text-pretty text-sm font-semibold text-ink hover:bg-ink/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">
+                            名称未設定のOrganization
+                          </summary>
+                          <ul className="mb-2 ml-3 border-l border-hairline pl-3">
+                            {catalogFallbackJobs.map((job) => (
+                              <li key={job.id}>
+                                <a
+                                  href={`#legacy-campaign-${job.id}`}
+                                  className="block truncate rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                                >
+                                  {job.businessName ?? job.name}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                    </div>
+                  )}
+                  <a
+                    href="#create"
+                    className="mt-2 block rounded-lg border border-dashed border-hairline px-3 py-2 text-center text-xs font-semibold text-ink-muted hover:border-ink hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  >
+                    ＋ URLから登録
+                  </a>
+                </nav>
+              </aside>
 
-            <div className="min-w-0 space-y-5">
-              {(organizations ?? []).map((organization) => (
-                <article
-                  id={`organization-${organization.id}`}
-                  key={organization.id}
-                  className="scroll-mt-24 rounded-2xl border border-hairline p-5 md:p-6"
-                >
-                  <header className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline pb-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-base font-semibold">
-                          {organization.name}
-                        </h3>
-                        {organization.status === "inferred" ? (
+              <div className="min-w-0 space-y-5">
+                {(organizations ?? []).map((organization) => (
+                  <article
+                    id={`organization-${organization.id}`}
+                    key={organization.id}
+                    className="scroll-mt-24 rounded-2xl border border-hairline p-5 md:p-6"
+                  >
+                    <header className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline pb-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="truncate text-base font-semibold">
+                            {organization.name}
+                          </h3>
+                          {organization.status === "inferred" ? (
+                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                              未確認
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-pretty text-[11px] text-ink-muted">
+                          {organization.description ||
+                            organization.website ||
+                            "組織情報はこれから補完されます"}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <span className="text-[10px] text-ink-faint">
+                          オーガニゼーション
+                        </span>
+                        <Link
+                          href={`/organizations/${organization.id}`}
+                          className="rounded-full border border-hairline px-3 py-1.5 text-[10px] font-semibold text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                        >
+                          詳細を編集
+                        </Link>
+                      </div>
+                    </header>
+
+                    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {organization.brands.map((business) => (
+                        <section
+                          id={`business-${business.id}`}
+                          key={business.id}
+                          className="scroll-mt-24 rounded-xl bg-ink/[0.03] p-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold">
+                                {business.name}
+                              </p>
+                              <p className="mt-0.5 truncate text-[10px] text-ink-muted">
+                                {business.kind === "corporate"
+                                  ? "企業ブランド"
+                                  : business.kind === "audience"
+                                    ? "対象別ブランド"
+                                    : business.industry || "事業ブランド"}
+                              </p>
+                            </div>
+                            <span
+                              className="flex shrink-0 gap-1.5"
+                              aria-label="ブランドカラー"
+                            >
+                              {[business.primary, business.accent].map(
+                                (color, index) => (
+                                  <span
+                                    key={index}
+                                    className="size-4 rounded-full border border-hairline bg-white"
+                                    style={
+                                      color
+                                        ? { backgroundColor: color }
+                                        : undefined
+                                    }
+                                  />
+                                ),
+                              )}
+                            </span>
+                          </div>
+
+                          <dl className="mt-3 grid grid-cols-3 gap-2 text-[10px]">
+                            <div>
+                              <dt className="text-ink-faint">ロゴ</dt>
+                              <dd className="mt-0.5 tabular-nums">
+                                {business.logoIds.length}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-ink-faint">アセット</dt>
+                              <dd className="mt-0.5 tabular-nums">
+                                {business.assets.length +
+                                  business.logoIds.length}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-ink-faint">情報</dt>
+                              <dd className="mt-0.5">
+                                {business.status === "confirmed"
+                                  ? "確認済み"
+                                  : "仮登録"}
+                              </dd>
+                            </div>
+                          </dl>
+
+                          {business.campaigns.length > 0 ? (
+                            <div className="mt-3 border-t border-hairline pt-3">
+                              <p className="text-[10px] text-ink-faint">
+                                最近のLP
+                              </p>
+                              {business.campaigns
+                                .slice(0, 2)
+                                .map((campaign) => (
+                                  <Link
+                                    key={campaign.id}
+                                    href={`/brands/${business.id}/lp/${campaign.id}`}
+                                    className="mt-1 flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-[11px] hover:bg-white"
+                                  >
+                                    <span className="truncate">
+                                      {campaign.name}
+                                    </span>
+                                    <span className="shrink-0 tabular-nums text-ink-faint">
+                                      {formatDate(campaign.createdAt)}
+                                    </span>
+                                  </Link>
+                                ))}
+                            </div>
+                          ) : (
+                            <p className="mt-3 border-t border-hairline pt-3 text-pretty text-[10px] text-ink-faint">
+                              LPはまだありません。
+                            </p>
+                          )}
+
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            <Link
+                              href={`/brands/${business.id}`}
+                              className="rounded-full border border-hairline px-4 py-2 text-center text-[11px] font-semibold text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                            >
+                              ブランド詳細を編集
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedBusiness({
+                                  business,
+                                  organizationName: organization.name,
+                                });
+                                document
+                                  .getElementById("create")
+                                  ?.scrollIntoView();
+                              }}
+                              className="rounded-full border border-ink px-4 py-2 text-[11px] font-semibold transition-colors hover:bg-ink hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                            >
+                              アセットを生成
+                            </button>
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+
+                {organizations !== null &&
+                organizations.length === 0 &&
+                catalogFallbackJobs.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-hairline px-6 py-10 text-center">
+                    <p className="text-balance text-sm font-semibold">
+                      まだブランドが登録されていません
+                    </p>
+                    <p className="mx-auto mt-2 max-w-lg text-pretty text-[11px] text-ink-muted">
+                      上でURLや資料を追加すると、Organization、ブランドプロフィール、仮ロゴ、LPがまとめて登録されます。
+                    </p>
+                    <a
+                      href="#create"
+                      className="mt-4 inline-block rounded-full bg-ink px-5 py-2 text-[11px] font-semibold text-white"
+                    >
+                      最初のブランドを登録する
+                    </a>
+                  </div>
+                ) : null}
+
+                {catalogFallbackJobs.length > 0 ? (
+                  <article className="rounded-2xl border border-hairline p-5 md:p-6">
+                    <header className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline pb-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-balance text-base font-semibold">
+                            名称未設定のOrganization
+                          </h3>
                           <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                             未確認
                           </span>
+                        </div>
+                        <p className="mt-1 text-pretty text-[11px] text-ink-muted">
+                          運営会社をまだ特定できていない事業を、一時的にまとめています。
+                        </p>
+                        {catalogMigrationError ? (
+                          <p
+                            className="mt-2 text-pretty text-[11px] text-red-700"
+                            role="status"
+                          >
+                            {catalogMigrationError}
+                          </p>
                         ) : null}
                       </div>
-                      <p className="mt-1 line-clamp-2 text-pretty text-[11px] text-ink-muted">
-                        {organization.description ||
-                          organization.website ||
-                          "組織情報はこれから補完されます"}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <span className="text-[10px] text-ink-faint">
-                        オーガニゼーション
+                      <span className="shrink-0 text-[10px] text-ink-faint">
+                        仮Organization
                       </span>
-                      <Link
-                        href={`/organizations/${organization.id}`}
-                        className="rounded-full border border-hairline px-3 py-1.5 text-[10px] font-semibold text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                      >
-                        詳細を編集
-                      </Link>
-                    </div>
-                  </header>
+                    </header>
 
-                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                    {organization.brands.map((business) => (
-                      <section
-                        id={`business-${business.id}`}
-                        key={business.id}
-                        className="scroll-mt-24 rounded-xl bg-ink/[0.03] p-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">
-                              {business.name}
-                            </p>
-                            <p className="mt-0.5 truncate text-[10px] text-ink-muted">
-                              {business.kind === "corporate"
-                                ? "企業ブランド"
-                                : business.kind === "audience"
-                                  ? "対象別ブランド"
-                                  : business.industry || "事業ブランド"}
-                            </p>
-                          </div>
-                          <span
-                            className="flex shrink-0 gap-1.5"
-                            aria-label="ブランドカラー"
-                          >
-                            {[business.primary, business.accent].map(
-                              (color, index) => (
-                                <span
-                                  key={index}
-                                  className="size-4 rounded-full border border-hairline bg-white"
-                                  style={
-                                    color
-                                      ? { backgroundColor: color }
-                                      : undefined
-                                  }
-                                />
-                              ),
-                            )}
-                          </span>
-                        </div>
-
-                        <dl className="mt-3 grid grid-cols-3 gap-2 text-[10px]">
-                          <div>
-                            <dt className="text-ink-faint">ロゴ</dt>
-                            <dd className="mt-0.5 tabular-nums">
-                              {business.logoIds.length}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-ink-faint">アセット</dt>
-                            <dd className="mt-0.5 tabular-nums">
-                              {business.assets.length + business.logoIds.length}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-ink-faint">情報</dt>
-                            <dd className="mt-0.5">
-                              {business.status === "confirmed"
-                                ? "確認済み"
-                                : "仮登録"}
-                            </dd>
-                          </div>
-                        </dl>
-
-                        {business.campaigns.length > 0 ? (
-                          <div className="mt-3 border-t border-hairline pt-3">
-                            <p className="text-[10px] text-ink-faint">
-                              最近のLP
-                            </p>
-                            {business.campaigns.slice(0, 2).map((campaign) => (
-                              <Link
-                                key={campaign.id}
-                                href={`/brands/${business.id}/lp/${campaign.id}`}
-                                className="mt-1 flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-[11px] hover:bg-white"
-                              >
-                                <span className="truncate">
-                                  {campaign.name}
-                                </span>
-                                <span className="shrink-0 tabular-nums text-ink-faint">
-                                  {formatDate(campaign.createdAt)}
-                                </span>
-                              </Link>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="mt-3 border-t border-hairline pt-3 text-pretty text-[10px] text-ink-faint">
-                            LPはまだありません。
-                          </p>
-                        )}
-
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                          <Link
-                            href={`/brands/${business.id}`}
-                            className="rounded-full border border-hairline px-4 py-2 text-center text-[11px] font-semibold text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                          >
-                            ブランド詳細を編集
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedBusiness({
-                                business,
-                                organizationName: organization.name,
-                              });
-                              document
-                                .getElementById("create")
-                                ?.scrollIntoView();
-                            }}
-                            className="rounded-full border border-ink px-4 py-2 text-[11px] font-semibold transition-colors hover:bg-ink hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                          >
-                            アセットを生成
-                          </button>
-                        </div>
-                      </section>
-                    ))}
-                  </div>
-                </article>
-              ))}
-
-              {organizations !== null &&
-              organizations.length === 0 &&
-              catalogFallbackJobs.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-hairline px-6 py-10 text-center">
-                  <p className="text-balance text-sm font-semibold">
-                    まだブランドが登録されていません
-                  </p>
-                  <p className="mx-auto mt-2 max-w-lg text-pretty text-[11px] text-ink-muted">
-                    上でURLや資料を追加すると、Organization、ブランドプロフィール、仮ロゴ、LPがまとめて登録されます。
-                  </p>
-                  <a
-                    href="#create"
-                    className="mt-4 inline-block rounded-full bg-ink px-5 py-2 text-[11px] font-semibold text-white"
-                  >
-                    最初のブランドを登録する
-                  </a>
-                </div>
-              ) : null}
-
-              {catalogFallbackJobs.length > 0 ? (
-                <article className="rounded-2xl border border-hairline p-5 md:p-6">
-                  <header className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline pb-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-balance text-base font-semibold">
-                          名称未設定のOrganization
-                        </h3>
-                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                          未確認
-                        </span>
-                      </div>
-                      <p className="mt-1 text-pretty text-[11px] text-ink-muted">
-                        運営会社をまだ特定できていない事業を、一時的にまとめています。
-                      </p>
-                      {catalogMigrationError ? (
-                        <p
-                          className="mt-2 text-pretty text-[11px] text-red-700"
-                          role="status"
+                    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {catalogFallbackJobs.map((job) => (
+                        <Link
+                          id={`legacy-campaign-${job.id}`}
+                          key={job.id}
+                          href={`/campaigns/${job.id}`}
+                          className="scroll-mt-24 rounded-xl bg-ink/[0.03] p-4 hover:bg-ink/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                         >
-                          {catalogMigrationError}
-                        </p>
-                      ) : null}
-                    </div>
-                    <span className="shrink-0 text-[10px] text-ink-faint">
-                      仮Organization
-                    </span>
-                  </header>
-
-                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                    {catalogFallbackJobs.map((job) => (
-                      <Link
-                        id={`legacy-campaign-${job.id}`}
-                        key={job.id}
-                        href={`/campaigns/${job.id}`}
-                        className="scroll-mt-24 rounded-xl bg-ink/[0.03] p-4 hover:bg-ink/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="truncate text-sm font-semibold">
-                            {job.businessName ?? job.name}
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="truncate text-sm font-semibold">
+                              {job.businessName ?? job.name}
+                            </p>
+                            <span className="shrink-0 text-[10px] text-ink-faint">
+                              {job.status === "error" ? "エラー" : "整理中"}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-pretty text-[10px] text-ink-muted">
+                            {job.catalogError
+                              ? `${job.registrationScope === "organization" ? "Organization" : "ブランド"}登録を再試行中です`
+                              : (job.organizationName ??
+                                "運営Organizationは未確認です")}
                           </p>
-                          <span className="shrink-0 text-[10px] text-ink-faint">
-                            {job.status === "error" ? "エラー" : "整理中"}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-pretty text-[10px] text-ink-muted">
-                          {job.catalogError
-                            ? `${job.registrationScope === "organization" ? "Organization" : "ブランド"}登録を再試行中です`
-                            : (job.organizationName ??
-                              "運営Organizationは未確認です")}
-                        </p>
-                      </Link>
-                    ))}
-                  </div>
-                </article>
-              ) : null}
+                        </Link>
+                      ))}
+                    </div>
+                  </article>
+                ) : null}
+              </div>
             </div>
-          </div>
-
-        </section>
+          </section>
         </div>
       )}
 

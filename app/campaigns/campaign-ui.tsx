@@ -66,6 +66,10 @@ export type JobPayload = {
     input?: { registrationScope?: UrlRegistrationScope };
     catalog?: {
       organizationId: string;
+      brandId?: string;
+      workId?: string | null;
+      publishedLpTakeId?: string;
+      publishedLpPath?: string;
       businessId: string;
       campaignId: string;
       logoId: string;

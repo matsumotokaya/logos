@@ -8,7 +8,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { currentTemplate, type RenderFormat } from "@/lib/templates/catalog";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import { renderRemotionComposition } from "@/lib/video/remotion-cli";
+import { renderLandingPage } from "@/lib/campaign/render-lp";
+import type { CampaignBrandKit } from "@/lib/campaign/schema";
 import { putRenderArtifact } from "./storage";
+import { stageBriefMaterials } from "./materials";
 
 // Rendering one render of one take.
 //
@@ -91,7 +94,7 @@ export async function renderTake(
     .eq("id", renderId);
 
   try {
-    const bytes = await produce(template.id, render.format, validated.brief);
+    const bytes = await produce(supabase, render.take_id, template.id, render.format, validated.brief);
     const renderedAt = new Date().toISOString();
     const { key, mediaType } = await putRenderArtifact(
       take.brand_id,
@@ -147,25 +150,38 @@ export async function renderTake(
 /** Template-specific production. Each arm owns exactly one renderer; a template
  *  without one says so instead of producing an empty file. */
 async function produce(
+  supabase: SupabaseClient,
+  takeId: string,
   templateId: string,
   format: RenderFormat,
   brief: unknown,
 ): Promise<Buffer> {
   if (templateId === "event-promo" && format === "mp4") {
-    return renderEventMp4(brief);
+    return renderEventMp4(supabase, takeId, brief);
+  }
+  if (templateId === "campaign-lp" && format === "html") {
+    const kit = (brief as { kit?: CampaignBrandKit }).kit;
+    if (!kit) throw new Error("LPのService Brand Kitが未充足です");
+    return Buffer.from(renderLandingPage(kit), "utf8");
   }
   throw new Error(
     `${templateId} の ${format} レンダラーはまだv2経路に接続されていません`,
   );
 }
 
-async function renderEventMp4(brief: unknown): Promise<Buffer> {
+async function renderEventMp4(
+  supabase: SupabaseClient,
+  takeId: string,
+  brief: unknown,
+): Promise<Buffer> {
   const dir = await mkdtemp(path.join(tmpdir(), "logos-take-"));
   const propsPath = path.join(dir, "props.json");
   const outPath = path.join(dir, "out.mp4");
+  const publicDir = path.join(dir, "public");
   try {
-    await writeFile(propsPath, JSON.stringify({ brief }));
-    await renderRemotionComposition("event", propsPath, outPath);
+    const stagedBrief = await stageBriefMaterials(supabase, takeId, brief, publicDir);
+    await writeFile(propsPath, JSON.stringify({ brief: stagedBrief }));
+    await renderRemotionComposition("event", propsPath, outPath, publicDir);
     return await readFile(outPath);
   } finally {
     await rm(dir, { recursive: true, force: true });

@@ -1,7 +1,7 @@
 # v2スキーマ概念設計(マーケティングツール生成)
 
-最終更新: 2026-08-05
-ステータス: **migration 0023〜0031 適用済み。event-promo が新構造だけで1本通った(§17-2)。画面の読み書きはまだ1行も移していない**
+最終更新: 2026-08-06
+ステータス: **migration 0023〜0031 適用済み。event-promo のv2レンダーとWork素材共有は実測済み(§17.1〜17.2)。URL生成はv2 LP書き込みへ、`/c/[id]`はv2 Publication読み取りへ接続済み(§17.3)。Brand管理画面と既存動画ポータルはまだv1を読む**
 
 要件の正本は [deliverable-architecture.md](deliverable-architecture.md)。本書はその §10-2「新スキーマ概念設計」の成果物であり、**テーブル・列・不変条件・RLS・移行段の正本**である。現行(v1)の稼働構造は [data-model.md](data-model.md)、アカウント・URL・RLSの原則は [account-design.md](account-design.md) が正本のまま。切り替え完了後、本書の内容は data-model.md へ統合して本書を廃止する。
 
@@ -11,12 +11,12 @@
 
 ## 1. 設計の前提として確定した4点(2026-08-04)
 
-| 論点 | 決定 | 帰結 |
-|---|---|---|
+| 論点                        | 決定                                                                                                      | 帰結                                                                                                                                                        |
+| --------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Organization / Brand の実体 | **既存 `brand_organizations` / `brand_entities` を v2 の Org / Brand として継承**し、不足分を追加列で足す | ID が変わらないので `/p/[id]`・`/c/[id]`・`logos.subject_entity_id`・`brand_assets.brand_id` の参照が壊れない。並行追加は**本当に新しいエンティティに限る** |
-| Brand 種別の語彙(§11-1) | **閉じた enum を拡張**: `corporate / business / service / product / media / event` | 要件 §2.3 の判定表と1対1。「Brandを増やしすぎない」判断をDB制約が支える |
-| audience の置き場所(§11-1) | **1Brand内のバリアント**(`brand_variants`)。独立Brandにしない | 実DBに `brand_kind='audience'` の行は**0件**なので、畳み込みコストはゼロ |
-| Work の属性(§11-2) | **薄いコレクション**(id / brand / 名前 / 状態 / 任意の期間のみ) | 目的・オファー・KPIは持たせない。継続運用は期間nullのWork1本。必要になれば列を足す |
+| Brand 種別の語彙(§11-1)     | **閉じた enum を拡張**: `corporate / business / service / product / media / event`                        | 要件 §2.3 の判定表と1対1。「Brandを増やしすぎない」判断をDB制約が支える                                                                                     |
+| audience の置き場所(§11-1)  | **1Brand内のバリアント**(`brand_variants`)。独立Brandにしない                                             | 実DBに `brand_kind='audience'` の行は**0件**なので、畳み込みコストはゼロ                                                                                    |
+| Work の属性(§11-2)          | **薄いコレクション**(id / brand / 名前 / 状態 / 任意の期間のみ)                                           | 目的・オファー・KPIは持たせない。継続運用は期間nullのWork1本。必要になれば列を足す                                                                          |
 
 テーブル名 `brand_entities` は **改名しない**。実体はBrandだが、読み手・書き手が多く、改名の利得はコメント1行分しかない。コード側の型名は `Brand` を使う(現行 `BrandSummary` がすでにそうなっている)。
 
@@ -24,16 +24,16 @@
 
 project ref `xhbdfzceyfrxsmaixkne`。移行設計は**この実測値**を前提にする。
 
-| テーブル | 行数 | 内訳・注意 |
-|---|---|---|
-| `brand_organizations` | 17 | うち11が `system_key='unassigned_logo_organization'`(ロゴ単体投入で自動生成された「名称未設定のOrganization」)。`parent_organization_id` はまだ無い |
-| `brand_entities` | 53 | **legacy Organization行 16 が同居**(`brand_kind is null`、`entity_type='organization'`)。Brandは corporate 17 / business 20。`brand_kind='audience'` は**0** |
-| `brand_profiles` | 14 | jsonbのキーは `palette` / `theme` / `service` / `design_tokens` / `organization` の5系統。これが BrandKnowledge の field_path の出発点 |
-| `logos` | 25 | 多くが placeholder Brand(`未整理のブランドアセット`)配下。public 2件、unlisted 1件 |
-| `brand_assets` | 12 | LP 11件 + `event-promo` 動画1件(`世界が恋する日本酒`)。`asset_kind='video'` はこの1件だけ |
-| `brand_generation_runs` | LP生成分 | `legacy_campaign_id` / `external_job_id` 経由で `var/campaign-lab/jobs/*.json` に依存 |
-| `campaigns` / `campaign_*` | **0** | 0021 で移行済み。**縮退の対象で、移すデータは無い** |
-| `logo_presentations` | 0 | プレゼン編集の保存実績なし。Take化の実データ移行は不要 |
+| テーブル                   | 行数     | 内訳・注意                                                                                                                                                   |
+| -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `brand_organizations`      | 17       | うち11が `system_key='unassigned_logo_organization'`(ロゴ単体投入で自動生成された「名称未設定のOrganization」)。`parent_organization_id` はまだ無い          |
+| `brand_entities`           | 53       | **legacy Organization行 16 が同居**(`brand_kind is null`、`entity_type='organization'`)。Brandは corporate 17 / business 20。`brand_kind='audience'` は**0** |
+| `brand_profiles`           | 14       | jsonbのキーは `palette` / `theme` / `service` / `design_tokens` / `organization` の5系統。これが BrandKnowledge の field_path の出発点                       |
+| `logos`                    | 25       | 多くが placeholder Brand(`未整理のブランドアセット`)配下。public 2件、unlisted 1件                                                                           |
+| `brand_assets`             | 12       | LP 11件 + `event-promo` 動画1件(`世界が恋する日本酒`)。`asset_kind='video'` はこの1件だけ                                                                    |
+| `brand_generation_runs`    | LP生成分 | `legacy_campaign_id` / `external_job_id` 経由で `var/campaign-lab/jobs/*.json` に依存                                                                        |
+| `campaigns` / `campaign_*` | **0**    | 0021 で移行済み。**縮退の対象で、移すデータは無い**                                                                                                          |
+| `logo_presentations`       | 0        | プレゼン編集の保存実績なし。Take化の実データ移行は不要                                                                                                       |
 
 読み取れること:
 
@@ -208,16 +208,16 @@ create unique index brand_knowledge_values_variant_field_uq
 
 実DBの `brand_profiles` にある5系統を出発点に、**事実と表現を分けて**再配置する。これが §11-3「briefSchemaの共通部分」の答えでもある(共通コアはこの語彙の射影)。
 
-| field_path | layer | 出所(現行) |
-|---|---|---|
-| `identity.legal_name` / `identity.location` / `identity.founded_on` | fact | profile.organization |
-| `contact.website` / `contact.inquiry_url` | fact | profile.organization / brand_entities.website |
-| `offering.name` / `offering.tagline` / `offering.description` / `offering.industry` / `offering.business_type` / `offering.audience` | fact | profile.service |
-| `palette.primary` / `.accent` / `.background` / `.surface` / `.text` / `palette.source` | expression | profile.palette |
-| `typography.font_style` / `typography.body_font` / `typography.heading_font` | expression | profile.design_tokens |
-| `tokens.button_radius` / `.section_spacing` / `.container_width` | expression | profile.design_tokens |
-| `tone.theme` / `tone.direction` | expression | profile.theme + themes.ts の `direction` |
-| `proof.*`(実績・証言・価格) | fact | **現行は架空生成。claimsには入れない**(テイク内の表現に留める) |
+| field_path                                                                                                                           | layer      | 出所(現行)                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ---------- | -------------------------------------------------------------- |
+| `identity.legal_name` / `identity.location` / `identity.founded_on`                                                                  | fact       | profile.organization                                           |
+| `contact.website` / `contact.inquiry_url`                                                                                            | fact       | profile.organization / brand_entities.website                  |
+| `offering.name` / `offering.tagline` / `offering.description` / `offering.industry` / `offering.business_type` / `offering.audience` | fact       | profile.service                                                |
+| `palette.primary` / `.accent` / `.background` / `.surface` / `.text` / `palette.source`                                              | expression | profile.palette                                                |
+| `typography.font_style` / `typography.body_font` / `typography.heading_font`                                                         | expression | profile.design_tokens                                          |
+| `tokens.button_radius` / `.section_spacing` / `.container_width`                                                                     | expression | profile.design_tokens                                          |
+| `tone.theme` / `tone.direction`                                                                                                      | expression | profile.theme + themes.ts の `direction`                       |
+| `proof.*`(実績・証言・価格)                                                                                                          | fact       | **現行は架空生成。claimsには入れない**(テイク内の表現に留める) |
 
 - `offering.*` を `service.*` と呼ばないのは、Brand種別が service に限らないため(product / media / event も同じ語彙を使う)
 - 継承解決(親Brandの確定値 → 子が上書き)は**アプリ側1モジュール**に置く。現在 [../app/api/brands/route.ts](../app/api/brands/route.ts) の `mergeProfile` / `resolvedProfile` に実装があり、レンダラー(TS)も同じ解決を必要とするため、DB関数に移すと二重実装になる。`lib/brand/knowledge.ts` へ集約し、APIルートはそれを呼ぶだけにする
@@ -498,12 +498,12 @@ create table public.brand_access_grants (
 
 ロールを列挙する代わりに、**4つの述語**で全テーブルを説明する。新規ヘルパーはこの4つと補助関数だけ。
 
-| 述語 | 満たす人 | 何ができるか |
-|---|---|---|
-| `can_view_brand_entity` | owner / admin / editor / purchaser / viewer、grant の manager / editor / viewer、作成者 | **成果物の閲覧**(Take / Render / Artifact / 素材 / Knowledge確定値) |
-| `can_edit_brand_output` | 上記のうち owner / admin / editor、grant の manager / editor | Take・brief・Render の作成と編集、素材の投入、生成の起動 |
-| `can_edit_brand_core` | owner / admin / editor、grant の **manager のみ** | Brand正本(名前・種別・継承元)、**Knowledge確定値の採用**、**素材のブランド昇格** |
-| `can_admin_brand` | owner / admin、個人所有なら作成者。**grantは含まない** | **Publication(公開)**、Take / Work の削除、共有の付与と解除 |
+| 述語                    | 満たす人                                                                                | 何ができるか                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `can_view_brand_entity` | owner / admin / editor / purchaser / viewer、grant の manager / editor / viewer、作成者 | **成果物の閲覧**(Take / Render / Artifact / 素材 / Knowledge確定値)              |
+| `can_edit_brand_output` | 上記のうち owner / admin / editor、grant の manager / editor                            | Take・brief・Render の作成と編集、素材の投入、生成の起動                         |
+| `can_edit_brand_core`   | owner / admin / editor、grant の **manager のみ**                                       | Brand正本(名前・種別・継承元)、**Knowledge確定値の採用**、**素材のブランド昇格** |
+| `can_admin_brand`       | owner / admin、個人所有なら作成者。**grantは含まない**                                  | **Publication(公開)**、Take / Work の削除、共有の付与と解除                      |
 
 決定の根拠:
 
@@ -515,21 +515,21 @@ create table public.brand_access_grants (
 
 ### 14.2 テーブル別
 
-| テーブル | SELECT | INSERT / UPDATE | DELETE |
-|---|---|---|---|
-| `brand_organizations` | `can_view_brand_organization` | `can_manage_brand_organization` | 同左 |
-| `brand_entities` | `can_view_brand_entity` | `can_edit_brand_core` | `can_admin_brand` |
-| `brand_variants` | `can_view_brand_entity` | `can_edit_brand_core` | 同左 |
-| `brand_knowledge_claims` | `can_view_brand_entity` | **INSERT のみ**(`can_edit_brand_output`) | **ポリシーなし** |
-| `brand_knowledge_values` | `can_view_brand_entity` | `can_edit_brand_core` | 同左 |
-| `brand_materials` | `can_view_brand_entity` | `can_edit_brand_output`(scope拡大は `can_edit_brand_core`) | `can_edit_brand_core` |
-| `works` / `takes` | `can_view_brand_entity` | `can_edit_brand_output` | **ポリシーなし**(RPC経由・§14.3) |
-| `take_renders` / `render_artifacts` | `can_view_brand_entity` | `can_edit_brand_output` | `can_edit_brand_output` |
-| `take_runs` | **`can_edit_brand_output`** | 同左 | 同左 |
-| `publications` | `can_view_brand_entity` | **`can_admin_brand`** | 同左 |
-| `canonical_slots` | `can_view_brand_entity` / ロゴのview権限 | `can_edit_brand_core` / ロゴのadmin権限 | 同左 |
-| `template_versions` | authenticated 全員(定義カタログ) | service_role のみ | なし |
-| `brand_access_grants` | `can_admin_brand` または被付与者 | `can_admin_brand` | 同左 |
+| テーブル                            | SELECT                                   | INSERT / UPDATE                                            | DELETE                           |
+| ----------------------------------- | ---------------------------------------- | ---------------------------------------------------------- | -------------------------------- |
+| `brand_organizations`               | `can_view_brand_organization`            | `can_manage_brand_organization`                            | 同左                             |
+| `brand_entities`                    | `can_view_brand_entity`                  | `can_edit_brand_core`                                      | `can_admin_brand`                |
+| `brand_variants`                    | `can_view_brand_entity`                  | `can_edit_brand_core`                                      | 同左                             |
+| `brand_knowledge_claims`            | `can_view_brand_entity`                  | **INSERT のみ**(`can_edit_brand_output`)                   | **ポリシーなし**                 |
+| `brand_knowledge_values`            | `can_view_brand_entity`                  | `can_edit_brand_core`                                      | 同左                             |
+| `brand_materials`                   | `can_view_brand_entity`                  | `can_edit_brand_output`(scope拡大は `can_edit_brand_core`) | `can_edit_brand_core`            |
+| `works` / `takes`                   | `can_view_brand_entity`                  | `can_edit_brand_output`                                    | **ポリシーなし**(RPC経由・§14.3) |
+| `take_renders` / `render_artifacts` | `can_view_brand_entity`                  | `can_edit_brand_output`                                    | `can_edit_brand_output`          |
+| `take_runs`                         | **`can_edit_brand_output`**              | 同左                                                       | 同左                             |
+| `publications`                      | `can_view_brand_entity`                  | **`can_admin_brand`**                                      | 同左                             |
+| `canonical_slots`                   | `can_view_brand_entity` / ロゴのview権限 | `can_edit_brand_core` / ロゴのadmin権限                    | 同左                             |
+| `template_versions`                 | authenticated 全員(定義カタログ)         | service_role のみ                                          | なし                             |
+| `brand_access_grants`               | `can_admin_brand` または被付与者         | `can_admin_brand`                                          | 同左                             |
 
 - v2の全テーブルは `to authenticated` + `private.is_registered_user()`。**匿名セッションには1行も見せない**(§14.4)
 - 新規ヘルパー: `private.has_brand_grant(uuid, logo_access_role[], org_role[])` / `can_edit_brand_output(uuid)` / `can_edit_brand_core(uuid)` / `can_admin_brand(uuid)` / `take_brand_id(uuid)` / `render_brand_id(uuid)` / `organization_is_ancestor(uuid, uuid)`
@@ -576,20 +576,20 @@ create table public.brand_access_grants (
 
 **権限の梯子(§14.1)を先に作る。** 後続の全テーブルのポリシーがそれを参照するため。
 
-| # | 内容 | 依存 | 検証 |
-|---|---|---|---|
-| 0023 | Org ネスト(`parent_organization_id` + 循環/深さトリガー + `linked_org_id` の作成時コピー + 祖先関数)、`brand_kind` 拡張、`brand_variants` | — | 循環INSERTが失敗する / 既存50行が制約を通る |
-| 0024 | `brand_access_grants` + 4段の梯子(`has_brand_grant` / `can_edit_brand_output` / `can_edit_brand_core` / `can_admin_brand`)+ `can_view_brand_entity` へのgrant追加 | 0023 | 付与前は他人が読めない / grantでadminにならない |
-| 0025 | `template_versions`(`(template_id, version, tool_kind)` の一意索引つき) | — | production 昇格前は `published_at is null` |
-| 0026 | `works`、`takes`(+ 版の不変トリガー) | 0024, 0025 | template版を持たないTakeを作れない / tool_kind不一致が失敗する |
-| 0027 | `take_runs`、`take_renders`、`render_artifacts` | 0026 | 同一 (take, locale, ratio, theme, format) が2行にならない |
-| 0028 | `brand_materials`(3スコープ + 昇格トリガー)、`take_inputs` | 0026, 0027 | scope縮小が失敗する / 実体なし行が作れない |
-| 0029 | `brand_knowledge_claims` / `_values` | 0027(run_id) | `layer='fact'` + `source_kind='llm_generation'` が失敗する |
-| 0030 | `publications`、`canonical_slots` | 0026 | live な同一パスが2行にならない / 公開はadminのみ |
-| 0031 | `delete_take` / `delete_work` RPC(§14.3)+ 退会RPC拡張(§15) | 0028, 0030 | live公開中は削除できない / 新テーブルのキーがプレビューに出る |
-| 0032 | **ポート1: event-promo 動画1件**を `takes` + `take_renders` + `render_artifacts` へ複製(冪等) | 上記全部 | 件数1 / R2キー一致 |
-| 0033 | **ポート2: LP 11件**を `takes`(template=`campaign-lp`)へ複製。`brand_profiles` 14行を claims + values へ複製(`inferred` として) | 0032 | 件数・`/c/<id>` パス一致 / values が profile のキーを網羅 |
-| 0040+ | **contract**: legacy Organization行(16)削除、`entity_type` / `parent_entity_id` / `organization_kind` 列と旧トリガー削除、`brand_kind` を not null 化、`campaigns` / `campaign_*` drop、`brand_assets` / `brand_generation_runs` 縮退 | 読み取り切替の完了後 | `brand_kind is null` が0行 / 旧テーブル参照コードが無い |
+| #     | 内容                                                                                                                                                                                                                                  | 依存                 | 検証                                                           |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------------------------------------------------------------- |
+| 0023  | Org ネスト(`parent_organization_id` + 循環/深さトリガー + `linked_org_id` の作成時コピー + 祖先関数)、`brand_kind` 拡張、`brand_variants`                                                                                             | —                    | 循環INSERTが失敗する / 既存50行が制約を通る                    |
+| 0024  | `brand_access_grants` + 4段の梯子(`has_brand_grant` / `can_edit_brand_output` / `can_edit_brand_core` / `can_admin_brand`)+ `can_view_brand_entity` へのgrant追加                                                                     | 0023                 | 付与前は他人が読めない / grantでadminにならない                |
+| 0025  | `template_versions`(`(template_id, version, tool_kind)` の一意索引つき)                                                                                                                                                               | —                    | production 昇格前は `published_at is null`                     |
+| 0026  | `works`、`takes`(+ 版の不変トリガー)                                                                                                                                                                                                  | 0024, 0025           | template版を持たないTakeを作れない / tool_kind不一致が失敗する |
+| 0027  | `take_runs`、`take_renders`、`render_artifacts`                                                                                                                                                                                       | 0026                 | 同一 (take, locale, ratio, theme, format) が2行にならない      |
+| 0028  | `brand_materials`(3スコープ + 昇格トリガー)、`take_inputs`                                                                                                                                                                            | 0026, 0027           | scope縮小が失敗する / 実体なし行が作れない                     |
+| 0029  | `brand_knowledge_claims` / `_values`                                                                                                                                                                                                  | 0027(run_id)         | `layer='fact'` + `source_kind='llm_generation'` が失敗する     |
+| 0030  | `publications`、`canonical_slots`                                                                                                                                                                                                     | 0026                 | live な同一パスが2行にならない / 公開はadminのみ               |
+| 0031  | `delete_take` / `delete_work` RPC(§14.3)+ 退会RPC拡張(§15)                                                                                                                                                                            | 0028, 0030           | live公開中は削除できない / 新テーブルのキーがプレビューに出る  |
+| 0032  | **ポート1: event-promo 動画1件**を `takes` + `take_renders` + `render_artifacts` へ複製(冪等)                                                                                                                                         | 上記全部             | 件数1 / R2キー一致                                             |
+| 0033  | **ポート2: LP 11件**を `takes`(template=`campaign-lp`)へ複製。`brand_profiles` 14行を claims + values へ複製(`inferred` として)                                                                                                       | 0032                 | 件数・`/c/<id>` パス一致 / values が profile のキーを網羅      |
+| 0040+ | **contract**: legacy Organization行(16)削除、`entity_type` / `parent_entity_id` / `organization_kind` 列と旧トリガー削除、`brand_kind` を not null 化、`campaigns` / `campaign_*` drop、`brand_assets` / `brand_generation_runs` 縮退 | 読み取り切替の完了後 | `brand_kind is null` が0行 / 旧テーブル参照コードが無い        |
 
 0032/0033 はテンプレートID(コード側)が決まってから書く。**0023〜0031 は追加のみで、既存の読み書き経路に一切触らない**ため、適用してもプロダクトの挙動は変わらない。
 
@@ -609,18 +609,66 @@ create table public.brand_access_grants (
 
 `npm run templates:sync` → `npm run takes:event`([../scripts/run-event-take.ts](../scripts/run-event-take.ts))。ハーネスは**既存v1アセットの実briefを読む**ので、合成データでは分からない「スキーマが手持ちのデータと合っているか」も同時に確かめている。
 
-| 段 | 結果 |
-|---|---|
-| 台帳 | `event-promo@1` / `product-cm@1` / `campaign-lp@1` の3行。コード側カタログのハッシュ付き |
-| brief | 実データ(`brand_assets.metadata.brief`)が `EventBriefSchema` を通過。**未充足は `schedule.venue` の1件だけ**で、これは設計上「画面から消える null」 |
-| Take | `event-promo@1` / brief schema v1 に版を固定して作成。既定Renderを同時に作成 |
-| Render | `ja / 16:9 / sumi / mp4`、`status=ready`、`latest_artifact_id` がArtifactを指す |
-| Artifact | 9,308,518 bytes、R2キーは `brands/<brandId>/takes/<takeId>/renders/<renderId>/video-<ts>.mp4` |
-| 読み戻し | R2から `HeadObject` でサイズ一致を確認 |
-| 同一性 | **sha256 が v1レンダー(`var/event-lab/sake-2026.mp4`)と完全一致**(`e7bb93dc…`)。v2経路が同じ出力を作っている |
-| 副作用 | v1の `brand_assets` 行は無傷。`publications` 0件、`brand_materials` 0件 |
+| 段       | 結果                                                                                                                                                |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 台帳     | `event-promo@1` / `product-cm@1` / `campaign-lp@1` の3行。コード側カタログのハッシュ付き                                                            |
+| brief    | 実データ(`brand_assets.metadata.brief`)が `EventBriefSchema` を通過。**未充足は `schedule.venue` の1件だけ**で、これは設計上「画面から消える null」 |
+| Take     | `event-promo@1` / brief schema v1 に版を固定して作成。既定Renderを同時に作成                                                                        |
+| Render   | `ja / 16:9 / sumi / mp4`、`status=ready`、`latest_artifact_id` がArtifactを指す                                                                     |
+| Artifact | 9,308,518 bytes、R2キーは `brands/<brandId>/takes/<takeId>/renders/<renderId>/video-<ts>.mp4`                                                       |
+| 読み戻し | R2から `HeadObject` でサイズ一致を確認                                                                                                              |
+| 同一性   | **sha256 が v1レンダー(`var/event-lab/sake-2026.mp4`)と完全一致**(`e7bb93dc…`)。v2経路が同じ出力を作っている                                        |
+| 副作用   | v1の `brand_assets` 行は無傷。`publications` 0件、`brand_materials` 0件                                                                             |
 
 **分かった穴**: 素材(`public/event/sake-2026/`)はまだ `staticFile()` 参照のままで `brand_materials` に1行も無い。つまり**3段スコープの素材はまだ1度も使われていない**。§9-4(LP + Work共有の検証)は、この素材の移行と同時にやる必要がある。
+
+### 17.2 event-promo のWork素材化と再レンダー(2026-08-05)
+
+`scripts/import-event-materials.ts` で、上のevent-promo TakeをWorkへ所属させ、`public/event/sake-2026/` の13ファイル(ロゴ4・人物写真3・シーン素材5・BGM1)を**workスコープ**の`brand_materials`へ移した。briefはR2キーではなく`material:<id>`だけを持ち、`take_inputs`が素材IDとchecksumを固定する。レンダー時は`lib/takes/materials.ts`が固定済みの素材だけをprivate R2から一時publicディレクトリへ展開し、Remotionへ渡す。これによりブラウザ・brief・公開URLにprivate R2キーを出さない。
+
+| 段         | 結果                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Work       | `世界が恋する日本酒` 用のWorkを1件作成し、既存Takeへ紐付け                                                                     |
+| Material   | 13行を`scope='work'`で登録。R2キーは内容SHA-256を含む不変キー                                                                  |
+| Input pin  | 13行を`take_inputs`へ登録。素材を削除できず、Takeの入力版が固定される                                                          |
+| 再レンダー | R2素材だけを一時展開して実行。新Artifactは9,308,518 bytes、SHA-256 `e7bb93dc…`でv1と完全一致                                   |
+| LP共有     | `campaign-lp` Takeを同じWorkへ追加。動画と**13/13件で同じ`brand_materials`行**を`take_inputs`から参照することを確認            |
+| 未完了     | このイベントにはService Brand Kitが無いためLP Renderは`pending`。Kitを捏造せず、BrandKnowledge/Kit実体化後にHTML出力を接続する |
+
+インポーターは冪等で、まず `npm run takes:import-event-materials -- --take <takeId> --dry-run` を実行して対象13ファイルを確認する。実行はR2へアップロードしてから素材行を登録するが、登録に失敗した場合は直前に作ったR2オブジェクトを削除する。v1の`brand_assets`と既存Artifactは変更しない。
+
+LP側の検証Takeは `scripts/create-event-lp-take.ts` で作成する。`campaign-lp` のbriefは`campaignJobId` / `sourceUrl` / `theme`をすべてnullで保持する。これは「不足を収集タスクとして表面化し、架空の事実を補わない」という要件の実測であり、表示可能なLPを偽装するものではない。入力固定は動画の`take_inputs`をそのまま再利用するため、Workスコープの素材共有は実際の2テイクで成立している。
+
+再確認は次のread-only監査で行う。動画/LPが同じWorkであること、13件の素材ID集合が同一であること、各素材と最新MP4 ArtifactがR2にありDB記録とサイズ一致することを検査する。
+
+```bash
+npm run takes:audit-event-work -- \
+  --video-take 24f44bd0-e6e4-423d-bd41-aa00b8a4df37 \
+  --lp-take 107abf6e-6a27-4a38-94b3-83a0c4c305a6
+```
+
+### 17.3 URL投入からv2 LP公開まで(2026-08-05)
+
+`campaign-lp@2` はService Brand Kitの**スナップショットをTakeのbriefへ固定**する版である。URL投入の既存パイプラインはKit生成とBrand登録を終えた後、このv2経路も実行する。
+
+1. Kit由来のサービス名・説明・業種・対象を`brand_knowledge_claims`へ`llm_structuring / inferred`としてappendする。生成コピー・架空の実績・証言はclaimに入れない
+2. `campaign-lp@2` Takeとresponsive HTML Renderを作り、HTMLをprivate R2 Artifactへ保存する
+3. `publications`に`canonical_url`・`/c/<takeId>`・`live`を作る
+4. `/c/[id]`はまずこのlive Publicationをサーバー側で解決し、Artifactを返す。v2表をanon RLSへ開かない
+
+URL投入前の企業/サービス選択ダイアログは廃止した。既存のBrand Kit構造化出力に`classification`を加え、同じLLM呼び出しの中で`corporate / business / service / product / media / event`と`brand / work`を判定する。継続的な独自アイデンティティを持つ対象だけをBrandにし、単発イベント・キャンペーンは既存または同時生成されたcorporate Brand配下のWorkに置く。旧ジョブの`registrationScope`は読み取り互換だけ残す。
+
+既存の`var/campaign-lab`ジョブとv1の`brand_assets`は、切替中の画面互換として残る。v2の公開URLはv1 job IDではなくTake IDであり、正しい新規データでの生成時からv2を正本にする。`npm run templates:sync`で`campaign-lp@2`は台帳へ同期済み。
+
+#### 2026-08-06 セッション終了時の引き継ぎ
+
+- トップのURL入力はボタン1回で開始し、分類ダイアログを出さない。分類はBrand Kit生成と同じLLM構造化出力なので、追加のLLM呼び出しはない
+- `classification.placement='brand'`は判定された`brand_kind`のBrandを作成・再利用する。`placement='work'`はcorporate Brand配下にWorkを作り、単発施策のKitを恒久Brandプロフィールやfact claimへ混入させない
+- LP Takeには判定された`work_id`を渡す。Render成功後にlive Publicationを作り、ジョブの「LPを開く」は旧job IDではなくv2の`/c/<takeId>`を返す
+- 詳細画面にAI判定結果を表示する。旧`registrationScope`は保存済みジョブを読むためだけに残す
+- v2 Render Artifact配信ルートはDBを読まず、署名対象のR2オブジェクトキーをそのまま検証してRangeレスポンスを返す
+- 検証済み: `npm test` 15件、`npx tsc --noEmit`、対象ESLint、`npm run build`。トップページはローカルでHTTP 200、旧分類選択肢がHTMLに無いことを確認
+- **次回最初に行うこと**: 実URLをトップから1件生成し、AI判定表示、Brand/Workの配置、`campaign-lp@2`のTake/Render/Artifact、live Publication、`/c/<takeId>`の表示を一連で実測する。これは本番DBへの新規書き込みを伴うため、このセッションでは実行していない
 
 ## 18. この設計で残る未決定
 

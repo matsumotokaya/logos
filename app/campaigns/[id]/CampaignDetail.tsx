@@ -30,6 +30,15 @@ import {
 
 type Status = "loading" | "running" | "done" | "error" | "missing";
 
+const BRAND_KIND_LABELS: Record<string, string> = {
+  corporate: "企業・団体ブランド",
+  business: "事業ブランド",
+  service: "サービスブランド",
+  product: "製品ブランド",
+  media: "メディアブランド",
+  event: "イベントブランド",
+};
+
 export default function CampaignDetail({
   id,
   sampleHtml,
@@ -381,53 +390,69 @@ export default function CampaignDetail({
         ) : (
           <>
             {digestKit ? (
-              <nav
-                aria-label="現在のブランド階層"
-                className="mb-4 flex flex-wrap items-center gap-2 text-[11px] text-ink-muted"
-              >
-                <Link
-                  href={
-                    brandId
-                      ? `/brands/${brandId}`
-                      : catalogOrganizationId
-                      ? `/organizations/${catalogOrganizationId}`
-                      : "/brands"
-                  }
-                  className="hover:text-ink"
+              <>
+                <nav
+                  aria-label="現在のブランド階層"
+                  className="mb-4 flex flex-wrap items-center gap-2 text-[11px] text-ink-muted"
                 >
-                  {registrationScope === "organization"
-                    ? digestKit.service.name
-                    : (digestKit.organization?.name ??
-                      (registrationScope === "both"
-                        ? digestKit.service.name
-                        : "運営組織（未確認）"))}
-                </Link>
-                <span aria-hidden className="text-ink-faint">
-                  /
-                </span>
-                <span className="font-semibold text-ink">
-                  {digestKit.service.name}
-                </span>
-                <span aria-hidden className="text-ink-faint">
-                  /
-                </span>
-                {view === "catalog" ? (
-                  <span>生成アセット</span>
-                ) : (
-                  <>
-                    <Link
-                      href={brandId ? `/brands/${brandId}` : `/campaigns/${id}`}
-                      className="hover:text-ink"
-                    >
-                      ブランド
-                    </Link>
-                    <span aria-hidden className="text-ink-faint">
-                      /
-                    </span>
-                    <span>{view === "lp" ? "LP" : "動画"}</span>
-                  </>
-                )}
-              </nav>
+                  <Link
+                    href={
+                      brandId
+                        ? `/brands/${brandId}`
+                        : catalogOrganizationId
+                          ? `/organizations/${catalogOrganizationId}`
+                          : "/brands"
+                    }
+                    className="hover:text-ink"
+                  >
+                    {registrationScope === "organization"
+                      ? digestKit.service.name
+                      : (digestKit.organization?.name ??
+                        (registrationScope === "both"
+                          ? digestKit.service.name
+                          : "運営組織（未確認）"))}
+                  </Link>
+                  <span aria-hidden className="text-ink-faint">
+                    /
+                  </span>
+                  <span className="font-semibold text-ink">
+                    {digestKit.service.name}
+                  </span>
+                  <span aria-hidden className="text-ink-faint">
+                    /
+                  </span>
+                  {view === "catalog" ? (
+                    <span>生成アセット</span>
+                  ) : (
+                    <>
+                      <Link
+                        href={
+                          brandId ? `/brands/${brandId}` : `/campaigns/${id}`
+                        }
+                        className="hover:text-ink"
+                      >
+                        ブランド
+                      </Link>
+                      <span aria-hidden className="text-ink-faint">
+                        /
+                      </span>
+                      <span>{view === "lp" ? "LP" : "動画"}</span>
+                    </>
+                  )}
+                </nav>
+                {digestKit.classification ? (
+                  <p
+                    className="mb-4 text-[11px] text-ink-muted"
+                    title={digestKit.classification.rationale}
+                  >
+                    AI判定:{" "}
+                    {BRAND_KIND_LABELS[digestKit.classification.brand_kind]}
+                    {digestKit.classification.placement === "work"
+                      ? "（単発の施策）"
+                      : ""}
+                  </p>
+                ) : null}
+              </>
             ) : null}
             {view !== "catalog" ? (
               <header className="mb-6 flex flex-wrap items-start justify-between gap-5 border-b border-hairline pb-6">

@@ -11,6 +11,8 @@
 // the same RLS-driven model as /p/[id].
 
 import { labsDisabledResponse, labsEnabled } from "@/lib/labs-access";
+import { getR2Object } from "@/lib/r2";
+import { createAdminSupabase } from "@/lib/supabase/server";
 import { signedLabsUrl, verifyLabsSignature } from "@/lib/labs-output-sign";
 import { campaignCmMp4Exists, readCampaignJobHtml } from "@/lib/campaign/jobs";
 import {
@@ -48,6 +50,36 @@ export async function GET(
       }),
       "public, max-age=300"
     );
+  }
+
+  // v2 public resolution is server-only. New tables stay closed to anon RLS;
+  // Publication.status='live' is the single publicness decision.
+  const admin = createAdminSupabase();
+  const { data: publication } = await admin
+    .from("publications")
+    .select("render_id")
+    .eq("surface", "canonical_url")
+    .eq("url_path", `/c/${id}`)
+    .eq("status", "live")
+    .maybeSingle();
+  if (publication) {
+    const { data: render } = await admin
+      .from("take_renders")
+      .select("latest_artifact_id")
+      .eq("id", publication.render_id)
+      .maybeSingle();
+    if (!render?.latest_artifact_id) return Response.json({ error: "LPが見つかりません" }, { status: 404 });
+    const { data: artifact } = await admin
+      .from("render_artifacts")
+      .select("r2_key, media_type")
+      .eq("id", render.latest_artifact_id)
+      .maybeSingle();
+    if (!artifact) return Response.json({ error: "LPが見つかりません" }, { status: 404 });
+    const html = await getR2Object(artifact.r2_key);
+    if (!html) return Response.json({ error: "LPが見つかりません" }, { status: 404 });
+    return new Response(new Uint8Array(html).buffer, {
+      headers: { "Content-Type": artifact.media_type, "Cache-Control": "public, max-age=300" },
+    });
   }
 
   if (!labsEnabled()) return labsDisabledResponse();

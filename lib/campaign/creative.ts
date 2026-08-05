@@ -34,7 +34,8 @@ export const LLM_ENGINE = `OpenAI API（Chat Completions + structured outputs / 
 // the (detached) generation job forever. The SDK default is 10 min × retries;
 // a campaign stage that hasn't answered in 2 min is stuck, not slow.
 const LLM_TIMEOUT_MS = 120_000;
-const openai = (): OpenAI => new OpenAI({ timeout: LLM_TIMEOUT_MS, maxRetries: 2 });
+const openai = (): OpenAI =>
+  new OpenAI({ timeout: LLM_TIMEOUT_MS, maxRetries: 2 });
 
 // Pricing (USD per 1M tokens) — for the cost line in the process log.
 // GPT-5.6 family GA 2026-07-09: sol $5/$30, terra $2.50/$15, luna $1/$6.
@@ -55,8 +56,10 @@ export interface LlmUsage {
 }
 
 function usageOf(
-  response: { usage?: { prompt_tokens: number; completion_tokens: number } | null },
-  purpose: LlmUsage["purpose"]
+  response: {
+    usage?: { prompt_tokens: number; completion_tokens: number } | null;
+  },
+  purpose: LlmUsage["purpose"],
 ): LlmUsage {
   const inputTokens = response.usage?.prompt_tokens ?? 0;
   const outputTokens = response.usage?.completion_tokens ?? 0;
@@ -119,6 +122,7 @@ Given raw information about a service (scraped page text, meta info, brand color
 Rules:
 - All user-facing copy (headlines, descriptions, narration) must be in natural, punchy Japanese. Avoid literal-translation tone.
 - organization is the real-world company, sole proprietor, nonprofit, or person operating the service. It is NOT the Logos account/workspace. Use footer text, legal notices, JSON-LD, and source documents as evidence. Never silently treat the service name as a legal company name when the operator is unknown; use relationship="unknown" and low confidence instead.
+- classification decides where this subject belongs without asking the user. Use brand_kind="corporate" for the operator's own corporate identity, "business" for a broad line of business, "service" for a named service, "product" for an independently branded product, "media" for a publication/channel, and "event" only for a recurring event with its own durable logo, colors, and tone. Set placement="brand" only when the subject has a durable independent identity. Set placement="work" for a one-off seminar, campaign, launch, or an item that is merely part of a parent service. When uncertain, prefer placement="work" so the permanent Brand catalog is not polluted. Explain the evidence briefly in Japanese.
 - Copy is benefit-driven: lead with what the audience gains, not feature lists.
 - service.industry / business_type / offering / audience are ANALYSIS results, not marketing copy: state factually what kind of business this is and what it primarily provides, grounded in the source material.
 - Colors: when the prompt provides an adjudicated palette extracted from the real site, reproduce it EXACTLY and set palette_source to "extracted". Never invent colors when evidence exists. Only when no palette evidence is provided may you propose a palette that fits the service genre and personality — in that case set palette_source to "generated". Ensure text/background contrast is readable (WCAG AA-ish).
@@ -130,11 +134,14 @@ Rules:
 type ContentPart = OpenAI.Chat.Completions.ChatCompletionContentPart;
 
 function imagePart(mediaType: string, base64: string): ContentPart {
-  return { type: "image_url", image_url: { url: `data:${mediaType};base64,${base64}` } };
+  return {
+    type: "image_url",
+    image_url: { url: `data:${mediaType};base64,${base64}` },
+  };
 }
 
 export async function generateBrandKit(
-  input: CreativeInput
+  input: CreativeInput,
 ): Promise<{ kit: BrandKit; usage: LlmUsage }> {
   const client = openai();
 
@@ -143,7 +150,10 @@ export async function generateBrandKit(
     if (file.kind === "pdf") {
       content.push({
         type: "file",
-        file: { filename: "source.pdf", file_data: `data:application/pdf;base64,${file.data}` },
+        file: {
+          filename: "source.pdf",
+          file_data: `data:application/pdf;base64,${file.data}`,
+        },
       });
     } else {
       content.push(imagePart(file.mediaType, file.data));
@@ -170,7 +180,8 @@ export async function generateBrandKit(
   // Enforce the adjudicated palette structurally — the LLM was instructed to
   // reproduce it, but the pipeline does not rely on obedience.
   if (input.adjudicated) {
-    const { primary, accent, background, surface, text, mode } = input.adjudicated;
+    const { primary, accent, background, surface, text, mode } =
+      input.adjudicated;
     kit.brand = {
       ...kit.brand,
       primary,
@@ -189,7 +200,8 @@ export async function generateBrandKit(
 
 function buildUserPrompt(input: CreativeInput): string {
   const parts: string[] = ["# Source material for the Brand Kit"];
-  if (input.userName) parts.push(`Service name (user-provided): ${input.userName}`);
+  if (input.userName)
+    parts.push(`Service name (user-provided): ${input.userName}`);
   if (input.userDescription)
     parts.push(`Service description (user-provided): ${input.userDescription}`);
 
@@ -206,7 +218,9 @@ function buildUserPrompt(input: CreativeInput): string {
     if (raw.bodyText) parts.push(`Page text (truncated):\n${raw.bodyText}`);
     if (raw.footerText) parts.push(`Footer / legal text:\n${raw.footerText}`);
     if (raw.organizationHints.length) {
-      parts.push(`Possible organization names found mechanically:\n${raw.organizationHints.map((name) => `- ${name}`).join("\n")}`);
+      parts.push(
+        `Possible organization names found mechanically:\n${raw.organizationHints.map((name) => `- ${name}`).join("\n")}`,
+      );
     }
   }
   if (input.pastedText) {
@@ -222,12 +236,12 @@ function buildUserPrompt(input: CreativeInput): string {
     ].filter(Boolean);
     if (lines.length)
       parts.push(
-        `Design tokens observed on the rendered page (use as hints for font_style / tone):\n${lines.join("\n")}`
+        `Design tokens observed on the rendered page (use as hints for font_style / tone):\n${lines.join("\n")}`,
       );
   }
   if (input.files.length) {
     parts.push(
-      `The ${input.files.length} attached document(s)/image(s) above describe the service (flyers, decks, screenshots, key visuals). Use them for content, palette and tone.`
+      `The ${input.files.length} attached document(s)/image(s) above describe the service (flyers, decks, screenshots, key visuals). Use them for content, palette and tone.`,
     );
   }
   if (input.adjudicated) {
@@ -243,17 +257,17 @@ function buildUserPrompt(input: CreativeInput): string {
         `mode: ${p.mode}`,
         `rationale: ${p.rationale}`,
         'Set brand.palette_source to "extracted".',
-      ].join("\n")
+      ].join("\n"),
     );
   } else {
     parts.push(
-      'No palette evidence could be extracted from a rendered page. Propose a fitting palette and set brand.palette_source to "generated".'
+      'No palette evidence could be extracted from a rendered page. Propose a fitting palette and set brand.palette_source to "generated".',
     );
   }
   parts.push(describeThemesForPrompt());
   if (input.feedback) {
     parts.push(
-      `# Reviewer feedback on the previous attempt (fix this)\n${input.feedback}`
+      `# Reviewer feedback on the previous attempt (fix this)\n${input.feedback}`,
     );
   }
   parts.push("Produce the Service Brand Kit now.");
@@ -287,7 +301,9 @@ export async function adjudicatePalette(input: {
   const AdjudicationSchema = z.object({
     assessment: z
       .enum(["confident", "insufficient"])
-      .describe('"insufficient" only when the candidates cannot represent the brand'),
+      .describe(
+        '"insufficient" only when the candidates cannot represent the brand',
+      ),
     palette: z
       .object({
         primary: HexEnum,
@@ -299,7 +315,9 @@ export async function adjudicatePalette(input: {
       })
       .nullable()
       .describe("null only when assessment is insufficient"),
-    rationale: z.string().describe("1-3 sentences: why these roles, citing the evidence"),
+    rationale: z
+      .string()
+      .describe("1-3 sentences: why these roles, citing the evidence"),
   });
 
   const client = openai();
@@ -317,7 +335,7 @@ export async function adjudicatePalette(input: {
   content.push({
     type: "text",
     text: `Candidate colors extracted from the rendered page:\n${describeCandidates(
-      input.candidates
+      input.candidates,
     )}${
       input.feedback
         ? `\n\nReviewer feedback on the previous assignment (fix this):\n${input.feedback}`
@@ -333,7 +351,10 @@ export async function adjudicatePalette(input: {
       { role: "system", content: ADJUDICATOR_SYSTEM },
       { role: "user", content },
     ],
-    response_format: zodResponseFormat(AdjudicationSchema, "palette_adjudication"),
+    response_format: zodResponseFormat(
+      AdjudicationSchema,
+      "palette_adjudication",
+    ),
   });
 
   const usage = usageOf(response, "palette-adjudication");
@@ -404,9 +425,10 @@ export async function judgeBrandMatch(input: {
   });
 
   return {
-    judgment:
-      response.choices[0]?.message.parsed ??
-      { verdict: "pass", reason: "判定結果を取得できず既定でpass" },
+    judgment: response.choices[0]?.message.parsed ?? {
+      verdict: "pass",
+      reason: "判定結果を取得できず既定でpass",
+    },
     usage: usageOf(response, "brand-match"),
   };
 }

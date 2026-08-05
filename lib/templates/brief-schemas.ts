@@ -19,7 +19,9 @@ import { EventBriefSchema } from "@/remotion/event/brief-schema";
  * pipeline is still the one implementation (docs/schema-v2.md §16).
  */
 export const CampaignKitBriefSchema = z.object({
-  campaignJobId: z.string().uuid().nullable(),
+  /** Immutable Kit snapshot; its generated copy stays inside the Take. */
+  kit: z.unknown(),
+  campaignJobId: z.string().uuid().nullable().optional(),
   sourceUrl: z.string().nullable(),
   /** Theme is a style choice inside the template, changeable after creation. */
   theme: z.string().nullable(),

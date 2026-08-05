@@ -16,6 +16,7 @@ export function renderRemotionComposition(
   composition: string,
   propsPath: string,
   outPath: string,
+  publicDir = "public",
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(
@@ -27,10 +28,7 @@ export function renderRemotionComposition(
         composition,
         outPath,
         `--props=${propsPath}`,
-        // Materials still live under public/ and are referenced by
-        // staticFile(); moving them into the material library is a separate
-        // step (see docs/schema-v2.md §10).
-        "--public-dir=public",
+        `--public-dir=${publicDir}`,
       ],
       {
         cwd: process.cwd(),

@@ -12,10 +12,6 @@
 // Labs is local-first, and Phase 1 moves this to a real queue.
 
 import { NextResponse } from "next/server";
-import {
-  isUrlRegistrationScope,
-  type UrlRegistrationScope,
-} from "@/lib/brand-registration";
 import { guardLabsRequest } from "@/lib/labs-access";
 import {
   createServerSupabaseForToken,
@@ -24,6 +20,7 @@ import {
 import type { SourceFile } from "@/lib/campaign/creative";
 import { runCampaignPipeline } from "@/lib/campaign/pipeline";
 import { persistCampaignCatalog } from "@/lib/campaign/catalog";
+import { createPublishedCampaignLp } from "@/lib/takes/campaign-lp";
 import {
   createCampaignJob,
   appendCampaignStep,
@@ -40,7 +37,12 @@ export const maxDuration = 300;
 const MAX_FILES = 5;
 const MAX_FILE_BASE64_LENGTH = 6_000_000; // ~4.5MB binary per file
 const MAX_TEXT_LENGTH = 20_000;
-const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
 
 type GenerateBody = {
   url?: string;
@@ -49,12 +51,12 @@ type GenerateBody = {
   pastedText?: string;
   files?: { kind?: string; mediaType?: string; data?: string }[];
   brandEntityId?: string;
-  registrationScope?: UrlRegistrationScope;
 };
 
 function parseFiles(raw: GenerateBody["files"]): SourceFile[] {
   if (!raw) return [];
-  if (raw.length > MAX_FILES) throw new Error(`ファイルは${MAX_FILES}個までです`);
+  if (raw.length > MAX_FILES)
+    throw new Error(`ファイルは${MAX_FILES}個までです`);
   return raw.map((f) => {
     if (typeof f.data !== "string" || f.data.length === 0)
       throw new Error("ファイルデータが空です");
@@ -64,11 +66,17 @@ function parseFiles(raw: GenerateBody["files"]): SourceFile[] {
     if (f.kind === "image" && f.mediaType && IMAGE_TYPES.has(f.mediaType)) {
       return {
         kind: "image",
-        mediaType: f.mediaType as "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+        mediaType: f.mediaType as
+          | "image/png"
+          | "image/jpeg"
+          | "image/webp"
+          | "image/gif",
         data: f.data,
       };
     }
-    throw new Error("対応していないファイル形式です（PDF / PNG / JPEG / WebP / GIF）");
+    throw new Error(
+      "対応していないファイル形式です（PDF / PNG / JPEG / WebP / GIF）",
+    );
   });
 }
 
@@ -90,7 +98,7 @@ export async function POST(req: Request) {
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
       { error: "OPENAI_API_KEY is not set. Add it to .env.local and restart." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -98,7 +106,6 @@ export async function POST(req: Request) {
   let files: SourceFile[];
   let body: GenerateBody;
   let brandEntityId: string | null = null;
-  let registrationScope: UrlRegistrationScope = "business";
   try {
     body = (await req.json()) as GenerateBody;
     url = parseUrl(body.url);
@@ -110,25 +117,30 @@ export async function POST(req: Request) {
         .from("brand_entities")
         .select("id, entity_type")
         .eq("id", candidateId)
-        .in("entity_type", ["business", "audience"])
+        .in("entity_type", ["brand", "business", "audience"])
         .maybeSingle();
-      if (entityError || !entity) throw new Error("選択した事業を利用できません");
+      if (entityError || !entity)
+        throw new Error("選択した事業を利用できません");
       brandEntityId = entity.id as string;
     }
-    if (url && !brandEntityId) {
-      if (!isUrlRegistrationScope(body.registrationScope)) {
-        throw new Error("URLが企業・事業・その両方のどれに当たるか選択してください");
-      }
-      registrationScope = body.registrationScope;
-    }
-    if (typeof body.pastedText === "string" && body.pastedText.length > MAX_TEXT_LENGTH)
+    if (
+      typeof body.pastedText === "string" &&
+      body.pastedText.length > MAX_TEXT_LENGTH
+    )
       throw new Error("貼り付けテキストが長すぎます（2万字上限）");
-    if (!url && files.length === 0 && !body.pastedText?.trim() && !body.name?.trim())
-      throw new Error("URL・ファイル・テキストのいずれかのソースを追加してください");
+    if (
+      !url &&
+      files.length === 0 &&
+      !body.pastedText?.trim() &&
+      !body.name?.trim()
+    )
+      throw new Error(
+        "URL・ファイル・テキストのいずれかのソースを追加してください",
+      );
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "リクエストが不正です" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -139,7 +151,6 @@ export async function POST(req: Request) {
     fileKinds: files.map((file) => file.kind),
     hasText: Boolean(body.pastedText?.trim()),
     brandEntityId,
-    registrationScope,
   });
 
   // Detached run: progress and result live in the job store, not in this
@@ -156,7 +167,7 @@ export async function POST(req: Request) {
       onProgress: (event) => appendCampaignStep(job.id, event),
       onPartial: (patch) => updateCampaignPartial(job.id, patch),
       onDraft: (kit) => saveCampaignJobDraft(job.id, { kit }),
-    }
+    },
   )
     .then(async (result) => {
       completeCampaignJob(job.id, {
@@ -179,23 +190,45 @@ export async function POST(req: Request) {
           kit: result.kit,
         });
         saveCampaignCatalog(job.id, catalog);
+        const v2 = await createPublishedCampaignLp(
+          createServerSupabaseForToken(user.token),
+          {
+            userId: user.id,
+            brandId: catalog.brandId,
+            workId: catalog.workId,
+            job: completedJob,
+            kit: result.kit,
+          },
+        );
+        saveCampaignCatalog(job.id, {
+          ...catalog,
+          publishedLpTakeId: v2.takeId,
+          publishedLpPath: v2.urlPath,
+        });
         appendCampaignStep(job.id, {
-          message: `catalog: ${result.kit.organization?.name ?? "運営組織（未確認）"} / ${result.kit.service.name} に登録`,
+          message: `catalog: ${result.kit.organization?.name ?? "運営組織（未確認）"} / ${result.kit.service.name} に登録、LP公開: ${v2.urlPath}`,
           level: "success",
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "ブランド台帳への登録に失敗しました";
+        const message =
+          error instanceof Error
+            ? error.message
+            : "ブランド台帳への登録に失敗しました";
         console.error("Campaign catalog persistence failed:", error);
         saveCampaignCatalog(job.id, { error: message });
         appendCampaignStep(job.id, {
-          message: "catalog: キャンペーンは完成しましたが、ブランド台帳への登録は保留されています",
+          message:
+            "catalog: キャンペーンは完成しましたが、ブランド台帳への登録は保留されています",
           level: "warn",
         });
       }
     })
     .catch((e) => {
       console.error("Campaign generate failed:", e);
-      failCampaignJob(job.id, e instanceof Error ? e.message : "生成に失敗しました");
+      failCampaignJob(
+        job.id,
+        e instanceof Error ? e.message : "生成に失敗しました",
+      );
     });
 
   return NextResponse.json({ jobId: job.id }, { status: 202 });

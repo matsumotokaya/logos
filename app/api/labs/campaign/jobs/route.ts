@@ -28,22 +28,23 @@ function jobResponse(rawJob: CampaignJob) {
       // published after the creative stage, before verification settles.
       html: job.kit ? readCampaignJobHtml(job.id) : null,
       lpUrl: done
-        ? signedLabsUrl(`/c/${job.id}`, `campaign-lp:${job.id}`)
+        ? (job.catalog?.publishedLpPath ??
+          signedLabsUrl(`/c/${job.id}`, `campaign-lp:${job.id}`))
         : null,
       audioUrl: job.cm?.track
         ? signedLabsUrl(
             `/api/labs/campaign/audio/${job.id}`,
-            `campaign-audio:${job.id}`
+            `campaign-audio:${job.id}`,
           )
         : null,
       videoUrl: job.cm?.mp4
         ? signedLabsUrl(
             `/api/labs/campaign/video/${job.id}`,
-            `campaign-video:${job.id}`
+            `campaign-video:${job.id}`,
           )
         : null,
     },
-    { headers: { "Cache-Control": "no-store" } }
+    { headers: { "Cache-Control": "no-store" } },
   );
 }
 
@@ -66,26 +67,36 @@ export async function GET(req: Request) {
       accent: job.kit?.brand.accent ?? null,
       organizationName:
         job.input.registrationScope === "organization"
-          ? job.kit?.service.name ?? null
-          : job.kit?.organization?.name ?? null,
+          ? (job.kit?.service.name ?? null)
+          : (job.kit?.organization?.name ?? null),
       businessName: job.kit?.service.name ?? job.input.name ?? null,
       organizationId: job.catalog?.organizationId ?? null,
       businessId: job.catalog?.businessId ?? job.input.brandEntityId ?? null,
       registrationScope: job.input.registrationScope ?? "business",
       catalogError: job.catalogError ?? null,
     }));
-    return Response.json({ jobs }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json(
+      { jobs },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const id = search.get("id");
   if (id) {
     const job = getCampaignJob(id);
     if (!job || job.userId !== user.id)
-      return Response.json({ error: "ジョブが見つかりません" }, { status: 404 });
+      return Response.json(
+        { error: "ジョブが見つかりません" },
+        { status: 404 },
+      );
     return jobResponse(job);
   }
 
   const latest = latestCampaignJobForUser(user.id);
-  if (!latest) return Response.json({ job: null }, { headers: { "Cache-Control": "no-store" } });
+  if (!latest)
+    return Response.json(
+      { job: null },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   return jobResponse(latest);
 }
