@@ -12,6 +12,12 @@ import { authedFetch } from "../../campaign-ui";
 import BusinessMoveDialog from "./BusinessMoveDialog";
 import BrandLogoAssets from "./BrandLogoAssets";
 import { refreshBrandTree } from "@/lib/brand-events";
+import PipelineBar from "@/components/pipeline/PipelineBar";
+import StageDrawer from "@/components/pipeline/StageDrawer";
+import BrandPipelinePanel, {
+  type BrandPipelinePayload,
+} from "@/components/pipeline/BrandPipelinePanel";
+import type { PipelineStage } from "@/lib/pipeline/stages";
 
 const EMPTY_FORM: BusinessUpdate = {
   name: "",
@@ -83,6 +89,32 @@ export default function BusinessDetailClient({ id }: { id: string }) {
   const [pendingBrandAssets, setPendingBrandAssets] = useState<
     BrandUrlInspection["brandAssets"] | null
   >(null);
+  const [pipeline, setPipeline] = useState<
+    (BrandPipelinePayload & { stages: PipelineStage[] }) | null
+  >(null);
+  // Which stage is open. Reloading the page closes it rather than restoring
+  // it; putting this in the URL is the follow-up that makes back/forward work.
+  const [openStage, setOpenStage] = useState<string | null>(null);
+  const [pipelineTick, setPipelineTick] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void authedFetch(`/api/brands/businesses/${id}/pipeline`)
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = (await response.json().catch(() => null)) as {
+          pipeline?: BrandPipelinePayload & { stages: PipelineStage[] };
+        } | null;
+        if (!cancelled && body?.pipeline) setPipeline(body.pipeline);
+      })
+      .catch(() => {
+        // The pipeline is a read of existing rows; failing to draw it must not
+        // take the brand page down with it.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, pipelineTick]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -169,6 +201,7 @@ export default function BusinessDetailClient({ id }: { id: string }) {
           : current,
       );
       setPendingBrandAssets(null);
+      setPipelineTick((tick) => tick + 1);
       refreshBrandTree();
       setNotice(
         savedLogo
@@ -333,8 +366,36 @@ export default function BusinessDetailClient({ id }: { id: string }) {
     targetOrganization.id !== detail.parentOrganization.id,
   );
 
+  const openStageDef = pipeline?.stages.find((stage) => stage.id === openStage);
+
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 md:px-10">
+      {pipeline && (
+        <div className="-mx-6 mb-6 md:-mx-10">
+          <PipelineBar
+            stages={pipeline.stages}
+            openStage={openStage}
+            onOpenStage={setOpenStage}
+          />
+        </div>
+      )}
+      {pipeline && openStageDef && (
+        <StageDrawer
+          title={`${openStageDef.label}`}
+          description={openStageDef.summary}
+          onClose={() => setOpenStage(null)}
+        >
+          <BrandPipelinePanel
+            stageId={openStageDef.id}
+            payload={pipeline}
+            injecting={inspecting}
+            onInject={() => {
+              setOpenStage(null);
+              void inspectUrl();
+            }}
+          />
+        </StageDrawer>
+      )}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-muted">
         <Link
           href="/brands"
