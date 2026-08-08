@@ -77,6 +77,12 @@ export default function BusinessDetailClient({ id }: { id: string }) {
   const [importOpen, setImportOpen] = useState(false);
   const [selectedImportFields, setSelectedImportFields] =
     useState(EMPTY_SELECTION);
+  // The palette, design tokens and logo from the last inspection, waiting for
+  // the save that applies them. They ride along with the text fields rather
+  // than being written on inspect: nothing is stored until the user saves.
+  const [pendingBrandAssets, setPendingBrandAssets] = useState<
+    BrandUrlInspection["brandAssets"] | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -118,15 +124,19 @@ export default function BusinessDetailClient({ id }: { id: string }) {
     value: BusinessUpdate[Key],
   ) => setForm((current) => ({ ...current, [field]: value }));
 
-  const patchBusiness = async (payload: BusinessUpdate) => {
+  const patchBusiness = async (
+    payload: BusinessUpdate,
+    brandImport?: BrandUrlInspection["brandAssets"] | null,
+  ) => {
     const response = await authedFetch(`/api/brands/businesses/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(brandImport ? { ...payload, brandImport } : payload),
     });
     const body = (await response.json().catch(() => null)) as {
       ok?: boolean;
       parentChanged?: boolean;
+      logo?: BusinessDetail["logos"][number] | null;
       error?: string;
     } | null;
     if (!response.ok || !body?.ok) {
@@ -140,19 +150,31 @@ export default function BusinessDetailClient({ id }: { id: string }) {
     setError(null);
     setNotice(null);
     try {
-      await patchBusiness(form);
+      const result = await patchBusiness(form, pendingBrandAssets);
+      const savedLogo = result.logo ?? null;
       setDetail((current) =>
         current
           ? {
               ...current,
               ...editableFields(form),
+              logos: savedLogo
+                ? [
+                    savedLogo,
+                    ...current.logos.filter((logo) => logo.id !== savedLogo.id),
+                  ]
+                : current.logos,
               status: "confirmed",
               updatedAt: new Date().toISOString(),
             }
           : current,
       );
+      setPendingBrandAssets(null);
       refreshBrandTree();
-      setNotice("ブランド情報を保存しました。");
+      setNotice(
+        savedLogo
+          ? "ブランド情報とロゴを保存しました。"
+          : "ブランド情報を保存しました。",
+      );
     } catch (saveError) {
       setError(
         saveError instanceof Error ? saveError.message : "保存できませんでした",
@@ -212,9 +234,12 @@ export default function BusinessDetailClient({ id }: { id: string }) {
         ? inspection.description
         : current.description,
     }));
+    setPendingBrandAssets(inspection.brandAssets);
     setImportOpen(false);
     setNotice(
-      "取得した候補を入力欄へ反映しました。内容を確認して保存してください。",
+      inspection.brandAssets
+        ? "取得した候補を入力欄へ反映しました。保存するとロゴ・カラー・フォントも取り込みます。"
+        : "取得した候補を入力欄へ反映しました。内容を確認して保存してください。",
     );
   };
 

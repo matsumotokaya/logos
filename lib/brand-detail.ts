@@ -125,8 +125,16 @@ export type BrandUrlInspection = {
       container_width: string | null;
     } | null;
     logo: {
-      data: string;
-      mediaType: "image/png";
+      /**
+       * The site's own vector master, when it ships one. Sites serve .svg for
+       * the mark and raster for photography, so this is the file the capture
+       * should be judged on — carrying only the rendered PNG is what made a
+       * site with a perfectly good logo end up with its favicon.
+       */
+      svg: string | null;
+      /** base64 raster, used when there is no vector to be had. */
+      data: string | null;
+      mediaType: string;
       sourceUrl: string;
     } | null;
   } | null;

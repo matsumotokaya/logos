@@ -1,22 +1,19 @@
 import { guardLabsRequest } from "@/lib/labs-access";
 import type {
-  BrandUrlInspection,
   OrganizationDetail,
   OrganizationKind,
   OrganizationUpdate,
 } from "@/lib/brand-detail";
-import { newLogoId } from "@/lib/id";
-import { getR2Object } from "@/lib/r2";
+import { logoPreviewUrl } from "@/lib/brand/logo-preview";
+import {
+  parseBrandImport,
+  saveBrandAssetsFromUrl,
+} from "@/lib/brand/import-assets";
 import {
   createServerSupabaseForToken,
   requireUser,
 } from "@/lib/supabase/server";
-import {
-  adoptBrandKnowledge,
-  knowledgeProfilesByBrand,
-  mergeProfile,
-  type AdoptKnowledgeField,
-} from "@/lib/brand/knowledge";
+import { knowledgeProfilesByBrand } from "@/lib/brand/knowledge";
 
 const ORGANIZATION_KINDS = new Set<OrganizationKind>([
   "company",
@@ -46,8 +43,6 @@ function website(value: unknown): string {
   return url.href.replace(/\/$/, "");
 }
 
-type BrandImport = NonNullable<BrandUrlInspection["brandAssets"]>;
-
 type OrganizationLogoRow = {
   id: string;
   title: string;
@@ -65,241 +60,12 @@ type OrganizationLogoRow = {
 async function organizationLogoSummary(
   row: OrganizationLogoRow,
 ): Promise<OrganizationDetail["logos"][number]> {
-  const candidate =
-    row.logo_candidates.find((item) => item.is_primary) ??
-    row.logo_candidates[0];
-  let previewUrl: string | null = null;
-  if (candidate?.svg) {
-    previewUrl = `data:image/svg+xml;base64,${Buffer.from(candidate.svg, "utf8").toString("base64")}`;
-  } else if (candidate?.file_path) {
-    const file = await getR2Object(candidate.file_path);
-    if (file) {
-      previewUrl = `data:${candidate.media_type || "image/png"};base64,${file.toString("base64")}`;
-    }
-  }
   return {
     id: row.id,
     title: row.title,
     role: row.role,
     visibility: row.visibility,
-    previewUrl,
-  };
-}
-
-function brandImport(value: unknown): BrandImport | null {
-  if (!value || typeof value !== "object") return null;
-  const candidate = value as Partial<BrandImport>;
-  const rawPalette = candidate.palette;
-  const palette =
-    rawPalette && typeof rawPalette === "object"
-      ? Object.fromEntries(
-          Object.entries(rawPalette)
-            .filter(
-              ([key, color]) =>
-                key.length <= 40 &&
-                typeof color === "string" &&
-                /^#[0-9a-f]{6}$/i.test(color),
-            )
-            .slice(0, 8),
-        )
-      : {};
-  const tokenKeys = [
-    "body_font",
-    "heading_font",
-    "button_radius",
-    "button_padding",
-    "section_spacing",
-    "container_width",
-  ] as const;
-  const rawTokens = candidate.designTokens;
-  const designTokens = rawTokens
-    ? (Object.fromEntries(
-        tokenKeys.map((key) => {
-          const token = rawTokens[key];
-          return [
-            key,
-            typeof token === "string" ? token.trim().slice(0, 240) : null,
-          ];
-        }),
-      ) as BrandImport["designTokens"])
-    : null;
-  const rawLogo = candidate.logo;
-  const logo =
-    rawLogo?.mediaType === "image/png" &&
-    typeof rawLogo.data === "string" &&
-    rawLogo.data.length > 0 &&
-    rawLogo.data.length <= 2_000_000 &&
-    typeof rawLogo.sourceUrl === "string"
-      ? {
-          data: rawLogo.data,
-          mediaType: "image/png" as const,
-          sourceUrl: website(rawLogo.sourceUrl),
-        }
-      : null;
-  if (Object.keys(palette).length === 0 && !designTokens && !logo) return null;
-  return { palette, designTokens, logo };
-}
-
-async function saveOrganizationBrandAssets({
-  supabase,
-  userId,
-  corporateBrandId,
-  organizationName,
-  sourceUrl,
-  value,
-}: {
-  supabase: ReturnType<typeof createServerSupabaseForToken>;
-  userId: string;
-  corporateBrandId: string;
-  organizationName: string;
-  sourceUrl: string;
-  value: BrandImport;
-}): Promise<{
-  profile: OrganizationDetail["profile"];
-  logo: OrganizationDetail["logos"][number] | null;
-}> {
-  const currentKnowledge = await knowledgeProfilesByBrand(supabase, [corporateBrandId]);
-  if (currentKnowledge.error) {
-    throw new Error("ブランドプロフィールを確認できませんでした");
-  }
-  const profileValue = mergeProfile(currentKnowledge.data.get(corporateBrandId) ?? {}, {
-    ...(Object.keys(value.palette).length > 0
-      ? { palette: value.palette }
-      : {}),
-    ...(value.designTokens ? { design_tokens: value.designTokens } : {}),
-  });
-  const fields: AdoptKnowledgeField[] = [];
-  const palettePaths: Record<string, string> = {
-    primary: "palette.primary",
-    accent: "palette.accent",
-    background: "palette.background",
-    surface: "palette.surface",
-    text: "palette.text",
-    mode: "palette.mode",
-    palette_source: "palette.source",
-    font_style: "typography.font_style",
-  };
-  for (const [key, fieldPath] of Object.entries(palettePaths)) {
-    const fieldValue = value.palette[key];
-    if (typeof fieldValue === "string" && fieldValue) {
-      fields.push({ field_path: fieldPath, layer: "expression", value: fieldValue });
-    }
-  }
-  const tokenPaths: Record<string, string> = {
-    body_font: "typography.body_font",
-    heading_font: "typography.heading_font",
-    button_radius: "tokens.button_radius",
-    button_padding: "tokens.button_padding",
-    section_spacing: "tokens.section_spacing",
-    container_width: "tokens.container_width",
-  };
-  for (const [key, fieldPath] of Object.entries(tokenPaths)) {
-    const fieldValue = value.designTokens?.[key as keyof typeof value.designTokens];
-    if (typeof fieldValue === "string" && fieldValue) {
-      fields.push({ field_path: fieldPath, layer: "expression", value: fieldValue });
-    }
-  }
-  const adopted = await adoptBrandKnowledge(supabase, {
-    brandId: corporateBrandId,
-    fields,
-    sourceKind: "url_extraction",
-    sourceRef: { source: "site_capture", source_url: sourceUrl },
-    userId,
-  });
-  if (!adopted.ok) throw new Error("ブランドプロフィールを保存できませんでした");
-
-  let createdLogo: OrganizationDetail["logos"][number] | null = null;
-  if (value.logo) {
-    const existingLogo = await supabase
-      .from("logos")
-      .select("id")
-      .eq("subject_entity_id", corporateBrandId)
-      .eq("role", "corporate")
-      .limit(1)
-      .maybeSingle();
-    if (existingLogo.error)
-      throw new Error("コーポレートロゴを確認できませんでした");
-    if (!existingLogo.data) {
-      const logoId = newLogoId();
-      const logoBuffer = Buffer.from(value.logo.data, "base64");
-      if (
-        logoBuffer.length < 8 ||
-        !logoBuffer
-          .subarray(0, 8)
-          .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-      ) {
-        throw new Error("取得したロゴ画像が不正です");
-      }
-      const embeddedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 256"><image width="512" height="256" preserveAspectRatio="xMidYMid meet" href="data:image/png;base64,${value.logo.data}"/></svg>`;
-      const created = await supabase.rpc(
-        "create_brand_logo_with_presentation",
-        {
-          p_brand_id: corporateBrandId,
-          p_logo_id: logoId,
-          p_title: organizationName,
-          p_role: "corporate",
-          p_visibility: "draft",
-          p_svg: embeddedSvg,
-          p_analysis: {
-            viewBox: { x: 0, y: 0, w: 512, h: 256 },
-            colors: [
-              {
-                hex: "#101012",
-                rgb: { r: 16, g: 16, b: 18 },
-                cmyk: [11, 11, 0, 93],
-                share: 1,
-              },
-            ],
-            anchors: [],
-            handles: [],
-            fileName: "website-logo.svg",
-          },
-        },
-      );
-      if (created.error) {
-        throw new Error("コーポレートロゴとプレゼンを登録できませんでした");
-      }
-
-      // The master and its V2 presentation are already committed atomically.
-      // Enrich the candidate with capture provenance for later confirmation.
-      const candidate = await supabase
-        .from("logo_candidates")
-        .select("id")
-        .eq("logo_id", logoId)
-        .eq("is_primary", true)
-        .maybeSingle();
-      if (candidate.data) {
-        await supabase
-          .from("logo_candidates")
-          .update({
-            label: "公式サイトから取得（仮）",
-            source_url: value.logo.sourceUrl,
-            asset_status: "provisional",
-            provenance: {
-              source: "site_capture",
-              source_url: sourceUrl,
-              confirmed: false,
-            },
-          })
-          .eq("id", candidate.data.id);
-      }
-      createdLogo = {
-        id: logoId,
-        title: organizationName,
-        role: "corporate",
-        visibility: "draft",
-        previewUrl: `data:${value.logo.mediaType};base64,${value.logo.data}`,
-      };
-    }
-  }
-
-  return {
-    profile: {
-      inheritsParent: false,
-      status: "confirmed",
-      value: profileValue,
-    },
-    logo: createdLogo,
+    previewUrl: await logoPreviewUrl(row.logo_candidates),
   };
 }
 
@@ -566,7 +332,7 @@ export async function PATCH(
         )
       : new Set(fields);
     const importedBrand = importedFromWebsite
-      ? brandImport(body.brandImport)
+      ? parseBrandImport(body.brandImport)
       : null;
     if (importedFromWebsite && importedFields.size === 0 && !importedBrand) {
       throw new Error("上書きする情報を選択してください");
@@ -628,11 +394,12 @@ export async function PATCH(
       throw new Error("企業ブランドを確認できませんでした");
     }
     const savedBrand = importedBrand && corporate?.data
-      ? await saveOrganizationBrandAssets({
+      ? await saveBrandAssetsFromUrl({
           supabase,
           userId: user.id,
-          corporateBrandId: corporate.data.id as string,
-          organizationName: name,
+          brandId: corporate.data.id as string,
+          brandName: name,
+          role: "corporate",
           sourceUrl,
           value: importedBrand,
         })

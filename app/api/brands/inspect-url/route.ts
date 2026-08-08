@@ -119,18 +119,24 @@ export async function POST(req: Request) {
       evidence,
       brandAssets:
         Object.keys(palette).length > 0 ||
-        Boolean(capture?.logoImage) ||
+        Boolean(capture?.logoSvg || capture?.logoImage) ||
         Boolean(designTokens && Object.values(designTokens).some(Boolean))
           ? {
               palette,
               designTokens,
-              logo: capture?.logoImage
-                ? {
-                    data: capture.logoImage,
-                    mediaType: "image/png",
-                    sourceUrl: page.url,
-                  }
-                : null,
+              // Prefer the vector. The PNG stays as the fallback for sites
+              // that only ever render their mark as an image.
+              logo:
+                capture?.logoSvg || capture?.logoImage
+                  ? {
+                      svg: capture.logoSvg,
+                      data: capture.logoImage,
+                      mediaType: capture.logoSvg
+                        ? "image/svg+xml"
+                        : "image/png",
+                      sourceUrl: page.url,
+                    }
+                  : null,
             }
           : null,
     };

@@ -5,6 +5,15 @@ import {
   requireUser,
 } from "@/lib/supabase/server";
 import { knowledgeProfilesByBrand } from "@/lib/brand/knowledge";
+import {
+  parseBrandImport,
+  saveBrandAssetsFromUrl,
+} from "@/lib/brand/import-assets";
+import {
+  LOGO_PREVIEW_COLUMNS,
+  logoPreviewUrl,
+  type LogoPreviewCandidate,
+} from "@/lib/brand/logo-preview";
 import { listTakeAssetsByBrand } from "@/lib/takes/read-model";
 
 const MANAGER_ROLES = ["owner", "admin", "editor"];
@@ -104,7 +113,9 @@ export async function GET(
     knowledgeProfilesByBrand(supabase, [id]),
     supabase
       .from("logos")
-      .select("id, title, role, visibility, logo_candidates(is_primary, svg)")
+      .select(
+        `id, title, role, visibility, logo_candidates(${LOGO_PREVIEW_COLUMNS})`,
+      )
       .eq("subject_entity_id", id)
       .order("created_at", { ascending: true }),
     listTakeAssetsByBrand(supabase, [id]),
@@ -176,23 +187,17 @@ export async function GET(
           value: knowledgeProfile,
         }
       : null,
-    logos: (logosResult.data ?? []).map((logo) => {
-      const candidates = (logo.logo_candidates ?? []) as Array<{
-        is_primary: boolean;
-        svg: string | null;
-      }>;
-      const candidate =
-        candidates.find((item) => item.is_primary) ?? candidates[0];
-      return {
+    logos: await Promise.all(
+      (logosResult.data ?? []).map(async (logo) => ({
         id: logo.id as string,
         title: logo.title as string,
         role: logo.role as string,
         visibility: logo.visibility as string,
-        previewUrl: candidate?.svg
-          ? `data:image/svg+xml;base64,${Buffer.from(candidate.svg, "utf8").toString("base64")}`
-          : null,
-      };
-    }),
+        previewUrl: await logoPreviewUrl(
+          (logo.logo_candidates ?? []) as LogoPreviewCandidate[],
+        ),
+      })),
+    ),
     campaigns: (takeAssetsResult.data.get(id) ?? [])
         .filter((asset) => asset.kind === "lp")
         .map((asset) => ({
@@ -220,7 +225,14 @@ export async function PATCH(
   const supabase = createServerSupabaseForToken(user.token);
 
   try {
-    const body = (await req.json()) as Partial<BusinessUpdate>;
+    const body = (await req.json()) as Partial<BusinessUpdate> & {
+      brandImport?: unknown;
+    };
+    // The capture that produced the name also produced the palette, the design
+    // tokens and the logo. This screen used to keep the three text fields and
+    // drop the rest, which is why a brand could sit here with a full set of
+    // knowledge claims and no logo to show for it.
+    const importedBrand = parseBrandImport(body.brandImport);
     const name = text(body.name, "事業名", 160);
     if (!name) throw new Error("事業名を入力してください");
     const parentOrganizationId = text(
@@ -338,8 +350,27 @@ export async function PATCH(
     }
     if (!updated.data) throw new Error("この事業を編集する権限がありません");
 
+    // Assets are applied after the entity update so a rejected edit never
+    // leaves a refreshed logo attached to stale brand facts.
+    const savedBrand = importedBrand
+      ? await saveBrandAssetsFromUrl({
+          supabase,
+          userId: user.id,
+          brandId: id,
+          brandName: name,
+          role: current.data.brand_kind === "corporate" ? "corporate" : "service",
+          sourceUrl: website(body.website),
+          value: importedBrand,
+        })
+      : null;
+
     return Response.json(
-      { ok: true, parentChanged },
+      {
+        ok: true,
+        parentChanged,
+        profile: savedBrand?.profile ?? null,
+        logo: savedBrand?.logo ?? null,
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
