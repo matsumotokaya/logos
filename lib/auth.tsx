@@ -18,6 +18,16 @@ import { ensureSession, hasSupabase, supabase } from "@/lib/supabase/client";
 /** OAuth providers wired in the UI. Each activates once enabled in Supabase. */
 export type OAuthProvider = "google" | "apple" | "figma";
 export type AuthDialogMode = "create" | "signin";
+/**
+ * Why the gate appeared. The dialog is shared, but "save the logo you just
+ * dropped" and "generate a video and a sales page" are different asks, and a
+ * visitor who is told the wrong one cannot tell what signing in will get them.
+ */
+export type AuthDialogPurpose = "default" | "generate";
+export type AuthDialogRequest = {
+  mode: AuthDialogMode;
+  purpose: AuthDialogPurpose;
+};
 export const OPEN_AUTH_DIALOG_EVENT = "logos:open-auth";
 
 export type AuthUser = {
@@ -49,10 +59,15 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-export function requestAuthDialog(mode: AuthDialogMode = "create") {
+export function requestAuthDialog(
+  mode: AuthDialogMode = "create",
+  purpose: AuthDialogPurpose = "default"
+) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
-    new CustomEvent<AuthDialogMode>(OPEN_AUTH_DIALOG_EVENT, { detail: mode })
+    new CustomEvent<AuthDialogRequest>(OPEN_AUTH_DIALOG_EVENT, {
+      detail: { mode, purpose },
+    })
   );
 }
 

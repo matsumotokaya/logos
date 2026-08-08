@@ -19,7 +19,11 @@ import type {
 import { analyzeSvg } from "@/lib/svg";
 import { createStoredLogo, repo } from "@/lib/store";
 import { newLogoId } from "@/lib/id";
-import { requestAuthDialog, useAuth } from "@/lib/auth";
+import {
+  requestAuthDialog,
+  useAuth,
+  type AuthDialogPurpose,
+} from "@/lib/auth";
 import {
   authedFetch,
   AuthRequiredError,
@@ -100,6 +104,47 @@ async function fileToUiFile(file: File): Promise<UiFile | null> {
   };
 }
 
+// Signing in with a provider leaves the page entirely and comes back to a
+// freshly mounted component, so the source the visitor typed — and the fact
+// that they had already asked to generate — would be gone. Park both for the
+// duration of the round trip. Attachments stay behind: they are megabytes of
+// base64 and would blow the session store, so a run that used them is resumed
+// by hand.
+const INTAKE_KEY = "logos:campaign-intake";
+
+type ParkedIntake = {
+  url: string;
+  pastedText: string;
+  hadFiles: boolean;
+};
+
+function parkIntake(intake: ParkedIntake) {
+  try {
+    window.sessionStorage.setItem(INTAKE_KEY, JSON.stringify(intake));
+  } catch {
+    // A full or unavailable store costs the visitor a retype, not the page.
+  }
+}
+
+/** Reading is destructive: a reload must not replay a generation unasked. */
+function takeParkedIntake(): ParkedIntake | null {
+  try {
+    const raw = window.sessionStorage.getItem(INTAKE_KEY);
+    window.sessionStorage.removeItem(INTAKE_KEY);
+    return raw ? (JSON.parse(raw) as ParkedIntake) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearParkedIntake() {
+  try {
+    window.sessionStorage.removeItem(INTAKE_KEY);
+  } catch {
+    // Nothing to recover from; the entry is one-shot either way.
+  }
+}
+
 async function loadCampaignCatalog(): Promise<{
   jobs: JobSummary[];
   organizations: BrandOrganizationSummary[];
@@ -156,6 +201,41 @@ export default function CampaignsTop() {
   // Shown from the moment an SVG logo is accepted until the presentation route
   // takes over — a loading bar bridges the parse/save/navigation gap.
   const [logoLoading, setLogoLoading] = useState(false);
+  // A generation the visitor asked for before signing in, waiting for the
+  // session to become a real account. A ref, not state: flipping it must not
+  // be what schedules the run — the effect below is already re-run by the
+  // restored source landing in `generate`.
+  const pendingResume = useRef(false);
+
+  // Pick up whatever a sign-in redirect left behind, before anything else can
+  // touch the intake fields.
+  /* eslint-disable react-hooks/set-state-in-effect --
+     Reading the parked intake is a read from an external store, and it cannot
+     happen during render: the server has no session storage, so seeding the
+     initial state from it would make the first client render disagree with the
+     server's HTML. This runs once on mount and the entry is one-shot. */
+  useEffect(() => {
+    const parked = takeParkedIntake();
+    if (!parked) return;
+    setUrl(parked.url);
+    setPastedText(parked.pastedText);
+    if (parked.pastedText) setShowPaste(true);
+    if (parked.hadFiles) {
+      // Resuming with less material than the visitor chose would quietly
+      // generate the wrong thing, so this run waits for them.
+      setFileNotice("添付したファイルをもう一度追加してください。");
+      return;
+    }
+    pendingResume.current = true;
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Signing in from the dialog without leaving the page (email) keeps the
+  // fields on screen, which makes the parked copy stale the moment the session
+  // becomes an account. Drop it, or the next visit would replay it.
+  useEffect(() => {
+    if (isSignedIn) clearParkedIntake();
+  }, [isSignedIn]);
 
   const hasSource =
     url.trim() !== "" || files.length > 0 || pastedText.trim() !== "";
@@ -187,16 +267,23 @@ export default function CampaignsTop() {
     }
   }, []);
 
-  const requireAccount = useCallback(() => {
-    if (!enabled) return false;
-    if (authLoading) return true;
-    if (isSignedIn) return false;
-    requestAuthDialog("create");
-    return true;
-  }, [enabled, authLoading, isSignedIn]);
+  // True when the caller must stop — either auth is still settling, or the
+  // visitor needs an account and the dialog is now open. onPrompt runs only in
+  // that second case, which is the one that can navigate away from the page.
+  const requireAccount = useCallback(
+    (purpose: AuthDialogPurpose = "default", onPrompt?: () => void) => {
+      if (!enabled) return false;
+      if (authLoading) return true;
+      if (isSignedIn) return false;
+      onPrompt?.();
+      requestAuthDialog("create", purpose);
+      return true;
+    },
+    [enabled, authLoading, isSignedIn],
+  );
 
-  // An explicitly uploaded image is a logo. SVG opens the full brand
-  // presentation; raster stays "準備中" until its dedicated animation ships.
+  // An explicitly uploaded image is a logo. SVG opens its management-side
+  // presentation editor; raster stays "準備中" until its dedicated mode ships.
   const openLogoFromImage = useCallback(
     async (file: File) => {
       setFileNotice(null);
@@ -215,7 +302,7 @@ export default function CampaignsTop() {
         const existing = await repo.listLogos();
         const dup = existing.find((l) => l.data.svg === data.svg);
         if (dup) {
-          router.push(`/p/${dup.id}`);
+          router.push(`/logos/${dup.id}/presentation`);
           return;
         }
         const id = newLogoId();
@@ -227,7 +314,7 @@ export default function CampaignsTop() {
             data,
           }),
         );
-        router.push(`/p/${id}`);
+        router.push(`/logos/${id}/presentation`);
       } catch (e) {
         setLogoLoading(false);
         setFileNotice(
@@ -238,7 +325,7 @@ export default function CampaignsTop() {
     [requireAccount, router],
   );
 
-  // Route dropped/selected files by intent: an image is a logo (→ presentation),
+  // Route dropped/selected files by intent: an image is a logo (→ editor),
   // anything else (PDF) is campaign source material.
   const acceptFiles = useCallback(
     (list: FileList | File[]) => {
@@ -355,15 +442,34 @@ export default function CampaignsTop() {
     }
   }, [url, pastedText, files, selectedBusiness, router]);
 
+  // A generation parked before sign-in starts itself once the session is a
+  // real account. If sign-in produced none (dialog dismissed, OAuth failed),
+  // the source is back on screen and the button is the next step.
+  useEffect(() => {
+    if (!pendingResume.current || authLoading || !isSignedIn) return;
+    pendingResume.current = false;
+    void generate();
+  }, [authLoading, isSignedIn, generate]);
+
   const requestGeneration = useCallback(() => {
     setError(null);
-    // Signed out: send them to sign-in instead of telling them to. requireAccount
-    // opens the dialog over this page — the same affordance the logo upload uses
-    // — so the source they just typed is still there when it closes, and the
-    // press that follows is the one that starts the run.
-    if (requireAccount()) return;
+    // Signed out: send them to sign-in instead of telling them to. Providers
+    // sign in by leaving the page, so the source and the intent are parked
+    // first — coming back to an empty form is what made a refused generation
+    // look like nothing had happened at all.
+    if (
+      requireAccount("generate", () =>
+        parkIntake({
+          url: url.trim(),
+          pastedText: pastedText.trim(),
+          hadFiles: files.length > 0,
+        }),
+      )
+    ) {
+      return;
+    }
     void generate();
-  }, [requireAccount, generate]);
+  }, [requireAccount, generate, url, pastedText, files]);
 
   return (
     <main>

@@ -46,6 +46,9 @@ export type Dict = {
     subtitle: string;
     signInTitle: string;
     signInSubtitle: string;
+    /** Shown when the gate was a generation, not a logo upload. */
+    generateTitle: string;
+    generateSubtitle: string;
     failed: string;
     sentTitle: string;
     continueWith: string; // {provider}
@@ -178,6 +181,9 @@ const en: Dict = {
     subtitle: "Create an account to keep your logos, edit them later and share them. Everything you have already made carries over.",
     signInTitle: "Welcome back",
     signInSubtitle: "Sign in to your account to manage your logos.",
+    generateTitle: "Sign in required",
+    generateSubtitle:
+      "Generating a video and a sales page requires an account. What you entered stays here once you are signed in.",
     failed: "Authentication failed",
     sentTitle: "Check your email",
     continueWith: "Continue with {provider}",
@@ -326,6 +332,9 @@ const ja: Dict = {
     subtitle: "アカウントを作成すると、ロゴを保存して後から編集・共有できます。ここまで作成した内容はそのまま引き継がれます。",
     signInTitle: "おかえりなさい",
     signInSubtitle: "アカウントにログインしてロゴを管理します。",
+    generateTitle: "ログインが必要です",
+    generateSubtitle:
+      "動画とセールスページを生成するにはログインが必要です。入力した内容はログイン後もそのまま残ります。",
     failed: "認証に失敗しました",
     sentTitle: "確認メールを送信しました",
     continueWith: "{provider} で続ける",
@@ -474,6 +483,9 @@ const ko: Dict = {
     subtitle: "계정을 만들면 로고를 저장하고 나중에 편집·공유할 수 있습니다. 지금까지 만든 내용은 그대로 이어집니다.",
     signInTitle: "다시 오신 것을 환영합니다",
     signInSubtitle: "계정에 로그인하여 로고를 관리하세요.",
+    generateTitle: "로그인이 필요합니다",
+    generateSubtitle:
+      "동영상과 세일즈 페이지를 생성하려면 로그인이 필요합니다. 입력한 내용은 로그인 후에도 그대로 남습니다.",
     failed: "인증에 실패했습니다",
     sentTitle: "확인 메일을 보냈습니다",
     continueWith: "{provider}(으)로 계속하기",
@@ -621,6 +633,9 @@ const zhHant: Dict = {
     subtitle: "建立帳號即可保存標誌、日後編輯與分享。您目前建立的內容都會保留。",
     signInTitle: "歡迎回來",
     signInSubtitle: "登入帳號以管理您的標誌。",
+    generateTitle: "需要登入",
+    generateSubtitle:
+      "生成影片與銷售頁面需要登入。您輸入的內容在登入後仍會保留。",
     failed: "驗證失敗",
     sentTitle: "確認信已寄出",
     continueWith: "使用 {provider} 繼續",
@@ -768,6 +783,9 @@ const zhHans: Dict = {
     subtitle: "创建账号即可保存标志、稍后编辑与分享。您目前创建的内容都会保留。",
     signInTitle: "欢迎回来",
     signInSubtitle: "登录账号以管理您的标志。",
+    generateTitle: "需要登录",
+    generateSubtitle:
+      "生成视频与销售页面需要登录。您输入的内容在登录后仍会保留。",
     failed: "身份验证失败",
     sentTitle: "确认邮件已发送",
     continueWith: "使用 {provider} 继续",

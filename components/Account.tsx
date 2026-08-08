@@ -10,7 +10,8 @@ import Link from "next/link";
 import {
   OPEN_AUTH_DIALOG_EVENT,
   useAuth,
-  type AuthDialogMode,
+  type AuthDialogPurpose,
+  type AuthDialogRequest,
   type OAuthProvider,
 } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -70,6 +71,7 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"create" | "signin">("create");
+  const [purpose, setPurpose] = useState<AuthDialogPurpose>("default");
   // "form" collects credentials; "sent" is the post-signup confirm-email panel.
   const [phase, setPhase] = useState<"form" | "sent">("form");
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +79,21 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
   const [menuOpen, setMenuOpen] = useState(false);
   const activeMode = oauthCallbackError ? "signin" : mode;
   const activeError = oauthCallbackError ?? error;
+  // The heading follows why the gate opened rather than which form is showing:
+  // creating an account and signing in both lead to the same generation, so
+  // splitting the wording by mode would only describe the form.
+  const gateTitle =
+    purpose === "generate"
+      ? dict.auth.generateTitle
+      : activeMode === "create"
+        ? dict.auth.title
+        : dict.auth.signInTitle;
+  const gateSubtitle =
+    purpose === "generate"
+      ? dict.auth.generateSubtitle
+      : activeMode === "create"
+        ? dict.auth.subtitle
+        : dict.auth.signInSubtitle;
 
   // Once the session becomes a real signed-in account (e.g. instant signup when
   // email confirmation is off, or a successful sign-in), close the dialog.
@@ -101,8 +118,12 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
     };
   }, [menuOpen]);
 
-  const open = (initial: "create" | "signin" = "create") => {
+  const open = (
+    initial: "create" | "signin" = "create",
+    nextPurpose: AuthDialogPurpose = "default",
+  ) => {
     setMode(initial);
+    setPurpose(nextPurpose);
     setPhase("form");
     setError(null);
     dialogRef.current?.showModal();
@@ -121,8 +142,8 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
 
   useEffect(() => {
     const onOpenAuth = (event: Event) => {
-      const detail = (event as CustomEvent<AuthDialogMode>).detail;
-      open(detail ?? "create");
+      const detail = (event as CustomEvent<AuthDialogRequest>).detail;
+      open(detail?.mode ?? "create", detail?.purpose ?? "default");
     };
     window.addEventListener(OPEN_AUTH_DIALOG_EVENT, onOpenAuth);
     return () => {
@@ -236,18 +257,10 @@ export default function Account({ tone = "dark" }: { tone?: "dark" | "light" }) 
         <div className="flex flex-col gap-6 p-8">
           <div>
             <h2 id="auth-dialog-title" className="font-display text-2xl font-medium text-balance">
-              {phase === "sent"
-                ? dict.auth.sentTitle
-                : activeMode === "create"
-                  ? dict.auth.title
-                  : dict.auth.signInTitle}
+              {phase === "sent" ? dict.auth.sentTitle : gateTitle}
             </h2>
             <p id="auth-dialog-description" className="mt-2 text-pretty text-sm text-ink-muted">
-              {phase === "sent"
-                ? dict.auth.checkEmail
-                : activeMode === "create"
-                  ? dict.auth.subtitle
-                  : dict.auth.signInSubtitle}
+              {phase === "sent" ? dict.auth.checkEmail : gateSubtitle}
             </p>
           </div>
 
