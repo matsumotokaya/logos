@@ -265,7 +265,13 @@ const COLLECT_PAGE_COLORS = String.raw`(() => {
 // was never tried. Also serializes inline-SVG logos with computed fills baked
 // in: a real vector master, which is exactly this product's currency.
 const PICK_LOGO_ELEMENT = String.raw`(() => {
-  const SEL = 'header img, header svg, nav img, nav svg, [class*="logo" i] img, [class*="logo" i] svg, img[alt*="logo" i], a[href="/"] img, a[href="/"] svg';
+  // Named markup: a <header>/<nav>, a "logo"/"brand" class, an alt saying so,
+  // or a link to the site root. Sites built by visual builders have none of
+  // these — no semantic tags, class="sd appear", empty alt — so the broad
+  // selector below adds "any image inside any link", and NAMED decides how
+  // much that candidate has to prove.
+  const NAMED = 'header img, header svg, nav img, nav svg, [class*="logo" i] img, [class*="logo" i] svg, img[alt*="logo" i], a[href="/"] img, a[href="/"] svg';
+  const SEL = NAMED + ', a img, a svg';
   const seen = new Set();
   const cands = [];
   for (const el of Array.from(document.querySelectorAll(SEL))) {
@@ -277,6 +283,12 @@ const PICK_LOGO_ELEMENT = String.raw`(() => {
     if (cs.display === "none" || cs.visibility === "hidden" || parseFloat(cs.opacity) < 0.1) continue;
     if (r.bottom < 0 || r.top > window.innerHeight) continue;
 
+    // An unnamed link image is only a logo where a logo actually sits. Without
+    // this, every thumbnail in a card grid becomes a candidate and one of them
+    // can out-score the real mark on position alone.
+    const named = el.matches(NAMED);
+    if (!named && r.top >= 200) continue;
+
     let hasLogoName = false, inHomeLink = false;
     let a = el, depth = 0;
     while (a && depth < 5) {
@@ -284,16 +296,32 @@ const PICK_LOGO_ELEMENT = String.raw`(() => {
       const idc = (cls + " " + (a.id || "") + " " + ((a.getAttribute && a.getAttribute("alt")) || "") + " " + ((a.getAttribute && a.getAttribute("aria-label")) || "")).toLowerCase();
       if (idc.indexOf("logo") !== -1 || idc.indexOf("brand") !== -1) hasLogoName = true;
       if (a.tagName === "A") {
-        const href = a.getAttribute("href") || "";
-        if (href === "/" || href === location.origin || href === location.origin + "/") inHomeLink = true;
+        // The masthead of a section links to that section, not to "/". Treat
+        // the site root, this page, and any ancestor of it as "home" — all of
+        // them are the link a masthead mark carries.
+        let u = null;
+        try { u = new URL(a.getAttribute("href") || "", location.href); } catch (e) { u = null; }
+        if (u && u.origin === location.origin) {
+          const there = u.pathname.replace(/\/+$/, "") || "/";
+          const here = location.pathname.replace(/\/+$/, "") || "/";
+          if (there === "/" || there === here || here.indexOf(there + "/") === 0) inHomeLink = true;
+        }
       }
       a = a.parentElement;
       depth++;
     }
 
+    // A vector file referenced from the masthead is a logo almost every time:
+    // sites ship .svg for the mark and raster for photography.
+    const rawSrc = el.tagName.toLowerCase() === "img"
+      ? (el.currentSrc || el.getAttribute("src") || "")
+      : "";
+    const vectorFile = /\.svg(\?|#|$)/i.test(rawSrc) || rawSrc.indexOf("data:image/svg") === 0;
+
     let score = 0;
     if (hasLogoName) score += 3;
     if (inHomeLink) score += 3;
+    if (vectorFile) score += 3;
     if (r.top < 160) score += 2;
     if (r.left < window.innerWidth * 0.4) score += 1;
     const ar = r.width / r.height;
