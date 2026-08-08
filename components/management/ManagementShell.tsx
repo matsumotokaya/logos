@@ -212,7 +212,7 @@ function BrandTree({
           ))}
 
         {lpAssets.map((asset) => {
-          const lpPath = `/brands/${brand.id}/lp/${asset.jobId}`;
+          const lpPath = `/brands/${brand.id}/lp/${asset.id}`;
           return (
             <li key={asset.id}>
               <TreeLink

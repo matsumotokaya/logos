@@ -1,22 +1,20 @@
 // One video of one brand.
 //
-// The path segment can be either a brand_assets id (a real video row) or a
-// campaign job id (the brand's default product CM, which has no row yet). Both
-// are UUIDs, so they cannot be told apart by shape — this route does the lookup
-// and tells the client which it is, so the disambiguation lives in one place
-// instead of being guessed in the UI.
-//
-// PATCH updates the stored payload: the brief for an event promo, or the
-// published flag. The row's metadata is the source of truth after creation, so
-// editing a video never means editing repo code.
+// The path segment is always a V2 Take id. PATCH updates its validated brief,
+// title, or canonical publication state.
 
 import { guardLabsRequest } from "@/lib/labs-access";
 import { campaignCmMp4Exists, getCampaignJob } from "@/lib/campaign/jobs";
 import { signedLabsUrl } from "@/lib/labs-output-sign";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
-import { parseVideoMetadata, type EventRenderState, type VideoState } from "@/lib/video/asset";
+import { type VideoState } from "@/lib/video/asset";
 import { VIDEO_TEMPLATES } from "@/lib/video/templates";
-import { outputSignatureToken } from "./output/route";
+import { renderOutputSignatureToken } from "../../takes/[takeId]/renders/[renderId]/output/route";
+import { validateBrief } from "@/lib/templates/brief-schemas";
+import {
+  ensureCanonicalVideoPublication,
+  retireCanonicalPublications,
+} from "@/lib/takes/publication";
 
 const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -41,63 +39,107 @@ export async function GET(
   const { id: brandId, videoId } = await ctx.params;
   const supabase = createServerSupabaseForToken(user.token);
 
-  const { data: row, error } = await supabase
-    .from("brand_assets")
-    .select("id, brand_id, asset_kind, title, status, metadata, created_at")
+  const { data: take, error: takeError } = await supabase
+    .from("takes")
+    .select("id, brand_id, template_id, title, brief, created_at")
     .eq("id", videoId)
     .eq("brand_id", brandId)
-    .eq("asset_kind", "video")
+    .eq("tool_kind", "video")
     .maybeSingle();
-  if (error) {
+  if (takeError) {
     return Response.json({ error: "動画を取得できませんでした" }, { status: 500 });
   }
-
-  if (row) {
-    const meta = parseVideoMetadata(row.metadata);
-    if (!meta) {
-      return Response.json({ error: "動画の構成を読み取れませんでした" }, { status: 500 });
+  if (take) {
+    const { data: render, error: renderError } = await supabase
+      .from("take_renders")
+      .select("id, status, latest_artifact_id, updated_at")
+      .eq("take_id", take.id)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (renderError || !render) {
+      return Response.json({ error: "動画の出力単位を取得できませんでした" }, { status: 500 });
     }
-    // The MP4 lives in R2 and is played through a signed same-origin URL —
-    // <video> cannot send an Authorization header, so the URL is minted here,
-    // where the caller is already authenticated.
-    const render = (row.metadata as { render?: EventRenderState } | null)?.render ?? null;
-    const mp4Url =
-      render?.status === "done" && render.mp4Key
-        ? signedLabsUrl(
-            `/api/brands/${brandId}/videos/${videoId}/output?key=${encodeURIComponent(render.mp4Key)}`,
-            outputSignatureToken(videoId, render.mp4Key),
-          )
+    const [artifactResult, publicationResult] = await Promise.all([
+      render.latest_artifact_id
+        ? supabase
+            .from("render_artifacts")
+            .select("r2_key, created_at")
+            .eq("id", render.latest_artifact_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      supabase
+        .from("publications")
+        .select("id, url_path")
+        .eq("render_id", render.id)
+        .eq("status", "live")
+        .limit(1),
+    ]);
+    if (artifactResult.error || publicationResult.error) {
+      return Response.json({ error: "動画の成果物を取得できませんでした" }, { status: 500 });
+    }
+    const artifact = artifactResult.data;
+    const mp4Url = artifact
+      ? signedLabsUrl(
+          `/api/brands/${brandId}/takes/${take.id}/renders/${render.id}/output?key=${encodeURIComponent(artifact.r2_key)}`,
+          renderOutputSignatureToken(brandId, take.id, render.id, artifact.r2_key),
+        )
+      : null;
+    const briefRecord = take.brief as Record<string, unknown> | null;
+    const eventBrief = take.template_id === "event-promo" ? take.brief : null;
+    const campaignJobId =
+      typeof briefRecord?.campaignJobId === "string"
+        ? briefRecord.campaignJobId
         : null;
+    const hasPinnedVoice =
+      briefRecord?.voice != null && typeof briefRecord.voice === "object";
+    const renderState =
+      render.status === "running"
+        ? { status: "running" as const, error: null, renderedAt: null }
+        : render.status === "ready"
+          ? {
+              status: "done" as const,
+              error: null,
+              renderedAt: artifact?.created_at ?? render.updated_at,
+            }
+          : render.status === "failed"
+            ? {
+                status: "error" as const,
+                error: "前回のレンダーに失敗しました",
+                renderedAt: null,
+              }
+            : null;
+
     return Response.json({
       kind: "asset" as const,
       video: {
-        render: render
-          ? { status: render.status, error: render.error ?? null, renderedAt: render.renderedAt ?? null }
-          : null,
+        render: renderState,
         mp4Url,
-        id: row.id,
-        brandId: row.brand_id,
-        title: row.title,
-        template: meta.template,
-        templateName: VIDEO_TEMPLATES[meta.template]?.name ?? meta.template,
-        published: meta.published,
-        briefSlug: meta.briefSlug ?? null,
-        brief: meta.brief ?? null,
-        campaignJobId: meta.campaignJobId ?? null,
-        state:
-          meta.template === "product-cm"
-            ? campaignVideoState(meta.campaignJobId ?? null)
-            : meta.brief
+        id: take.id,
+        brandId: take.brand_id,
+        title: take.title,
+        template: take.template_id,
+        templateName: VIDEO_TEMPLATES[take.template_id]?.name ?? take.template_id,
+        published: (publicationResult.data?.length ?? 0) > 0,
+        publicUrl: publicationResult.data?.[0]?.url_path ?? null,
+        briefSlug: null,
+        brief: take.template_id === "event-promo" ? eventBrief : take.brief,
+        campaignJobId,
+        state: artifact
+          ? "mp4_ready"
+          : take.template_id === "product-cm"
+            ? hasPinnedVoice
+              ? "preview_ready"
+              : campaignVideoState(campaignJobId)
+            : eventBrief
               ? "preview_ready"
               : "empty",
-        createdAt: row.created_at,
+        createdAt: take.created_at,
       },
     });
   }
 
-  // No row: treat the segment as the campaign job behind the brand's default
-  // product CM. The legacy campaign screen renders it.
-  return Response.json({ kind: "campaign" as const, jobId: videoId });
+  return Response.json({ error: "動画が見つかりません" }, { status: 404 });
 }
 
 export async function PATCH(
@@ -122,40 +164,88 @@ export async function PATCH(
     return Response.json({ error: "リクエストを解釈できませんでした" }, { status: 400 });
   }
 
-  const { data: row, error: readError } = await supabase
-    .from("brand_assets")
-    .select("id, metadata")
+  const { data: take, error: takeReadError } = await supabase
+    .from("takes")
+    .select("id, template_id, brief")
     .eq("id", videoId)
     .eq("brand_id", brandId)
-    .eq("asset_kind", "video")
+    .eq("tool_kind", "video")
     .maybeSingle();
-  if (readError) {
+  if (takeReadError) {
     return Response.json({ error: "動画を確認できませんでした" }, { status: 500 });
   }
-  if (!row) return Response.json({ error: "動画が見つかりません" }, { status: 404 });
+  if (take) {
+    if (body.published === true) {
+      const { data: render, error: renderError } = await supabase
+        .from("take_renders")
+        .select("id, status, latest_artifact_id")
+        .eq("take_id", take.id)
+        .eq("format", "mp4")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (renderError || !render) {
+        return Response.json({ error: "動画Renderが見つかりません" }, { status: 409 });
+      }
+      if (render.status !== "ready" || !render.latest_artifact_id) {
+        return Response.json({ error: "完成したMP4がない動画は公開できません" }, { status: 409 });
+      }
+      const published = await ensureCanonicalVideoPublication(supabase, {
+        takeId: take.id as string,
+        renderId: render.id as string,
+        userId: user.id,
+      });
+      if (!published.ok) {
+        return Response.json(
+          {
+            error: published.error.includes("row-level security")
+              ? "動画を公開する権限がありません"
+              : published.error,
+          },
+          { status: published.error.includes("row-level security") ? 403 : 409 },
+        );
+      }
+    }
+    if (body.published === false) {
+      const { data: renders, error: rendersError } = await supabase
+        .from("take_renders")
+        .select("id")
+        .eq("take_id", take.id);
+      if (rendersError) {
+        return Response.json({ error: "公開状態を確認できませんでした" }, { status: 500 });
+      }
+      const renderIds = (renders ?? []).map((render) => render.id as string);
+      const retired = await retireCanonicalPublications(supabase, renderIds);
+      if (!retired.ok) {
+        return Response.json({ error: "公開を終了できませんでした" }, { status: 500 });
+      }
+    }
 
-  const meta = parseVideoMetadata(row.metadata);
-  if (!meta) {
-    return Response.json({ error: "動画の構成を読み取れませんでした" }, { status: 500 });
+    const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (body.brief && typeof body.brief === "object") {
+      const validated = validateBrief(take.template_id as string, body.brief);
+      if (!validated.ok) {
+        return Response.json(
+          { error: `ブリーフが不正です: ${validated.issues.join(", ")}` },
+          { status: 400 },
+        );
+      }
+      update.brief = validated.brief;
+    }
+    if (typeof body.title === "string" && body.title.trim()) {
+      update.title = body.title.trim();
+    }
+    if (Object.keys(update).length > 1) {
+      const { error: updateError } = await supabase
+        .from("takes")
+        .update(update)
+        .eq("id", take.id);
+      if (updateError) {
+        return Response.json({ error: updateError.message }, { status: 500 });
+      }
+    }
+    return Response.json({ ok: true });
   }
 
-  const nextMetadata: Record<string, unknown> = { ...meta };
-  if (typeof body.published === "boolean") nextMetadata.published = body.published;
-  if (body.brief && typeof body.brief === "object") nextMetadata.brief = body.brief;
-
-  const update: Record<string, unknown> = {
-    metadata: nextMetadata,
-    updated_at: new Date().toISOString(),
-  };
-  if (typeof body.title === "string" && body.title.trim()) update.title = body.title.trim();
-
-  const { error: writeError } = await supabase
-    .from("brand_assets")
-    .update(update)
-    .eq("id", videoId);
-  if (writeError) {
-    return Response.json({ error: writeError.message }, { status: 500 });
-  }
-
-  return Response.json({ ok: true });
+  return Response.json({ error: "動画が見つかりません" }, { status: 404 });
 }

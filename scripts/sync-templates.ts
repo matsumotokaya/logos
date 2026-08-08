@@ -23,16 +23,6 @@ async function main() {
 
   const report = await syncTemplateVersions();
   console.log(`\nwrote ${report.written.length} ledger rows`);
-
-  if (report.driftedProduction.length > 0) {
-    console.error(
-      "\nreleased versions whose definition changed in place:\n  " +
-        report.driftedProduction.join("\n  ") +
-        "\nTakes pinned to these no longer match the code. Bump the version " +
-        "instead of editing a released one.",
-    );
-    process.exitCode = 1;
-  }
 }
 
 main().catch((error) => {

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import CampaignManagementPage from "@/app/(management)/campaigns/CampaignManagementPage";
+import BrandLpDetail from "./BrandLpDetail";
 
 export const metadata: Metadata = {
   title: "LP — ブランドアセット",
@@ -12,11 +12,5 @@ export default async function BrandLpPage({
   params: Promise<{ id: string; jobId: string }>;
 }) {
   const { id, jobId } = await params;
-  return (
-    <CampaignManagementPage
-      params={Promise.resolve({ id: jobId })}
-      view="lp"
-      brandId={id}
-    />
-  );
+  return <BrandLpDetail brandId={id} resourceId={jobId} />;
 }

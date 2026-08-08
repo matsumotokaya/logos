@@ -8,6 +8,7 @@
 
 import { labsDisabledResponse, labsEnabled } from "@/lib/labs-access";
 import { verifyLabsSignature } from "@/lib/labs-output-sign";
+import { parseByteRange } from "@/lib/video/byte-range";
 import { getR2ObjectRange, headR2Object } from "@/lib/video/storage";
 
 const renderOutputPrefix = (brandId: string, takeId: string, renderId: string): string =>
@@ -47,10 +48,9 @@ export async function GET(
   if (!stat) return new Response("Not found", { status: 404 });
 
   const contentType = stat.contentType ?? "video/mp4";
-  const range = req.headers.get("range");
-  const match = range?.match(/^bytes=(\d*)-(\d*)$/);
+  const range = parseByteRange(req.headers.get("range"), stat.size);
 
-  if (!match) {
+  if (range.kind === "none") {
     const body = await getR2ObjectRange(key, 0, stat.size - 1);
     if (!body) return new Response("Not found", { status: 404 });
     return new Response(new Uint8Array(body), {
@@ -63,14 +63,13 @@ export async function GET(
     });
   }
 
-  const start = match[1] ? Number(match[1]) : 0;
-  const end = match[2] ? Math.min(Number(match[2]), stat.size - 1) : stat.size - 1;
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= stat.size) {
+  if (range.kind === "invalid") {
     return new Response("Range Not Satisfiable", {
       status: 416,
       headers: { "Content-Range": `bytes */${stat.size}` },
     });
   }
+  const { start, end } = range;
 
   const chunk = await getR2ObjectRange(key, start, end);
   if (!chunk) return new Response("Not found", { status: 404 });

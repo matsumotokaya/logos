@@ -4,6 +4,8 @@ import {
   createServerSupabaseForToken,
   requireUser,
 } from "@/lib/supabase/server";
+import { knowledgeProfilesByBrand } from "@/lib/brand/knowledge";
+import { listTakeAssetsByBrand } from "@/lib/takes/read-model";
 
 const MANAGER_ROLES = ["owner", "admin", "editor"];
 
@@ -63,10 +65,18 @@ export async function GET(
   const entityResult = await supabase
     .from("brand_entities")
     .select(
-      "id, name, entity_type, brand_organization_id, brand_kind, parent_brand_id, website, industry, location, description, status, updated_at",
+      "id, name, brand_organization_id, brand_kind, parent_brand_id, website, industry, location, description, status, updated_at",
     )
     .eq("id", id)
-    .in("brand_kind", ["corporate", "business", "audience"])
+    .in("brand_kind", [
+      "corporate",
+      "business",
+      "service",
+      "product",
+      "media",
+      "event",
+      "audience",
+    ])
     .maybeSingle();
   if (entityResult.error) {
     return Response.json({ error: "事業を取得できませんでした" }, { status: 500 });
@@ -84,36 +94,20 @@ export async function GET(
   }
 
   const [
-    profileResult,
+    knowledgeResult,
     logosResult,
-    assetsResult,
-    runsResult,
+    takeAssetsResult,
     audiencesResult,
     organizationsResult,
     membershipsResult,
   ] = await Promise.all([
-    supabase
-      .from("brand_profiles")
-      .select("inherits_parent, status, profile")
-      .eq("entity_id", id)
-      .maybeSingle(),
+    knowledgeProfilesByBrand(supabase, [id]),
     supabase
       .from("logos")
-      .select("id, title, role, visibility")
+      .select("id, title, role, visibility, logo_candidates(is_primary, svg)")
       .eq("subject_entity_id", id)
       .order("created_at", { ascending: true }),
-    supabase
-      .from("brand_assets")
-      .select(
-        "id, title, status, created_at, public_path, legacy_campaign_id, generation_run_id",
-      )
-      .eq("brand_id", id)
-      .eq("asset_kind", "lp")
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("brand_generation_runs")
-      .select("id, external_job_id, legacy_campaign_id")
-      .eq("brand_id", id),
+    listTakeAssetsByBrand(supabase, [id]),
     supabase
       .from("brand_entities")
       .select("id, name, status")
@@ -132,10 +126,9 @@ export async function GET(
   ]);
 
   const relatedError =
-    profileResult.error ??
+    knowledgeResult.error ??
     logosResult.error ??
-    assetsResult.error ??
-    runsResult.error ??
+    takeAssetsResult.error ??
     audiencesResult.error ??
     organizationsResult.error ??
     membershipsResult.error;
@@ -164,15 +157,7 @@ export async function GET(
   }
 
   const row = entityResult.data;
-  const runs = new Map(
-    (runsResult.data ?? []).map((run) => [
-      run.id as string,
-      {
-        externalJobId: run.external_job_id as string | null,
-        legacyCampaignId: run.legacy_campaign_id as string | null,
-      },
-    ]),
-  );
+  const knowledgeProfile = knowledgeResult.data.get(id) ?? {};
   const detail: BusinessDetail = {
     id: row.id as string,
     kind: row.brand_kind as BusinessDetail["kind"],
@@ -184,33 +169,39 @@ export async function GET(
     status: row.status as BusinessDetail["status"],
     updatedAt: row.updated_at as string,
     parentOrganization: { id: parent.id, name: parent.name },
-    profile: profileResult.data
+    profile: Object.keys(knowledgeProfile).length > 0
       ? {
-          inheritsParent: profileResult.data.inherits_parent as boolean,
-          status: profileResult.data.status as BusinessDetail["status"],
-          value: (profileResult.data.profile as Record<string, unknown>) ?? {},
+          inheritsParent: true,
+          status: "confirmed",
+          value: knowledgeProfile,
         }
       : null,
-    logos: (logosResult.data ?? []) as BusinessDetail["logos"],
-    campaigns: (assetsResult.data ?? []).map((asset) => {
-      const run = asset.generation_run_id
-        ? runs.get(asset.generation_run_id as string)
-        : undefined;
-      const pathJobId = (asset.public_path as string | null)?.match(
-        /^\/c\/([^/?#]+)/,
-      )?.[1];
+    logos: (logosResult.data ?? []).map((logo) => {
+      const candidates = (logo.logo_candidates ?? []) as Array<{
+        is_primary: boolean;
+        svg: string | null;
+      }>;
+      const candidate =
+        candidates.find((item) => item.is_primary) ?? candidates[0];
       return {
-        id:
-          run?.externalJobId ??
-          (asset.legacy_campaign_id as string | null) ??
-          run?.legacyCampaignId ??
-          pathJobId ??
-          (asset.id as string),
-        name: (asset.title as string).replace(/\s+LP$/, ""),
-        status: asset.status as string,
-        createdAt: asset.created_at as string,
+        id: logo.id as string,
+        title: logo.title as string,
+        role: logo.role as string,
+        visibility: logo.visibility as string,
+        previewUrl: candidate?.svg
+          ? `data:image/svg+xml;base64,${Buffer.from(candidate.svg, "utf8").toString("base64")}`
+          : null,
       };
     }),
+    campaigns: (takeAssetsResult.data.get(id) ?? [])
+        .filter((asset) => asset.kind === "lp")
+        .map((asset) => ({
+          id: asset.id,
+          jobId: asset.jobId,
+          name: asset.title.replace(/\s+LP$/, ""),
+          status: asset.status,
+          createdAt: asset.createdAt,
+        })),
     audiences: (audiencesResult.data ?? []) as BusinessDetail["audiences"],
     availableOrganizations,
   };
@@ -243,7 +234,15 @@ export async function PATCH(
       .from("brand_entities")
       .select("brand_organization_id, brand_kind, parent_brand_id, provenance")
       .eq("id", id)
-      .in("brand_kind", ["corporate", "business", "audience"])
+      .in("brand_kind", [
+        "corporate",
+        "business",
+        "service",
+        "product",
+        "media",
+        "event",
+        "audience",
+      ])
       .maybeSingle();
     if (current.error) throw new Error("事業を確認できませんでした");
     if (!current.data) {
@@ -303,8 +302,6 @@ export async function PATCH(
       .from("brand_entities")
       .update({
         name,
-        entity_type: "brand",
-        parent_entity_id: null,
         brand_organization_id: parentOrganizationId,
         parent_brand_id:
           current.data.brand_kind === "business"
@@ -321,7 +318,15 @@ export async function PATCH(
         updated_at: now,
       })
       .eq("id", id)
-      .in("brand_kind", ["corporate", "business", "audience"])
+      .in("brand_kind", [
+        "corporate",
+        "business",
+        "service",
+        "product",
+        "media",
+        "event",
+        "audience",
+      ])
       .select("id")
       .maybeSingle();
     if (updated.error) {

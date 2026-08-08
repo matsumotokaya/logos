@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { guardLabsRequest } from "@/lib/labs-access";
 import type {
   BrandUrlInspection,
@@ -7,16 +6,17 @@ import type {
   OrganizationUpdate,
 } from "@/lib/brand-detail";
 import { newLogoId } from "@/lib/id";
-import {
-  deleteR2Object,
-  getR2Object,
-  isR2Configured,
-  putR2Object,
-} from "@/lib/r2";
+import { getR2Object } from "@/lib/r2";
 import {
   createServerSupabaseForToken,
   requireUser,
 } from "@/lib/supabase/server";
+import {
+  adoptBrandKnowledge,
+  knowledgeProfilesByBrand,
+  mergeProfile,
+  type AdoptKnowledgeField,
+} from "@/lib/brand/knowledge";
 
 const ORGANIZATION_KINDS = new Set<OrganizationKind>([
   "company",
@@ -158,57 +158,55 @@ async function saveOrganizationBrandAssets({
   profile: OrganizationDetail["profile"];
   logo: OrganizationDetail["logos"][number] | null;
 }> {
-  const now = new Date().toISOString();
-  const currentProfile = await supabase
-    .from("brand_profiles")
-    .select("profile, provenance, created_by")
-    .eq("entity_id", corporateBrandId)
-    .maybeSingle();
-  if (currentProfile.error)
+  const currentKnowledge = await knowledgeProfilesByBrand(supabase, [corporateBrandId]);
+  if (currentKnowledge.error) {
     throw new Error("ブランドプロフィールを確認できませんでした");
-  const profileValue = {
-    ...((currentProfile.data?.profile as Record<string, unknown> | null) ?? {}),
+  }
+  const profileValue = mergeProfile(currentKnowledge.data.get(corporateBrandId) ?? {}, {
     ...(Object.keys(value.palette).length > 0
       ? { palette: value.palette }
       : {}),
     ...(value.designTokens ? { design_tokens: value.designTokens } : {}),
+  });
+  const fields: AdoptKnowledgeField[] = [];
+  const palettePaths: Record<string, string> = {
+    primary: "palette.primary",
+    accent: "palette.accent",
+    background: "palette.background",
+    surface: "palette.surface",
+    text: "palette.text",
+    mode: "palette.mode",
+    palette_source: "palette.source",
+    font_style: "typography.font_style",
   };
-  const profileProvenance = {
-    ...((currentProfile.data?.provenance as Record<string, unknown> | null) ??
-      {}),
-    ...(Object.keys(value.palette).length > 0
-      ? {
-          palette: {
-            source: "site_capture",
-            source_url: sourceUrl,
-            confirmed_by: userId,
-          },
-        }
-      : {}),
-    ...(value.designTokens
-      ? {
-          design_tokens: {
-            source: "site_capture",
-            source_url: sourceUrl,
-            confirmed_by: userId,
-          },
-        }
-      : {}),
+  for (const [key, fieldPath] of Object.entries(palettePaths)) {
+    const fieldValue = value.palette[key];
+    if (typeof fieldValue === "string" && fieldValue) {
+      fields.push({ field_path: fieldPath, layer: "expression", value: fieldValue });
+    }
+  }
+  const tokenPaths: Record<string, string> = {
+    body_font: "typography.body_font",
+    heading_font: "typography.heading_font",
+    button_radius: "tokens.button_radius",
+    button_padding: "tokens.button_padding",
+    section_spacing: "tokens.section_spacing",
+    container_width: "tokens.container_width",
   };
-  const savedProfile = await supabase.from("brand_profiles").upsert(
-    {
-      entity_id: corporateBrandId,
-      inherits_parent: false,
-      status: "confirmed",
-      profile: profileValue,
-      provenance: profileProvenance,
-      created_by: currentProfile.data?.created_by ?? userId,
-      updated_at: now,
-    },
-    { onConflict: "entity_id" },
-  );
-  if (savedProfile.error)
-    throw new Error("ブランドプロフィールを保存できませんでした");
+  for (const [key, fieldPath] of Object.entries(tokenPaths)) {
+    const fieldValue = value.designTokens?.[key as keyof typeof value.designTokens];
+    if (typeof fieldValue === "string" && fieldValue) {
+      fields.push({ field_path: fieldPath, layer: "expression", value: fieldValue });
+    }
+  }
+  const adopted = await adoptBrandKnowledge(supabase, {
+    brandId: corporateBrandId,
+    fields,
+    sourceKind: "url_extraction",
+    sourceRef: { source: "site_capture", source_url: sourceUrl },
+    userId,
+  });
+  if (!adopted.ok) throw new Error("ブランドプロフィールを保存できませんでした");
 
   let createdLogo: OrganizationDetail["logos"][number] | null = null;
   if (value.logo) {
@@ -223,7 +221,6 @@ async function saveOrganizationBrandAssets({
       throw new Error("コーポレートロゴを確認できませんでした");
     if (!existingLogo.data) {
       const logoId = newLogoId();
-      const candidateId = randomUUID();
       const logoBuffer = Buffer.from(value.logo.data, "base64");
       if (
         logoBuffer.length < 8 ||
@@ -233,65 +230,59 @@ async function saveOrganizationBrandAssets({
       ) {
         throw new Error("取得したロゴ画像が不正です");
       }
-      const filePath = isR2Configured()
-        ? `logos/${logoId}/candidates/${candidateId}/master.png`
-        : null;
-      const embeddedSvg = filePath
-        ? null
-        : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 256"><image width="512" height="256" preserveAspectRatio="xMidYMid meet" href="data:image/png;base64,${value.logo.data}"/></svg>`;
-      if (filePath) {
-        await putR2Object(
-          filePath,
-          logoBuffer,
-          value.logo.mediaType,
-          "private, max-age=0",
-        );
-      }
-      const logoResult = await supabase.from("logos").insert({
-        id: logoId,
-        owner_user_id: userId,
-        created_by: userId,
-        updated_by: userId,
-        subject_entity_id: corporateBrandId,
-        title: organizationName,
-        role: "corporate",
-        logo_type: "combination",
-        visibility: "draft",
-      });
-      if (logoResult.error) {
-        if (filePath) await deleteR2Object(filePath);
-        throw new Error("コーポレートロゴを登録できませんでした");
-      }
-      const candidateResult = await supabase.from("logo_candidates").insert({
-        id: candidateId,
-        logo_id: logoId,
-        label: "公式サイトから取得（仮）",
-        is_primary: true,
-        svg: embeddedSvg,
-        media_type: filePath ? value.logo.mediaType : "image/svg+xml",
-        file_path: filePath,
-        source_url: value.logo.sourceUrl,
-        asset_status: "provisional",
-        provenance: {
-          source: "site_capture",
-          source_url: sourceUrl,
-          confirmed: false,
+      const embeddedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 256"><image width="512" height="256" preserveAspectRatio="xMidYMid meet" href="data:image/png;base64,${value.logo.data}"/></svg>`;
+      const created = await supabase.rpc(
+        "create_brand_logo_with_presentation",
+        {
+          p_brand_id: corporateBrandId,
+          p_logo_id: logoId,
+          p_title: organizationName,
+          p_role: "corporate",
+          p_visibility: "draft",
+          p_svg: embeddedSvg,
+          p_analysis: {
+            viewBox: { x: 0, y: 0, w: 512, h: 256 },
+            colors: [
+              {
+                hex: "#101012",
+                rgb: { r: 16, g: 16, b: 18 },
+                cmyk: [11, 11, 0, 93],
+                share: 1,
+              },
+            ],
+            anchors: [],
+            handles: [],
+            fileName: "website-logo.svg",
+          },
         },
-      });
-      if (candidateResult.error) {
-        await supabase.from("logos").delete().eq("id", logoId);
-        if (filePath) await deleteR2Object(filePath);
-        throw new Error("ロゴ候補を保存できませんでした");
+      );
+      if (created.error) {
+        throw new Error("コーポレートロゴとプレゼンを登録できませんでした");
       }
-      await supabase.from("logo_activities").insert({
-        logo_id: logoId,
-        user_id: userId,
-        action: "created",
-        detail: {
-          source: "organization_site_capture",
-          asset_status: "provisional",
-        },
-      });
+
+      // The master and its V2 presentation are already committed atomically.
+      // Enrich the candidate with capture provenance for later confirmation.
+      const candidate = await supabase
+        .from("logo_candidates")
+        .select("id")
+        .eq("logo_id", logoId)
+        .eq("is_primary", true)
+        .maybeSingle();
+      if (candidate.data) {
+        await supabase
+          .from("logo_candidates")
+          .update({
+            label: "公式サイトから取得（仮）",
+            source_url: value.logo.sourceUrl,
+            asset_status: "provisional",
+            provenance: {
+              source: "site_capture",
+              source_url: sourceUrl,
+              confirmed: false,
+            },
+          })
+          .eq("id", candidate.data.id);
+      }
       createdLogo = {
         id: logoId,
         title: organizationName,
@@ -359,23 +350,26 @@ export async function GET(
   const corporateBrandId = corporateResult.data.id as string;
 
   const [
-    profileResult,
+    knowledgeResult,
     businessesResult,
     logosResult,
     availableBusinessesResult,
     organizationsResult,
   ] = await Promise.all([
-    supabase
-      .from("brand_profiles")
-      .select("inherits_parent, status, profile")
-      .eq("entity_id", corporateBrandId)
-      .maybeSingle(),
+    knowledgeProfilesByBrand(supabase, [corporateBrandId]),
     supabase
       .from("brand_entities")
       .select("id, name, website, status")
       .eq("brand_organization_id", id)
       .neq("id", corporateBrandId)
-      .in("brand_kind", ["business", "audience"])
+      .in("brand_kind", [
+        "business",
+        "service",
+        "product",
+        "media",
+        "event",
+        "audience",
+      ])
       .order("created_at", { ascending: true }),
     supabase
       .from("logos")
@@ -396,7 +390,7 @@ export async function GET(
       .order("created_at", { ascending: true }),
   ]);
   const relatedError =
-    profileResult.error ??
+    knowledgeResult.error ??
     businessesResult.error ??
     logosResult.error ??
     availableBusinessesResult.error ??
@@ -409,6 +403,7 @@ export async function GET(
   }
 
   const row = entityResult.data;
+  const knowledgeProfile = knowledgeResult.data.get(corporateBrandId) ?? {};
   const logos = await Promise.all(
     ((logosResult.data ?? []) as unknown as OrganizationLogoRow[]).map(
       organizationLogoSummary,
@@ -447,11 +442,11 @@ export async function GET(
     description: (row.description as string) ?? "",
     status: row.status as OrganizationDetail["status"],
     updatedAt: row.updated_at as string,
-    profile: profileResult.data
+    profile: Object.keys(knowledgeProfile).length > 0
       ? {
-          inheritsParent: profileResult.data.inherits_parent as boolean,
-          status: profileResult.data.status as OrganizationDetail["status"],
-          value: (profileResult.data.profile as Record<string, unknown>) ?? {},
+          inheritsParent: true,
+          status: "confirmed",
+          value: knowledgeProfile,
         }
       : null,
     businesses: (businessesResult.data ??
@@ -702,14 +697,9 @@ export async function DELETE(
     }
 
     const brandIds = brands.map((brand) => brand.id as string);
-    const [assetsResult, runsResult, logosResult] = await Promise.all([
+    const [takesResult, logosResult] = await Promise.all([
       supabase
-        .from("brand_assets")
-        .select("id")
-        .in("brand_id", brandIds)
-        .limit(1),
-      supabase
-        .from("brand_generation_runs")
+        .from("takes")
         .select("id")
         .in("brand_id", brandIds)
         .limit(1),
@@ -719,16 +709,14 @@ export async function DELETE(
         .in("subject_entity_id", brandIds)
         .limit(1),
     ]);
-    const relatedError =
-      assetsResult.error ?? runsResult.error ?? logosResult.error;
+    const relatedError = takesResult.error ?? logosResult.error;
     if (relatedError) throw new Error("関連データを確認できませんでした");
     if (
-      (assetsResult.data?.length ?? 0) > 0 ||
-      (runsResult.data?.length ?? 0) > 0 ||
+      (takesResult.data?.length ?? 0) > 0 ||
       (logosResult.data?.length ?? 0) > 0
     ) {
       return Response.json(
-        { error: "ブランドアセットまたは生成履歴があるため削除できません" },
+        { error: "Takeまたはロゴがあるため削除できません" },
         { status: 409 },
       );
     }
@@ -745,16 +733,6 @@ export async function DELETE(
       ) {
         throw new Error("企業ブランドを削除できませんでした");
       }
-    }
-
-    // Existing containers may still have their pre-0021 compatibility row.
-    const legacyDeleted = await supabase
-      .from("brand_entities")
-      .delete()
-      .eq("id", id)
-      .eq("entity_type", "organization");
-    if (legacyDeleted.error) {
-      throw new Error("旧Organization情報を整理できませんでした");
     }
 
     const deleted = await supabase

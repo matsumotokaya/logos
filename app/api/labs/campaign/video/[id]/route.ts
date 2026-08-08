@@ -9,15 +9,15 @@ import {
   labsEnabled,
 } from "@/lib/labs-access";
 import { verifyLabsSignature } from "@/lib/labs-output-sign";
-import { requireUser } from "@/lib/supabase/server";
-import { renderCmMp4 } from "@/lib/campaign/render-video";
+import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
+import { renderProductCmJob } from "@/lib/takes/product-cm";
 import {
   appendCampaignStep,
-  campaignCmMp4Exists,
   failCampaignCm,
   finishCampaignCm,
   getCampaignJob,
   readCampaignCmMp4,
+  readCampaignCmWav,
   startCampaignCmRender,
 } from "@/lib/campaign/jobs";
 
@@ -43,14 +43,22 @@ export async function POST(
       { error: "先に製品紹介動画を生成してください" },
       { status: 409 }
     );
-  if (campaignCmMp4Exists(id)) return Response.json({ jobId: id }, { status: 200 });
   if (job.cm.status === "running")
     return Response.json({ jobId: id }, { status: 202 });
+  const wav = readCampaignCmWav(id);
+  if (!wav) {
+    return Response.json({ error: "ナレーション音声が見つかりません" }, { status: 409 });
+  }
 
   startCampaignCmRender(id);
   appendCampaignStep(id, { message: "MP4ファイルを作成中…", level: "info" });
 
-  void renderCmMp4(id)
+  void renderProductCmJob(createServerSupabaseForToken(user.token), {
+    userId: user.id,
+    job,
+    wav,
+    track: job.cm.track,
+  })
     .then(() => {
       finishCampaignCm(id, { mp4: true });
       appendCampaignStep(id, { message: "MP4ファイルが完成しました", level: "success" });

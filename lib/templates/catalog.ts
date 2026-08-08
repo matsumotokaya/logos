@@ -98,6 +98,27 @@ export interface TemplateEntry {
 
 export const TEMPLATES: TemplateEntry[] = [
   {
+    id: "logo-presentation",
+    version: 1,
+    toolKind: "logo_presentation",
+    briefSchemaVersion: 1,
+    rendererRevision: "react/presentation@2026-08-08",
+    name: "ロゴプレゼンテーション",
+    summary:
+      "ロゴの正本データと編集済みコピー、採用アセット配置から構成する恒久プレゼンテーションです。",
+    requires: "ロゴ正本とプレゼンテーション編集内容",
+    stages: ["collect", "render", "publish"],
+    publishSurfaces: ["canonical_url", "vanity_url"],
+    costProfile: { llm: false, tts: false, render: "none" },
+    defaultRenders: [
+      { locale: "und", aspectRatio: "responsive", theme: "", format: "html" },
+    ],
+    isBrandDefault: false,
+    // The view resolves the immutable template version plus the still-canonical
+    // logo master and this Take's editorial snapshot at request time.
+    rerenderable: true,
+  },
+  {
     id: "event-promo",
     version: 1,
     toolKind: "video",
@@ -123,10 +144,10 @@ export const TEMPLATES: TemplateEntry[] = [
   },
   {
     id: "product-cm",
-    version: 1,
+    version: 2,
     toolKind: "video",
-    briefSchemaVersion: 1,
-    rendererRevision: "remotion/cm@2026-07-20",
+    briefSchemaVersion: 2,
+    rendererRevision: "remotion/cm@2026-08-07-v2-materials",
     name: "製品紹介動画",
     summary:
       "課題解決型の30秒CM。Service Brand Kitのコピーとナレーションから、ロゴ・配色をそのまま使って組み立てます。",
@@ -140,9 +161,9 @@ export const TEMPLATES: TemplateEntry[] = [
       { locale: "ja", aspectRatio: "16:9", theme: "", format: "mp4" },
     ],
     isBrandDefault: true,
-    // Its narration and kit still live in the campaign job store rather than on
-    // the take, so re-rendering an old version cannot be promised yet.
-    rerenderable: false,
+    // Kit, timing metadata and the pinned voice material all live with the
+    // Take, so a render no longer depends on the local campaign job store.
+    rerenderable: true,
   },
   {
     id: "campaign-lp",

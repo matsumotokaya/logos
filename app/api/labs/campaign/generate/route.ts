@@ -115,9 +115,9 @@ export async function POST(req: Request) {
       const supabase = createServerSupabaseForToken(user.token);
       const { data: entity, error: entityError } = await supabase
         .from("brand_entities")
-        .select("id, entity_type")
+        .select("id")
         .eq("id", candidateId)
-        .in("entity_type", ["brand", "business", "audience"])
+        .not("brand_kind", "is", null)
         .maybeSingle();
       if (entityError || !entity)
         throw new Error("選択した事業を利用できません");

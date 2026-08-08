@@ -68,8 +68,8 @@ type LogoRow = {
 type BrandEntityRow = {
   id: string;
   name: string;
-  entity_type: string;
-  parent_entity_id: string | null;
+  brand_kind: string;
+  parent_brand_id: string | null;
   website: string;
   industry: string;
   location: string;
@@ -186,8 +186,8 @@ function mapBrandEntity(row: BrandEntityRow): BrandEntity {
   return {
     id: row.id,
     name: row.name,
-    entityType: row.entity_type as BrandEntity["entityType"],
-    parentId: row.parent_entity_id,
+    entityType: row.brand_kind as BrandEntity["entityType"],
+    parentId: row.parent_brand_id,
     website: row.website,
     industry: row.industry,
     location: row.location,
@@ -486,27 +486,17 @@ export class SupabaseRepo implements BrandRepo {
   }
 
   async saveLogo(logo: StoredLogo): Promise<void> {
-    const uid = await this.ensureAuth();
-    const { error } = await supabase.from("logos").insert({
-      id: logo.id,
-      owner_user_id: uid,
-      created_by: uid,
-      title: logo.title,
-      role: logo.role,
-      visibility: logo.visibility,
-      updated_by: uid,
+    await this.ensureAuth();
+    const { svg, analysis } = splitLogoData(logo.data);
+    const { error } = await supabase.rpc("create_logo_with_presentation", {
+      p_logo_id: logo.id,
+      p_title: logo.title,
+      p_role: logo.role,
+      p_visibility: logo.visibility,
+      p_svg: svg,
+      p_analysis: analysis,
     });
     throwOn(error);
-    const { svg, analysis } = splitLogoData(logo.data);
-    const { error: candErr } = await supabase.from("logo_candidates").insert({
-      logo_id: logo.id,
-      label: "A",
-      is_primary: true,
-      svg,
-      analysis,
-    });
-    throwOn(candErr);
-    await this.logActivity(logo.id, "created");
   }
 
   async updateLogo(id: string, patch: LogoPatch): Promise<void> {
@@ -639,9 +629,11 @@ export class SupabaseRepo implements BrandRepo {
         throw new Error(body?.error || "Failed to purge mockups.");
       }
     }
-    // Children and presentation cascade; child logos' parent_logo_id is
-    // cleared by the FK's on delete set null.
-    const { error } = await supabase.from("logos").delete().eq("id", id);
+    // The canonical presentation Take must disappear with the logo; doing both
+    // in one RPC avoids leaving an unreachable Take or a dangling /p slot.
+    const { error } = await supabase.rpc("delete_logo_with_presentation", {
+      p_logo_id: id,
+    });
     throwOn(error);
   }
 
@@ -660,7 +652,7 @@ export class SupabaseRepo implements BrandRepo {
       subjectId
         ? supabase
             .from("brand_entities")
-            .select("id, name, entity_type, parent_entity_id, website, industry, location, description")
+            .select("id, name, brand_kind, parent_brand_id, website, industry, location, description")
             .eq("id", subjectId)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
@@ -752,7 +744,7 @@ export class SupabaseRepo implements BrandRepo {
       if (!placeholderId) throw new Error("ロゴの仮Organizationを作成できませんでした");
       const placeholder = await supabase
         .from("brand_entities")
-        .select("id, name, entity_type, parent_entity_id, website, industry, location, description")
+        .select("id, name, brand_kind, parent_brand_id, website, industry, location, description")
         .eq("id", placeholderId)
         .single();
       throwOn(placeholder.error);
@@ -762,42 +754,24 @@ export class SupabaseRepo implements BrandRepo {
 
     const row = {
       name: subject.name,
-      entity_type: subject.entityType,
-      parent_entity_id: subject.parentId,
+      brand_kind: subject.entityType,
+      parent_brand_id: subject.parentId,
       website: subject.website,
       industry: subject.industry,
       location: subject.location,
       description: subject.description,
       updated_at: now,
     };
-    const { data: saved, error: saveErr } = currentSubjectId
-      ? await supabase
-          .from("brand_entities")
-          .update(row)
-          .eq("id", currentSubjectId)
-          .select("id, name, entity_type, parent_entity_id, website, industry, location, description")
-          .single()
-      : await supabase
-          .from("brand_entities")
-          .insert({ ...row, created_by: uid })
-          .select("id, name, entity_type, parent_entity_id, website, industry, location, description")
-          .single();
-    throwOn(saveErr);
-
     if (!currentSubjectId) {
-      throwOn(
-        (
-          await supabase
-            .from("logos")
-            .update({
-              subject_entity_id: saved!.id,
-              updated_at: now,
-              updated_by: uid,
-            })
-            .eq("id", logoId)
-        ).error
-      );
+      throw new Error("ロゴに紐づくBrandが見つかりません");
     }
+    const { data: saved, error: saveErr } = await supabase
+      .from("brand_entities")
+      .update(row)
+      .eq("id", currentSubjectId)
+      .select("id, name, brand_kind, parent_brand_id, website, industry, location, description")
+      .single();
+    throwOn(saveErr);
     await this.logActivity(logoId, "info_updated");
     return mapBrandEntity(saved as BrandEntityRow);
   }
@@ -806,20 +780,15 @@ export class SupabaseRepo implements BrandRepo {
 
   async getPresentation(logoId: string): Promise<LogoPresentation> {
     await this.ensureAuth();
-    const { data, error } = await supabase
-      .from("logo_presentations")
-      .select("catchphrase, story, scene_texts, layout, updated_at")
-      .eq("logo_id", logoId)
-      .maybeSingle();
-    throwOn(error);
-    if (!data) return emptyPresentation();
-    return normalizePresentation({
-      catchphrase: data.catchphrase,
-      story: data.story,
-      sceneTexts: data.scene_texts ?? {},
-      layout: data.layout ?? emptyPresentation().layout,
-      updatedAt: data.updated_at,
+    const { data, error } = await supabase.rpc("read_logo_presentation_take", {
+      p_logo_id: logoId,
     });
+    throwOn(error);
+    const row = (data as
+      | { presentation: Partial<LogoPresentation> | null; updated_at: string }[]
+      | null)?.[0];
+    if (!row?.presentation) return emptyPresentation();
+    return normalizePresentation({ ...row.presentation, updatedAt: row.updated_at });
   }
 
   async savePresentation(
@@ -827,17 +796,15 @@ export class SupabaseRepo implements BrandRepo {
     presentation: LogoPresentation
   ): Promise<void> {
     await this.ensureAuth();
-    const normalized = normalizePresentation(presentation);
-    const { error } = await supabase.from("logo_presentations").upsert({
-      logo_id: logoId,
-      catchphrase: normalized.catchphrase,
-      story: normalized.story,
-      scene_texts: normalized.sceneTexts,
-      layout: normalized.layout,
-      updated_at: new Date().toISOString(),
+    const normalized = {
+      ...normalizePresentation(presentation),
+      updatedAt: new Date().toISOString(),
+    };
+    const { error } = await supabase.rpc("update_logo_presentation_take", {
+      p_logo_id: logoId,
+      p_presentation: normalized,
     });
     throwOn(error);
-    await this.logActivity(logoId, "presentation_updated");
   }
 
   // ---------- inventory / orders (org-scoped) ----------

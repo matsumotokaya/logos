@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import PresentationPage from "@/app/p/[id]/page";
+import LogoInfoPage from "@/app/brand/logos/[id]/page";
 
 export const metadata: Metadata = {
-  title: "ロゴプレゼンテーション",
+  title: "ロゴ詳細・編集",
   robots: { index: false, follow: false },
 };
 
@@ -11,5 +11,5 @@ export default function ManagedLogoPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  return <PresentationPage params={params} embedded />;
+  return <LogoInfoPage params={params} embedded />;
 }

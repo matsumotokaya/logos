@@ -2,7 +2,7 @@ import "server-only";
 
 // Running the Remotion CLI as a child process.
 //
-// Extracted so the v1 video-asset renderer and the v2 take renderer invoke it
+// Shared Remotion CLI adapter used by the Take renderer.
 // the same way. There is one place that knows the argv, the public directory and
 // the NODE_OPTIONS reset, so a fix to any of those reaches both callers.
 //

@@ -10,6 +10,7 @@ import type {
 import BrandUrlImportDialog from "../../BrandUrlImportDialog";
 import { authedFetch } from "../../campaign-ui";
 import BusinessMoveDialog from "./BusinessMoveDialog";
+import BrandLogoAssets from "./BrandLogoAssets";
 import { refreshBrandTree } from "@/lib/brand-events";
 
 const EMPTY_FORM: BusinessUpdate = {
@@ -453,6 +454,20 @@ export default function BusinessDetailClient({ id }: { id: string }) {
               </button>
             </div>
           </section>
+
+          <BrandLogoAssets
+            brandId={id}
+            brandName={detail.name}
+            brandKind={detail.kind}
+            logos={detail.logos}
+            onLogoCreated={(logo) =>
+              setDetail((current) =>
+                current
+                  ? { ...current, logos: [...current.logos, logo] }
+                  : current,
+              )
+            }
+          />
 
           {detail.kind === "business" ? (
           <section className="rounded-2xl border border-hairline p-5 md:p-6">

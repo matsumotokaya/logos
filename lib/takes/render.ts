@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -10,6 +10,7 @@ import { validateBrief } from "@/lib/templates/brief-schemas";
 import { renderRemotionComposition } from "@/lib/video/remotion-cli";
 import { renderLandingPage } from "@/lib/campaign/render-lp";
 import type { CampaignBrandKit } from "@/lib/campaign/schema";
+import { deleteR2Object } from "@/lib/r2";
 import { putRenderArtifact } from "./storage";
 import { stageBriefMaterials } from "./materials";
 
@@ -88,11 +89,15 @@ export async function renderTake(
     return { ok: false, error: `briefが壊れています: ${validated.issues.join(", ")}` };
   }
 
-  await supabase
+  const { error: startError } = await supabase
     .from("take_renders")
     .update({ status: "running", updated_at: new Date().toISOString() })
     .eq("id", renderId);
+  if (startError) {
+    return { ok: false, error: `レンダーを開始できませんでした: ${startError.message}` };
+  }
 
+  let renderReady = false;
   try {
     const bytes = await produce(supabase, render.take_id, template.id, render.format, validated.brief);
     const renderedAt = new Date().toISOString();
@@ -118,10 +123,22 @@ export async function renderTake(
       .select("id")
       .maybeSingle();
     if (artifactError || !artifact) {
+      // The object has no durable DB owner yet. Remove it immediately instead
+      // of relying on a future global garbage collector to find it.
+      try {
+        await deleteR2Object(key);
+      } catch (cleanupError) {
+        const cleanupMessage =
+          cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+        throw new Error(
+          `${artifactError?.message ?? "成果物を登録できませんでした"}; ` +
+            `R2補償削除にも失敗しました: ${cleanupMessage}`,
+        );
+      }
       throw new Error(artifactError?.message ?? "成果物を登録できませんでした");
     }
 
-    await supabase
+    const { error: readyError } = await supabase
       .from("take_renders")
       .update({
         status: "ready",
@@ -129,6 +146,28 @@ export async function renderTake(
         updated_at: renderedAt,
       })
       .eq("id", renderId);
+    if (readyError) {
+      throw new Error(`成果物の採用状態を更新できませんでした: ${readyError.message}`);
+    }
+    renderReady = true;
+
+    const { count: unfinished, error: countError } = await supabase
+      .from("take_renders")
+      .select("*", { count: "exact", head: true })
+      .eq("take_id", render.take_id)
+      .neq("status", "ready");
+    if (countError) {
+      throw new Error(`テイクの完了状態を確認できませんでした: ${countError.message}`);
+    }
+    if ((unfinished ?? 0) === 0) {
+      const { error: takeReadyError } = await supabase
+        .from("takes")
+        .update({ status: "ready", updated_at: renderedAt })
+        .eq("id", render.take_id);
+      if (takeReadyError) {
+        throw new Error(`テイクを完了状態にできませんでした: ${takeReadyError.message}`);
+      }
+    }
 
     return {
       ok: true,
@@ -139,11 +178,21 @@ export async function renderTake(
     };
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
-    await supabase
+    if (renderReady) {
+      // The output itself is durable and adopted. A follow-up state update
+      // failing must not rewrite that truthful ready state to failed.
+      return { ok: false, error: message };
+    }
+    const { error: failError } = await supabase
       .from("take_renders")
       .update({ status: "failed", updated_at: new Date().toISOString() })
       .eq("id", renderId);
-    return { ok: false, error: message };
+    return {
+      ok: false,
+      error: failError
+        ? `${message}; 失敗状態も保存できませんでした: ${failError.message}`
+        : message,
+    };
   }
 }
 
@@ -159,6 +208,9 @@ async function produce(
   if (templateId === "event-promo" && format === "mp4") {
     return renderEventMp4(supabase, takeId, brief);
   }
+  if (templateId === "product-cm" && format === "mp4") {
+    return renderProductCmMp4(supabase, takeId, brief);
+  }
   if (templateId === "campaign-lp" && format === "html") {
     const kit = (brief as { kit?: CampaignBrandKit }).kit;
     if (!kit) throw new Error("LPのService Brand Kitが未充足です");
@@ -167,6 +219,52 @@ async function produce(
   throw new Error(
     `${templateId} の ${format} レンダラーはまだv2経路に接続されていません`,
   );
+}
+
+async function renderProductCmMp4(
+  supabase: SupabaseClient,
+  takeId: string,
+  brief: unknown,
+): Promise<Buffer> {
+  const dir = await mkdtemp(path.join(tmpdir(), "logos-product-cm-"));
+  const propsPath = path.join(dir, "props.json");
+  const outPath = path.join(dir, "out.mp4");
+  const publicDir = path.join(dir, "public");
+  try {
+    const staged = await stageBriefMaterials(supabase, takeId, brief, publicDir);
+    const productBrief = staged as {
+      kit?: CampaignBrandKit;
+      voice?: { track?: unknown; audio?: string };
+    };
+    if (!productBrief.kit || !productBrief.voice?.track || !productBrief.voice.audio) {
+      throw new Error("Product CMのBrand Kitまたは固定済み音声が未充足です");
+    }
+
+    let bgmSrc: string | null = null;
+    try {
+      await copyFile(
+        path.join(process.cwd(), "public", "campaigns", "bgm.mp3"),
+        path.join(publicDir, "bgm.mp3"),
+      );
+      bgmSrc = "bgm.mp3";
+    } catch {
+      // BGM is a template-owned optional asset. Narration alone is a complete
+      // render and stays deterministic when the optional file is absent.
+    }
+    await writeFile(
+      propsPath,
+      JSON.stringify({
+        kit: productBrief.kit,
+        track: productBrief.voice.track,
+        audioSrc: productBrief.voice.audio,
+        bgmSrc,
+      }),
+    );
+    await renderRemotionComposition("cm", propsPath, outPath, publicDir);
+    return await readFile(outPath);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 async function renderEventMp4(

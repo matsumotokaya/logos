@@ -6,6 +6,7 @@ import {
   templateSpec,
   type TemplateEntry,
 } from "./catalog";
+import { productionTemplateDrift } from "./ledger-guard";
 import { createAdminSupabase } from "@/lib/supabase/server";
 
 // Writing the code-side catalog into public.template_versions.
@@ -57,10 +58,6 @@ export function ledgerRow(template: TemplateEntry): LedgerRow {
 
 export interface SyncReport {
   written: string[];
-  /** Versions whose definition changed since they were recorded. Reported
-   *  rather than hidden: on a production row this means takes were pinned to
-   *  something that no longer matches the code. */
-  driftedProduction: string[];
 }
 
 /**
@@ -77,23 +74,26 @@ export async function syncTemplateVersions(): Promise<SyncReport> {
     .select("template_id, version, definition_hash, stage");
   if (readError) throw new Error(`ledger read failed: ${readError.message}`);
 
-  const before = new Map(
-    (existing ?? []).map((row) => [
-      `${row.template_id}@${row.version}`,
-      row as { definition_hash: string; stage: string },
-    ]),
+  const driftedProduction = productionTemplateDrift(
+    (existing ?? []).map((row) => ({
+      template_id: row.template_id as string,
+      version: row.version as number,
+      definition_hash: row.definition_hash as string,
+      stage: row.stage as string,
+    })),
+    rows,
   );
 
-  const driftedProduction = rows
-    .filter((row) => {
-      const previous = before.get(`${row.template_id}@${row.version}`);
-      return (
-        previous &&
-        previous.stage === "production" &&
-        previous.definition_hash !== row.definition_hash
-      );
-    })
-    .map((row) => `${row.template_id}@${row.version}`);
+  // Never overwrite the evidence before reporting the problem. The previous
+  // implementation upserted these rows and only then returned a non-zero exit
+  // code, so the next sync could no longer detect what had drifted.
+  if (driftedProduction.length > 0) {
+    throw new Error(
+      "公開済みテンプレート版がコード上で変更されています: " +
+        driftedProduction.join(", ") +
+        "。同じ版を上書きせずversionを上げてください。台帳は変更していません。",
+    );
+  }
 
   const { error: writeError } = await supabase
     .from("template_versions")
@@ -105,6 +105,5 @@ export async function syncTemplateVersions(): Promise<SyncReport> {
 
   return {
     written: rows.map((row) => `${row.template_id}@${row.version}`),
-    driftedProduction,
   };
 }

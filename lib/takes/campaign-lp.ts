@@ -3,8 +3,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CampaignBrandKit } from "@/lib/campaign/schema";
 import type { CampaignJob } from "@/lib/campaign/jobs";
+import { appendBrandKnowledgeClaims } from "@/lib/brand/knowledge";
 import { createTake } from "./create";
 import { renderTake } from "./render";
+import { ensureCanonicalPublication } from "./publication";
 
 /** Persist one URL-generated Kit into v2 without turning generated copy into facts. */
 export async function createPublishedCampaignLp(
@@ -25,68 +27,153 @@ export async function createPublishedCampaignLp(
     ["offering.industry", kit.service.industry],
     ["offering.audience", kit.service.audience],
   ].map(([field_path, value]) => ({
-    brand_id: brandId,
     field_path,
     layer: "fact",
     value,
     confidence: "inferred",
-    source_kind: "llm_structuring",
-    source_ref: sourceRef,
-    recorded_by: userId,
-  }));
-  if (!workId) {
-    const { error: claimError } = await supabase
-      .from("brand_knowledge_claims")
-      .insert(claims);
-    if (claimError)
-      throw new Error(
-        `Knowledge claimを保存できませんでした: ${claimError.message}`,
-      );
-  }
+  })) as Array<{
+    field_path: string;
+    layer: "fact";
+    value: unknown;
+    confidence: "inferred";
+  }>;
 
   const { data: prior, error: priorError } = await supabase
     .from("takes")
-    .select("id")
+    .select("id, take_renders(id, status, latest_artifact_id)")
     .eq("brand_id", brandId)
     .eq("template_id", "campaign-lp")
     .contains("brief", { campaignJobId: job.id })
+    .order("created_at", { ascending: true })
+    .limit(1)
     .maybeSingle();
   if (priorError)
     throw new Error(`既存LP Takeを読めませんでした: ${priorError.message}`);
-  if (prior) return { takeId: prior.id as string, urlPath: `/c/${prior.id}` };
 
-  const created = await createTake(supabase, {
-    brandId,
-    workId,
-    templateId: "campaign-lp",
-    createdBy: userId,
-    title: `${kit.service.name} LP`,
-    brief: {
-      kit,
-      campaignJobId: job.id,
-      sourceUrl: job.input.url,
-      theme: kit.theme ?? null,
-    },
-  });
-  if (!created.ok) throw new Error(created.error);
-  const renderId = created.renderIds[0];
-  if (!renderId) throw new Error("LP Renderが作成されませんでした");
-  const rendered = await renderTake(supabase, renderId);
-  if (!rendered.ok) throw new Error(rendered.error);
+  let takeId: string;
+  let renderId: string | undefined;
+  let renderIsReady = false;
 
-  const urlPath = `/c/${created.takeId}`;
-  const { error: publicationError } = await supabase
-    .from("publications")
-    .insert({
-      render_id: renderId,
-      surface: "canonical_url",
-      url_path: urlPath,
-      status: "live",
-      published_at: new Date().toISOString(),
-      published_by: userId,
-      metadata: { campaign_job_id: job.id },
+  if (prior) {
+    takeId = prior.id as string;
+    const render = (prior.take_renders as
+      | { id: string; status: string; latest_artifact_id: string | null }[]
+      | null)?.[0];
+    renderId = render?.id;
+    renderIsReady = render?.status === "ready" && Boolean(render.latest_artifact_id);
+  } else {
+    const created = await createTake(supabase, {
+      brandId,
+      workId,
+      templateId: "campaign-lp",
+      createdBy: userId,
+      idempotencyKey: `campaign-job:${job.id}`,
+      title: `${kit.service.name} LP`,
+      brief: {
+        kit,
+        campaignJobId: job.id,
+        sourceUrl: job.input.url,
+        theme: kit.theme ?? null,
+      },
     });
-  if (publicationError)
-    throw new Error(`LPを公開できませんでした: ${publicationError.message}`);
-  return { takeId: created.takeId, urlPath };
+    if (!created.ok) throw new Error(created.error);
+    takeId = created.takeId;
+    renderId = created.renderIds[0];
+    if (!created.created) {
+      const state = await readRenderState(supabase, renderId);
+      renderIsReady = state.ready;
+    }
+  }
+
+  const runId = await ensureTakeRun(supabase, takeId, userId, job);
+  if (!workId) {
+    const appended = await appendBrandKnowledgeClaims(supabase, {
+      brandId,
+      fields: claims,
+      sourceKind: "llm_structuring",
+      sourceRef,
+      userId,
+      runId,
+    });
+    if (!appended.ok) {
+      throw new Error(`Knowledge claimを保存できませんでした: ${appended.error}`);
+    }
+  }
+  if (!renderId) throw new Error("LP Renderが作成されませんでした");
+  if (!renderIsReady) {
+    const rendered = await renderTake(supabase, renderId);
+    if (!rendered.ok) throw new Error(rendered.error);
+  }
+
+  const publication = await ensureCanonicalPublication(supabase, {
+    takeId,
+    renderId,
+    userId,
+    metadata: { campaign_job_id: job.id },
+  });
+  if (!publication.ok) throw new Error(`LPを公開できませんでした: ${publication.error}`);
+  return { takeId, urlPath: publication.urlPath };
+}
+
+async function readRenderState(
+  supabase: SupabaseClient,
+  renderId: string | undefined,
+): Promise<{ ready: boolean }> {
+  if (!renderId) return { ready: false };
+  const { data, error } = await supabase
+    .from("take_renders")
+    .select("status, latest_artifact_id")
+    .eq("id", renderId)
+    .maybeSingle();
+  if (error) throw new Error(`LP Renderを読めませんでした: ${error.message}`);
+  return {
+    ready: data?.status === "ready" && Boolean(data.latest_artifact_id),
+  };
+}
+
+async function ensureTakeRun(
+  supabase: SupabaseClient,
+  takeId: string,
+  userId: string,
+  job: CampaignJob,
+): Promise<string> {
+  const { data: existing, error: readError } = await supabase
+    .from("take_runs")
+    .select("id, take_id")
+    .eq("external_job_id", job.id)
+    .maybeSingle();
+  if (readError) throw new Error(`既存Take Runを読めませんでした: ${readError.message}`);
+  if (existing) {
+    if (existing.take_id !== takeId) {
+      throw new Error("同じキャンペーンジョブが別のTakeに使われています");
+    }
+    return existing.id as string;
+  }
+
+  const { data, error } = await supabase
+    .from("take_runs")
+    .insert({
+      take_id: takeId,
+      stage: "structure",
+      status: "succeeded",
+      input: {
+        source_url: job.input.url,
+        has_text: job.input.hasText,
+        file_count: job.input.files,
+        file_kinds: job.input.fileKinds ?? [],
+        selected_brand_id: job.input.brandEntityId ?? null,
+      },
+      steps: job.steps,
+      usage: job.meta?.usage ?? {},
+      external_job_id: job.id,
+      triggered_by: userId,
+      started_at: job.createdAt,
+      finished_at: job.updatedAt,
+    })
+    .select("id")
+    .maybeSingle();
+  if (error || !data) {
+    throw new Error(`Take Runを保存できませんでした: ${error?.message ?? "not found"}`);
+  }
+  return data.id as string;
 }

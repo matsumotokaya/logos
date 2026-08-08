@@ -6,7 +6,7 @@
 //
 // This is intentionally a one-off, explicit port rather than a general upload
 // API. It proves the v2 invariant that one Work-scoped material can feed more
-// than one take, without changing the still-live v1 video asset.
+// than one Take while keeping every input immutable and checksum-pinned.
 
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";

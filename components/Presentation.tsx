@@ -50,6 +50,7 @@ type Props = {
   }) => void | Promise<void>;
   /** Hide the product header when rendered inside the management shell. */
   embedded?: boolean;
+  resetLabel?: string;
 };
 
 function applyPresentationPatch(
@@ -82,6 +83,7 @@ export default function Presentation({
   onRequestSignIn,
   onCommitEdits,
   embedded = false,
+  resetLabel,
 }: Props) {
   const { dict, format } = useI18n();
   const [editing, setEditing] = useState(false);
@@ -225,7 +227,7 @@ export default function Presentation({
         onClick={onReset}
         className="bg-ink px-4 py-1.5 text-sm font-medium text-paper hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
       >
-        {embedded ? "ロゴ一覧" : dict.header.newLogo}
+        {resetLabel ?? (embedded ? "ロゴ一覧" : dict.header.newLogo)}
       </button>
     </>
   );

@@ -76,9 +76,11 @@ export type BusinessDetail = {
     title: string;
     role: string;
     visibility: string;
+    previewUrl: string | null;
   }>;
   campaigns: Array<{
     id: string;
+    jobId: string | null;
     name: string;
     status: string;
     createdAt: string;

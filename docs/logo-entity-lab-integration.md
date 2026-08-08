@@ -10,7 +10,7 @@
 - homepage、Brand Manager、プレゼン、Labs、Blenderは同じ`logos`とprimary `logo_candidates`を参照する
 - ロゴIDは対象を特定する情報であり、認証情報ではない。privateなSVGの取得やR2/DB書き込みには別途権限が必要
 - Lab成果物は`presentation_asset_definitions`へ登録し、`draft`はLabsだけ、`production`はプレゼン編集の候補にも出す
-- 利用者の採用状態は`logo_presentations.layout`、candidate×asset versionの実行状態は`logo_asset_runs`、現在の成功成果物は`logo_mockups`に分離する
+- 利用者の採用状態は`logo-presentation` Takeの`brief.presentation.layout`、candidate×asset versionの実行状態は`logo_asset_runs`、現在の成功成果物は`logo_mockups`に分離する
 - 同じ表現の改良版は、同じ`family_id`と新しい`definition_version`を持つ不変IDとして追加する
 
 ## 2. 現在地
@@ -33,7 +33,7 @@ Labsページ/APIへ入れるのは`platform_admin`または`labs_member`だけ�
 |---|---|
 | ロゴとmaster SVG | `logos` → `logo_candidates.svg` |
 | assetの提供可否・version・placement互換性 | `presentation_asset_definitions`または同期元のcode/`template.json` |
-| ロゴごとの表示オン/オフ・順序・設定 | `logo_presentations.layout.mappings[]` |
+| ロゴごとの表示オン/オフ・順序・設定 | `logo-presentation` Takeの`brief.presentation.layout.mappings[]` |
 | 実行キュー・状態・失敗 | `logo_asset_runs` |
 | 成功した現在成果物 | private R2 object + `logo_mockups` |
 

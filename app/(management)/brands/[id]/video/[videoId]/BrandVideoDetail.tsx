@@ -1,15 +1,13 @@
 "use client";
 
-// One video under a brand. The path segment is either a video asset id or the
-// campaign job id behind the brand's default product CM; the API resolves
-// which (see app/api/brands/[id]/videos/[videoId]/route.ts) and this component
-// renders the matching surface:
+// One V2 video Take under a brand. This component renders the matching surface:
 //
 //   event-promo → EventVideoWorkspace (goal + material slots)
-//   product-cm / campaign → the existing campaign video screen, unchanged
+//   product-cm with no pinned voice → the campaign narration screen
+//   product-cm with pinned voice → the V2 render/publication workspace
 //
-// Keeping the legacy screen rather than reimplementing it means the CM
-// pipeline stays the single implementation for product videos.
+// The narration screen remains the authoring entry point. Once it produces a
+// voice track, the Take becomes self-contained and the V2 workspace takes over.
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -27,8 +25,9 @@ type VideoAsset = {
   template: VideoTemplateId;
   templateName: string;
   published: boolean;
+  publicUrl: string | null;
   briefSlug: string | null;
-  brief: EventBrief | null;
+  brief: EventBrief | Record<string, unknown> | null;
   campaignJobId: string | null;
   state: VideoState;
   createdAt: string;
@@ -40,9 +39,17 @@ type VideoAsset = {
 /** A render takes minutes; poll while one is in flight. */
 const RENDER_POLL_MS = 5000;
 
-type Resolved =
-  | { kind: "asset"; video: VideoAsset }
-  | { kind: "campaign"; jobId: string };
+type Resolved = { kind: "asset"; video: VideoAsset };
+
+function hasPinnedProductVoice(brief: VideoAsset["brief"]): boolean {
+  if (!brief || typeof brief !== "object") return false;
+  const voice = (brief as Record<string, unknown>).voice;
+  if (!voice || typeof voice !== "object") return false;
+  return (
+    typeof (voice as Record<string, unknown>).track === "object" &&
+    typeof (voice as Record<string, unknown>).audio === "string"
+  );
+}
 
 export default function BrandVideoDetail({
   brandId,
@@ -146,18 +153,17 @@ export default function BrandVideoDetail({
     return <main className="px-6 py-10 text-sm text-ink-muted md:px-10">読み込み中…</main>;
   }
 
-  // The brand's default product CM, or any product-cm video: the existing
-  // campaign screen already handles narration, MP4 export and preview.
-  if (resolved.kind === "campaign") {
-    return (
-      <CampaignDetail id={resolved.jobId} sampleHtml={null} embedded view="video" brandId={brandId} />
-    );
-  }
-
   const video = resolved.video;
 
-  if (video.template === "product-cm") {
-    return video.campaignJobId ? (
+  // A Product CM Take is created before narration is generated. Keep that
+  // draft in the established authoring screen until the voice RPC pins the
+  // WAV and timing into the Take; a refresh then lands in the V2 workspace.
+  if (
+    video.template === "product-cm" &&
+    video.campaignJobId &&
+    !hasPinnedProductVoice(video.brief)
+  ) {
+    return (
       <CampaignDetail
         id={video.campaignJobId}
         sampleHtml={null}
@@ -165,17 +171,6 @@ export default function BrandVideoDetail({
         view="video"
         brandId={brandId}
       />
-    ) : (
-      <main className="mx-auto max-w-3xl px-6 py-10 md:px-10">
-        <h1 className="font-display text-2xl font-semibold">{video.title}</h1>
-        <p className="mt-3 text-sm text-ink-muted">
-          この製品紹介動画に紐づくBrand Kitがまだありません。トップ（CM Maker）でソースから生成すると、
-          ここにナレーションとMP4の導線が出ます。
-        </p>
-        <Link href={`/brands/${brandId}/video`} className="mt-5 inline-block text-xs text-accent">
-          ← 動画一覧へ
-        </Link>
-      </main>
     );
   }
 
@@ -204,6 +199,16 @@ export default function BrandVideoDetail({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {video.published && video.publicUrl ? (
+            <a
+              href={video.publicUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full border border-hairline px-4 py-2 text-xs font-semibold hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            >
+              公開動画 ↗
+            </a>
+          ) : null}
           <button
             type="button"
             onClick={() => void startRender()}
@@ -262,8 +267,16 @@ export default function BrandVideoDetail({
         </section>
       ) : null}
 
-      {video.brief ? (
-        <EventVideoWorkspace brief={video.brief} />
+      {video.template === "event-promo" && video.brief ? (
+        <EventVideoWorkspace brief={video.brief as EventBrief} />
+      ) : video.template === "product-cm" ? (
+        <section className="rounded-2xl border border-hairline p-5">
+          <h2 className="text-balance text-sm font-semibold">Product CM入力</h2>
+          <p className="mt-2 text-pretty text-xs text-ink-muted">
+            Brand Kit、ナレーションタイミング、固定済みWAVをTakeが保持します。
+            MP4の再生成はローカルのキャンペーンジョブに依存しません。
+          </p>
+        </section>
       ) : (
         <p className="rounded-xl border border-hairline bg-ink/[0.03] px-4 py-3 text-[12px] text-ink-muted">
           このイベント動画にはまだブリーフがありません。

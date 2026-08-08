@@ -29,9 +29,11 @@ type State =
 export default function PresentationPage({
   params,
   embedded = false,
+  editable = false,
 }: {
   params: Promise<{ id: string }>;
   embedded?: boolean;
+  editable?: boolean;
 }) {
   const { id } = use(params);
   const router = useRouter();
@@ -153,14 +155,15 @@ export default function PresentationPage({
       name={state.name}
       mockupLogoId={id === "sample" ? undefined : id}
       mockupCandidateId={state.mockupCandidateId ?? undefined}
-      onReset={() => router.push(embedded ? "/logos" : "/")}
+      onReset={() => router.push(embedded ? `/logos/${id}` : "/")}
+      resetLabel={embedded ? "ロゴ詳細" : undefined}
       contactEmail={state.contactEmail}
       presentation={pres}
-      canEdit={state.stored && state.canEdit}
+      canEdit={editable && state.stored && state.canEdit}
       isSignedIn={isSignedIn}
       onRequestSignIn={() => requestAuthDialog("signin")}
       onCommitEdits={
-        state.stored && state.canEdit && isSignedIn
+        editable && state.stored && state.canEdit && isSignedIn
           ? (payload) => void handleCommitEdits(payload)
           : undefined
       }

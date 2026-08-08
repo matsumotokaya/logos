@@ -62,7 +62,7 @@ type SubjectDraft = BrandEntityDraft;
 function emptySubjectDraft(name = ""): SubjectDraft {
   return {
     name,
-    entityType: "organization",
+    entityType: "business",
     parentId: null,
     website: "",
     industry: "",
@@ -132,8 +132,10 @@ function Card({
 
 export default function LogoInfoPage({
   params,
+  embedded = false,
 }: {
   params: Promise<{ id: string }>;
+  embedded?: boolean;
 }) {
   const { id } = use(params);
   const [logo, setLogo] = useState<StoredLogo | null>(null);
@@ -234,7 +236,7 @@ export default function LogoInfoPage({
   if (!loaded) {
     return (
       <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
-        <AppHeader section="Asset Detail" />
+        {embedded ? null : <AppHeader section="Asset Detail" />}
         <div className="flex min-h-[60dvh] items-center justify-center">
           <p className="text-sm text-gray-500">読み込み中…</p>
         </div>
@@ -245,7 +247,7 @@ export default function LogoInfoPage({
   if (!logo) {
     return (
       <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
-        <AppHeader section="Asset Detail" />
+        {embedded ? null : <AppHeader section="Asset Detail" />}
         <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-4">
           <p className="text-sm text-gray-500">ロゴが見つかりません。</p>
           <Link href="/logos" className="text-sm underline underline-offset-2">
@@ -259,7 +261,7 @@ export default function LogoInfoPage({
   if (logo.canEdit === false) {
     return (
       <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
-        <AppHeader section="Asset Detail" />
+        {embedded ? null : <AppHeader section="Asset Detail" />}
         <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-4">
           <p className="text-sm text-gray-500">
             このロゴを管理する権限がありません。
@@ -379,7 +381,7 @@ export default function LogoInfoPage({
 
   return (
     <div className="min-h-dvh bg-[#F7F7F8] text-[#111827]">
-      <AppHeader section="Asset Detail" />
+      {embedded ? null : <AppHeader section="Asset Detail" />}
 
       <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -389,12 +391,20 @@ export default function LogoInfoPage({
           >
             ← Assets
           </Link>
-          <a
-            href={`/p/${logo.id}`}
-            className="text-sm text-gray-500 hover:text-gray-900"
-          >
-            プレゼンを見る →
-          </a>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <Link
+              href={`/logos/${logo.id}/presentation`}
+              className="text-gray-500 hover:text-gray-900"
+            >
+              プレゼンを編集
+            </Link>
+            <Link
+              href={`/p/${logo.id}`}
+              className="text-gray-500 hover:text-gray-900"
+            >
+              閲覧画面を確認 →
+            </Link>
+          </div>
         </div>
 
         <div>
@@ -550,12 +560,12 @@ export default function LogoInfoPage({
               Splash / Social / On-site / Merchandise / Generated に入る asset
               は、プレゼン本編の編集モードで切り替えられます。ここでは現在の採用状態を確認します。
             </p>
-            <a
-              href={`/p/${logo.id}`}
+            <Link
+              href={`/logos/${logo.id}/presentation`}
               className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 transition hover:border-gray-900 hover:text-gray-900"
             >
               プレゼンで編集 →
-            </a>
+            </Link>
           </div>
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             {Object.entries(
@@ -628,13 +638,7 @@ export default function LogoInfoPage({
                         string,
                       ][]
                     ).map(([value, label]) => (
-                      <option
-                        key={value}
-                        value={value}
-                        disabled={
-                          value !== "organization" && !subjectDraft.parentId
-                        }
-                      >
+                      <option key={value} value={value}>
                         {label}
                       </option>
                     ))}

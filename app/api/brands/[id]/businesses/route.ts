@@ -74,8 +74,6 @@ export async function POST(
     const updated = await supabase
       .from("brand_entities")
       .update({
-        entity_type: "brand",
-        parent_entity_id: null,
         brand_organization_id: organizationId,
         parent_brand_id: corporateResult.data.id,
         linked_org_id: organizationResult.data.linked_org_id,

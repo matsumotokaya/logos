@@ -11,13 +11,35 @@ import { EventBriefSchema } from "@/remotion/event/brief-schema";
 // Kept apart from catalog.ts so client components can read template metadata
 // without pulling zod and every schema into the browser bundle.
 
-/**
- * product-cm and campaign-lp both consume the Service Brand Kit, which is
- * generated and stored by the campaign pipeline today. Their brief is therefore
- * a pointer to that job rather than the kit itself — copying the kit into the
- * take would create a second source of truth for the same bytes while the old
- * pipeline is still the one implementation (docs/schema-v2.md §16).
- */
+const LogoPresentationBriefSchema = z.object({
+  logoId: z.string().min(1),
+  presentation: z.object({
+    catchphrase: z.string(),
+    story: z.string(),
+    sceneTexts: z.record(z.string(), z.object({ lead: z.string().optional() })),
+    layout: z.object({
+      version: z.literal(1),
+      mappings: z.array(
+        z.object({
+          assetId: z.string(),
+          placementId: z.enum([
+            "splash.hero",
+            "web.device",
+            "social.primary",
+            "onsite.primary",
+            "merch.primary",
+            "generated.tile",
+          ]),
+          order: z.number().finite(),
+          enabled: z.boolean(),
+          params: z.record(z.string(), z.unknown()).optional(),
+        }),
+      ),
+    }),
+    updatedAt: z.string(),
+  }),
+});
+
 export const CampaignKitBriefSchema = z.object({
   /** Immutable Kit snapshot; its generated copy stays inside the Take. */
   kit: z.unknown(),
@@ -27,9 +49,33 @@ export const CampaignKitBriefSchema = z.object({
   theme: z.string().nullable(),
 });
 
+export const CmVoiceTrackSchema = z
+  .object({
+    version: z.literal(1),
+    generatedAt: z.string(),
+    totalMs: z.number().positive(),
+    sampleRate: z.number().positive(),
+    mock: z.boolean(),
+    provider: z.string(),
+    voice: z.string(),
+    scenes: z.array(z.object({ startMs: z.number(), durationMs: z.number() }).passthrough()),
+    captions: z.array(
+      z.object({ text: z.string(), startMs: z.number(), endMs: z.number() }),
+    ),
+  })
+  .passthrough();
+
+export const ProductCmBriefSchema = CampaignKitBriefSchema.extend({
+  voice: z.object({
+    track: CmVoiceTrackSchema,
+    audio: z.string().startsWith("material:"),
+  }).optional(),
+});
+
 export const BRIEF_SCHEMAS: Record<string, z.ZodType<unknown>> = {
+  "logo-presentation": LogoPresentationBriefSchema,
   "event-promo": EventBriefSchema,
-  "product-cm": CampaignKitBriefSchema,
+  "product-cm": ProductCmBriefSchema,
   "campaign-lp": CampaignKitBriefSchema,
 };
 

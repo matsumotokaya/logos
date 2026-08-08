@@ -298,12 +298,21 @@ export type AssetRun = {
   finishedAt: string | null;
 };
 
-export type BrandEntityType = "organization" | "business" | "audience";
+export type BrandEntityType =
+  | "corporate"
+  | "business"
+  | "service"
+  | "product"
+  | "media"
+  | "event";
 
 export const BRAND_ENTITY_TYPE_LABELS: Record<BrandEntityType, string> = {
-  organization: "オーガニゼーション",
-  business: "事業・サービス",
-  audience: "対象別ブランド",
+  corporate: "企業ブランド",
+  business: "事業ブランド",
+  service: "サービスブランド",
+  product: "製品ブランド",
+  media: "メディアブランド",
+  event: "イベントブランド",
 };
 
 export type BrandEntity = {

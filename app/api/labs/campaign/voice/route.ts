@@ -10,7 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { guardLabsRequest } from "@/lib/labs-access";
-import { requireUser } from "@/lib/supabase/server";
+import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { generateCmVoice, cmVoiceAvailable } from "@/lib/campaign/voice";
 import {
   getCampaignJob,
@@ -20,7 +20,7 @@ import {
   finishCampaignCm,
   failCampaignCm,
 } from "@/lib/campaign/jobs";
-import { renderCmMp4 } from "@/lib/campaign/render-video";
+import { renderProductCmJob } from "@/lib/takes/product-cm";
 
 export const maxDuration = 300;
 
@@ -95,7 +95,12 @@ export async function POST(req: Request) {
 
       appendCampaignStep(jobId, { message: "MP4ファイルを作成中…", level: "info" });
       try {
-        await renderCmMp4(jobId);
+        await renderProductCmJob(createServerSupabaseForToken(user.token), {
+          userId: user.id,
+          job,
+          wav: result.wav,
+          track: result.track,
+        });
         finishCampaignCm(jobId, { mp4: true });
         appendCampaignStep(jobId, {
           message: "MP4ファイルが完成しました",

@@ -7,9 +7,8 @@ import type {
   BrandRecordStatus,
   BrandSummary,
 } from "@/lib/brand-hierarchy";
-import { campaignCmMp4Exists, getCampaignJob } from "@/lib/campaign/jobs";
-import { signedLabsUrl } from "@/lib/labs-output-sign";
-import { resolveCampaignJobId } from "@/lib/video/job-id";
+import { listTakeAssetsByBrand } from "@/lib/takes/read-model";
+import { knowledgeProfilesByBrand, mergeProfile } from "@/lib/brand/knowledge";
 import {
   createServerSupabaseForToken,
   requireUser,
@@ -37,12 +36,6 @@ type BrandRow = {
   status: BrandRecordStatus;
 };
 
-type ProfileRow = {
-  entity_id: string;
-  inherits_parent: boolean;
-  profile: Record<string, unknown>;
-};
-
 type LogoRow = {
   id: string;
   subject_entity_id: string;
@@ -50,47 +43,6 @@ type LogoRow = {
   role: string;
   visibility: string;
 };
-
-type GenerationRunRow = {
-  id: string;
-  external_job_id: string | null;
-  legacy_campaign_id: string | null;
-};
-
-type AssetRow = {
-  id: string;
-  brand_id: string;
-  generation_run_id: string | null;
-  legacy_campaign_id: string | null;
-  asset_kind: BrandAssetSummary["kind"];
-  title: string;
-  status: BrandAssetSummary["status"];
-  public_path: string | null;
-  created_at: string;
-};
-
-function mergeProfile(
-  base: Record<string, unknown>,
-  override: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged: Record<string, unknown> = { ...base };
-  for (const [key, value] of Object.entries(override)) {
-    const current = merged[key];
-    merged[key] =
-      current &&
-      value &&
-      typeof current === "object" &&
-      typeof value === "object" &&
-      !Array.isArray(current) &&
-      !Array.isArray(value)
-        ? mergeProfile(
-            current as Record<string, unknown>,
-            value as Record<string, unknown>,
-          )
-        : value;
-  }
-  return merged;
-}
 
 function paletteFrom(value: Record<string, unknown>): {
   primary: string | null;
@@ -152,7 +104,15 @@ export async function GET(req: Request) {
       "id, brand_organization_id, parent_brand_id, brand_kind, is_primary_brand, name, website, industry, description, status",
     )
     .in("brand_organization_id", organizationIds)
-    .in("brand_kind", ["corporate", "business", "audience"])
+    .in("brand_kind", [
+      "corporate",
+      "business",
+      "service",
+      "product",
+      "media",
+      "event",
+      "audience",
+    ])
     .order("created_at", { ascending: false });
   if (brandResult.error) {
     return Response.json(
@@ -184,32 +144,18 @@ export async function GET(req: Request) {
     );
   }
 
-  const [profileResult, logoResult, runResult, assetResult] = await Promise.all([
-    supabase
-      .from("brand_profiles")
-      .select("entity_id, inherits_parent, profile")
-      .in("entity_id", brandIds),
+  const [knowledgeResult, logoResult, takeAssetResult] = await Promise.all([
+    knowledgeProfilesByBrand(supabase, brandIds),
     supabase
       .from("logos")
       .select("id, subject_entity_id, title, role, visibility")
       .in("subject_entity_id", brandIds),
-    supabase
-      .from("brand_generation_runs")
-      .select("id, external_job_id, legacy_campaign_id")
-      .in("brand_id", brandIds),
-    supabase
-      .from("brand_assets")
-      .select(
-        "id, brand_id, generation_run_id, legacy_campaign_id, asset_kind, title, status, public_path, created_at",
-      )
-      .in("brand_id", brandIds)
-      .order("created_at", { ascending: false }),
+    listTakeAssetsByBrand(supabase, brandIds),
   ]);
   const relatedError =
-    profileResult.error ??
+    knowledgeResult.error ??
     logoResult.error ??
-    runResult.error ??
-    assetResult.error;
+    takeAssetResult.error;
   if (relatedError) {
     return Response.json(
       { error: "ブランド関連データを取得できませんでした" },
@@ -217,37 +163,14 @@ export async function GET(req: Request) {
     );
   }
 
-  const profiles = new Map(
-    ((profileResult.data ?? []) as ProfileRow[]).map((row) => [
-      row.entity_id,
-      row,
-    ]),
-  );
+  const profiles = knowledgeResult.data;
   const logos = new Map<string, LogoRow[]>();
   for (const row of (logoResult.data ?? []) as LogoRow[]) {
     const current = logos.get(row.subject_entity_id) ?? [];
     current.push(row);
     logos.set(row.subject_entity_id, current);
   }
-  const runs = new Map(
-    ((runResult.data ?? []) as GenerationRunRow[]).map((run) => [run.id, run]),
-  );
-  const rawAssets = (assetResult.data ?? []) as AssetRow[];
-  const assets = new Map<string, BrandAssetSummary[]>();
-  for (const row of rawAssets) {
-    const current = assets.get(row.brand_id) ?? [];
-    current.push({
-      id: row.id,
-      kind: row.asset_kind,
-      title: row.title,
-      status: row.status,
-      publicPath: row.public_path,
-      generationRunId: row.generation_run_id,
-      jobId: resolveCampaignJobId(row, runs),
-      createdAt: row.created_at,
-    });
-    assets.set(row.brand_id, current);
-  }
+  const assets = takeAssetResult.data;
 
   const brandById = new Map(brands.map((brand) => [brand.id, brand]));
   const availableLogos = (brand: BrandRow): BrandLogoSummary[] => {
@@ -289,10 +212,9 @@ export async function GET(req: Request) {
     }
     let resolved: Record<string, unknown> = {};
     for (const member of chain) {
-      const row = profiles.get(member.id);
-      if (!row) continue;
-      if (!row.inherits_parent) resolved = {};
-      resolved = mergeProfile(resolved, row.profile);
+      const profile = profiles.get(member.id);
+      if (!profile) continue;
+      resolved = mergeProfile(resolved, profile);
     }
     return resolved;
   };
@@ -302,28 +224,32 @@ export async function GET(req: Request) {
     const profile = paletteFrom(resolvedProfile(brand));
     const resolvedLogos = availableLogos(brand);
     const brandAssets = assets.get(brand.id) ?? [];
+    const videosByJob = new Map(
+      brandAssets
+        .filter((asset) => asset.kind === "video" && asset.jobId)
+        .map((asset) => [asset.jobId!, asset]),
+    );
     const campaigns: BrandCampaignSummary[] = brandAssets
       .filter((asset) => asset.kind === "lp" && asset.jobId)
       .map((asset) => {
         const jobId = asset.jobId!;
-        const job = getCampaignJob(jobId);
+        const video = videosByJob.get(jobId);
         return {
-          id: jobId,
+          id: asset.id,
+          jobId,
           name: asset.title.replace(/\s+LP$/, ""),
           status: campaignStatus(asset.status),
           logoId: resolvedLogos[0]?.id ?? null,
           primary: profile.primary,
           accent: profile.accent,
           createdAt: asset.createdAt,
-          lpUrl: signedLabsUrl(
-            asset.publicPath ?? `/c/${jobId}`,
-            `campaign-lp:${jobId}`,
-          ),
-          videoStatus: campaignCmMp4Exists(jobId)
-            ? "mp4_ready"
-            : job?.cm?.track
-              ? "preview_ready"
-              : "not_created",
+          lpUrl: asset.publicPath ?? `/brands/${brand.id}/lp/${asset.id}`,
+          videoStatus:
+            video?.status === "ready"
+              ? "mp4_ready"
+              : video
+                ? "preview_ready"
+                : "not_created",
         };
       });
     const summary: BrandSummary = {

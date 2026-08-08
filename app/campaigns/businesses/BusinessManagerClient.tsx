@@ -660,14 +660,14 @@ function BusinessPane({
                           LPを開く <ExternalIcon />
                         </a>
                         <Link
-                          href={`/campaigns/${campaign.id}#campaign-video`}
+                          href={`/campaigns/${campaign.jobId ?? campaign.id}#campaign-video`}
                           className="inline-flex items-center justify-center rounded-full border border-hairline bg-white px-3 py-2 text-xs font-semibold hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                         >
                           動画を管理
                         </Link>
                       </div>
                       <Link
-                        href={`/campaigns/${campaign.id}`}
+                        href={`/campaigns/${campaign.jobId ?? campaign.id}`}
                         className="mt-3 block text-center text-xs text-ink-muted underline underline-offset-4 hover:text-ink"
                       >
                         キャンペーン詳細

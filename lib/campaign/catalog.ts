@@ -6,6 +6,10 @@ import { newLogoId } from "@/lib/id";
 import type { UrlRegistrationScope } from "@/lib/brand-registration";
 import { deleteR2Object, isR2Configured, putR2Object } from "@/lib/r2";
 import { createServerSupabaseForToken } from "@/lib/supabase/server";
+import {
+  appendBrandKnowledgeClaims,
+  type AppendKnowledgeField,
+} from "@/lib/brand/knowledge";
 import type { CampaignJob } from "./jobs";
 import type { CampaignBrandKit } from "./schema";
 import { resolveSubjectPlacement, type BrandKind } from "./classification";
@@ -24,8 +28,10 @@ export type CampaignCatalogLink = {
   businessId: string;
   /** @deprecated The generation job ID, not a required Campaign container. */
   campaignId: string;
-  generationRunId: string;
-  lpAssetId: string;
+  /** @deprecated New generations record execution on take_runs. */
+  generationRunId?: string;
+  /** @deprecated New generated outputs are Takes. */
+  lpAssetId?: string;
   logoId: string;
   syncedAt: string;
 };
@@ -85,7 +91,6 @@ async function ensureCorporateBrand(
   const inserted = await supabase.from("brand_entities").insert({
     id: brandId,
     name: seed.name,
-    entity_type: "brand",
     website: seed.website,
     description: seed.description,
     status: "inferred",
@@ -190,7 +195,6 @@ async function findOrCreateBrand(
   const inserted = await supabase.from("brand_entities").insert({
     id: brandId,
     name: kit.service.name,
-    entity_type: "brand",
     website: normalizedCatalogWebsite(kit.service.url ?? sourceUrl),
     industry: kit.service.industry,
     description: kit.service.description,
@@ -288,41 +292,76 @@ async function findOrCreateWork(
   return workId;
 }
 
-async function saveProfile(
+async function saveCatalogKnowledge(
   supabase: SupabaseClient,
   userId: string,
-  brandId: string,
-  profile: Record<string, unknown>,
-  provenance: Record<string, unknown>,
+  target: BrandTarget,
+  job: CampaignJob,
+  kit: CampaignBrandKit,
 ): Promise<void> {
-  const existing = await supabase
-    .from("brand_profiles")
-    .select("status, profile, provenance")
-    .eq("entity_id", brandId)
-    .maybeSingle();
-  throwOn(existing.error);
-  if (existing.data?.status === "confirmed") return;
+  const sourceRef = { campaign_job_id: job.id, source_url: job.input.url };
+  const organizationFields: AppendKnowledgeField[] = [
+    { field_path: "identity.legal_name", layer: "fact", value: kit.organization?.name, confidence: "inferred" },
+    { field_path: "identity.description", layer: "fact", value: kit.organization?.description, confidence: "inferred" },
+  ];
+  const serviceFields: AppendKnowledgeField[] = [
+    { field_path: "offering.name", layer: "fact", value: kit.service.name, confidence: "inferred" },
+    { field_path: "offering.tagline", layer: "fact", value: kit.service.tagline, confidence: "inferred" },
+    { field_path: "offering.description", layer: "fact", value: kit.service.description, confidence: "inferred" },
+    { field_path: "offering.industry", layer: "fact", value: kit.service.industry, confidence: "inferred" },
+    { field_path: "offering.business_type", layer: "fact", value: kit.service.business_type, confidence: "inferred" },
+    { field_path: "offering.audience", layer: "fact", value: kit.service.audience, confidence: "inferred" },
+    { field_path: "offering.summary", layer: "fact", value: kit.service.offering, confidence: "inferred" },
+  ];
+  const expressionFields: AppendKnowledgeField[] = [
+    { field_path: "palette.primary", layer: "expression", value: kit.brand.primary, confidence: "suggested" },
+    { field_path: "palette.accent", layer: "expression", value: kit.brand.accent, confidence: "suggested" },
+    { field_path: "palette.background", layer: "expression", value: kit.brand.background, confidence: "suggested" },
+    { field_path: "palette.surface", layer: "expression", value: kit.brand.surface, confidence: "suggested" },
+    { field_path: "palette.text", layer: "expression", value: kit.brand.text, confidence: "suggested" },
+    { field_path: "palette.mode", layer: "expression", value: kit.brand.mode, confidence: "suggested" },
+    { field_path: "palette.source", layer: "expression", value: kit.brand.palette_source, confidence: "suggested" },
+    { field_path: "typography.font_style", layer: "expression", value: kit.brand.font_style, confidence: "suggested" },
+    { field_path: "typography.body_font", layer: "expression", value: kit.design_tokens?.body_font, confidence: "suggested" },
+    { field_path: "typography.heading_font", layer: "expression", value: kit.design_tokens?.heading_font, confidence: "suggested" },
+    { field_path: "tokens.button_radius", layer: "expression", value: kit.design_tokens?.button_radius, confidence: "suggested" },
+    { field_path: "tokens.button_padding", layer: "expression", value: kit.design_tokens?.button_padding, confidence: "suggested" },
+    { field_path: "tokens.section_spacing", layer: "expression", value: kit.design_tokens?.section_spacing, confidence: "suggested" },
+    { field_path: "tokens.container_width", layer: "expression", value: kit.design_tokens?.container_width, confidence: "suggested" },
+    { field_path: "tone.theme", layer: "expression", value: kit.theme, confidence: "suggested" },
+  ];
 
-  const saved = await supabase.from("brand_profiles").upsert(
-    {
-      entity_id: brandId,
-      inherits_parent: true,
-      status: "inferred",
-      profile: {
-        ...((existing.data?.profile as Record<string, unknown> | null) ?? {}),
-        ...profile,
-      },
-      provenance: {
-        ...((existing.data?.provenance as Record<string, unknown> | null) ??
-          {}),
-        ...provenance,
-      },
-      created_by: userId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "entity_id" },
-  );
-  throwOn(saved.error);
+  const factsByBrand = new Map<string, AppendKnowledgeField[]>();
+  factsByBrand.set(target.corporateBrandId, organizationFields);
+  if (target.placement !== "work") {
+    factsByBrand.set(target.brandId, [
+      ...(factsByBrand.get(target.brandId) ?? []),
+      ...serviceFields,
+    ]);
+  }
+  for (const [brandId, fields] of factsByBrand) {
+    const result = await appendBrandKnowledgeClaims(supabase, {
+      brandId,
+      fields,
+      sourceKind: "llm_structuring",
+      sourceRef,
+      userId,
+    });
+    if (!result.ok) throw new Error(result.error);
+  }
+  if (target.placement !== "work") {
+    const result = await appendBrandKnowledgeClaims(supabase, {
+      brandId: target.brandId,
+      fields: expressionFields,
+      sourceKind:
+        kit.brand.palette_source === "extracted"
+          ? "url_extraction"
+          : "llm_generation",
+      sourceRef,
+      userId,
+    });
+    if (!result.ok) throw new Error(result.error);
+  }
 }
 
 async function findOrCreateLogo(
@@ -422,97 +461,6 @@ async function findOrCreateLogo(
   return logoId;
 }
 
-async function saveGenerationRun(
-  supabase: SupabaseClient,
-  userId: string,
-  brandId: string,
-  job: CampaignJob,
-  kit: CampaignBrandKit,
-): Promise<string> {
-  const existing = await supabase
-    .from("brand_generation_runs")
-    .select("id")
-    .eq("external_job_id", job.id)
-    .maybeSingle();
-  throwOn(existing.error);
-
-  const runId = (existing.data?.id as string | undefined) ?? randomUUID();
-  const row = {
-    brand_id: brandId,
-    external_job_id: job.id,
-    status: "succeeded",
-    input: {
-      source_url: job.input.url,
-      has_text: job.input.hasText,
-      file_count: job.input.files,
-      file_kinds: job.input.fileKinds ?? [],
-      registration_scope: job.input.registrationScope ?? null,
-      subject_classification: kit.classification ?? null,
-      selected_brand_id: job.input.brandEntityId ?? null,
-    },
-    steps: job.steps,
-    usage: job.meta?.usage ?? {},
-    metadata: { brand_kit_snapshot: kit },
-    error_message: null,
-    triggered_by: userId,
-    started_at: job.createdAt,
-    finished_at: job.updatedAt,
-    updated_at: new Date().toISOString(),
-  };
-  const saved = existing.data
-    ? await supabase.from("brand_generation_runs").update(row).eq("id", runId)
-    : await supabase
-        .from("brand_generation_runs")
-        .insert({ id: runId, ...row });
-  throwOn(saved.error);
-  return runId;
-}
-
-async function saveLpAsset(
-  supabase: SupabaseClient,
-  userId: string,
-  brandId: string,
-  generationRunId: string,
-  job: CampaignJob,
-  kit: CampaignBrandKit,
-): Promise<string> {
-  const publicPath = `/c/${job.id}`;
-  const existing = await supabase
-    .from("brand_assets")
-    .select("id")
-    .eq("generation_run_id", generationRunId)
-    .eq("asset_kind", "lp")
-    .eq("public_path", publicPath)
-    .maybeSingle();
-  throwOn(existing.error);
-
-  const assetId = (existing.data?.id as string | undefined) ?? randomUUID();
-  const row = {
-    brand_id: brandId,
-    generation_run_id: generationRunId,
-    asset_kind: "lp",
-    title: `${kit.service.name} LP`,
-    status: "ready",
-    source_kind: "generated",
-    public_path: publicPath,
-    metadata: {
-      generated_at: job.updatedAt,
-      brand_kit_snapshot: kit,
-    },
-    created_by: userId,
-    updated_at: new Date().toISOString(),
-  };
-  const saved = existing.data
-    ? await supabase.from("brand_assets").update(row).eq("id", assetId)
-    : await supabase.from("brand_assets").insert({
-        id: assetId,
-        created_at: job.createdAt,
-        ...row,
-      });
-  throwOn(saved.error);
-  return assetId;
-}
-
 export async function persistCampaignCatalog({
   accessToken,
   userId,
@@ -565,94 +513,13 @@ export async function persistCampaignCatalog({
     };
   }
 
-  const targetIsCorporate = target.brandId === target.corporateBrandId;
   const isWork = target.placement === "work";
-  await Promise.all([
-    saveProfile(
-      supabase,
-      userId,
-      target.corporateBrandId,
-      {
-        organization: kit.organization ?? null,
-        ...(targetIsCorporate && !isWork
-          ? {
-              palette: kit.brand,
-              design_tokens: kit.design_tokens,
-              theme: kit.theme ?? null,
-            }
-          : {}),
-      },
-      {
-        organization: {
-          source: sourceUrl ? "scraped_inferred" : "uploaded_inferred",
-          confidence: kit.organization?.confidence ?? "low",
-        },
-        ...(targetIsCorporate && !isWork
-          ? {
-              palette: {
-                source:
-                  kit.brand.palette_source === "extracted"
-                    ? "site_evidence"
-                    : "generated",
-                confidence:
-                  kit.brand.palette_source === "extracted" ? "high" : "low",
-              },
-              design_tokens: { source: "site_capture", confidence: "medium" },
-            }
-          : {}),
-      },
-    ),
-    ...(targetIsCorporate || isWork
-      ? []
-      : [
-          saveProfile(
-            supabase,
-            userId,
-            target.brandId,
-            {
-              service: kit.service,
-              palette: kit.brand,
-              design_tokens: kit.design_tokens,
-              theme: kit.theme ?? null,
-            },
-            {
-              service: {
-                source: "generation_brand_kit",
-                confidence: "medium",
-              },
-              palette: {
-                source:
-                  kit.brand.palette_source === "extracted"
-                    ? "site_evidence"
-                    : "generated",
-                confidence:
-                  kit.brand.palette_source === "extracted" ? "high" : "low",
-              },
-              design_tokens: { source: "site_capture", confidence: "medium" },
-            },
-          ),
-        ]),
-  ]);
+  await saveCatalogKnowledge(supabase, userId, target, job, kit);
 
   const workId = isWork
     ? await findOrCreateWork(supabase, userId, target.brandId, job, kit)
     : null;
   const logoId = await findOrCreateLogo(supabase, userId, target, kit, !isWork);
-  const generationRunId = await saveGenerationRun(
-    supabase,
-    userId,
-    target.brandId,
-    job,
-    kit,
-  );
-  const lpAssetId = await saveLpAsset(
-    supabase,
-    userId,
-    target.brandId,
-    generationRunId,
-    job,
-    kit,
-  );
   const now = new Date().toISOString();
 
   return {
@@ -661,8 +528,6 @@ export async function persistCampaignCatalog({
     workId,
     businessId: target.brandId,
     campaignId: job.id,
-    generationRunId,
-    lpAssetId,
     logoId,
     syncedAt: now,
   };

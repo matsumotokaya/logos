@@ -1,4 +1,11 @@
-export type BrandEntityKind = "corporate" | "business" | "audience";
+export type BrandEntityKind =
+  | "corporate"
+  | "business"
+  | "service"
+  | "product"
+  | "media"
+  | "event"
+  | "audience";
 export type BrandRecordStatus = "inferred" | "confirmed" | "archived";
 
 export type BrandAssetKind =
@@ -26,6 +33,8 @@ export type BrandAssetSummary = {
 
 export type BrandCampaignSummary = {
   id: string;
+  /** Local generation job that supplied this campaign Take, when present. */
+  jobId: string | null;
   name: string;
   status: "running" | "draft" | "published" | "failed" | "archived";
   logoId: string | null;

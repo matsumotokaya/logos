@@ -1,32 +1,28 @@
 // Videos of one brand — the portal's list and its "add a video" action.
 //
-// GET returns the brand's video assets plus, always first, the brand's default
-// product CM. That default is deliberately not a row: every brand is offered a
-// product CM whether or not anyone generated one, so materialising a row for
-// each brand would fill the table with empty placeholders. It becomes a real
-// row only when a campaign has produced something (see campaignJobId below).
-//
-// POST creates a video asset. The template is chosen here and never changes.
+// Every listed video is a V2 Take. POST chooses the immutable template and
+// creates that Take; there are no synthetic rows or legacy asset fallbacks.
 
 import { guardLabsRequest } from "@/lib/labs-access";
 import { campaignCmMp4Exists, getCampaignJob } from "@/lib/campaign/jobs";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { isVideoTemplateId, VIDEO_TEMPLATES } from "@/lib/video/templates";
-import { parseVideoMetadata, type VideoState, type VideoSummary } from "@/lib/video/asset";
-import { resolveCampaignJobId } from "@/lib/video/job-id";
+import { type VideoState, type VideoSummary } from "@/lib/video/asset";
 import { bundledBrief, emptyEventBrief } from "@/remotion/event/briefs";
+import { createTake } from "@/lib/takes/create";
 
-type AssetRow = {
+type TakeVideoRow = {
   id: string;
   brand_id: string;
-  asset_kind: string;
+  template_id: string;
   title: string;
-  status: string;
-  metadata: unknown;
+  brief: unknown;
   created_at: string;
-  generation_run_id: string | null;
-  legacy_campaign_id: string | null;
-  public_path: string | null;
+  take_renders: Array<{
+    status: string;
+    latest_artifact_id: string | null;
+    publications: Array<{ status: string }> | null;
+  }> | null;
 };
 
 const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -58,74 +54,71 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (brandError) return Response.json({ error: "ブランドを確認できませんでした" }, { status: 500 });
   if (!brand) return Response.json({ error: "ブランドが見つかりません" }, { status: 404 });
 
-  const [assetResult, runResult] = await Promise.all([
+  const [takeResult, lpTakeResult] = await Promise.all([
     supabase
-      .from("brand_assets")
+      .from("takes")
       .select(
-        "id, brand_id, asset_kind, title, status, metadata, created_at, generation_run_id, legacy_campaign_id, public_path",
+        "id, brand_id, template_id, title, brief, created_at, take_renders(status, latest_artifact_id, publications(status))",
       )
       .eq("brand_id", brandId)
-      .in("asset_kind", ["video", "lp"])
+      .eq("tool_kind", "video")
       .order("created_at", { ascending: true }),
-    supabase.from("brand_generation_runs").select("id, external_job_id").eq("brand_id", brandId),
+    supabase
+      .from("takes")
+      .select("brief")
+      .eq("brand_id", brandId)
+      .eq("template_id", "campaign-lp")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
-  if (assetResult.error || runResult.error) {
+  if (takeResult.error || lpTakeResult.error) {
     return Response.json({ error: "アセットを取得できませんでした" }, { status: 500 });
   }
-
-  const rows = (assetResult.data ?? []) as AssetRow[];
-  const runs = new Map(
-    ((runResult.data ?? []) as { id: string; external_job_id: string | null }[]).map((run) => [
-      run.id,
-      run,
-    ]),
-  );
-
-  // The product CM still lives on a campaign job, so the default entry reads
-  // its state from the brand's most recent LP campaign.
-  const latestLp = rows.filter((row) => row.asset_kind === "lp").at(-1) ?? null;
-  const campaignJobId = latestLp ? resolveCampaignJobId(latestLp, runs) : null;
+  const lpBrief = lpTakeResult.data?.brief as Record<string, unknown> | null;
+  const campaignJobId =
+    typeof lpBrief?.campaignJobId === "string" ? lpBrief.campaignJobId : null;
 
   const videos: VideoSummary[] = [];
-
-  const persistedProductCm = rows.find(
-    (row) => row.asset_kind === "video" && parseVideoMetadata(row.metadata)?.template === "product-cm",
-  );
-  if (!persistedProductCm) {
+  const v2Videos = (takeResult.data ?? []) as unknown as TakeVideoRow[];
+  for (const take of v2Videos) {
+    if (!isVideoTemplateId(take.template_id)) continue;
+    const brief = take.brief as Record<string, unknown> | null;
+    const renderReady = (take.take_renders ?? []).some(
+      (render) => render.status === "ready" && render.latest_artifact_id,
+    );
+    const published = (take.take_renders ?? []).some((render) =>
+      (render.publications ?? []).some((publication) => publication.status === "live"),
+    );
+    const takeJobId =
+      typeof brief?.campaignJobId === "string" ? brief.campaignJobId : null;
     videos.push({
-      id: campaignJobId ?? "product-cm",
-      brandId,
-      template: "product-cm",
-      title: `${brand.name} ${VIDEO_TEMPLATES["product-cm"].name}`,
-      published: false,
-      state: campaignVideoState(campaignJobId),
-      createdAt: latestLp?.created_at ?? new Date(0).toISOString(),
-      isPlaceholder: true,
-    });
-  }
-
-  for (const row of rows) {
-    if (row.asset_kind !== "video") continue;
-    const meta = parseVideoMetadata(row.metadata);
-    if (!meta) continue;
-    videos.push({
-      id: row.id,
-      brandId: row.brand_id,
-      template: meta.template,
-      title: row.title,
-      published: meta.published,
+      id: take.id,
+      brandId: take.brand_id,
+      template: take.template_id,
+      title: take.title,
+      published,
       state:
-        meta.template === "product-cm"
-          ? campaignVideoState(meta.campaignJobId ?? campaignJobId)
-          : // An event promo renders from its brief alone, so a stored brief is
-            // already previewable — there is nothing to generate first.
-            meta.brief
-            ? "preview_ready"
-            : "empty",
-      createdAt: row.created_at,
+        take.template_id === "product-cm"
+          ? campaignVideoState(takeJobId ?? campaignJobId)
+          : renderReady
+            ? "mp4_ready"
+            : take.brief
+              ? "preview_ready"
+              : "empty",
+      createdAt: take.created_at,
       isPlaceholder: false,
     });
   }
+
+  videos.sort((left, right) => {
+    if (left.template === right.template) {
+      return left.createdAt.localeCompare(right.createdAt);
+    }
+    if (left.template === "product-cm") return -1;
+    if (right.template === "product-cm") return 1;
+    return 0;
+  });
 
   return Response.json({ brand: { id: brand.id, name: brand.name }, videos });
 }
@@ -156,8 +149,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const requestedTitle = typeof body.title === "string" ? body.title.trim() : "";
   const briefSlug = typeof body.briefSlug === "string" ? body.briefSlug : "";
 
-  const metadata: Record<string, unknown> = { template, published: false, createdVia: "portal" };
   let title = requestedTitle;
+  let brief: unknown;
 
   if (template === "event-promo") {
     const seed = briefSlug ? bundledBrief(briefSlug) : null;
@@ -168,55 +161,60 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       );
     }
     // Copy the seed so the row owns its brief from here on.
-    const brief = seed ? structuredClone(seed.brief) : emptyEventBrief(title || "新しいイベント動画");
+    brief = seed ? structuredClone(seed.brief) : emptyEventBrief(title || "新しいイベント動画");
     if (!title) title = seed ? seed.brief.title : "新しいイベント動画";
-    if (seed) metadata.briefSlug = seed.slug;
-    metadata.brief = brief;
   } else {
     // product-cm is driven by the campaign pipeline; the row records which job
     // owns the Brand Kit and narration.
-    const [lpResult, runResult] = await Promise.all([
-      supabase
-        .from("brand_assets")
-        .select("generation_run_id, legacy_campaign_id, public_path")
-        .eq("brand_id", brandId)
-        .eq("asset_kind", "lp")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase.from("brand_generation_runs").select("id, external_job_id").eq("brand_id", brandId),
-    ]);
-    const runs = new Map(
-      ((runResult.data ?? []) as { id: string; external_job_id: string | null }[]).map((run) => [
-        run.id,
-        run,
-      ]),
-    );
-    const jobId = lpResult.data ? resolveCampaignJobId(lpResult.data, runs) : null;
-    if (jobId) metadata.campaignJobId = jobId;
+    const { data: lpTake, error: lpTakeError } = await supabase
+      .from("takes")
+      .select("brief")
+      .eq("brand_id", brandId)
+      .eq("template_id", "campaign-lp")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lpTakeError) {
+      return Response.json(
+        { error: "製品紹介動画のBrand Kitを確認できませんでした" },
+        { status: 500 },
+      );
+    }
+    const lpTakeBrief = lpTake?.brief as Record<string, unknown> | null;
+    const jobId =
+      typeof lpTakeBrief?.campaignJobId === "string" ? lpTakeBrief.campaignJobId : null;
+    const job = jobId ? getCampaignJob(jobId) : null;
+    brief = {
+      kit: lpTakeBrief?.kit ?? job?.kit ?? null,
+      campaignJobId: jobId,
+      sourceUrl:
+        (typeof lpTakeBrief?.sourceUrl === "string" ? lpTakeBrief.sourceUrl : null) ??
+        job?.input.url ??
+        null,
+      theme:
+        (typeof lpTakeBrief?.theme === "string" ? lpTakeBrief.theme : null) ??
+        job?.kit?.theme ??
+        null,
+    };
     if (!title) title = VIDEO_TEMPLATES["product-cm"].name;
   }
 
-  const { data, error } = await supabase
-    .from("brand_assets")
-    .insert({
-      brand_id: brandId,
-      asset_kind: "video",
-      title,
-      status: "ready",
-      source_kind: "generated",
-      metadata,
-      created_by: user.id,
-    })
-    .select("id, created_at")
-    .maybeSingle();
-
-  if (error || !data) {
+  const created = await createTake(supabase, {
+    brandId,
+    templateId: template,
+    title,
+    brief,
+    createdBy: user.id,
+  });
+  if (!created.ok) {
     return Response.json(
-      { error: error?.message ?? "動画を作成できませんでした" },
+      { error: created.error },
       { status: 500 },
     );
   }
 
-  return Response.json({ id: data.id, createdAt: data.created_at }, { status: 201 });
+  return Response.json(
+    { id: created.takeId, createdAt: new Date().toISOString() },
+    { status: 201 },
+  );
 }

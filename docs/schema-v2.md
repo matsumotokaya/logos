@@ -1,9 +1,9 @@
 # v2スキーマ概念設計(マーケティングツール生成)
 
-最終更新: 2026-08-06
-ステータス: **migration 0023〜0031 適用済み。event-promo のv2レンダーとWork素材共有は実測済み(§17.1〜17.2)。URL生成はv2 LP書き込みへ、`/c/[id]`はv2 Publication読み取りへ接続済み(§17.3)。Brand管理画面と既存動画ポータルはまだv1を読む**
+最終更新: 2026-08-08
+ステータス: **V2完了。migration 0045まで適用済み。旧テーブル・互換読み・移行期カラム・旧helperを廃止し、現在形は [data-model.md](data-model.md) へ統合済み。本書の件数と段階記録は移行当時の履歴として残す。**
 
-要件の正本は [deliverable-architecture.md](deliverable-architecture.md)。本書はその §10-2「新スキーマ概念設計」の成果物であり、**テーブル・列・不変条件・RLS・移行段の正本**である。現行(v1)の稼働構造は [data-model.md](data-model.md)、アカウント・URL・RLSの原則は [account-design.md](account-design.md) が正本のまま。切り替え完了後、本書の内容は data-model.md へ統合して本書を廃止する。
+要件の正本は [deliverable-architecture.md](deliverable-architecture.md)。本書はその §10-2「新スキーマ概念設計」と実施記録であり、**現在のテーブル契約は [data-model.md](data-model.md) と適用済みmigrationが正本**である。アカウント・URL・RLSの原則は [account-design.md](account-design.md) を参照する。
 
 適用済みSQLの正本は常に [../supabase/migrations/](../supabase/migrations/) であり、本書のDDLは**設計の記述**である(コピー元ではなく、書くべきものの定義)。
 
@@ -587,13 +587,20 @@ create table public.brand_access_grants (
 | 0029  | `brand_knowledge_claims` / `_values`                                                                                                                                                                                                  | 0027(run_id)         | `layer='fact'` + `source_kind='llm_generation'` が失敗する     |
 | 0030  | `publications`、`canonical_slots`                                                                                                                                                                                                     | 0026                 | live な同一パスが2行にならない / 公開はadminのみ               |
 | 0031  | `delete_take` / `delete_work` RPC(§14.3)+ 退会RPC拡張(§15)                                                                                                                                                                            | 0028, 0030           | live公開中は削除できない / 新テーブルのキーがプレビューに出る  |
-| 0032  | **ポート1: event-promo 動画1件**を `takes` + `take_renders` + `render_artifacts` へ複製(冪等)                                                                                                                                         | 上記全部             | 件数1 / R2キー一致                                             |
-| 0033  | **ポート2: LP 11件**を `takes`(template=`campaign-lp`)へ複製。`brand_profiles` 14行を claims + values へ複製(`inferred` として)                                                                                                       | 0032                 | 件数・`/c/<id>` パス一致 / values が profile のキーを網羅      |
-| 0040+ | **contract**: legacy Organization行(16)削除、`entity_type` / `parent_entity_id` / `organization_kind` 列と旧トリガー削除、`brand_kind` を not null 化、`campaigns` / `campaign_*` drop、`brand_assets` / `brand_generation_runs` 縮退 | 読み取り切替の完了後 | `brand_kind is null` が0行 / 旧テーブル参照コードが無い        |
+| 0032  | Take + 既定Renderの原子的作成RPC、外部リクエストのidempotency key                                                                                                                                                                  | 0026, 0027           | 途中失敗で孤児Takeが残らない / 同じキーの再送が同じTakeを返す  |
+| 0033  | 0032 RPCの列参照修正                                                                                                                                                                                                                  | 0032                 | DB上のrollback契約テストが成功                                 |
+| 0034  | `brand_profiles`をclaims + valuesへ冪等に複製                                                                                                                                                                                       | 0029                 | 非nullフィールドの網羅 / 明示済みvalueを上書きしない           |
+| 0035  | 0034で作ったmigration claimをvaluesへ採用（同一statement snapshotの補正）                                                                                                                                                            | 0034                 | migrated claims / valuesが同数                                 |
+| 0036  | 明示入力をclaim追加+value採用する原子的RPC                                                                                                                                                                                          | 0029                 | claimとvalueが同じ採用IDを指す / 生成sourceを拒否              |
+| 0037  | 0036 RPCのPL/pgSQL変数名衝突を補正                                                                                                                                                                                                  | 0036                 | DB上のrollback契約テストが成功                                 |
+| 0038  | **ポート1: event-promo 動画1件**を `takes` + `take_renders` + `render_artifacts` へ複製(冪等)                                                                                                                                         | 上記全部             | 件数1 / R2キー一致                                             |
+| 0039  | **ポート2: LP 11件**を `takes`(template=`campaign-lp`)へ複製                                                                                                                                                                        | 0038                 | 件数・`/c/<id>` パス一致                                       |
+| 0040  | Product CMのWAV Material登録、`take_inputs`固定、briefの音声参照更新を原子的に行う冪等RPC                                                                                                                                          | 0028                 | 同一checksum再送で素材を重複作成しない                         |
+| 0042 | **contract**: legacy Organization行削除、`entity_type` / `parent_entity_id` / `organization_kind`列と旧トリガー削除、`brand_kind`をnot null化、`campaigns` / `campaign_*` / `brand_assets` / `brand_generation_runs` / `brand_profiles` / `logo_presentations`をdrop | 読み取り切替の完了後 | `brand_kind is null`が0行 / 旧テーブル参照コードが無い |
 
-0032/0033 はテンプレートID(コード側)が決まってから書く。**0023〜0031 は追加のみで、既存の読み書き経路に一切触らない**ため、適用してもプロダクトの挙動は変わらない。
+0038/0039 はテンプレートID(コード側)が決まってから書く。**0023〜0031 は追加のみで、既存の読み書き経路に一切触らない**ため、適用してもプロダクトの挙動は変わらない。
 
-0032/0033 は**冪等**(再実行可能)にし、`provenance`/`metadata` に `migrated_from` を刻む(0021の規約)。
+0038/0039 は**冪等**(再実行可能)にし、`provenance`/`metadata` に `migrated_from` を刻む(0021の規約)。
 
 ## 17. 着手順(要件 §10 の具体化)
 
@@ -601,7 +608,7 @@ create table public.brand_access_grants (
 2. ~~**event-promo を1本、新構造だけで通す**~~ **完了(2026-08-05)**。下記の実測を参照。publication だけは意図的に作っていない(配信ルートが無い状態で `live` 行を作ると「公開したのに開けない」ため)
 3. **BrandKnowledge の実体化**: Brand Kit生成を claims 追加へ。`var/campaign-lab/jobs/*.json` 依存の解消はここで直る
 4. **LP を通し、Work内で動画と素材を共有できるかを確認**(要件 §9-4 = §4.2 の機能判定)
-5. **ポート(0032/0033) → 照合 → 読み取り切替**
+5. **ポート(0038/0039) → 照合 → 読み取り切替**
 6. **退会RPCの追随を確認**(§15。チェックリスト: `brand_materials.r2_key` / `render_artifacts.r2_key` / 参照カウント / 削除順序)
 7. **ロゴプレゼンのTake化**(canonicalスロットが動いてから。最後)
 
@@ -678,3 +685,132 @@ URL投入前の企業/サービス選択ダイアログは廃止した。既存�
 - **§11-7 旧README残タスクとの合流順**: raster画像ロゴのプレゼン / 個人ハンドル / ロゴ単位共有UI
 - **placeholder Organization/Brand の整理**: 実DBに11組ある「名称未設定のOrganization → 未整理のブランドアセット」を、v2で利用者にどう畳ませるか(仕組みは残すが、UIの導線は未設計)
 - **`presentation_asset_definitions` と `template_versions` の統合時期**: 併存で始め、ロゴプレゼンのTake化と同時に寄せる(§8)
+
+## 19. v2切替完遂マイルストーン（2026-08-07監査）
+
+### 19.1 ゼロベース再評価
+
+既存実装を前提にせず、現在の要件からモデルを引き直しても、次の中心構造は同じ結論になる。
+
+- `MarketOrganization → Brand` と、権限・課金の `Workspace` を分離する
+- 継続する主体はBrand、一回限りの施策は任意のWorkに置く
+- BrandKnowledgeを「出典付きの主張」と「人が採用した値」に分ける
+- 素材をBrand / Work / Takeの3スコープに置き、狭い側を既定にする
+- テンプレート版をTake作成時に固定し、出力差分をRenderへ分離する
+- 実ファイルをArtifact、公開状態をPublicationとして分離する
+
+したがって、ここから全面的な再設計や一括リライトは行わない。問題は概念モデルではなく、v1とv2の二重書き・二重読みが残ったまま切替工程が止まり、生成処理の原子性と再試行契約が十分に定義されていないことである。
+
+次の4点は当初計画へ追加する。
+
+1. **再試行可能性**: 同じ外部入力を再送してもTakeやPublicationを重複させず、途中から回復できる
+2. **補償処理**: DB登録前後でR2書き込みが失敗しても、孤児行・孤児オブジェクトを残さない
+3. **切替観測**: v1/v2の件数・対応・不一致をread-only監査で毎段確認する
+4. **削除の発火条件**: 旧テーブル参照がコード、運用スクリプト、公開URL、退会処理から0になって初めてcontract migrationを適用する
+
+`template_versions`についても、production版の定義差分を検出した後に同じ版を上書きする挙動は禁止する。差分があれば同期を失敗させ、新しいversionを発行する。
+
+### 19.2 2026-08-07時点の実測
+
+接続先 `xhbdfzceyfrxsmaixkne` を照合したread-only監査結果。
+
+| 領域 | v1 | v2 | 判定 |
+| --- | ---: | ---: | --- |
+| Brand | `brand_entities` 53行（うち`brand_kind is null` 16行） | 同じ行を継承 | null行の整理が必要 |
+| Profile / Knowledge | `brand_profiles` 14行 | claims 0行 / values 0行 | 未移行 |
+| 生成履歴 | `brand_generation_runs` 11行 | `take_runs` 0行 | 未移行 |
+| 成果物 | `brand_assets` 12行（LP 11 / video 1） | Takes 2 / Renders 2 / Artifacts 2 | 実験2件のみ移行済み |
+| 素材 | 旧ローカル素材 | `brand_materials` 13行 / `take_inputs` 26行 | event-promoの実測は完了 |
+| 公開 | v1のpublic path | Publications 0行 | 切替未実測 |
+| canonical | v1固有経路 | canonical slots 0行 | 未接続 |
+
+ローカル基準線は `npm test` 15件、`npx tsc --noEmit`、`npm run lint` が成功している。
+
+### 19.3 完了条件
+
+「v2完了」はテーブルが存在することではなく、次をすべて満たした状態とする。
+
+- 新規LP・動画・ロゴプレゼンの正本がTake以下だけに作られ、v1への新規二重書きがない
+- Brand管理画面の一覧・詳細・公開操作がv2 read modelだけで成立する
+- 既存LP 11件、動画1件、Profile 14件が冪等に移行され、件数・所有Brand・公開URL・R2 checksumを照合できる
+- `brand_kind is null` の既存行を分類または明示的なplaceholderとして解消する
+- 生成・レンダー・公開の各段が同じidempotency keyで再試行できる
+- 退会、Take削除、Work削除が共有R2キーの参照カウントを守る
+- `/c/[id]` と `/p/[id]` の既存URLを壊さず、v2 Publication / canonical slotで解決する
+- リポジトリの実行コードから旧 `brand_profiles` / `brand_generation_runs` / `brand_assets`（マーケティング成果物用途）/ `campaigns` 参照が0になる
+- contract migration後にテスト、型検査、lint、build、主要E2E、Supabase security/performance advisorが成功する
+- 完了後、この文書の確定内容を [data-model.md](data-model.md) へ統合し、本書を廃止する
+
+### 19.4 実行順
+
+| 段 | 内容 | 終了判定 | 推定 |
+| --- | --- | --- | ---: |
+| V2-0 | 監査・完了条件・基準線 | 本節とread-only監査が再実行可能 | 0.5日 |
+| V2-1 | 書き込み経路の安定化 | Take作成、Render、Artifact、Publicationが冪等・回復可能。production template driftを拒否 | 1.5〜2.5日 |
+| V2-2 | 管理画面read model切替 | Brand一覧・詳細・LP・動画がv2優先で同じ表示を返す | 2〜3日 |
+| V2-3 | BrandKnowledge切替 | Profile編集とURL抽出がclaims/valuesを正本にし、生成コピーをfactへ入れない | 1.5〜2.5日 |
+| V2-4 | 動画のTake化 | product-cm / event-promoの作成・再レンダー・公開がv2だけで成立 | 2〜3日 |
+| V2-5 | 既存データ移行・照合 | 12成果物・14 Profile・11生成履歴・16 null Brandを移行または明示分類 | 1.5〜2.5日 |
+| V2-6 | ロゴプレゼンTake化 | `/p/[id]`をcanonical slot + server resolutionへ切替、編集互換を維持 | 2〜3日 |
+| V2-7 | contract・全通し検証 | 旧参照0、旧列/表縮退、全検証成功、data-modelへ統合 | 1.5〜2.5日 |
+
+合計は**12〜19実働日**を見込む。AI支援で連続して進めても、リモートデータ移行の承認、実URL生成、R2/Remotion実レンダー、公開URL互換確認を含むため、現実的なカレンダー期間は**2〜4週間**。UI仕様変更や16件の未分類Brandを人手で個別判断する場合は別途増える。
+
+各段は「互換読み → v2書き → 照合 → v2読み → v1書き停止」の順で進める。一括置換は行わない。リモートDBへのmigrationまたはデータ更新は、接続先URLを都度照合し、SQLと影響件数をレビューして明示承認を得てから実行する。
+
+### 19.5 2026-08-07 実行チェックポイント
+
+- **V2-0 完了**: `npm run v2:audit`を追加。件数、未分類Brand、Knowledge、Publication、canonical slot、production template driftをread-onlyで再監査できる
+- **V2-1 DB契約完了**: 0032/0033を適用。Take + 既定Renderを1トランザクションで作り、同じidempotency keyは同じTakeを返し、別inputでのキー再利用を拒否する。DB上の`BEGIN ... ROLLBACK`契約テスト成功、テスト行漏れ0
+- **V2-1 アプリ経路完了**: LP再送時に不足Render/Publicationから再開し、R2登録後のArtifact登録失敗はオブジェクトを補償削除する。公開・公開終了は履歴を残して冪等に処理し、production template driftは台帳上書き前に失敗する
+- **V2-2 LP完了・動画一部**: Brand一覧・企業/Brand詳細はKnowledgeとTakeをv2優先で読み、同じcampaign jobのv1/v2二重表示を抑止する。新しいBrand種別6種も一覧対象にした。LP詳細はTake/Render/Artifact/Publicationのv2 read modelへ切替済み。動画はevent-promoのみv2完了
+- **V2-3 backfill完了**: 0034/0035でlegacy Profileを224 claims + 224 valuesへ移行。採用リンク不整合0、`llm_generation` fact 0。0036/0037で明示入力だけをclaim追加+value採用する原子的RPCを追加し、生成source拒否のrollback契約テストに成功
+- **V2-3 書き込み切替完了**: OrganizationのWeb取込によるpalette/design token更新はKnowledge RPCへ切替済み。campaign catalogも生成結果を未採用claimとして追記し、`brand_profiles`への新規writerを停止した
+- **V2-4 完了（2026-08-08）**: 動画ポータルはv2 Takeを優先表示し、新規動画をTakeとして作成する。event-promoに加え、Product CMも音声WAV・タイミング・Brand KitをTakeへ固定し、同じv2 Render/Artifact/Publication経路で再生成・private preview・`/v/<takeId>`公開を行う
+- **検証済み**: unit test 24件、TypeScript、ESLint、production build、DB/R2整合監査。リモートmigrationは0040まで適用済み
+
+次の手動確認は、権限を持つ既存アカウントで `/brands/<brandId>/video` を開き、Product CMとevent-promoが重複せず表示されること、private MP4を再生できること、明示的に「公開する」を選んだ動画だけ`/v/<takeId>`で再生できること。
+
+### 19.6 2026-08-07 LP・生成履歴ポート完了
+
+- **0038適用**: legacy event-promo asset 1件を既存v2 Takeのidempotency keyへ対応付けた。新規環境では同じmigrationが不足Take/Renderを作る
+- **0039適用**: legacy LP asset 12件を`campaign-lp@2` Take 12件、responsive HTML Render 12件、Take Run 12件へ冪等に複製。Brand、作成者、時刻、外部job ID、Brand Kit、steps、usageを保持した
+- **Artifact移行完了**: 12 LPを現行rendererでHTML化してprivate R2へ保存。12/12件を`HeadObject`で読み戻し、DB記録とbyte数・media typeが一致した
+- **公開状態を維持**: legacy LPは全件privateだったためPublicationを追加していない。データ移行を理由に公開範囲を広げない
+- **新規二重書き停止**: campaign catalogは`brand_profiles` / `brand_generation_runs` / `brand_assets`へ新規書き込みせず、未採用のKnowledge claimsを追記する。LP実行履歴は`take_runs`、成果物はTake/Render/Artifactへ保存する
+- **監査結果**: legacy asset未ポート0、legacy generation run未ポート0。`generation_runs_not_migrated=false`、`outputs_not_migrated=false`
+- **次の大区切り（当時）**: Publication管理UIとLP詳細read model。その後の残件はproduct-cm v2 renderer、16件のnull Brand整理、ロゴプレゼンcanonical slot、旧参照削除とcontract migration
+
+### 19.7 2026-08-07 LP Publication管理のv2切替完了
+
+- Brand配下のLPリンクはv2 assetではjob IDではなくTake IDを使う。旧job ID URLはlegacy画面へフォールバックして維持する
+- LP詳細APIはTake → HTML Render → latest Artifact → Publication履歴をRLS付きで読み、private Artifact用の短期署名URLを発行する
+- 管理画面はprivate previewと公開ページを区別し、完成Artifactがある場合だけ公開できる。公開終了は行を削除せず`retired`にして履歴を保持する
+- canonical URLは常に`/c/<takeId>`。再送・同時公開では同じRenderを冪等に解決し、別Renderによる同一パス占有を拒否する
+- `/c/[id]`は引き続き`Publication.status='live'`だけを公開判定にする。非公開LP 12件はPublication 0のままで、管理者が明示操作するまで公開されない
+- DB rollback契約テストで、`live`作成 → `retired`化 → 履歴1件保持を確認。rollback後のテスト行漏れ0
+- `npm run v2:audit`の`publications_not_cut_over`は、公開件数ではなく管理API・管理画面・public resolverの3経路が揃っているかを判定する。privateのみの環境でPublication 0件を誤って未移行扱いしない
+
+### 19.8 2026-08-08 Product CM v2切替完了
+
+- `product-cm@2`はBrand Kitに加えて、ナレーションのタイミングJSONとTakeスコープのWAV Material参照をbriefに保持する。入力は`take_inputs.role='product_cm_voice'`にも固定し、ローカルcampaign jobを削除しても再レンダーできる
+- 0040の`attach_product_cm_voice` RPCは、WAV Material登録、Take入力固定、brief更新を同一トランザクションで行う。同一Take・同一checksumの再送は既存Materialを再利用する
+- 新規TTSと明示的な動画生成APIは`renderProductCmJob`へ接続し、Product CMも共通のTake Render → private R2 Artifact経路を使う。音声未生成のTakeだけは従来のナレーション作成画面をauthoring入口として維持する
+- 既存ローカルProduct CM 5件を5 Take、5 WAV Material、5 ready MP4 Artifactへ移行。全件でR2 `HeadObject`と実体byte数がDB記録に一致し、孤立入力・未完了Renderは0件
+- 旧MP4が残る3件は現行rendererで再エンコードしたためバイナリhashは一致しなかった。旧版と同じH.264/AAC・1920×1080・30fps契約を動画デコード検査で確認する。旧ファイルは互換用に保持する
+- canonical公開URLは`/v/<takeId>`。LPと同様にlive Publicationがある場合だけprivate R2 ArtifactをRange対応で返す。移行を理由に公開範囲を変えず、Publicationは0件のまま維持した
+- `npm run v2:audit`はProduct CM Take、固定済み音声、ready MP4、作成・再生成・公開の接続ファイルを監査し、`product_cm_not_cut_over`を判定する
+
+### 19.9 2026-08-08 V2 contract完了
+
+- 0041でロゴプレゼンを`logo-presentation@1` Take + HTML Render + `canonical_slots`へ移し、作成・編集・削除を原子的RPCへ統一した。旧`logo_presentations`フォールバックはない
+- 動画一覧・詳細・レンダーから`brand_assets`とgeneration runの互換経路、実体のないProduct CMプレースホルダー、旧動画output routeを削除した。`videoId`は常にTake ID
+- ダミーデータとR2オブジェクトを削除し、WealthPark / WealthPark Lab / 「世界が恋する日本酒」の閉包だけを保全した。13 Material + latest MP4 Artifactの計14 R2オブジェクトをHEAD検証済み
+- 0042で旧Profile、generation run、asset、campaign、logo presentationテーブルと移行期のBrand列・トリガー・policy分岐を削除。`brand_kind`と`brand_organization_id`をnot null化した
+- 適用後の実測はOrganization 1、Brand 1、Work 1、Take 1、Input/Material 13、Render/Artifact 1、Logo 0。旧テーブル非存在、旧列非存在、未分類Brand 0
+- ロゴ作成 → presentation Take/Render/slot → 編集 → 削除をリモートDBのrollback契約テストで再確認。テスト行漏れ0
+- `npm run v2:audit`の全blockerはfalse、`npm run v2:prune-r2`は`preserve=14 / delete=0`。現在形は [data-model.md](data-model.md) へ統合済み
+- 0043で、SQL body参照のため旧テーブルdropに追随しなかった`can_view_campaign` / `can_manage_campaign` helperも削除した
+- 0044でロゴプレゼンの内部ensure RPCをservice role限定にし、read RPCをRLSに従うsecurity invokerへ変更した
+- 0045で保全Organizationのprimary corporate Brandを復元し、WealthPark Labをその子Brandへ接続した。Organization詳細が企業プロフィール・企業ロゴの基点を必ず持つ不変条件を回復した
+- 0046で既存Brandを明示してLogo + primary Candidate + logo-presentation Take/Render/canonical slotを一括作成するRPCを追加した。Brand詳細のSVG追加と企業URL取り込みはこの経路を共有し、未所属用の仮Organization/Brandを増やさない
