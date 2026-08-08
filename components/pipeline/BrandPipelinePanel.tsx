@@ -6,6 +6,7 @@
 // (deliverable-architecture §17.8).
 
 import type { GoalField, GoalProgress } from "@/lib/pipeline/stages";
+import MaterialIntake, { type BrandMaterial } from "./MaterialIntake";
 
 export interface BrandPipelinePayload {
   sources: Array<{ label: string; addedAt: string | null }>;
@@ -13,6 +14,15 @@ export interface BrandPipelinePayload {
   structuredFields: string[];
   adoptedFields: string[];
   goal: GoalProgress;
+}
+
+export interface MaterialActions {
+  websiteLabel: string | null;
+  materials: BrandMaterial[];
+  busy: boolean;
+  onUploadFile: (file: File, data: string) => Promise<void>;
+  onAddNote: (text: string) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
 }
 
 function FieldList({
@@ -78,38 +88,24 @@ export default function BrandPipelinePanel({
   stageId,
   payload,
   onInject,
-  injecting,
+  materials,
 }: {
   stageId: string;
   payload: BrandPipelinePayload;
   onInject: () => void;
-  injecting: boolean;
+  materials: MaterialActions;
 }) {
   if (stageId === "input") {
     return (
-      <>
-        <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-ink">いま使われている素材</h3>
-          <FieldList
-            fields={payload.sources.map((source) => source.label)}
-            empty="素材がまだありません"
-          />
-        </section>
-        <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-ink">情報を足す</h3>
-          <p className="text-sm text-ink-muted">
-            公式サイトを読み直します。取得したロゴ・カラー・書体は保存時に反映されます。
-          </p>
-          <button
-            type="button"
-            onClick={onInject}
-            disabled={injecting}
-            className="self-start bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent disabled:opacity-50"
-          >
-            {injecting ? "取得中…" : "サイトから取り直す"}
-          </button>
-        </section>
-      </>
+      <MaterialIntake
+        websiteLabel={materials.websiteLabel}
+        materials={materials.materials}
+        busy={materials.busy}
+        onUploadFile={materials.onUploadFile}
+        onAddNote={materials.onAddNote}
+        onRemove={materials.onRemove}
+        onRefetchSite={onInject}
+      />
     );
   }
 

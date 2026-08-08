@@ -57,17 +57,25 @@ function latest(times: Array<string | null | undefined>): string | null {
 }
 
 /**
- * A stage is stale when something upstream of it is newer than its own output.
- * Comparing timestamps is enough here because each stage writes exactly once
- * per run; content fingerprints become necessary when a stage can be re-run
- * without its inputs changing (§16 Phase 2).
+ * A stage is stale when something upstream of it is newer than its own output,
+ * **or when that upstream is itself stale**. Staleness has to travel the whole
+ * chain: adding one source invalidates extraction, and everything extraction
+ * fed is then built on a reading that no longer covers the inputs. Comparing
+ * only against the immediate upstream's timestamp stops the signal one stage
+ * in, which reads as "the structure is fine" when it is not.
+ *
+ * Timestamps suffice while each stage writes once per run; content fingerprints
+ * become necessary when a stage can re-run without its inputs changing
+ * (§16 Phase 2).
  */
 function statusFor(
   produced: string | null,
   upstream: string | null,
   hasOutput: boolean,
+  upstreamStale: boolean,
 ): PipelineStageStatus {
   if (!hasOutput) return "empty";
+  if (upstreamStale) return "stale";
   if (produced && upstream && upstream > produced) return "stale";
   return "ready";
 }
@@ -88,11 +96,38 @@ export function brandAssetsPipeline(input: BrandPipelineInput): BrandPipeline {
   const mapAt = input.adoptedPaths.length > 0 ? structureAt : null;
   const withImage = input.logos.filter((logo) => logo.hasImage);
 
+  const inputStatus: PipelineStageStatus =
+    input.sources.length > 0 ? "ready" : "empty";
+  const extractStatus = statusFor(
+    extractAt,
+    inputAt,
+    input.extracted.length > 0,
+    false,
+  );
+  const structureStatus = statusFor(
+    structureAt,
+    extractAt,
+    input.claims.length > 0,
+    extractStatus === "stale",
+  );
+  const mapStatus = statusFor(
+    mapAt,
+    structureAt,
+    input.adoptedPaths.length > 0,
+    structureStatus === "stale",
+  );
+  const outputStatus = statusFor(
+    mapAt,
+    mapAt,
+    withImage.length > 0,
+    mapStatus === "stale",
+  );
+
   const stages: PipelineStage[] = [
     {
       id: "input",
       label: STAGE_LABELS.input,
-      status: input.sources.length > 0 ? "ready" : "empty",
+      status: inputStatus,
       summary:
         input.sources.length > 0
           ? `${input.sources.length}件の素材`
@@ -102,7 +137,7 @@ export function brandAssetsPipeline(input: BrandPipelineInput): BrandPipeline {
     {
       id: "extract",
       label: STAGE_LABELS.extract,
-      status: statusFor(extractAt, inputAt, input.extracted.length > 0),
+      status: extractStatus,
       summary:
         input.extracted.length > 0
           ? `${input.extracted.length}件を取り出し`
@@ -112,7 +147,7 @@ export function brandAssetsPipeline(input: BrandPipelineInput): BrandPipeline {
     {
       id: "structure",
       label: STAGE_LABELS.structure,
-      status: statusFor(structureAt, extractAt, input.claims.length > 0),
+      status: structureStatus,
       summary:
         input.claims.length > 0
           ? `${input.claims.length}件の主張`
@@ -122,7 +157,7 @@ export function brandAssetsPipeline(input: BrandPipelineInput): BrandPipeline {
     {
       id: "map",
       label: STAGE_LABELS.map,
-      status: statusFor(mapAt, structureAt, input.adoptedPaths.length > 0),
+      status: mapStatus,
       // The denominator is the goal, not the number of claims: what matters is
       // how much of what a brand needs is settled, not how much was found.
       summary: `${goal.filled.length}/${BRAND_ASSET_GOAL.length}項目を採用`,
@@ -131,7 +166,7 @@ export function brandAssetsPipeline(input: BrandPipelineInput): BrandPipeline {
     {
       id: "output",
       label: STAGE_LABELS.output,
-      status: statusFor(mapAt, mapAt, withImage.length > 0),
+      status: outputStatus,
       summary:
         withImage.length > 0
           ? `ロゴ${withImage.length}件${

@@ -17,6 +17,7 @@ import StageDrawer from "@/components/pipeline/StageDrawer";
 import BrandPipelinePanel, {
   type BrandPipelinePayload,
 } from "@/components/pipeline/BrandPipelinePanel";
+import type { BrandMaterial } from "@/components/pipeline/MaterialIntake";
 import type { PipelineStage } from "@/lib/pipeline/stages";
 
 const EMPTY_FORM: BusinessUpdate = {
@@ -96,6 +97,125 @@ export default function BusinessDetailClient({ id }: { id: string }) {
   // it; putting this in the URL is the follow-up that makes back/forward work.
   const [openStage, setOpenStage] = useState<string | null>(null);
   const [pipelineTick, setPipelineTick] = useState(0);
+  const [materials, setMaterials] = useState<BrandMaterial[]>([]);
+  const [materialBusy, setMaterialBusy] = useState(false);
+
+  const reloadMaterials = async () => {
+    const response = await authedFetch(`/api/brands/businesses/${id}/materials`);
+    if (!response.ok) return;
+    const body = (await response.json().catch(() => null)) as {
+      materials?: BrandMaterial[];
+    } | null;
+    setMaterials(body?.materials ?? []);
+  };
+
+  // Adding or removing material changes what the later stages were built from,
+  // so the pipeline is re-read every time — that is how a stage turns stale.
+  const afterMaterialChange = async () => {
+    await reloadMaterials();
+    setPipelineTick((tick) => tick + 1);
+  };
+
+  const uploadMaterial = async (file: File, data: string) => {
+    setMaterialBusy(true);
+    setError(null);
+    try {
+      const response = await authedFetch(
+        `/api/brands/businesses/${id}/materials`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            label: file.name,
+            mediaType: file.type || "application/octet-stream",
+            data,
+          }),
+        },
+      );
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!response.ok) throw new Error(body?.error ?? "素材を追加できませんでした");
+      await afterMaterialChange();
+      setNotice(`${file.name} を追加しました。`);
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error ? uploadError.message : "素材を追加できませんでした",
+      );
+    } finally {
+      setMaterialBusy(false);
+    }
+  };
+
+  const addNote = async (value: string) => {
+    setMaterialBusy(true);
+    setError(null);
+    try {
+      const response = await authedFetch(
+        `/api/brands/businesses/${id}/materials`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            label: `メモ（${new Date().toLocaleDateString("ja-JP")}）`,
+            text: value,
+          }),
+        },
+      );
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!response.ok) throw new Error(body?.error ?? "テキストを追加できませんでした");
+      await afterMaterialChange();
+      setNotice("テキストを追加しました。");
+    } catch (noteError) {
+      setError(
+        noteError instanceof Error ? noteError.message : "テキストを追加できませんでした",
+      );
+    } finally {
+      setMaterialBusy(false);
+    }
+  };
+
+  const removeMaterial = async (materialId: string) => {
+    setMaterialBusy(true);
+    setError(null);
+    try {
+      const response = await authedFetch(
+        `/api/brands/businesses/${id}/materials/${materialId}`,
+        { method: "DELETE" },
+      );
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!response.ok) throw new Error(body?.error ?? "素材を削除できませんでした");
+      await afterMaterialChange();
+    } catch (removeError) {
+      setError(
+        removeError instanceof Error ? removeError.message : "素材を削除できませんでした",
+      );
+    } finally {
+      setMaterialBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    void authedFetch(`/api/brands/businesses/${id}/materials`)
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = (await response.json().catch(() => null)) as {
+          materials?: BrandMaterial[];
+        } | null;
+        if (!cancelled) setMaterials(body?.materials ?? []);
+      })
+      .catch(() => {
+        // Listing material must not take the brand page down.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -388,10 +508,17 @@ export default function BusinessDetailClient({ id }: { id: string }) {
           <BrandPipelinePanel
             stageId={openStageDef.id}
             payload={pipeline}
-            injecting={inspecting}
             onInject={() => {
               setOpenStage(null);
               void inspectUrl();
+            }}
+            materials={{
+              websiteLabel: detail.website || null,
+              materials,
+              busy: materialBusy || inspecting,
+              onUploadFile: uploadMaterial,
+              onAddNote: addNote,
+              onRemove: removeMaterial,
             }}
           />
         </StageDrawer>

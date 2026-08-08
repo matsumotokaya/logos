@@ -75,6 +75,34 @@ test("素材を足すと下流だけが古くなる", () => {
   assert.equal(stage(withNewSource, "extract").status, "stale");
 });
 
+test("古さは末端まで伝わる", () => {
+  // Stopping the signal at the first stage reads as "the structure is fine"
+  // when it was built from a reading that no longer covers the inputs.
+  const withNewSource: BrandPipelineInput = {
+    sources: [
+      { label: "https://example.com", addedAt: "2026-08-01T00:00:00Z" },
+      { label: "brand-book.pdf", addedAt: "2026-08-09T00:00:00Z" },
+    ],
+    extracted: [{ kind: "palette", observedAt: "2026-08-01T00:00:00Z" }],
+    claims: [
+      { fieldPath: "palette.primary", sourceKind: "url_extraction", createdAt: "2026-08-01T00:00:00Z" },
+    ],
+    adoptedPaths: ["palette.primary"],
+    logos: [{ hasImage: true, provisional: true }],
+  };
+  const { stages } = brandAssetsPipeline(withNewSource);
+  assert.deepEqual(
+    stages.map((s) => `${s.id}:${s.status}`),
+    [
+      "input:ready",
+      "extract:stale",
+      "structure:stale",
+      "map:stale",
+      "output:stale",
+    ],
+  );
+});
+
 test("マッピングの分母は主張の数ではなくゴールの項目数", () => {
   const many = Array.from({ length: 40 }, (_, i) => ({
     fieldPath: `noise.${i}`,
