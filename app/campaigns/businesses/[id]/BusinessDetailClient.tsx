@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   BrandUrlInspection,
   BusinessDetail,
@@ -9,6 +9,7 @@ import type {
 } from "@/lib/brand-detail";
 import BrandUrlImportDialog from "../../BrandUrlImportDialog";
 import { authedFetch } from "../../campaign-ui";
+import { ProcessLogPopup, type StepEvent } from "../../ProcessLogPopup";
 import BusinessMoveDialog from "./BusinessMoveDialog";
 import BrandLogoAssets from "./BrandLogoAssets";
 import { refreshBrandTree } from "@/lib/brand-events";
@@ -93,12 +94,64 @@ export default function BusinessDetailClient({ id }: { id: string }) {
   const [pipeline, setPipeline] = useState<
     (BrandPipelinePayload & { stages: PipelineStage[] }) | null
   >(null);
-  // Which stage is open. Reloading the page closes it rather than restoring
-  // it; putting this in the URL is the follow-up that makes back/forward work.
-  const [openStage, setOpenStage] = useState<string | null>(null);
+  // Which stage is open lives in the URL, so closing a drawer is a
+  // navigation: back goes back, reload restores, and a stage can be linked to.
+  // Read on mount rather than during render — the server has no location and
+  // seeding from it would make the first client render disagree.
+  const [openStage, setOpenStageState] = useState<string | null>(null);
+
+  const setOpenStage = (next: string | null) => {
+    setOpenStageState(next);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (next) url.searchParams.set("stage", next);
+    else url.searchParams.delete("stage");
+    window.history.pushState(window.history.state, "", url);
+  };
   const [pipelineTick, setPipelineTick] = useState(0);
   const [materials, setMaterials] = useState<BrandMaterial[]>([]);
   const [materialBusy, setMaterialBusy] = useState(false);
+  // Reading a site or storing a brand book takes long enough that silence
+  // reads as nothing happening. Same floating log the campaign runs use.
+  const [steps, setSteps] = useState<StepEvent[]>([]);
+  const [running, setRunning] = useState<string | null>(null);
+  const stepId = useRef(0);
+
+  const log = (message: string, level: StepEvent["level"] = "info") => {
+    stepId.current += 1;
+    setSteps((current) => [
+      ...current,
+      {
+        id: stepId.current,
+        ts: new Date().toLocaleTimeString("ja-JP", { hour12: false }),
+        message,
+        level,
+      },
+    ]);
+  };
+
+  /** Run one operation with the log open, and leave the trail behind after. */
+  const withLog = async <T,>(
+    title: string,
+    start: string,
+    body: () => Promise<T>,
+  ): Promise<T | null> => {
+    setSteps([]);
+    setRunning(title);
+    log(start);
+    try {
+      const result = await body();
+      setRunning(null);
+      return result;
+    } catch (runError) {
+      log(
+        runError instanceof Error ? runError.message : "失敗しました",
+        "warn",
+      );
+      setRunning(null);
+      throw runError;
+    }
+  };
 
   const reloadMaterials = async () => {
     const response = await authedFetch(`/api/brands/businesses/${id}/materials`);
@@ -120,23 +173,29 @@ export default function BusinessDetailClient({ id }: { id: string }) {
     setMaterialBusy(true);
     setError(null);
     try {
-      const response = await authedFetch(
-        `/api/brands/businesses/${id}/materials`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            label: file.name,
-            mediaType: file.type || "application/octet-stream",
-            data,
-          }),
-        },
-      );
-      const body = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      if (!response.ok) throw new Error(body?.error ?? "素材を追加できませんでした");
-      await afterMaterialChange();
+      await withLog("素材を取り込み中", `${file.name} を送信`, async () => {
+        const response = await authedFetch(
+          `/api/brands/businesses/${id}/materials`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              label: file.name,
+              mediaType: file.type || "application/octet-stream",
+              data,
+            }),
+          },
+        );
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        if (!response.ok) {
+          throw new Error(body?.error ?? "素材を追加できませんでした");
+        }
+        log("保存しました", "success");
+        await afterMaterialChange();
+        log("パイプラインの状態を更新", "success");
+      });
       setNotice(`${file.name} を追加しました。`);
     } catch (uploadError) {
       setError(
@@ -216,6 +275,19 @@ export default function BusinessDetailClient({ id }: { id: string }) {
       cancelled = true;
     };
   }, [id]);
+
+  // Adopt whatever stage the URL names, and keep following it as the user
+  // moves through history. Read here rather than during render: the server has
+  // no location, so seeding from it would disagree with the server's HTML.
+  useEffect(() => {
+    const read = () =>
+      setOpenStageState(
+        new URLSearchParams(window.location.search).get("stage"),
+      );
+    read();
+    window.addEventListener("popstate", read);
+    return () => window.removeEventListener("popstate", read);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -342,19 +414,32 @@ export default function BusinessDetailClient({ id }: { id: string }) {
     setError(null);
     setNotice(null);
     try {
-      const response = await authedFetch("/api/brands/inspect-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: form.website, scope: "business" }),
-      });
-      const body = (await response.json().catch(() => null)) as {
-        inspection?: BrandUrlInspection;
-        error?: string;
-      } | null;
-      if (!response.ok || !body?.inspection) {
-        throw new Error(body?.error ?? "URLから情報を取得できませんでした");
-      }
-      const next = body.inspection;
+      const next = await withLog(
+        "サイトを読み取り中",
+        `${form.website} を開く`,
+        async () => {
+          const response = await authedFetch("/api/brands/inspect-url", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: form.website, scope: "business" }),
+          });
+          const body = (await response.json().catch(() => null)) as {
+            inspection?: BrandUrlInspection;
+            error?: string;
+          } | null;
+          if (!response.ok || !body?.inspection) {
+            throw new Error(body?.error ?? "URLから情報を取得できませんでした");
+          }
+          // The evidence list is what the capture actually observed, so it is
+          // the honest content of this log rather than invented stages.
+          for (const line of body.inspection.evidence) log(line, "success");
+          if (!body.inspection.brandAssets?.logo) {
+            log("ロゴ候補は見つかりませんでした", "warn");
+          }
+          return body.inspection;
+        },
+      );
+      if (!next) return;
       setInspection(next);
       setSelectedImportFields({
         name: Boolean(
@@ -490,6 +575,13 @@ export default function BusinessDetailClient({ id }: { id: string }) {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 md:px-10">
+      {running && (
+        <ProcessLogPopup
+          steps={steps}
+          title={`${running}`}
+          hint="この画面のまま完了します"
+        />
+      )}
       {pipeline && (
         <div className="-mx-6 mb-6 md:-mx-10">
           <PipelineBar
