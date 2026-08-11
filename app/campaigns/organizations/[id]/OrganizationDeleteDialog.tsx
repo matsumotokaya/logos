@@ -5,7 +5,7 @@ import { AlertDialog } from "@base-ui/react/alert-dialog";
 type Props = {
   open: boolean;
   organizationName: string;
-  logoCount: number;
+  brandCount: number;
   deleting: boolean;
   error: string | null;
   onCancel: () => void;
@@ -15,7 +15,7 @@ type Props = {
 export default function OrganizationDeleteDialog({
   open,
   organizationName,
-  logoCount,
+  brandCount,
   deleting,
   error,
   onCancel,
@@ -48,15 +48,15 @@ export default function OrganizationDeleteDialog({
             </AlertDialog.Title>
             <AlertDialog.Description className="mt-2 text-pretty text-sm text-ink-muted">
               「{organizationName}
-              」と、そのOrganization固有のブランド情報を削除します。この操作は取り消せません。
+              」を削除します。この操作は取り消せません。Organization自体のメタ情報だけが対象で、配下のブランドやロゴはOrganizationの移管・削除まで残ります。
             </AlertDialog.Description>
 
             <div className="mt-5 rounded-xl bg-red-50 p-4 text-pretty text-xs text-red-800">
-              ブランドプロフィールとコーポレートロゴ
+              このOrganizationに紐づくブランド
               <span className="mx-1 tabular-nums font-semibold">
-                {logoCount}
+                {brandCount}
               </span>
-              件も削除されます。配下に事業がある場合は削除できません。
+              件があるため、先に別のOrganizationへ移動してください。
             </div>
 
             {error ? (

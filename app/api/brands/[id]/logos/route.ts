@@ -1,130 +1,118 @@
-import type { LogoData } from "@/lib/svg";
-import type { LogoRole } from "@/lib/store/types";
-import { newLogoId } from "@/lib/id";
+// Logos owned by the brand_entity's organization — the brand's library, viewed
+// from a single brand. Logos are recorded with subject_entity_id pointing at
+// the brand_entity that owns them, so the list reads "logos whose subject
+// sits under the same brand_organization as this brand".
+
 import { guardLabsRequest } from "@/lib/labs-access";
-import {
-  createServerSupabaseForToken,
-  requireUser,
-} from "@/lib/supabase/server";
+import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 
-const LOGO_ROLES = new Set<LogoRole>([
-  "brand",
-  "corporate",
-  "service",
-  "subsidiary",
-  "other",
-]);
+export type LogoSummary = {
+  id: string;
+  title: string;
+  role: string;
+  visibility: string;
+  /** The brand entity this logo is filed under. */
+  subjectEntityId: string;
+  subjectEntityName: string;
+  previewUrl: string | null;
+};
 
-function logoTitle(value: unknown): string {
-  if (typeof value !== "string") throw new Error("ロゴ名が不正です");
-  const normalized = value.trim();
-  if (!normalized) throw new Error("ロゴ名を入力してください");
-  if (normalized.length > 160) throw new Error("ロゴ名が長すぎます");
-  return normalized;
-}
+const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
 
-function logoRole(value: unknown): LogoRole {
-  if (typeof value !== "string" || !LOGO_ROLES.has(value as LogoRole)) {
-    throw new Error("ロゴの種類が不正です");
-  }
-  return value as LogoRole;
-}
-
-function logoSvg(value: unknown): string {
-  if (typeof value !== "string") throw new Error("SVGファイルが不正です");
-  const normalized = value.trim();
-  if (!normalized.startsWith("<svg") || normalized.length > 2_000_000) {
-    throw new Error("2MB以下のSVGファイルを選択してください");
-  }
-  if (
-    /<\s*(script|foreignObject)\b/i.test(normalized) ||
-    /\son[a-z]+\s*=/i.test(normalized) ||
-    /(?:href|xlink:href)\s*=\s*["']\s*javascript:/i.test(normalized)
-  ) {
-    throw new Error("安全でない要素を含むSVGは登録できません");
-  }
-  return normalized;
-}
-
-function logoAnalysis(value: unknown): Omit<LogoData, "svg"> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("SVGの解析結果が不正です");
-  }
-  const analysis = value as Partial<Omit<LogoData, "svg">>;
-  if (
-    !analysis.viewBox ||
-    !Number.isFinite(analysis.viewBox.x) ||
-    !Number.isFinite(analysis.viewBox.y) ||
-    !Number.isFinite(analysis.viewBox.w) ||
-    !Number.isFinite(analysis.viewBox.h) ||
-    analysis.viewBox.w <= 0 ||
-    analysis.viewBox.h <= 0 ||
-    !Array.isArray(analysis.colors) ||
-    !Array.isArray(analysis.anchors) ||
-    !Array.isArray(analysis.handles)
-  ) {
-    throw new Error("SVGの解析結果が不正です");
-  }
-  return analysis as Omit<LogoData, "svg">;
-}
-
-export async function POST(
-  req: Request,
-  ctx: { params: Promise<{ id: string }> },
-) {
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const denied = await guardLabsRequest(req);
   if (denied) return denied;
-  const user = await requireUser(req);
+  let user;
+  try {
+    user = await requireUser(req);
+  } catch {
+    return unauthorized();
+  }
   const { id: brandId } = await ctx.params;
   const supabase = createServerSupabaseForToken(user.token);
 
-  try {
-    const body = (await req.json()) as Record<string, unknown>;
-    const title = logoTitle(body.title);
-    const role = logoRole(body.role);
-    const svg = logoSvg(body.svg);
-    const analysis = logoAnalysis(body.analysis);
-    const logoId = newLogoId();
+  const { data: brand, error: brandError } = await supabase
+    .from("brand_entities")
+    .select("id, name, brand_organization_id")
+    .eq("id", brandId)
+    .maybeSingle();
+  if (brandError) {
+    return Response.json({ error: "ブランドを確認できませんでした" }, { status: 500 });
+  }
+  if (!brand) {
+    return Response.json({ error: "ブランドが見つかりません" }, { status: 404 });
+  }
 
-    const { data: takeId, error } = await supabase.rpc(
-      "create_brand_logo_with_presentation",
-      {
-        p_brand_id: brandId,
-        p_logo_id: logoId,
-        p_title: title,
-        p_role: role,
-        p_visibility: "draft",
-        p_svg: svg,
-        p_analysis: analysis,
-      },
-    );
-    if (error) {
-      if (error.code === "42501") {
-        return Response.json(
-          { error: "このブランドにロゴを追加する権限がありません" },
-          { status: 403 },
-        );
+  // All brand entities under the same organization as this brand are part of
+  // the same library — the user navigated here from one of them, but the logo
+  // list does not change shape between WealthPark Lab and WealthPark.
+  const { data: siblings, error: siblingsError } = await supabase
+    .from("brand_entities")
+    .select("id, name")
+    .eq("brand_organization_id", brand.brand_organization_id);
+  if (siblingsError) {
+    return Response.json({ error: "ライブラリを読み込めませんでした" }, { status: 500 });
+  }
+  const subjectIds = (siblings ?? []).map((s) => s.id);
+  const subjectNames = new Map(
+    (siblings ?? []).map((s) => [s.id as string, s.name as string]),
+  );
+
+  const { data: logos, error: logosError } = await supabase
+    .from("logos")
+    .select(
+      "id, title, role, visibility, subject_entity_id, logo_candidates(id, is_primary, svg, media_type, file_path)",
+    )
+    .in("subject_entity_id", subjectIds)
+    .order("created_at", { ascending: true });
+  if (logosError) {
+    return Response.json({ error: "ロゴを取得できませんでした" }, { status: 500 });
+  }
+
+  const summaries: LogoSummary[] = await Promise.all(
+    (logos ?? []).map(async (row) => {
+      const candidates = (row.logo_candidates ?? []) as Array<{
+        id: string;
+        is_primary: boolean;
+        svg: string | null;
+        media_type: string;
+        file_path: string | null;
+      }>;
+      const primary = candidates.find((c) => c.is_primary) ?? candidates[0];
+      let previewUrl: string | null = null;
+      if (primary) {
+        if (primary.svg) {
+          previewUrl = `data:image/svg+xml;base64,${Buffer.from(primary.svg, "utf8").toString("base64")}`;
+        } else if (primary.file_path && primary.media_type.startsWith("image/")) {
+          previewUrl = await logoPreviewSignedUrl(supabase, primary.file_path);
+        }
       }
-      throw new Error("ロゴとプレゼンを登録できませんでした");
-    }
+      return {
+        id: row.id as string,
+        title: row.title as string,
+        role: row.role as string,
+        visibility: row.visibility as string,
+        subjectEntityId: row.subject_entity_id as string,
+        subjectEntityName: subjectNames.get(row.subject_entity_id as string) ?? "",
+        previewUrl,
+      };
+    }),
+  );
 
-    return Response.json(
-      {
-        logo: {
-          id: logoId,
-          title,
-          role,
-          visibility: "draft",
-          previewUrl: `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`,
-          takeId,
-        },
-      },
-      { status: 201, headers: { "Cache-Control": "no-store" } },
-    );
-  } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "入力内容が不正です" },
-      { status: 400 },
-    );
+  return Response.json({
+    brand: { id: brand.id, name: brand.name },
+    logos: summaries,
+  });
+}
+
+async function logoPreviewSignedUrl(
+  supabase: ReturnType<typeof createServerSupabaseForToken>,
+  filePath: string,
+): Promise<string | null> {
+  try {
+    const { data } = await supabase.storage.from("logos").createSignedUrl(filePath, 3600);
+    return data?.signedUrl ?? null;
+  } catch {
+    return null;
   }
 }

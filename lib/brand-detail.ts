@@ -12,44 +12,26 @@ export type OrganizationDetail = {
   description: string;
   status: BrandRecordStatus;
   updatedAt: string;
-  profile: {
-    inheritsParent: boolean;
-    status: BrandRecordStatus;
-    value: Record<string, unknown>;
+  parentOrganization: {
+    id: string;
+    name: string;
   } | null;
-  businesses: Array<{
+  childOrganizations: Array<{
     id: string;
     name: string;
-    website: string;
-    status: BrandRecordStatus;
+    organizationKind: OrganizationKind | null;
   }>;
-  logos: Array<{
-    id: string;
-    title: string;
-    role: string;
-    visibility: string;
-    previewUrl: string | null;
-  }>;
-  availableBusinesses: Array<{
+  brands: Array<{
     id: string;
     name: string;
-    website: string;
+    brandKind: string;
     status: BrandRecordStatus;
-    parentOrganization: {
-      id: string;
-      name: string;
-    };
   }>;
 };
 
 export type OrganizationUpdate = Pick<
   OrganizationDetail,
-  | "name"
-  | "organizationKind"
-  | "website"
-  | "industry"
-  | "location"
-  | "description"
+  "name" | "organizationKind" | "website" | "industry" | "location" | "description"
 >;
 
 export type BusinessDetail = {

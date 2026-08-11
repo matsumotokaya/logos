@@ -1,7 +1,7 @@
 # v2スキーマ概念設計(マーケティングツール生成)
 
-最終更新: 2026-08-08
-ステータス: **V2完了。migration 0045まで適用済み。旧テーブル・互換読み・移行期カラム・旧helperを廃止し、現在形は [data-model.md](data-model.md) へ統合済み。本書の件数と段階記録は移行当時の履歴として残す。**
+最終更新: 2026-08-10
+ステータス: **V2完了。migration 0047まで適用済み。旧テーブル・互換読み・移行期カラム・旧helperを廃止し、現在形は [data-model.md](data-model.md) へ統合済み。本書の件数と段階記録は移行当時の履歴として残す。**
 
 要件の正本は [deliverable-architecture.md](deliverable-architecture.md)。本書はその §10-2「新スキーマ概念設計」と実施記録であり、**現在のテーブル契約は [data-model.md](data-model.md) と適用済みmigrationが正本**である。アカウント・URL・RLSの原則は [account-design.md](account-design.md) を参照する。
 
@@ -814,3 +814,11 @@ URL投入前の企業/サービス選択ダイアログは廃止した。既存�
 - 0044でロゴプレゼンの内部ensure RPCをservice role限定にし、read RPCをRLSに従うsecurity invokerへ変更した
 - 0045で保全Organizationのprimary corporate Brandを復元し、WealthPark Labをその子Brandへ接続した。Organization詳細が企業プロフィール・企業ロゴの基点を必ず持つ不変条件を回復した
 - 0046で既存Brandを明示してLogo + primary Candidate + logo-presentation Take/Render/canonical slotを一括作成するRPCを追加した。Brand詳細のSVG追加と企業URL取り込みはこの経路を共有し、未所属用の仮Organization/Brandを増やさない
+
+### 19.10 2026-08-10 event-promoテンプレート経路の補強
+
+- **問題**: event-promo Takeのブリーフ(bgm, photos, visuals.inkArt等)が `event/<slug>/...` のstaticFile相対パスを直接参照していたが、レンダラー`renderEventMp4`はテンポラリの空`publicDir`をRemotionに渡すため、Remotionが画像を読み込めず CancelledError で失敗していた。完成済み動画(例:`世界が恋する日本酒` v1)は別経路経由でR2生成されており、2本目以降の新規Takeでは動画が出てこなかった
+- **解決**: 既存Take の `take_inputs`(13件のrole + material_id + checksum)をそのまま新Takeにコピーし、ブリーフはソースのJSONを**そのままコピー**して `material:` URIに置き換えた状態で引き継ぐRPC `clone_event_promo_take(p_source_take_id, p_new_take_id, p_created_by, p_work_id)` を 0047 で追加。APIは `POST /api/brands/{id}/videos` の `templateTakeId` パラメータでこのRPCを呼ぶ
+- **新経路**: 動画ポータルの「＋動画を追加」で event-promo を選び、サブセレクト「下敷きにする動画」で同じブランドの既存 event-promo Take を選ぶと、新規Takeはブリーフ + 全 material pin を持ち越し、`POST /api/brands/{id}/videos/{videoId}/render` で正常にRemotionレンダーが通る。`take_inputs` は `material.checksum` が一致すれば `on conflict do update` で再利用するため、R2上の material を複製しない
+- **マイグレーションは追加関数の定義のみ**: 既存テーブルへの列追加も R2マイグレーションも発生しない。ソースTakeの `brief` と `take_inputs` を一時テーブルや中間状態に持たず、RPCの中で直接コピーする(冪等)
+- 残: `extract` ステージは将来拡張枠。`brief.bgm = "material:<uuid>"` の解決はレンダラー側の `stageBriefMaterials` が担当

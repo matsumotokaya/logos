@@ -1,0 +1,111 @@
+import { guardLabsRequest } from "@/lib/labs-access";
+import {
+  createServerSupabaseForToken,
+  requireUser,
+} from "@/lib/supabase/server";
+import { videoPipeline } from "@/lib/pipeline/video";
+
+/**
+ * The video pipeline for one V2 Take. Mirrors the brand-asset pipeline: the
+ * stage state is derived from rows that already exist (`takes`,
+ * `take_renders`, `render_artifacts`), so it cannot drift.
+ *
+ * Read-only: this route never writes. Adding material or swapping a template
+ * happens on its own screen and shows up next time the user opens this bar.
+ */
+export async function GET(
+  req: Request,
+  ctx: { params: Promise<{ id: string; videoId: string }> },
+) {
+  const denied = await guardLabsRequest(req);
+  if (denied) return denied;
+  let user;
+  try {
+    user = await requireUser(req);
+  } catch {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { id: brandId, videoId } = await ctx.params;
+  const supabase = createServerSupabaseForToken(user.token);
+
+  const takeResult = await supabase
+    .from("takes")
+    .select("id, brand_id, template_id, title, brief, updated_at")
+    .eq("id", videoId)
+    .eq("brand_id", brandId)
+    .eq("tool_kind", "video")
+    .maybeSingle();
+  if (takeResult.error) {
+    return Response.json(
+      { error: "動画を取得できませんでした" },
+      { status: 500 },
+    );
+  }
+  if (!takeResult.data) {
+    return Response.json({ error: "動画が見つかりません" }, { status: 404 });
+  }
+
+  const take = takeResult.data;
+
+  const renderResult = await supabase
+    .from("take_renders")
+    .select("id, status, latest_artifact_id, updated_at")
+    .eq("take_id", take.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (renderResult.error) {
+    return Response.json(
+      { error: "Renderを取得できませんでした" },
+      { status: 500 },
+    );
+  }
+
+  const render = renderResult.data;
+  const artifactResult = render?.latest_artifact_id
+    ? await supabase
+        .from("render_artifacts")
+        .select("id, created_at")
+        .eq("id", render.latest_artifact_id)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (artifactResult.error) {
+    return Response.json(
+      { error: "成果物を取得できませんでした" },
+      { status: 500 },
+    );
+  }
+
+  const renderStatus =
+    !render
+      ? "empty"
+      : render.status === "running"
+        ? "running"
+        : render.status === "ready"
+          ? "ready"
+          : render.status === "failed"
+            ? "failed"
+            : "empty";
+
+  const pipeline = videoPipeline({
+    template: (take.template_id as string) ?? "",
+    hasBrief: take.brief != null && typeof take.brief === "object",
+    briefUpdatedAt: (take.updated_at as string | null) ?? null,
+    brief: (take.brief as Record<string, unknown> | null) ?? null,
+    renderStatus,
+    renderUpdatedAt: (render?.updated_at as string | null) ?? null,
+    artifactCreatedAt:
+      (artifactResult.data?.created_at as string | null) ?? null,
+  });
+
+  return Response.json(
+    {
+      pipeline: {
+        stages: pipeline.stages,
+        goal: pipeline.goal,
+      },
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
+}

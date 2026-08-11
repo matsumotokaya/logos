@@ -1,6 +1,6 @@
 # Logos data model
 
-更新日: 2026-08-08
+更新日: 2026-08-10
 ステータス: **V2稼働構造の正本**
 
 V2の設計・移行判断の履歴は [schema-v2.md](schema-v2.md)、アカウントとRLSの原則は [account-design.md](account-design.md)、成果物アーキテクチャの背景は [deliverable-architecture.md](deliverable-architecture.md) を参照する。本書はmigration 0046適用後の現在形だけを記す。
@@ -40,7 +40,11 @@ CanonicalSlot → Take
 
 ## 2. OrganizationとBrand
 
-`brand_organizations`は任意に親Organizationを持てるが、アクセス権は親子関係から継承しない。各行の`linked_org_id`をRLSが直接評価する。
+`brand_organizations`は現実世界の所有コンテナ(会社・個人・非営利など)で、**メタ情報(name / website / industry / location / description / status / kind)の純粋な入れ物**として扱う。Organization自体にはロゴ・配色・タイポなどのBrand資産を持たない。
+
+- **任意に親Organizationを持てる**(`parent_organization_id`)。ホールディングス配下のグループ会社をN階層で表現可能
+- アクセス権は親子関係から継承しない。各行の`linked_org_id`をRLSが直接評価する
+- Organization一覧ページ(`/organizations/[id]`)はメタ情報と**子Organizations / Brandsの一覧**を表示するだけで、Brand Profile(palette / design tokens / logos)を混在させない
 
 `brand_entities.brand_kind`は次の6種。
 
@@ -54,6 +58,16 @@ CanonicalSlot → Take
 Brandの親子関係は`parent_brand_id`で表し、同じOrganization内に限定する。企業Brandは親を持たず、`is_primary_brand`は企業Brandだけが使える。対象顧客別の差分は別Brandを乱造せず`brand_variants`に置く。
 
 ロゴ、Knowledge、Work、Take、MaterialはすべてBrandへ属する。Organizationを成果物の直接所有者にしない。
+
+### 2.1 ブランドトップ(`/brands/[id]`)
+
+`/brands/[id]` は3セクションから成る。
+
+1. ブランド基本情報(`brand_entities` から name / kind / description / industry / location / website)
+2. 採用済みデザインルール(`brand_knowledge_values` から palette / typography / voice のうち known field のみ)
+3. 3タイル(動画 / LP / ロゴ) — 各 `/brands/[id]/{videos,lps,logos}` へのエントリ
+
+Organization詳細ページにはロゴ・パレット・タイポ等のBrand Profileを表示しない。Brand Profileは `/logos/[id]` 配下のLogoInfoPageでロゴ単位に表示する。
 
 ## 3. BrandKnowledge
 
@@ -87,6 +101,30 @@ Takeは以下を必須とする。
 - `logo-presentation@1`
 
 HTML/MP4はR2が正本で、ローカルファイルを配信フォールバックにしない。ブラウザ配信は署名付き同一オリジンURLを使い、動画はHTTP Rangeに対応する。
+
+### 5.1 event-promo テンプレート経路
+
+event-promo は **Take と `take_inputs` がペアで作成される**設計になっているが、R2 / DB に実際の material が無い状態で `brief` の `event/<slug>/...` 相対パスだけを持っていると、レンダラーは画像を読み込めず失敗する。完成済み「世界が恋する日本酒」Take は R2 に 13件の material と最新MP4 artifact が揃っている。
+
+`/brands/[id]/video` の「＋動画を追加」で **同じブランドの既存 event-promo Take** を選ぶと、新規Takeは RPC `clone_event_promo_take(p_source_take_id, p_new_take_id, p_created_by, p_work_id)`(migration 0047)で以下を引き継ぐ。
+
+- `brief` をソースJSONそのまま上書き(`material:` URI はすでにDB参照形式になっている)
+- `take_inputs`(role / material_id / checksum)を1件ずつ insert、`on conflict (take_id, material_id, role) do update` で material を再利用
+- 任意の `work_id` を新Takeに付け替え
+
+POST `/api/brands/{id}/videos` の `templateTakeId` パラメータがこの経路を駆動する。`briefSlug`(bundled seed ブリーフ)は互換のため残し、サブセレクト「下敷きにする動画」で brand_organizations 配下の既存 event-promo Takeが選べる。
+
+### 5.2 動画パイプライン(動画詳細の5ステージ)
+
+`/brands/[id]/video/[videoId]` ページ上部に、Slide-Factory 流の5段ステージを表示する(`lib/pipeline/video.ts` + `components/pipeline/VideoPipelinePanel.tsx`)。
+
+- **input** — `take.brief` の有無
+- **extract** — ブリーフから素材を抽出(現状は将来の予約枠、常 `empty`)
+- **structure** — テンプレートのブリーフスキーマに対する充足率(EventBriefは title / kind / startsAt / venue / headline / ctaLabel 必須)
+- **map** — テンプレートの選択状況(event-promo / product-cm)
+- **output** — `take_renders.status` と `render_artifacts.created_at`(timestamp差分で `stale` 判定)
+
+各ステージのステータス(`empty` / `ready` / `stale`)は読み取り専用で、実際の操作(ブリーフ編集・テンプレート切替・再生成)は下部の各workspace / button が担当する。
 
 ## 6. Publicationとcanonical slot
 

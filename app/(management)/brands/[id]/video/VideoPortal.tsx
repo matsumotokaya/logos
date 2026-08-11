@@ -28,6 +28,7 @@ import { VIDEO_STATE_LABEL, type VideoSummary } from "@/lib/video/asset";
 import { BUNDLED_BRIEFS } from "@/remotion/event/briefs";
 
 const EMPTY_BRIEF_VALUE = "__empty__";
+const TEMPLATE_TAKE_PREFIX = "take:";
 
 export default function VideoPortal({ brandId }: { brandId: string }) {
   const router = useRouter();
@@ -37,8 +38,8 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
   const [adding, setAdding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [template, setTemplate] = useState<VideoTemplateId>("event-promo");
-  const [briefSlug, setBriefSlug] = useState<string>(
-    BUNDLED_BRIEFS[0]?.slug ?? EMPTY_BRIEF_VALUE,
+  const [seed, setSeed] = useState<string>(
+    () => `${TEMPLATE_TAKE_PREFIX}${videos?.[0]?.id ?? ""}` || EMPTY_BRIEF_VALUE,
   );
   const [title, setTitle] = useState("");
 
@@ -56,6 +57,17 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
       setVideos(json.videos);
       setBrandName(json.brand.name);
       setError(null);
+      // Default the seed to the first existing event-promo Take of this brand.
+      // That is the only path that carries real materials into the new Take.
+      setSeed((current) => {
+        if (current !== EMPTY_BRIEF_VALUE && current.startsWith(TEMPLATE_TAKE_PREFIX)) {
+          return current;
+        }
+        const firstEvent = json.videos.find((v) => v.template === "event-promo");
+        return firstEvent
+          ? `${TEMPLATE_TAKE_PREFIX}${firstEvent.id}`
+          : EMPTY_BRIEF_VALUE;
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "動画を取得できませんでした");
       setVideos([]);
@@ -78,17 +90,21 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
   async function submit() {
     setSubmitting(true);
     try {
+      const body: Record<string, unknown> = {
+        template,
+        title: title.trim() || undefined,
+      };
+      if (template === "event-promo" && seed !== EMPTY_BRIEF_VALUE) {
+        if (seed.startsWith(TEMPLATE_TAKE_PREFIX)) {
+          body.templateTakeId = seed.slice(TEMPLATE_TAKE_PREFIX.length);
+        } else {
+          body.briefSlug = seed;
+        }
+      }
       const res = await videoFetch(`/api/brands/${brandId}/videos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          template,
-          title: title.trim() || undefined,
-          briefSlug:
-            template === "event-promo" && briefSlug !== EMPTY_BRIEF_VALUE
-              ? briefSlug
-              : undefined,
-        }),
+        body: JSON.stringify(body),
       });
       const json = (await res.json().catch(() => null)) as
         | { id?: string; error?: string }
@@ -107,6 +123,10 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
       setSubmitting(false);
     }
   }
+
+  const existingEventTakes = (videos ?? []).filter(
+    (video) => video.template === "event-promo",
+  );
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8 md:px-10">
@@ -152,8 +172,9 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
         <AddVideoOverlay
           template={template}
           onTemplate={setTemplate}
-          briefSlug={briefSlug}
-          onBriefSlug={setBriefSlug}
+          seed={seed}
+          onSeed={setSeed}
+          existingTakes={existingEventTakes}
           title={title}
           onTitle={setTitle}
           submitting={submitting}
@@ -197,8 +218,9 @@ function VideoRow({ brandId, video }: { brandId: string; video: VideoSummary }) 
 function AddVideoOverlay({
   template,
   onTemplate,
-  briefSlug,
-  onBriefSlug,
+  seed,
+  onSeed,
+  existingTakes,
   title,
   onTitle,
   submitting,
@@ -207,8 +229,9 @@ function AddVideoOverlay({
 }: {
   template: VideoTemplateId;
   onTemplate: (id: VideoTemplateId) => void;
-  briefSlug: string;
-  onBriefSlug: (slug: string) => void;
+  seed: string;
+  onSeed: (value: string) => void;
+  existingTakes: VideoSummary[];
   title: string;
   onTitle: (value: string) => void;
   submitting: boolean;
@@ -284,22 +307,38 @@ function AddVideoOverlay({
         {template === "event-promo" ? (
           <label className="mt-5 block">
             <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-              下敷きにするブリーフ
+              下敷きにする動画
             </span>
             <select
-              value={briefSlug}
-              onChange={(e) => onBriefSlug(e.target.value)}
+              value={seed}
+              onChange={(e) => onSeed(e.target.value)}
               className="mt-2 w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-[13px]"
             >
-              {BUNDLED_BRIEFS.map((item) => (
-                <option key={item.slug} value={item.slug}>
-                  {item.label}
-                </option>
-              ))}
+              {existingTakes.length > 0 ? (
+                <optgroup label="このブランドの既存の動画からコピー">
+                  {existingTakes.map((video) => (
+                    <option
+                      key={video.id}
+                      value={`${TEMPLATE_TAKE_PREFIX}${video.id}`}
+                    >
+                      {video.title}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+              {BUNDLED_BRIEFS.length > 0 ? (
+                <optgroup label="サンプルブリーフ">
+                  {BUNDLED_BRIEFS.map((item) => (
+                    <option key={item.slug} value={item.slug}>
+                      {item.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
               <option value={EMPTY_BRIEF_VALUE}>空から作る</option>
             </select>
             <span className="mt-1.5 block text-[11px] text-ink-muted">
-              選んだブリーフは複製されます。以後の編集はこの動画だけに効きます。
+              既存の動画を選ぶとそのブリefと素材を複製します。サンプルは素材が入っていないのでレンダーは空になります。
             </span>
           </label>
         ) : (

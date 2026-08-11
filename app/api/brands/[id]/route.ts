@@ -4,7 +4,6 @@ import type {
   OrganizationKind,
   OrganizationUpdate,
 } from "@/lib/brand-detail";
-import { logoPreviewUrl } from "@/lib/brand/logo-preview";
 import {
   parseBrandImport,
   saveBrandAssetsFromUrl,
@@ -13,7 +12,6 @@ import {
   createServerSupabaseForToken,
   requireUser,
 } from "@/lib/supabase/server";
-import { knowledgeProfilesByBrand } from "@/lib/brand/knowledge";
 
 const ORGANIZATION_KINDS = new Set<OrganizationKind>([
   "company",
@@ -43,32 +41,6 @@ function website(value: unknown): string {
   return url.href.replace(/\/$/, "");
 }
 
-type OrganizationLogoRow = {
-  id: string;
-  title: string;
-  role: string;
-  visibility: string;
-  logo_candidates: Array<{
-    id: string;
-    is_primary: boolean;
-    svg: string | null;
-    media_type: string;
-    file_path: string | null;
-  }>;
-};
-
-async function organizationLogoSummary(
-  row: OrganizationLogoRow,
-): Promise<OrganizationDetail["logos"][number]> {
-  return {
-    id: row.id,
-    title: row.title,
-    role: row.role,
-    visibility: row.visibility,
-    previewUrl: await logoPreviewUrl(row.logo_candidates),
-  };
-}
-
 export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -82,7 +54,7 @@ export async function GET(
   const entityResult = await supabase
     .from("brand_organizations")
     .select(
-      "id, name, organization_kind, website, industry, location, description, status, updated_at",
+      "id, name, organization_kind, website, industry, location, description, status, updated_at, parent_organization_id",
     )
     .eq("id", id)
     .maybeSingle();
@@ -99,104 +71,40 @@ export async function GET(
     );
   }
 
-  const corporateResult = await supabase
-    .from("brand_entities")
-    .select("id")
-    .eq("brand_organization_id", id)
-    .eq("brand_kind", "corporate")
-    .eq("is_primary_brand", true)
-    .limit(1)
-    .maybeSingle();
-  if (corporateResult.error || !corporateResult.data) {
-    return Response.json(
-      { error: "企業ブランドを取得できませんでした" },
-      { status: 409 },
-    );
-  }
-  const corporateBrandId = corporateResult.data.id as string;
-
-  const [
-    knowledgeResult,
-    businessesResult,
-    logosResult,
-    availableBusinessesResult,
-    organizationsResult,
-  ] = await Promise.all([
-    knowledgeProfilesByBrand(supabase, [corporateBrandId]),
-    supabase
-      .from("brand_entities")
-      .select("id, name, website, status")
-      .eq("brand_organization_id", id)
-      .neq("id", corporateBrandId)
-      .in("brand_kind", [
-        "business",
-        "service",
-        "product",
-        "media",
-        "event",
-        "audience",
-      ])
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("logos")
-      .select(
-        "id, title, role, visibility, logo_candidates(id, is_primary, svg, media_type, file_path)",
-      )
-      .eq("subject_entity_id", corporateBrandId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("brand_entities")
-      .select("id, name, website, status, brand_organization_id")
-      .eq("brand_kind", "business")
-      .neq("brand_organization_id", id)
-      .order("created_at", { ascending: true }),
+  const parentId = entityResult.data.parent_organization_id as string | null;
+  const [parentResult, childrenResult, brandsResult] = await Promise.all([
+    parentId
+      ? supabase
+          .from("brand_organizations")
+          .select("id, name")
+          .eq("id", parentId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null } as {
+          data: { id: string; name: string } | null;
+          error: unknown;
+        }),
     supabase
       .from("brand_organizations")
-      .select("id, name")
+      .select("id, name, organization_kind")
+      .eq("parent_organization_id", id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("brand_entities")
+      .select("id, name, brand_kind, status")
+      .eq("brand_organization_id", id)
       .order("created_at", { ascending: true }),
   ]);
+
   const relatedError =
-    knowledgeResult.error ??
-    businessesResult.error ??
-    logosResult.error ??
-    availableBusinessesResult.error ??
-    organizationsResult.error;
+    parentResult.error ?? childrenResult.error ?? brandsResult.error;
   if (relatedError) {
     return Response.json(
-      { error: "関連するブランド情報を取得できませんでした" },
+      { error: "関連するOrganization情報を取得できませんでした" },
       { status: 500 },
     );
   }
 
   const row = entityResult.data;
-  const knowledgeProfile = knowledgeResult.data.get(corporateBrandId) ?? {};
-  const logos = await Promise.all(
-    ((logosResult.data ?? []) as unknown as OrganizationLogoRow[]).map(
-      organizationLogoSummary,
-    ),
-  );
-  const organizationNames = new Map(
-    (organizationsResult.data ?? []).map((organization) => [
-      organization.id as string,
-      organization.name as string,
-    ]),
-  );
-  const availableBusinesses = (availableBusinessesResult.data ?? []).flatMap(
-    (business) => {
-      const parentId = business.brand_organization_id as string | null;
-      const parentName = parentId ? organizationNames.get(parentId) : null;
-      if (!parentId || !parentName) return [];
-      return [
-        {
-          id: business.id as string,
-          name: business.name as string,
-          website: (business.website as string) ?? "",
-          status: business.status as OrganizationDetail["status"],
-          parentOrganization: { id: parentId, name: parentName },
-        },
-      ];
-    },
-  );
   const detail: OrganizationDetail = {
     id: row.id as string,
     name: row.name as string,
@@ -208,17 +116,34 @@ export async function GET(
     description: (row.description as string) ?? "",
     status: row.status as OrganizationDetail["status"],
     updatedAt: row.updated_at as string,
-    profile: Object.keys(knowledgeProfile).length > 0
-      ? {
-          inheritsParent: true,
-          status: "confirmed",
-          value: knowledgeProfile,
-        }
-      : null,
-    businesses: (businessesResult.data ??
-      []) as OrganizationDetail["businesses"],
-    logos,
-    availableBusinesses,
+    parentOrganization:
+      parentResult.data && parentResult.data.id && parentResult.data.name
+        ? {
+            id: parentResult.data.id as string,
+            name: parentResult.data.name as string,
+          }
+        : null,
+    childOrganizations: ((childrenResult.data ?? []) as Array<{
+      id: string;
+      name: string;
+      organization_kind: string | null;
+    }>).map((child) => ({
+      id: child.id,
+      name: child.name,
+      organizationKind:
+        (child.organization_kind as OrganizationKind | null) ?? null,
+    })),
+    brands: ((brandsResult.data ?? []) as Array<{
+      id: string;
+      name: string;
+      brand_kind: string;
+      status: OrganizationDetail["status"];
+    }>).map((brand) => ({
+      id: brand.id,
+      name: brand.name,
+      brandKind: brand.brand_kind,
+      status: brand.status as OrganizationDetail["status"],
+    })),
   };
   return Response.json(
     { organization: detail },
@@ -393,24 +318,20 @@ export async function PATCH(
     if (corporate?.error || (importedBrand && !corporate?.data)) {
       throw new Error("企業ブランドを確認できませんでした");
     }
-    const savedBrand = importedBrand && corporate?.data
-      ? await saveBrandAssetsFromUrl({
-          supabase,
-          userId: user.id,
-          brandId: corporate.data.id as string,
-          brandName: name,
-          role: "corporate",
-          sourceUrl,
-          value: importedBrand,
-        })
-      : null;
+    if (importedBrand && corporate?.data) {
+      await saveBrandAssetsFromUrl({
+        supabase,
+        userId: user.id,
+        brandId: corporate.data.id as string,
+        brandName: name,
+        role: "corporate",
+        sourceUrl,
+        value: importedBrand,
+      });
+    }
 
     return Response.json(
-      {
-        ok: true,
-        profile: savedBrand?.profile ?? null,
-        logo: savedBrand?.logo ?? null,
-      },
+      { ok: true },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

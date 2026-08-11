@@ -147,7 +147,7 @@ function BrandTree({
   onToggle: () => void;
   onNavigate: () => void;
 }) {
-  const regionId = `${prefix}-brand-${brand.id}`;
+const regionId = `${prefix}-brand-${brand.id}`;
   const brandActive = pathname === `/brands/${brand.id}`;
   const ownedLogos = brand.logos.filter(
     (logo) => logo.subjectEntityId === brand.id,
@@ -169,6 +169,13 @@ function BrandTree({
       : brand.kind === "audience"
         ? "対象別"
         : "事業";
+
+  const logoSectionPath = `/brands/${brand.id}/logos`;
+  const videoSectionPath = `/brands/${brand.id}/video`;
+  const lpSectionPath = `/brands/${brand.id}/lp`;
+  const logoSectionActive = pathname === logoSectionPath || pathname.startsWith(`${logoSectionPath}/`);
+  const videoSectionActive = pathname === videoSectionPath || pathname.startsWith(`${videoSectionPath}/`);
+  const lpSectionActive = pathname === lpSectionPath || pathname.startsWith(`${lpSectionPath}/`);
 
   return (
     <li className="py-2 first:pt-1 last:pb-1">
@@ -198,78 +205,118 @@ function BrandTree({
       </div>
 
       <ul id={regionId} hidden={!open} className="mt-1 space-y-1">
-        {ownedLogos.map((logo) => (
-            <li key={logo.id}>
-              <TreeLink
-                href={`/logos/${logo.id}`}
-                active={pathname === `/logos/${logo.id}`}
-                depth={1}
-                onNavigate={onNavigate}
-              >
-                ロゴ：{logo.title}
-              </TreeLink>
-            </li>
-          ))}
-
-        {lpAssets.map((asset) => {
-          const lpPath = `/brands/${brand.id}/lp/${asset.id}`;
-          return (
-            <li key={asset.id}>
-              <TreeLink
-                href={lpPath}
-                active={pathname === lpPath}
-                depth={1}
-                onNavigate={onNavigate}
-              >
-                LP：{asset.title.replace(/\s+LP$/, "")}
-              </TreeLink>
-            </li>
-          );
-        })}
-
-        {videoAssets.map((asset) => {
-          const videoPath = `/brands/${brand.id}/video/${asset.id}`;
-          return (
-            <li key={`video-asset-${asset.id}`}>
-              <TreeLink
-                href={videoPath}
-                active={pathname === videoPath}
-                depth={1}
-                onNavigate={onNavigate}
-              >
-                動画：{asset.title}
-              </TreeLink>
-            </li>
-          );
-        })}
-
-        {videoCampaigns.map((campaign) => {
-          const videoPath = `/brands/${brand.id}/video/${campaign.id}`;
-          return (
-            <li key={`video-${campaign.id}`}>
-              <TreeLink
-                href={videoPath}
-                active={pathname === videoPath}
-                depth={1}
-                onNavigate={onNavigate}
-              >
-                動画：{campaign.name}
-              </TreeLink>
-            </li>
-          );
-        })}
-
-        {/* Always present: the portal is where a video gets added, so it must
-            be reachable even when the brand has no assets at all. */}
+        {/* Logos */}
         <li>
           <TreeLink
-            href={`/brands/${brand.id}/video`}
-            active={pathname === `/brands/${brand.id}/video`}
+            href={logoSectionPath}
+            active={logoSectionActive}
             depth={1}
             onNavigate={onNavigate}
           >
-            ＋ 動画を管理
+            ロゴ
+            <span className="ml-1 text-[10px] font-normal opacity-60">
+              {ownedLogos.length}件
+            </span>
           </TreeLink>
+          {ownedLogos.length > 0 ? (
+            <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-hairline pl-2">
+              {ownedLogos.map((logo) => (
+                <li key={logo.id}>
+                  <TreeLink
+                    href={`/brands/${brand.id}/logos/${logo.id}`}
+                    active={pathname === `/brands/${brand.id}/logos/${logo.id}`}
+                    depth={2}
+                    onNavigate={onNavigate}
+                  >
+                    {logo.title}
+                  </TreeLink>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </li>
+
+        {/* Videos */}
+        <li>
+          <TreeLink
+            href={videoSectionPath}
+            active={videoSectionActive}
+            depth={1}
+            onNavigate={onNavigate}
+          >
+            動画
+            <span className="ml-1 text-[10px] font-normal opacity-60">
+              {videoAssets.length + videoCampaigns.length}件
+            </span>
+          </TreeLink>
+          {(videoAssets.length + videoCampaigns.length) > 0 ? (
+            <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-hairline pl-2">
+              {videoAssets.map((asset) => {
+                const videoPath = `/brands/${brand.id}/video/${asset.id}`;
+                return (
+                  <li key={`video-asset-${asset.id}`}>
+                    <TreeLink
+                      href={videoPath}
+                      active={pathname === videoPath}
+                      depth={2}
+                      onNavigate={onNavigate}
+                    >
+                      {asset.title}
+                    </TreeLink>
+                  </li>
+                );
+              })}
+              {videoCampaigns.map((campaign) => {
+                const videoPath = `/brands/${brand.id}/video/${campaign.id}`;
+                return (
+                  <li key={`video-${campaign.id}`}>
+                    <TreeLink
+                      href={videoPath}
+                      active={pathname === videoPath}
+                      depth={2}
+                      onNavigate={onNavigate}
+                    >
+                      {campaign.name}
+                    </TreeLink>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </li>
+
+        {/* LPs */}
+        <li>
+          <TreeLink
+            href={lpSectionPath}
+            active={lpSectionActive}
+            depth={1}
+            onNavigate={onNavigate}
+          >
+            LP
+            <span className="ml-1 text-[10px] font-normal opacity-60">
+              {lpAssets.length}件
+            </span>
+          </TreeLink>
+          {lpAssets.length > 0 ? (
+            <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-hairline pl-2">
+              {lpAssets.map((asset) => {
+                const lpPath = `/brands/${brand.id}/lp/${asset.id}`;
+                return (
+                  <li key={asset.id}>
+                    <TreeLink
+                      href={lpPath}
+                      active={pathname === lpPath}
+                      depth={2}
+                      onNavigate={onNavigate}
+                    >
+                      {asset.title.replace(/\s+LP$/, "")}
+                    </TreeLink>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
         </li>
       </ul>
     </li>

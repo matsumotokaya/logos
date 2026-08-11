@@ -135,7 +135,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { id: brandId } = await ctx.params;
   const supabase = createServerSupabaseForToken(user.token);
 
-  let body: { template?: unknown; title?: unknown; briefSlug?: unknown };
+  let body: { template?: unknown; title?: unknown; briefSlug?: unknown; templateTakeId?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -148,21 +148,52 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
   const requestedTitle = typeof body.title === "string" ? body.title.trim() : "";
   const briefSlug = typeof body.briefSlug === "string" ? body.briefSlug : "";
+  const templateTakeId =
+    typeof body.templateTakeId === "string" ? body.templateTakeId : "";
 
   let title = requestedTitle;
   let brief: unknown;
+  let cloneFromTakeId: string | null = null;
+  let cloneWorkId: string | null = null;
 
   if (template === "event-promo") {
-    const seed = briefSlug ? bundledBrief(briefSlug) : null;
-    if (briefSlug && !seed) {
-      return Response.json(
-        { error: `ブリーフが見つかりません: ${briefSlug}` },
-        { status: 400 },
-      );
+    if (templateTakeId) {
+      // Clone from an existing Take. This is the only path that produces a
+      // brief whose material slots resolve on first render: the source Take
+      // already has its brand_materials + take_inputs in place, and the RPC
+      // carries both the brief and the pins forward to the new Take.
+      const { data: sourceTake, error: sourceError } = await supabase
+        .from("takes")
+        .select("id, brand_id, work_id, template_id")
+        .eq("id", templateTakeId)
+        .maybeSingle();
+      if (sourceError) {
+        return Response.json({ error: "テンプレートTakeを確認できませんでした" }, { status: 500 });
+      }
+      if (!sourceTake || sourceTake.brand_id !== brandId || sourceTake.template_id !== "event-promo") {
+        return Response.json(
+          { error: "テンプレートが見つかりません。event-promo の既存のTakeを指定してください" },
+          { status: 400 },
+        );
+      }
+      cloneFromTakeId = sourceTake.id as string;
+      cloneWorkId = (sourceTake.work_id as string | null) ?? null;
+      // create_v2_take still wants a structurally valid brief; the RPC will
+      // overwrite it with the source's brief immediately after creation.
+      brief = emptyEventBrief(title || "新しいイベント動画");
+      if (!title) title = "新しいイベント動画";
+    } else {
+      const seed = briefSlug ? bundledBrief(briefSlug) : null;
+      if (briefSlug && !seed) {
+        return Response.json(
+          { error: `ブリーフが見つかりません: ${briefSlug}` },
+          { status: 400 },
+        );
+      }
+      // Copy the seed so the row owns its brief from here on.
+      brief = seed ? structuredClone(seed.brief) : emptyEventBrief(title || "新しいイベント動画");
+      if (!title) title = seed ? seed.brief.title : "新しいイベント動画";
     }
-    // Copy the seed so the row owns its brief from here on.
-    brief = seed ? structuredClone(seed.brief) : emptyEventBrief(title || "新しいイベント動画");
-    if (!title) title = seed ? seed.brief.title : "新しいイベント動画";
   } else {
     // product-cm is driven by the campaign pipeline; the row records which job
     // owns the Brand Kit and narration.
@@ -211,6 +242,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       { error: created.error },
       { status: 500 },
     );
+  }
+
+  if (cloneFromTakeId) {
+    const { error: cloneError } = await supabase.rpc("clone_event_promo_take", {
+      p_source_take_id: cloneFromTakeId,
+      p_new_take_id: created.takeId,
+      p_created_by: user.id,
+      p_work_id: cloneWorkId,
+    });
+    if (cloneError) {
+      return Response.json(
+        { error: `テンプレートからのコピー中にエラーが発生しました: ${cloneError.message}` },
+        { status: 500 },
+      );
+    }
   }
 
   return Response.json(

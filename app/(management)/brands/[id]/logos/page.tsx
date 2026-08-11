@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import BrandTop from "./BrandTop";
+import LogoPortal from "./LogoPortal";
 
 export const metadata: Metadata = {
-  title: "ブランド — トップ",
+  title: "ロゴ — ブランドアセット",
   robots: { index: false, follow: false },
 };
 
-export default async function BrandDetailPage({
+export default async function BrandLogoPortalPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <BrandTop brandId={id} />;
+  return <LogoPortal brandId={id} />;
 }

@@ -8,12 +8,24 @@
 //
 // The narration screen remains the authoring entry point. Once it produces a
 // voice track, the Take becomes self-contained and the V2 workspace takes over.
+//
+// A Slide-Factory pipeline bar sits above the workspace for the two surfaces
+// that have one. Read-only by intent: actions stay on the screens that own
+// them (the brief editor, the template picker, the render button), and the
+// bar is what shows the user what each stage is waiting on
+// (deliverable-architecture §17.3, §17.6).
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { videoFetch } from "@/lib/video/client";
 import CampaignDetail from "@/app/campaigns/[id]/CampaignDetail";
 import EventVideoWorkspace from "@/components/video/EventVideoWorkspace";
+import PipelineBar from "@/components/pipeline/PipelineBar";
+import StageDrawer from "@/components/pipeline/StageDrawer";
+import VideoPipelinePanel, {
+  type VideoPipelinePayload,
+} from "@/components/pipeline/VideoPipelinePanel";
+import type { PipelineStage } from "@/lib/pipeline/stages";
 import { VIDEO_STATE_LABEL, type VideoState } from "@/lib/video/asset";
 import type { VideoTemplateId } from "@/lib/video/templates";
 import type { EventBrief } from "@/remotion/event/types";
@@ -51,6 +63,48 @@ function hasPinnedProductVoice(brief: VideoAsset["brief"]): boolean {
   );
 }
 
+function ProductCmInputSection({
+  brandId,
+  videoId,
+}: {
+  brandId: string;
+  videoId: string;
+}) {
+  // The button paths the user out to CM Maker (top page) so the LLM-driven
+  // pipeline can build a fresh Brand Kit, then comes back to this page after
+  // the user runs the voice step in the Maker. The Maker page already accepts
+  // a `resumeFor={videoId}` query parameter — see app/page.tsx.
+  return (
+    <section className="rounded-2xl border border-hairline p-5">
+      <h2 className="text-balance text-sm font-semibold">Product CM入力</h2>
+      <p className="mt-2 text-pretty text-xs text-ink-muted">
+        Brand Kit、ナレーションタイミング、固定済みWAVをTakeが保持します。
+        MP4の再生成はローカルのキャンペーンジョブに依存しません。
+      </p>
+      <p className="mt-2 text-pretty text-xs text-ink-muted">
+        このTakeはまだ音声が固定されていません。下のどちらかから始めて、Brand KitとWAVが揃ったあと、ページ上部の「MP4を作成」で書き出します。
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          href={`/?resumeFor=${encodeURIComponent(videoId)}`}
+          className="rounded-full bg-ink px-5 py-2.5 text-xs font-semibold text-paper transition hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          CM Makerで再生成する →
+        </Link>
+        <Link
+          href={`/brands/${brandId}/video`}
+          className="rounded-full border border-hairline px-5 py-2.5 text-xs font-semibold transition hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          動画一覧に戻る
+        </Link>
+      </div>
+      <p className="mt-3 font-mono text-[10px] text-ink-faint">
+        {videoId}
+      </p>
+    </section>
+  );
+}
+
 export default function BrandVideoDetail({
   brandId,
   videoId,
@@ -61,6 +115,10 @@ export default function BrandVideoDetail({
   const [resolved, setResolved] = useState<Resolved | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pipeline, setPipeline] = useState<
+    (VideoPipelinePayload & { stages: PipelineStage[] }) | null
+  >(null);
+  const [openStage, setOpenStage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -96,6 +154,33 @@ export default function BrandVideoDetail({
     const timer = setInterval(() => void load(), RENDER_POLL_MS);
     return () => clearInterval(timer);
   }, [rendering, load]);
+
+  // The pipeline is derived from the same rows the video page reads, so
+  // a successful take load is enough to fetch it. Re-fetching after each
+  // load() keeps the bar honest when a render completes or the brief is
+  // saved — a missing field there means a stale stage.
+  useEffect(() => {
+    if (!resolved || resolved.kind !== "asset") return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await videoFetch(
+          `/api/brands/${brandId}/videos/${videoId}/pipeline`,
+        );
+        if (!res.ok) return;
+        const body = (await res.json()) as {
+          pipeline?: VideoPipelinePayload & { stages: PipelineStage[] };
+        };
+        if (!cancelled && body.pipeline) setPipeline(body.pipeline);
+      } catch {
+        // A read failure here does not block the video page; the bar simply
+        // stays in its previous state until the next successful fetch.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resolved, brandId, videoId, rendering]);
 
   async function startRender() {
     setSaving(true);
@@ -154,6 +239,7 @@ export default function BrandVideoDetail({
   }
 
   const video = resolved.video;
+  const openStageDef = pipeline?.stages.find((stage) => stage.id === openStage);
 
   // A Product CM Take is created before narration is generated. Keep that
   // draft in the established authoring screen until the voice RPC pins the
@@ -176,6 +262,27 @@ export default function BrandVideoDetail({
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8 md:px-10">
+      {pipeline ? (
+        <div className="-mx-6 -mt-2 md:-mx-10">
+          <PipelineBar
+            stages={pipeline.stages}
+            openStage={openStage}
+            onOpenStage={setOpenStage}
+          />
+        </div>
+      ) : null}
+      {pipeline && openStageDef ? (
+        <StageDrawer
+          title={`${openStageDef.label} ステージ`}
+          description={openStageDef.summary}
+          onClose={() => setOpenStage(null)}
+        >
+          <VideoPipelinePanel
+            stageId={openStageDef.id}
+            payload={pipeline}
+          />
+        </StageDrawer>
+      ) : null}
       <nav aria-label="パンくず" className="flex flex-wrap items-center gap-2 text-[11px] text-ink-muted">
         <Link href={`/brands/${brandId}`} className="hover:text-ink">
           ブランド
@@ -269,6 +376,13 @@ export default function BrandVideoDetail({
 
       {video.template === "event-promo" && video.brief ? (
         <EventVideoWorkspace brief={video.brief as EventBrief} />
+      ) : video.template === "product-cm" && !hasPinnedProductVoice(video.brief) ? (
+        // Product CM without a pinned voice: surface the regeneration actions.
+        // Two ways in: CM Maker rebuilds the Brand Kit from a URL, then the
+        // voice RPC pins the WAV; uploading a WAV skips the kit and attaches
+        // a take-local material. Either path puts the Take in a state where
+        // the "MP4を作成" button above becomes useful.
+        <ProductCmInputSection brandId={brandId} videoId={videoId} />
       ) : video.template === "product-cm" ? (
         <section className="rounded-2xl border border-hairline p-5">
           <h2 className="text-balance text-sm font-semibold">Product CM入力</h2>
