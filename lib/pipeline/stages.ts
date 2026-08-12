@@ -78,3 +78,54 @@ export function goalProgress(
     missingRequired: missing.filter((field) => field.required),
   };
 }
+
+/**
+ * Where a filled value came from (§17.5, slide-factory's `fieldmap.ts`).
+ *
+ * This exists because a deliverable is handed to the user complete — dates,
+ * programmes and all — before anyone has told us anything. That is only
+ * honest if the screen can say which parts are the customer's own material and
+ * which parts the tool proposed.
+ *
+ * - `brand`     — taken from what this brand actually has (adopted knowledge,
+ *                 its logos, its site). Treated as settled.
+ * - `extracted` — read out of material the user supplied. Their own evidence,
+ *                 so it is not warned about, but it stays traceable to the
+ *                 document it came from.
+ * - `inferred`  — the tool's proposal. A plausible date, a likely programme.
+ *                 Never presented as established fact, and warned about on
+ *                 publish (§15.2-4) rather than blocked.
+ * - `user`      — someone typed or confirmed it. Settled, and never
+ *                 overwritten by a re-run.
+ */
+export const FIELD_ORIGINS = ["brand", "extracted", "inferred", "user"] as const;
+export type FieldOrigin = (typeof FIELD_ORIGINS)[number];
+
+export const ORIGIN_LABELS: Record<FieldOrigin, string> = {
+  brand: "ブランドから",
+  extracted: "資料から読んだ",
+  inferred: "推定",
+  user: "あなたの入力",
+};
+
+export interface FieldFill {
+  path: string;
+  origin: FieldOrigin;
+}
+
+/** A goal field plus where its value came from. `null` origin = still missing. */
+export interface GoalFieldState extends GoalField {
+  origin: FieldOrigin | null;
+}
+
+export function goalFieldMap(
+  goal: readonly GoalField[],
+  fills: readonly FieldFill[],
+): GoalFieldState[] {
+  const origins = new Map(fills.map((fill) => [fill.path, fill.origin]));
+  return goal.map((field) => ({ ...field, origin: origins.get(field.path) ?? null }));
+}
+
+/** Filled, but by the tool's guess — what a publish warning has to list. */
+export const provisionalFields = (states: readonly GoalFieldState[]): GoalFieldState[] =>
+  states.filter((state) => state.origin === "inferred");

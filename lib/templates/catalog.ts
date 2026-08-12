@@ -143,6 +143,31 @@ export const TEMPLATES: TemplateEntry[] = [
     rerenderable: true,
   },
   {
+    id: "event-cm",
+    version: 1,
+    toolKind: "video",
+    briefSchemaVersion: 1,
+    rendererRevision: "remotion/event-cm@2026-08-11",
+    name: "イベント紹介動画",
+    summary:
+      "イベント告知の30秒CM。ナレーションを先に書き、その読み上げのタイミングが画面の尺と並びを決めます。絵は和モダン（墨黒×金×明朝）で、素材が無いスロットは設計済みのフォールバックで描かれます。",
+    requires: "イベントの事実（EventBrief）と、そこから書いたナレーション台本",
+    duration: "30秒前後（ナレーション長で決まる）",
+    narration: true,
+    // The script is written by an LLM from the brief, then spoken. Both are
+    // charged, and both re-run only when asked.
+    stages: ["collect", "structure", "render", "publish"],
+    publishSurfaces: ["canonical_url", "embed", "social"],
+    costProfile: { llm: true, tts: true, render: "local" },
+    defaultRenders: [
+      { locale: "ja", aspectRatio: "16:9", theme: "sumi", format: "mp4" },
+    ],
+    isBrandDefault: false,
+    // Script, voice timing and the pinned WAV all live on the take, so an old
+    // version renders again as long as its materials exist.
+    rerenderable: true,
+  },
+  {
     id: "product-cm",
     version: 2,
     toolKind: "video",

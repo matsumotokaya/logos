@@ -1,12 +1,22 @@
 "use client";
 
-// One video-pipeline stage, opened over the video page. Read-only by design
-// (deliverable-architecture §17.6): the actions live on the surfaces they
-// belong to (the brief editor, the template picker, the render button), so
-// this drawer is the place to see what each stage produced and what it is
-// waiting on — not the place to do the work.
+// One video-pipeline stage, opened over the video page.
+//
+// The work happens HERE, not on the page behind it. This drawer used to be
+// read-only, on the reasoning that actions belong to the surfaces that own
+// them — but that split the pipeline in half: the bar said what a stage was
+// waiting on and the user had to go somewhere else to give it. Slide-factory
+// puts the form, the upload, the source list and the run button inside the
+// stage itself, and the deliverable stays visible behind the drawer the whole
+// time. Same here.
+//
+// The page still owns fetching and running; what each stage renders is passed
+// in, so this component knows about stages and nothing about endpoints.
 
+import type { ReactNode } from "react";
 import type { GoalField, GoalProgress, PipelineStageId } from "@/lib/pipeline/stages";
+import TakeRunLog from "./TakeRunLog";
+import type { TakeRunRecord } from "@/app/api/brands/[id]/videos/[videoId]/runs/route";
 
 function StatusBadge({ status }: { status: "empty" | "ready" | "stale" }) {
   const map = {
@@ -65,19 +75,41 @@ export interface VideoPipelinePayload {
 }
 
 const STAGE_DESCRIPTION: Record<PipelineStageId, string> = {
-  input: "動画のブリーフが take に書かれているか。書かれていないと先には進めません。",
-  extract: "画像・音声などから素材を取り出す段階。動画では将来のための予約枠です。",
-  structure: "ブリーフがテンプレートのスキーマに沿っているか。必須項目が埋まっているかを一覧します。",
-  map: "テンプレート (event-promo / product-cm) が適用されているか。",
+  input: "この動画のもとになる資料。何も入れていないときは、内容はすべてこちらの提案です。",
+  extract: "資料を機械的に読み取ります。テキストはそのまま読み、PDFや画像は次の段でモデルが直接見ます。",
+  structure: "読み取った資料からイベントの事実を取り出し、動画に反映します。資料に書かれていないことは埋めません。",
+  map: "いま動画が何でできているか。各項目の由来と、まだ埋まっていないものの一覧です。",
   output: "Remotion でMP4が書き出されたか。失敗・実行中・成功をここで区別します。",
 };
 
 export default function VideoPipelinePanel({
   stageId,
   payload,
+  intake,
+  extracted,
+  structured,
+  facts,
+  action,
+  runs,
 }: {
   stageId: PipelineStageId;
   payload: VideoPipelinePayload;
+  /** Input stage: the source list and the upload UI. */
+  intake?: ReactNode;
+  /** Extract stage: what the last read produced. */
+  extracted?: ReactNode;
+  /** Structure stage: the facts the last reading worked out. */
+  structured?: ReactNode;
+  /** Map stage: the editable fact list. */
+  facts?: ReactNode;
+  /**
+   * The one thing this stage does — always the step that carries the work
+   * forward into the next stage. One button per drawer, because a stage is a
+   * state and its action is the transition out of it.
+   */
+  action?: ReactNode;
+  /** Shown at the bottom of every stage, as in slide-factory. */
+  runs?: TakeRunRecord[];
 }) {
   const stage = payload.stages.find((item) => item.id === stageId);
   const filled = payload.goal.filled;
@@ -104,8 +136,24 @@ export default function VideoPipelinePanel({
         </section>
       ) : null}
 
+      {/* The input UI belongs to the input stage and nowhere else. Putting a
+          file picker inside 構造化 asked the user to supply material at a step
+          that consumes it. */}
+      {stageId === "input" && intake ? (
+        <section className="border-t border-hairline pt-5">{intake}</section>
+      ) : null}
+
+      {stageId === "extract" && extracted ? (
+        <section className="border-t border-hairline pt-5">{extracted}</section>
+      ) : null}
+
+      {stageId === "map" && facts ? (
+        <section className="border-t border-hairline pt-5">{facts}</section>
+      ) : null}
+
       {stageId === "structure" ? (
         <section className="flex flex-col gap-3 border-t border-hairline pt-5">
+          {structured}
           <div>
             <h3 className="text-sm font-medium text-ink">
               採用済み ({filled.length}項目)
@@ -159,23 +207,11 @@ export default function VideoPipelinePanel({
         </section>
       ) : null}
 
-      {stageId === "map" ? (
-        <section className="flex flex-col gap-2 border-t border-hairline pt-5">
-          <h3 className="text-sm font-medium text-ink">テンプレート</h3>
-          <p className="text-sm text-ink-muted">
-            テンプレートの切り替えはブリーフ編集画面から行います。パイプライン上は選択中のテンプレートを表示するだけです。
-          </p>
-        </section>
+      {action ? (
+        <div className="flex justify-end border-t border-hairline pt-5">{action}</div>
       ) : null}
 
-      {stageId === "extract" ? (
-        <section className="flex flex-col gap-2 border-t border-hairline pt-5">
-          <h3 className="text-sm font-medium text-ink">抽出</h3>
-          <p className="text-sm text-ink-muted">
-            動画向けの素材抽出(音声・B-roll・色など)は将来の拡張ポイントです。今は未実装のままで、構造化以降の段で十分作れるように設計されています。
-          </p>
-        </section>
-      ) : null}
+      {runs ? <TakeRunLog runs={runs} /> : null}
     </div>
   );
 }

@@ -45,7 +45,9 @@ export type EventVideoProps = {
   brief: EventBrief;
 };
 
-const resolveMediaSrc = (src: string): string =>
+/** A src is a staged path, a signed same-origin URL, or a staticFile name. The
+ *  first two are already loadable; only the last needs resolving. */
+export const resolveMediaSrc = (src: string): string =>
   /^(https?:)?\//.test(src) ? src : staticFile(src);
 
 // ---------- shared motion helpers ----------
@@ -191,7 +193,7 @@ const SceneShell: React.FC<{ length: number; children: React.ReactNode }> = ({
 
 // ---------- scenes ----------
 
-const SeriesScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
+export const SeriesScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
   const frame = useCurrentFrame();
   const texture = brief.visuals.texture;
   return (
@@ -249,7 +251,7 @@ const SeriesScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, l
   );
 };
 
-const TitleScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
+export const TitleScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
   const frame = useCurrentFrame();
   const ink = brief.visuals.inkArt;
   return (
@@ -316,7 +318,7 @@ const TitleScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, le
   );
 };
 
-const ValueScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
+export const ValueScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
   const frame = useCurrentFrame();
   const photo = brief.visuals.value;
   return (
@@ -367,7 +369,7 @@ const ValueScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, le
   );
 };
 
-const ProgramsScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
+export const ProgramsScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
   const frame = useCurrentFrame();
   const photo = brief.visuals.programs;
   return (
@@ -506,7 +508,7 @@ const GuestPortrait: React.FC<{ guest: EventGuest; size: number }> = ({ guest, s
   );
 };
 
-const GuestsScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
+export const GuestsScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
   const frame = useCurrentFrame();
   return (
     <SceneShell length={length}>
@@ -595,7 +597,7 @@ const LogoSlot: React.FC<{ logo: EventLogo }> = ({ logo }) => {
   );
 };
 
-const ClosingScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
+export const ClosingScene: React.FC<{ brief: EventBrief; length: number }> = ({ brief, length }) => {
   const frame = useCurrentFrame();
   const photo = brief.visuals.closing;
   const details = [brief.schedule.venue, brief.schedule.fee].filter(Boolean).join("　");

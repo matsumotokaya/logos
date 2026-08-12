@@ -47,7 +47,7 @@ URL・資料・ロゴを起点に、Organizationと企業・事業ブランド�
 | `/brands/[id]/lp`              | LP一覧(`tool_kind='lp'` の campaign-lp Take)。生成済みLPはテンプレート+テーマで一覧化、未生成なら「CM Makerで作る」ガイド                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `/brands/[id]/lp/[jobId]`      | Brand配下のLP詳細。v2では末尾にTake IDを使い、private Artifactの短期署名preview、Publicationによる公開・公開終了・履歴を管理する。旧job ID URLは従来画面へフォールバックする                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `/brands/[id]/video`           | **動画ポータル**。このブランドが持つ動画の一覧と「＋動画を追加」。テンプレート選択時は同じブランドの既存 event-promo Take からコピーしてブリーフ+素材を引き継ぐ経路も選べる                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `/brands/[id]/video/[videoId]` | Brand配下の動画詳細。v2では末尾にTake IDを使い、Product CM / event-promoともprivate MP4の再生・再生成とPublicationを管理する。ページ上部にはSlide-Factory流の5段階パイプライン(入力/抽出/構造化/マッピング/出力)を表示し、各ステージの現状と不足項目を可視化する。Product CMでvoiceが未固定のときは「CM Makerで再生成する」ボタンが出る。旧動画アセットID・campaign job IDは互換画面へフォールバックする                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `/brands/[id]/video/[videoId]` | Brand配下の動画詳細。末尾はTake ID。ページ上部の5段パイプライン(入力/抽出/構造化/マッピング/出力)は**ドロワーで開いて中で作業する**——資料の投入、読み取り、構造化、動画への反映、事実の修正がすべて段の中で完結する。各ドロワーは**その段のアクション1つ**だけを持ち、一括実行はバーの外。実行は右下のカードで進行が見え、`take_runs` に永続する。イベント紹介動画(`event-cm`)はナレーション駆動で、台本・字幕・尺が連動する。Product CMでvoiceが未固定のときは「CM Makerで再生成する」ボタンが出る |
 | `/campaigns/[id]`              | 生成処理中および旧リンク向けの互換詳細。完成したLP・動画の正規管理導線はBrand配下のURLを使う                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `/c/[id]`                      | 生成されたセールスページの正規URL(`/p/[id]` と対称の opaque ID・所有者を含まない)。LPは `kit.theme` の**デザインテーマ(7種・業種からLLMが自動選択、正本は [lib/campaign/themes.ts](lib/campaign/themes.ts))**で描画される。各テーマは**4つのLPテンプレート**のどれかに割り当てられ、テンプレートは互いにスキンではなく別デザイン(下記「LPテンプレート」参照)。テーマはkitに保存されるため後から変更・再レンダリングできる。`/c/sample` はサンプル。新規URL生成はv2のTake IDを正規URLに使い、サーバーが`publications.status='live'`を判定してprivate R2のHTML Artifactを返す。v2テーブルはanonへ開かない |
 | `/v/[id]`                      | 公開動画の恒久URL。Take IDだけを含み、`publications.status='live'`のcanonical Publicationとready MP4が揃う場合だけprivate R2 ArtifactをRange対応で配信する                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -146,7 +146,7 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 
 動画の正本は**`takes` → `take_renders` → `render_artifacts`**であり、1ブランドが複数の動画Takeを持てる。テンプレート台帳の正本は [lib/templates/catalog.ts](lib/templates/catalog.ts)、Product CM briefの契約は [lib/templates/brief-schemas.ts](lib/templates/brief-schemas.ts)。旧`brand_assets`系テーブルと互換読み取りはmigration 0042で廃止済み。
 
-- **テンプレートは作成時に決まり、あとから変更できない**。シーン構成と素材スロットが変わり、将来の構造化プロンプトも変わるため(slide-factoryが物件の`deliverable`を固定するのと同じ契約)。現在は `product-cm`(製品紹介動画・課題解決型30秒CM)と `event-promo`(イベント動画・30秒PV)
+- **テンプレートは作成時に決まり、あとから変更できない**。シーン構成と素材スロットが変わり、将来の構造化プロンプトも変わるため(slide-factoryが物件の`deliverable`を固定するのと同じ契約)。現在は `product-cm`(製品紹介動画・課題解決型30秒CM)、`event-promo`(イベント動画・30秒PV・ナレーションなし)、`event-cm`(**イベント紹介動画・ナレーション駆動**)
 - **画面に見える動画は必ずTake**。Product CMも追加またはTTS開始時に冪等作成され、実体のないプレースホルダーやjob IDを動画IDとして扱う経路はない。パブリッシュは任意で、既定は未公開
 - **Takeの`brief`と固定済み`take_inputs`が作成後の正本**。`event-promo`は`EventBrief`、`product-cm@2`はBrand Kit・ナレーションタイミング・WAV Material参照を持つ。バンドル済みeventブリーフ([remotion/event/briefs/](remotion/event/briefs/))はseedであり、作成時に複製される
 - `videoId` は常にTake ID。Product CMが参照するローカル生成job IDは`brief.campaignJobId`に閉じ込め、エンティティIDと混同しない
@@ -176,6 +176,32 @@ node labs/event/scripts/prepare-assets.mjs --src <dir> --slug sake-2026
 ```
 
 **素材はリポジトリに入っていない**(`.gitignore` 参照)。ライセンス写真・実在人物のポートレート・支給BGMをgit履歴へ載せると後から取り消せないため、`public/event/*/photos/` `art/` `bgm.mp3` は除外し、**パートナーロゴ(`logos/`)だけコミットしている**。新しい環境では先に `prepare-assets.mjs` を実行する。sake-2026のブリーフはこれらのファイル名を指しているため、未実行のまま `event:render` すると失敗する(Remotionは画像の欠落でレンダーを止める。「素材が無い」と「ブリーフが null」を区別したいので、この挙動が正しい)。
+
+## イベント紹介動画(event-cm・ナレーション駆動)
+
+`event-promo` と同じ和モダンのアートディレクションを、**ナレーションを背骨にして**組み直したテンプレート。設計判断の正本は [docs/deliverable-architecture.md §18](docs/deliverable-architecture.md)。
+
+- **ナレーションがオントロジー**: 台本の5役割(`hook / theme / value / program / cta`)がシーンの並びを決め、尺は「各シーンの想定尺 → 台本の文字数 → 読み上げの実測」と段階的に精度が上がる([remotion/event-cm/timeline.ts](remotion/event-cm/timeline.ts))。だから**動画を追加した瞬間に、LLMもレンダリングも無しで完成した映像が再生される**
+- **字幕は必須**([remotion/event-cm/captions.ts](remotion/event-cm/captions.ts))。ミュートで見られる前提なので、**音声を待たず台本から**文単位で出し、読み上げ後に実測へ置き換わる
+- **事実が変わると台本が古くなる**。`brief.factsUpdatedAt` と `script.updatedAt` の比較で判定し、マッピング段が自動で書き直す。ただし `script.source === 'human'` は上書きしない
+- **BGMはシステムが持つ**([lib/assets/defaults.ts](lib/assets/defaults.ts))。Take IDからの安定ハッシュで選び、冒頭1.4秒だけ単独で鳴ってナレーション区間で下がる。`licensed: false` の素材は書き出しに乗せない
+- 由来は4値(`brand` / `extracted` / `inferred` / `user`)。**決めつけて埋め、一覧で正直に「仮に入れた値」と言う**。項目はその場で直せるし、消せる(消すは「不明」と別物)
+- 企画書には掲載用でない値が混ざるため、[lib/event-cm/sanitize.ts](lib/event-cm/sanitize.ts) が決定論で落とす(プレースホルダ・見出し・社内メモ・人数・装飾記号)
+
+### 部品語彙(remotion/kit/)
+
+テンプレートは**モジュール(シーン)の集まり**で、シーンは**同じオブジェクトのパラメーター違い**である部品から組む。
+
+| ファイル | 正本として扱う内容 |
+| --- | --- |
+| [remotion/kit/components.ts](remotion/kit/components.ts) | 17部品の語彙・パラメーター・**空のときの振る舞い** |
+| [remotion/kit/theme.ts](remotion/kit/theme.ts) | パレット/書体/4段の型スケール/**モーション語彙**/装飾/字幕。`SUMI_THEME` と `themeForBrand()` |
+| [remotion/kit/layout.ts](remotion/kit/layout.ts) | **7つの配置**と、部品をスロットへ配る規則 |
+| [remotion/kit/fit.ts](remotion/kit/fit.ts) | 再現性の保証。**黙って溢れさせない** |
+
+- **固定するのは**部品の集合・空の振る舞い・載る文字量。**自由なのは**どの部品をどう並べ何を言うか(=LLMが働く場所)
+- **モーションはテーマが持つ**。シーンが持つとテーマを差し替えられない
+- 受け入れ条件は「この語彙で日本酒の映画を再現できるか」で、[lib/kit/event-cm-scenes.test.ts](lib/kit/event-cm-scenes.test.ts) が実ブリーフで検証する
 
 ## Platform Admin / Labs権限
 
@@ -270,9 +296,9 @@ R2バケットはpublic access(`r2.dev`と公開custom domain)を無効にする
 
 ### Supabase
 
-スキーマの正本は [supabase/migrations/](supabase/migrations/) の連番migration。現行のリモートプロジェクトには`0047_clone_event_promo_take`まで適用済み。`0023`〜`0045`でV2基盤・データ移行・旧契約削除・保全データ修復を完了し、`0046`で既存Brandへのロゴ追加とcanonicalロゴプレゼンTake生成を原子的に統一、`0047`で既存 event-promo Take からブリーフ+`take_inputs` を持ち運んで新規Takeを作るRPC `clone_event_promo_take` を追加した。新規URL生成は旧Profile/Generation Run/Assetへ二重書きせず、Knowledge claims + Take Run + Takeを正本にする。移行記録は [docs/schema-v2.md](docs/schema-v2.md)、現在の契約は [docs/data-model.md](docs/data-model.md)。新規環境のセットアップ手順:
+スキーマの正本は [supabase/migrations/](supabase/migrations/) の連番migration。現行のリモートプロジェクトには`0049_take_runs_map_stage`まで適用済み。`0048`はナレーション音声をどの動画テンプレートからでも固定できるようRPCを一般化し、`0049`は`take_runs.stage`に`map`を足してマッピング段が自分の実行を記録できるようにした。`0023`〜`0045`でV2基盤・データ移行・旧契約削除・保全データ修復を完了し、`0046`で既存Brandへのロゴ追加とcanonicalロゴプレゼンTake生成を原子的に統一、`0047`で既存 event-promo Take からブリーフ+`take_inputs` を持ち運んで新規Takeを作るRPC `clone_event_promo_take` を追加した。新規URL生成は旧Profile/Generation Run/Assetへ二重書きせず、Knowledge claims + Take Run + Takeを正本にする。移行記録は [docs/schema-v2.md](docs/schema-v2.md)、現在の契約は [docs/data-model.md](docs/data-model.md)。新規環境のセットアップ手順:
 
-1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0047)
+1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0049)
 2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(公開ページ閲覧時のセッション初期化用。アップロードは本登録ユーザーのみ)
 3. `.env.local` に以下を追加:
 

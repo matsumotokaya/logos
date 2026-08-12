@@ -3,6 +3,7 @@ import type {
   BrandUrlInspection,
   OrganizationKind,
 } from "@/lib/brand-detail";
+import { assignPaletteRoles } from "@/lib/brand/site-palette";
 import { inferOrganizationFacts } from "@/lib/brand-source-inspection";
 import { captureSite, type SiteCapture } from "@/lib/campaign/capture";
 import { scrapeUrl } from "@/lib/campaign/ingest";
@@ -35,37 +36,18 @@ function detectedPalette(
 
   const byWeight = (values: Array<{ hex: string; weight: number }>) =>
     [...values].sort((left, right) => right.weight - left.weight).map((value) => value.hex);
-  const interactive = [...capture.evidence.interactive]
-    .sort((left, right) => right.count - left.count)
-    .map((value) => value.hex);
-  const backgrounds = byWeight(capture.evidence.backgrounds);
-  const texts = byWeight(capture.evidence.texts);
-  const logoColors = [...capture.evidence.logoColors]
-    .sort((left, right) => right.share - left.share)
-    .map((value) => value.hex);
-  const candidates = [...new Set([
-    ...logoColors,
-    themeColor ?? "",
-    ...interactive,
-    ...colorHints,
-    ...backgrounds,
-    ...texts,
-  ].filter((value) => /^#[0-9a-f]{6}$/i.test(value)))];
-  const primary = logoColors[0] ?? interactive[0] ?? candidates[0];
-  const accent = candidates.find((color) => color !== primary);
-  const background = backgrounds[0];
-  const surface = backgrounds.find((color) => color !== background) ?? background;
-  const text = texts[0];
 
-  return Object.fromEntries(
-    [
-      ["primary", primary],
-      ["accent", accent],
-      ["background", background],
-      ["surface", surface],
-      ["text", text],
-    ].filter((entry): entry is [string, string] => Boolean(entry[1])),
-  );
+  return assignPaletteRoles({
+    logoColors: [...capture.evidence.logoColors]
+      .sort((left, right) => right.share - left.share)
+      .map((value) => value.hex),
+    interactive: [...capture.evidence.interactive].sort(
+      (left, right) => right.count - left.count,
+    ),
+    backgrounds: byWeight(capture.evidence.backgrounds),
+    texts: byWeight(capture.evidence.texts),
+    hints: [themeColor ?? "", ...colorHints],
+  });
 }
 
 export async function POST(req: Request) {

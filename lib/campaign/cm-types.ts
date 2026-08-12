@@ -5,10 +5,12 @@
 import type { CmScene } from "./schema";
 
 /** One scene's slice of the mixed voice track (ms on the final timeline). */
-export interface CmVoiceScene extends CmScene {
+export type CmVoiceSceneOf<Scene> = Scene & {
   startMs: number;
   durationMs: number;
-}
+};
+
+export type CmVoiceScene = CmVoiceSceneOf<CmScene>;
 
 /** Sentence-level caption timing (character-count proration within a scene). */
 export interface CmCaption {
@@ -17,8 +19,17 @@ export interface CmCaption {
   endMs: number;
 }
 
-/** The voice artifact: everything the video renderer needs besides the WAV. */
-export interface CmVoiceTrack {
+/**
+ * The voice artifact: everything the video renderer needs besides the WAV.
+ *
+ * Generic over the script's own scene type. The track is timing measured over
+ * whatever scenes were spoken — product-cm's hook/problem/solution/features/cta
+ * or the narrated event promo's hook/theme/value/program/cta — and the role
+ * vocabulary belongs to the script, not to the recording of it. Pinning
+ * product-cm's roles into this type made a second narrated template
+ * unrepresentable.
+ */
+export interface CmVoiceTrackOf<Scene> {
   version: 1;
   generatedAt: string;
   totalMs: number;
@@ -27,9 +38,11 @@ export interface CmVoiceTrack {
   mock: boolean;
   provider: string;
   voice: string;
-  scenes: CmVoiceScene[];
+  scenes: CmVoiceSceneOf<Scene>[];
   captions: CmCaption[];
 }
+
+export type CmVoiceTrack = CmVoiceTrackOf<CmScene>;
 
 /** CM state stored on a campaign job (WAV/MP4 live next to the job file).
  *  `track` appears as soon as voice generation finishes. A later explicit

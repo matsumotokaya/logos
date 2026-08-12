@@ -4,13 +4,27 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getR2Object } from "@/lib/r2";
+import { signedLabsUrl } from "@/lib/labs-output-sign";
+import {
+  collectMaterialIds,
+  materialUri,
+  replaceMaterialUris,
+  takeMaterialSignatureToken,
+} from "./material-uri";
 
 // Briefs hold a material reference, never a private R2 key. The take_inputs
-// row pins the exact material version consumed by that take; this resolver
-// checks that relationship before a renderer receives the bytes.
-const MATERIAL_URI_PREFIX = "material:";
+// row pins the exact material version consumed by that take; the resolvers
+// below check that relationship before anyone receives the bytes.
+//
+// Two resolvers, one relationship:
+//   stageBriefMaterials    — render time. Downloads the bytes next to the
+//                            composition, and fails loudly on a missing pin.
+//   resolveBriefMaterialUrls — preview time. Mints signed same-origin URLs the
+//                            browser can fetch, and reports what it could not
+//                            resolve instead of throwing, so the rest of the
+//                            page still renders.
 
-export const materialUri = (materialId: string): string => `${MATERIAL_URI_PREFIX}${materialId}`;
+export { materialUri };
 
 type InputRow = {
   material_id: string;
@@ -19,6 +33,28 @@ type InputRow = {
   // return the object form. Support both at this boundary.
   brand_materials: { r2_key: string | null } | Array<{ r2_key: string | null }> | null;
 };
+
+function r2KeyOf(input: InputRow | undefined): string | null {
+  const material = input?.brand_materials;
+  return (Array.isArray(material) ? material[0] : material)?.r2_key ?? null;
+}
+
+async function pinnedInputs(
+  supabase: SupabaseClient,
+  takeId: string,
+  ids: ReadonlySet<string>,
+): Promise<Map<string, InputRow>> {
+  const { data, error } = await supabase
+    .from("take_inputs")
+    .select("material_id, brand_materials(r2_key)")
+    .eq("take_id", takeId)
+    .in("material_id", [...ids]);
+  if (error) throw new Error(`入力素材を読めませんでした: ${error.message}`);
+
+  const inputs = new Map<string, InputRow>();
+  for (const row of (data ?? []) as InputRow[]) inputs.set(row.material_id, row);
+  return inputs;
+}
 
 /**
  * Replace material:<uuid> leaves in a brief with staticFile-compatible paths,
@@ -35,21 +71,11 @@ export async function stageBriefMaterials<T>(
   const ids = collectMaterialIds(brief);
   if (ids.size === 0) return brief;
 
-  const { data, error } = await supabase
-    .from("take_inputs")
-    .select("material_id, brand_materials(r2_key)")
-    .eq("take_id", takeId)
-    .in("material_id", [...ids]);
-  if (error) throw new Error(`入力素材を読めませんでした: ${error.message}`);
-
-  const inputs = new Map<string, InputRow>();
-  for (const row of (data ?? []) as InputRow[]) inputs.set(row.material_id, row);
+  const inputs = await pinnedInputs(supabase, takeId, ids);
 
   const resolved = new Map<string, string>();
   for (const id of ids) {
-    const input = inputs.get(id);
-    const material = input?.brand_materials;
-    const key = (Array.isArray(material) ? material[0] : material)?.r2_key;
+    const key = r2KeyOf(inputs.get(id));
     if (!key) throw new Error(`テイクに固定されていない素材です: ${id}`);
 
     const bytes = await getR2Object(key);
@@ -65,32 +91,54 @@ export async function stageBriefMaterials<T>(
     resolved.set(id, relative);
   }
 
-  return replaceMaterialUris(brief, resolved);
+  return replaceMaterialUris(brief, (id) => {
+    const staged = resolved.get(id);
+    if (!staged) throw new Error(`素材を解決できませんでした: ${id}`);
+    return staged;
+  });
 }
 
-function collectMaterialIds(value: unknown, ids = new Set<string>()): Set<string> {
-  if (typeof value === "string" && value.startsWith(MATERIAL_URI_PREFIX)) {
-    ids.add(value.slice(MATERIAL_URI_PREFIX.length));
-  } else if (Array.isArray(value)) {
-    for (const item of value) collectMaterialIds(item, ids);
-  } else if (value && typeof value === "object") {
-    for (const item of Object.values(value)) collectMaterialIds(item, ids);
-  }
-  return ids;
-}
+/**
+ * Replace material:<uuid> leaves with signed same-origin URLs.
+ *
+ * The browser preview runs the same composition the renderer does, but it has
+ * no filesystem to stage bytes into and cannot attach an Authorization header
+ * to an <img>/<audio> request. So the server — which has already checked the
+ * caller's access to this take through RLS — hands the client URLs that carry
+ * their own proof. The composition accepts any "/..." or "http..." src
+ * (remotion/event/EventComposition.tsx), so no template change is needed.
+ *
+ * Unresolvable references are left as-is and returned in `unresolved`: the
+ * caller decides how to say "this material is not pinned to this take", which
+ * is a data problem, not a designed fallback.
+ */
+export async function resolveBriefMaterialUrls<T>(
+  supabase: SupabaseClient,
+  brandId: string,
+  takeId: string,
+  brief: T,
+): Promise<{ brief: T; unresolved: string[] }> {
+  const ids = collectMaterialIds(brief);
+  if (ids.size === 0) return { brief, unresolved: [] };
 
-function replaceMaterialUris<T>(value: T, resolved: ReadonlyMap<string, string>): T {
-  if (typeof value === "string" && value.startsWith(MATERIAL_URI_PREFIX)) {
-    const id = value.slice(MATERIAL_URI_PREFIX.length);
-    const path = resolved.get(id);
-    if (!path) throw new Error(`素材を解決できませんでした: ${id}`);
-    return path as T;
-  }
-  if (Array.isArray(value)) return value.map((item) => replaceMaterialUris(item, resolved)) as T;
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, replaceMaterialUris(item, resolved)]),
-    ) as T;
-  }
-  return value;
+  const inputs = await pinnedInputs(supabase, takeId, ids);
+
+  const unresolved: string[] = [];
+  const resolved = replaceMaterialUris(brief, (id) => {
+    const key = r2KeyOf(inputs.get(id));
+    if (!key) {
+      unresolved.push(id);
+      return null;
+    }
+    // Same shape the renderer stages to (materials/<id>/<name>): the last
+    // segment is the real filename, so the slot list stays readable and media
+    // players get the extension they expect.
+    const name = encodeURIComponent(path.posix.basename(key));
+    return signedLabsUrl(
+      `/api/brands/${brandId}/takes/${takeId}/materials/${id}/${name}?key=${encodeURIComponent(key)}`,
+      takeMaterialSignatureToken(brandId, takeId, id, key),
+    );
+  });
+
+  return { brief: resolved, unresolved };
 }

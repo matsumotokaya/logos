@@ -56,6 +56,12 @@ export const PRODUCT_CM_BRIEF_GOAL: readonly GoalField[] = [
 export interface VideoPipelineInput {
   template: "event-promo" | "product-cm" | string;
   hasBrief: boolean;
+  /** Materials the user actually supplied, pinned to this take. */
+  sourceCount?: number;
+  /** When the newest of them was pinned. */
+  sourcePinnedAt?: string | null;
+  /** Last successful run per stage, when there has been one. */
+  runs?: Partial<Record<"extract" | "structure" | "map", string | null>>;
   /** When the brief was last written. */
   briefUpdatedAt: string | null;
   /** Resolved brief payload (or whatever the take currently holds). */
@@ -125,36 +131,41 @@ export function latest(times: Array<string | null | undefined>): string | null {
 export function videoPipeline(input: VideoPipelineInput): VideoPipeline {
   const goal = goalProgress(goalFor(input.template), filledPaths(input.brief));
 
-  // input: there is a brief on the take.
-  const inputAt = input.briefUpdatedAt;
-  // `ready` here only means "a brief has been written". There is no path yet
-  // to make input stale: this build is read-only and the input stage is a
-  // bar marker, not a slot you can add to. The compare against `stale` would
-  // be `false` by construction, so the upstream-stale signal stays `false`.
-  const inputStatus: PipelineStageStatus = input.hasBrief ? "ready" : "empty";
+  // input: material the USER supplied — not the brief.
+  //
+  // This used to read `hasBrief`, which meant every take reported its input
+  // stage complete the moment it was created, because a seeded take is created
+  // with a brief. That said somebody had given us something when they had
+  // given us nothing. A seeded brief is the tool's proposal; the input stage
+  // is about what came in from outside.
+  const sourceCount = input.sourceCount ?? 0;
+  const inputAt = input.sourcePinnedAt ?? null;
+  const inputStatus: PipelineStageStatus = sourceCount > 0 ? "ready" : "empty";
 
-  // extract: currently a no-op slot. Empty until a real extractor lands, so the
-  // user can see this is reserved rather than missing entirely.
-  const extractStatus: PipelineStageStatus = "empty";
+  // extract: a run of the extraction stage. Stale once material was added
+  // after the last run, which is what makes "add a flyer" visibly change the
+  // state of the stages below it.
+  const extractAt = input.runs?.extract ?? null;
+  const extractStatus = statusFor(extractAt, inputAt, Boolean(extractAt), false);
 
-  // structure: brief schema validity, derived from goal.filled vs goal.missing.
-  // The stage timestamp is the brief update — the structured brief is what the
-  // brief currently is, so it was last produced when the brief was last saved.
-  const structureAt = inputAt;
-  const structureHasOutput = goal.filled.length > 0 || goal.missing.length > 0;
+  // structure: a run that worked out the event's facts from what was read.
+  // Recorded, not applied — applying is the map stage's job, which is what
+  // gives that stage something a person can actually run.
+  const structureAt = input.runs?.structure ?? null;
   const structureStatus = statusFor(
     structureAt,
-    inputAt,
-    structureHasOutput,
-    false,
+    extractAt ?? inputAt,
+    Boolean(structureAt),
+    extractStatus === "stale",
   );
 
-  // map: the template is chosen (always true on a V2 take — template_id is
-  // required), and structure produces the schema the template renders from.
-  // Status flips to stale when structure is stale: the rendered output would
-  // be working from a brief that no longer matches the saved one.
-  const mapAt = inputAt;
-  const mapHasOutput = Boolean(input.template);
+  // map: the brief as it now stands — what the template renders from. It has
+  // an output as soon as the take has a brief, because a seeded take is a
+  // complete film from the first second; what changes is where its values came
+  // from. Its timestamp is the map run when there has been one, and otherwise
+  // the brief's own, so a hand-corrected value still counts as work done.
+  const mapAt = input.runs?.map ?? input.briefUpdatedAt;
+  const mapHasOutput = input.hasBrief && Boolean(input.template);
   const mapStatus = statusFor(
     mapAt,
     structureAt,
@@ -187,31 +198,32 @@ export function videoPipeline(input: VideoPipelineInput): VideoPipeline {
       id: "input",
       label: STAGE_LABELS.input,
       status: inputStatus,
-      summary: input.hasBrief ? "ブリーフが登録済み" : "ブリーフ未登録",
+      summary:
+        sourceCount > 0 ? `資料${sourceCount}件` : "資料なし（すべてこちらの提案）",
       producedAt: inputAt,
     },
     {
       id: "extract",
       label: STAGE_LABELS.extract,
       status: extractStatus,
-      summary: "抽出は未実装",
-      producedAt: null,
+      summary: extractAt ? "資料を読み取り済み" : "未実行",
+      producedAt: extractAt,
     },
     {
       id: "structure",
       label: STAGE_LABELS.structure,
       status: structureStatus,
-      summary:
-        goal.missing.length === 0
-          ? `${goal.filled.length}/${goal.filled.length}項目を充足`
-          : `${goal.filled.length}/${goal.filled.length + goal.missing.length}項目を充足`,
+      summary: structureAt ? "資料の内容を反映済み" : "未実行",
       producedAt: structureAt,
     },
     {
       id: "map",
       label: STAGE_LABELS.map,
       status: mapStatus,
-      summary: `テンプレート: ${templateLabel}`,
+      summary:
+        goal.missing.length === 0
+          ? `テンプレート: ${templateLabel}`
+          : `${goal.filled.length}/${goal.filled.length + goal.missing.length}項目を充足`,
       producedAt: mapAt,
     },
     {

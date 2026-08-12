@@ -8,8 +8,9 @@ import { campaignCmMp4Exists, getCampaignJob } from "@/lib/campaign/jobs";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { isVideoTemplateId, VIDEO_TEMPLATES } from "@/lib/video/templates";
 import { type VideoState, type VideoSummary } from "@/lib/video/asset";
-import { bundledBrief, emptyEventBrief } from "@/remotion/event/briefs";
+import { emptyEventBrief } from "@/remotion/event/briefs";
 import { createTake } from "@/lib/takes/create";
+import { seedEventCmFromBrand } from "@/lib/event-cm/seed-from-brand";
 
 type TakeVideoRow = {
   id: string;
@@ -135,7 +136,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { id: brandId } = await ctx.params;
   const supabase = createServerSupabaseForToken(user.token);
 
-  let body: { template?: unknown; title?: unknown; briefSlug?: unknown; templateTakeId?: unknown };
+  let body: { template?: unknown; title?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -147,53 +148,33 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return Response.json({ error: "テンプレートが不正です" }, { status: 400 });
   }
   const requestedTitle = typeof body.title === "string" ? body.title.trim() : "";
-  const briefSlug = typeof body.briefSlug === "string" ? body.briefSlug : "";
-  const templateTakeId =
-    typeof body.templateTakeId === "string" ? body.templateTakeId : "";
 
   let title = requestedTitle;
   let brief: unknown;
-  let cloneFromTakeId: string | null = null;
-  let cloneWorkId: string | null = null;
+  let pinMaterial: { id: string; checksum: string } | null = null;
 
-  if (template === "event-promo") {
-    if (templateTakeId) {
-      // Clone from an existing Take. This is the only path that produces a
-      // brief whose material slots resolve on first render: the source Take
-      // already has its brand_materials + take_inputs in place, and the RPC
-      // carries both the brief and the pins forward to the new Take.
-      const { data: sourceTake, error: sourceError } = await supabase
-        .from("takes")
-        .select("id, brand_id, work_id, template_id")
-        .eq("id", templateTakeId)
-        .maybeSingle();
-      if (sourceError) {
-        return Response.json({ error: "テンプレートTakeを確認できませんでした" }, { status: 500 });
-      }
-      if (!sourceTake || sourceTake.brand_id !== brandId || sourceTake.template_id !== "event-promo") {
-        return Response.json(
-          { error: "テンプレートが見つかりません。event-promo の既存のTakeを指定してください" },
-          { status: 400 },
-        );
-      }
-      cloneFromTakeId = sourceTake.id as string;
-      cloneWorkId = (sourceTake.work_id as string | null) ?? null;
-      // create_v2_take still wants a structurally valid brief; the RPC will
-      // overwrite it with the source's brief immediately after creation.
-      brief = emptyEventBrief(title || "新しいイベント動画");
-      if (!title) title = "新しいイベント動画";
-    } else {
-      const seed = briefSlug ? bundledBrief(briefSlug) : null;
-      if (briefSlug && !seed) {
-        return Response.json(
-          { error: `ブリーフが見つかりません: ${briefSlug}` },
-          { status: 400 },
-        );
-      }
-      // Copy the seed so the row owns its brief from here on.
-      brief = seed ? structuredClone(seed.brief) : emptyEventBrief(title || "新しいイベント動画");
-      if (!title) title = seed ? seed.brief.title : "新しいイベント動画";
+  if (template === "event-cm") {
+    // Seeded, not empty. The take arrives as a finished film: the brand's own
+    // palette and mark, an event archetype inferred from its industry, and a
+    // plausible date — every guess labelled in the brief's provenance so the
+    // screen can say which parts are proposals (§17.5).
+    const seeded = await seedEventCmFromBrand(supabase, {
+      brandId,
+      userId: user.id,
+    });
+    if (!seeded.ok) {
+      return Response.json({ error: seeded.error }, { status: 500 });
     }
+    brief = seeded.seeded.brief;
+    pinMaterial = seeded.seeded.logoMaterial;
+    if (!title) title = seeded.seeded.brief.title;
+  } else if (template === "event-promo") {
+    // The template IS the starting point. Copying an existing take as a
+    // "base" was a way of getting materials before the take had its own input
+    // stage; now it has one, and offering a video to build from asked the
+    // user to pick a template twice.
+    brief = emptyEventBrief(title || "新しいイベント動画");
+    if (!title) title = "新しいイベント動画";
   } else {
     // product-cm is driven by the campaign pipeline; the row records which job
     // owns the Brand Kit and narration.
@@ -244,16 +225,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     );
   }
 
-  if (cloneFromTakeId) {
-    const { error: cloneError } = await supabase.rpc("clone_event_promo_take", {
-      p_source_take_id: cloneFromTakeId,
-      p_new_take_id: created.takeId,
-      p_created_by: user.id,
-      p_work_id: cloneWorkId,
+  if (pinMaterial) {
+    // The brief points at material:<uuid>; the pin is what lets both the
+    // preview resolver and the renderer read those bytes, and what fixes the
+    // exact version this take consumes.
+    const { error: pinError } = await supabase.from("take_inputs").insert({
+      take_id: created.takeId,
+      material_id: pinMaterial.id,
+      role: "logo",
+      checksum: pinMaterial.checksum,
     });
-    if (cloneError) {
+    if (pinError) {
       return Response.json(
-        { error: `テンプレートからのコピー中にエラーが発生しました: ${cloneError.message}` },
+        { error: `ロゴを入力として固定できませんでした: ${pinError.message}` },
         { status: 500 },
       );
     }

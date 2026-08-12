@@ -244,16 +244,23 @@ export async function saveBrandAssetsFromUrl({
       fields.push({ field_path: fieldPath, layer: "expression", value: fieldValue });
     }
   }
+  const sourceRef = { source: "site_capture", source_url: sourceUrl };
   if (fields.length > 0) {
     const adopted = await adoptBrandKnowledge(supabase, {
       brandId,
       fields,
       sourceKind: "url_extraction",
-      sourceRef: { source: "site_capture", source_url: sourceUrl },
+      sourceRef,
       userId,
     });
     if (!adopted.ok) throw new Error("ブランドプロフィールを保存できませんでした");
   }
+  await retireValuesThisSourceNoLongerFinds({
+    supabase,
+    brandId,
+    sourceRef,
+    stillFound: fields.map((field) => field.field_path),
+  });
 
   const logo = await saveCapturedLogo({
     supabase,
@@ -268,6 +275,55 @@ export async function saveBrandAssetsFromUrl({
     profile: { inheritsParent: false, status: "confirmed", value: profileValue },
     logo,
   };
+}
+
+/**
+ * Drop the values this source used to supply and no longer does.
+ *
+ * Adoption upserts field by field, so a value the extractor got wrong once
+ * outlived every correction: re-running with a better rule simply did not
+ * mention the field, and the bad row stayed adopted forever. That is the same
+ * defect §17.6 recorded for one-shot imports, in a slower form — and it broke
+ * the same principle, that a source can be re-run and the output must follow
+ * (§17.4). wealthpark-lab.com kept an accent of #abb8c3 (a WordPress preset)
+ * through two corrected captures because of it.
+ *
+ * Scope is deliberately narrow: only values whose adopted claim came from THIS
+ * source. A colour somebody typed, or one adopted from an uploaded guideline,
+ * is not this crawl's to retract.
+ */
+async function retireValuesThisSourceNoLongerFinds({
+  supabase,
+  brandId,
+  sourceRef,
+  stillFound,
+}: {
+  supabase: Supabase;
+  brandId: string;
+  sourceRef: Record<string, unknown>;
+  stillFound: string[];
+}): Promise<void> {
+  const { data: claims } = await supabase
+    .from("brand_knowledge_claims")
+    .select("id")
+    .eq("brand_id", brandId)
+    .eq("source_kind", "url_extraction")
+    .contains("source_ref", sourceRef);
+  const claimIds = (claims ?? []).map((claim) => claim.id as string);
+  if (claimIds.length === 0) return;
+
+  const { data: values } = await supabase
+    .from("brand_knowledge_values")
+    .select("id, field_path, adopted_claim_id")
+    .eq("brand_id", brandId)
+    .in("adopted_claim_id", claimIds);
+
+  const stale = (values ?? [])
+    .filter((value) => !stillFound.includes(value.field_path as string))
+    .map((value) => value.id as string);
+  if (stale.length === 0) return;
+
+  await supabase.from("brand_knowledge_values").delete().in("id", stale);
 }
 
 async function saveCapturedLogo({

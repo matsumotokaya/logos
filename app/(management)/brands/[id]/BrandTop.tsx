@@ -1,21 +1,40 @@
 "use client";
 
-// The brand's top page. Three things belong here:
+// The brand's top page, in the order the brand itself is built:
 //
-//   1. The brand profile (name, description, industry, location, website)
-//   2. The brand's design rules — palette / typography / voice — adopted from
-//      brand_knowledge_values so the next Take starts from what the team has
-//      already decided
-//   3. The three asset kinds this brand owns (videos, LPs, logos), each
-//      rendered as a tile that opens the corresponding list
+//   1. The pipeline that fills this brand — the five stages, opened over the
+//      page rather than navigated to (§17.3)
+//   2. The brand profile (name, description, industry, location, website)
+//   3. **Brand assets**, shown two ways: DESIGN (palette / typography /
+//      tokens, adopted into brand_knowledge_values) and LOGOS (all of them)
+//   4. The marketing tools built out of those assets — videos, LPs, banners
 //
-// The page deliberately mirrors a brand manager: profile above, assets below.
+// (3) and (4) are different kinds of thing and the page has to say so. A logo
+// is not a deliverable sitting beside a video: it is global, like the palette,
+// and every video, LP and banner is made out of it. Listing 動画 / LP / ロゴ as
+// three peer tiles said the opposite.
+//
+// (1) is here because /businesses/[id] and /campaigns/businesses/[id] both
+// redirect to this page: this IS the brand screen, and the pipeline has to be
+// reachable from it. Re-fetching the site refreshes what the brand LOOKS like
+// — palette, type, logo — and deliberately leaves its facts alone, since a
+// name and description someone has confirmed should not be reverted by a
+// crawl.
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { videoFetch } from "@/lib/video/client";
 import type { BrandOverview } from "@/app/api/brands/[id]/overview/route";
+import type { LogoSummary } from "@/app/api/brands/[id]/logos/route";
+import type { BrandUrlInspection } from "@/lib/brand-detail";
+import PipelineBar from "@/components/pipeline/PipelineBar";
+import StageDrawer from "@/components/pipeline/StageDrawer";
+import BrandPipelinePanel, {
+  type BrandPipelinePayload,
+} from "@/components/pipeline/BrandPipelinePanel";
+import type { BrandMaterial } from "@/components/pipeline/MaterialIntake";
+import type { PipelineStage } from "@/lib/pipeline/stages";
 import { ADDABLE_VIDEO_TEMPLATES } from "@/lib/video/templates";
 
 type Tile = {
@@ -43,9 +62,21 @@ const BRAND_KIND_LABEL: Record<string, string> = {
 const KNOWN_FIELDS: Record<string, string> = {
   "palette.primary": "プライマリカラー",
   "palette.accent": "アクセントカラー",
+  "palette.background": "背景色",
+  "palette.surface": "面の色",
+  "palette.text": "文字色",
+  "palette.mode": "明暗",
   "palette.neutral": "ニュートラル",
+  "palette.source": "パレットの出所",
   "typography.heading": "見出しフォント",
   "typography.body": "本文フォント",
+  "typography.heading_font": "見出しフォント",
+  "typography.body_font": "本文フォント",
+  "typography.font_style": "書体の性格",
+  "tokens.button_radius": "角の丸み",
+  "tokens.button_padding": "ボタンの余白",
+  "tokens.section_spacing": "セクション間の余白",
+  "tokens.container_width": "コンテナ幅",
   "voice.tone": "声のトーン",
   "voice.guideline": "ライティング指針",
   "voice.tagline": "タグライン",
@@ -53,6 +84,9 @@ const KNOWN_FIELDS: Record<string, string> = {
   "offering.summary": "提供内容の要約",
   "audience.primary": "主要な対象",
 };
+
+/** A hex value gets a swatch: a colour rule is unreadable as six characters. */
+const HEX_VALUE = /^#[0-9a-f]{6}$/i;
 
 function formatKnowledgeValue(value: unknown): string {
   if (value === null || value === undefined) return "—";
@@ -73,15 +107,24 @@ function formatKnowledgeValue(value: unknown): string {
 
 export default function BrandTop({ brandId }: { brandId: string }) {
   const [overview, setOverview] = useState<BrandOverview | null>(null);
+  const [logos, setLogos] = useState<LogoSummary[]>([]);
   const [counts, setCounts] = useState({ videos: 0, lps: 0 });
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pipeline, setPipeline] = useState<
+    (BrandPipelinePayload & { stages: PipelineStage[] }) | null
+  >(null);
+  const [openStage, setOpenStage] = useState<string | null>(null);
+  const [materials, setMaterials] = useState<BrandMaterial[]>([]);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [overviewRes, videoRes, lpRes] = await Promise.all([
+      const [overviewRes, videoRes, lpRes, logoRes] = await Promise.all([
         videoFetch(`/api/brands/${brandId}/overview`),
         videoFetch(`/api/brands/${brandId}/videos`),
         videoFetch(`/api/brands/${brandId}/lps`),
+        videoFetch(`/api/brands/${brandId}/logos`),
       ]);
       const overviewJson = overviewRes.ok
         ? ((await overviewRes.json()) as { overview?: BrandOverview } | null)
@@ -97,6 +140,10 @@ export default function BrandTop({ brandId }: { brandId: string }) {
         throw new Error("ブランド情報を取得できませんでした");
       }
       setOverview(overviewJson.overview);
+      const logoJson = logoRes.ok
+        ? ((await logoRes.json()) as { logos?: LogoSummary[] } | null)
+        : null;
+      setLogos(logoJson?.logos ?? []);
       setCounts({
         videos: videoJson?.videos?.length ?? 0,
         lps: lpJson?.lps?.length ?? 0,
@@ -107,16 +154,155 @@ export default function BrandTop({ brandId }: { brandId: string }) {
     }
   }, [brandId]);
 
+  // The pipeline and the material list are derived from the same rows the page
+  // reads, so they are refreshed by the same call that refreshes the page.
+  const loadPipeline = useCallback(async () => {
+    const [pipelineRes, materialsRes] = await Promise.all([
+      videoFetch(`/api/brands/businesses/${brandId}/pipeline`),
+      videoFetch(`/api/brands/businesses/${brandId}/materials`),
+    ]);
+    if (pipelineRes.ok) {
+      const body = (await pipelineRes.json()) as {
+        pipeline?: BrandPipelinePayload & { stages: PipelineStage[] };
+      };
+      if (body.pipeline) setPipeline(body.pipeline);
+    }
+    if (materialsRes.ok) {
+      const body = (await materialsRes.json()) as { materials?: BrandMaterial[] };
+      setMaterials(body.materials ?? []);
+    }
+  }, [brandId]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       await Promise.resolve();
-      if (!cancelled) await load();
+      if (cancelled) return;
+      await load();
+      if (!cancelled) await loadPipeline();
     })();
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [load, loadPipeline]);
+
+  /**
+   * Re-read the brand's own site and adopt what it wears.
+   *
+   * One action, no confirmation step: the golden path is that nobody has to
+   * choose anything. The result lands in the design-rules section below, where
+   * it can be judged — and re-run — after the fact.
+   */
+  const reimportSite = useCallback(async () => {
+    if (!overview?.website) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const inspectRes = await videoFetch("/api/brands/inspect-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: overview.website, scope: "business" }),
+      });
+      const inspectBody = (await inspectRes.json().catch(() => null)) as {
+        inspection?: BrandUrlInspection;
+        error?: string;
+      } | null;
+      if (!inspectRes.ok || !inspectBody?.inspection) {
+        throw new Error(inspectBody?.error ?? "サイトを読み取れませんでした");
+      }
+      const brandImport = inspectBody.inspection.brandAssets;
+      if (!brandImport) {
+        throw new Error("このサイトからは配色・書体・ロゴを取得できませんでした");
+      }
+
+      // The brand's facts are sent back unchanged. Only `brandImport` carries
+      // anything new, and it is the only part the crawl is allowed to decide.
+      const saveRes = await videoFetch(`/api/brands/businesses/${brandId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: overview.name,
+          parentOrganizationId: overview.brandOrganizationId,
+          website: overview.website,
+          industry: overview.industry,
+          location: overview.location,
+          description: overview.description,
+          brandImport,
+        }),
+      });
+      const saveBody = (await saveRes.json().catch(() => null)) as {
+        ok?: boolean;
+        logo?: unknown;
+        error?: string;
+      } | null;
+      if (!saveRes.ok || !saveBody?.ok) {
+        throw new Error(saveBody?.error ?? "取り込んだ内容を保存できませんでした");
+      }
+
+      await load();
+      await loadPipeline();
+      setNotice(
+        saveBody.logo
+          ? "サイトから配色・書体・ロゴを取り込みました。"
+          : "サイトから配色・書体を取り込みました。",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "サイトから取り込めませんでした");
+    } finally {
+      setBusy(false);
+    }
+  }, [brandId, load, loadPipeline, overview]);
+
+  const uploadMaterial = useCallback(
+    async (file: File, data: string) => {
+      setBusy(true);
+      try {
+        await videoFetch(`/api/brands/businesses/${brandId}/materials`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label: file.name, mediaType: file.type, data }),
+        });
+        await loadPipeline();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [brandId, loadPipeline],
+  );
+
+  const addNote = useCallback(
+    async (text: string) => {
+      setBusy(true);
+      try {
+        await videoFetch(`/api/brands/businesses/${brandId}/materials`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label: "メモ", text }),
+        });
+        await loadPipeline();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [brandId, loadPipeline],
+  );
+
+  const removeMaterial = useCallback(
+    async (materialId: string) => {
+      setBusy(true);
+      try {
+        await videoFetch(
+          `/api/brands/businesses/${brandId}/materials/${materialId}`,
+          { method: "DELETE" },
+        );
+        await loadPipeline();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [brandId, loadPipeline],
+  );
 
   if (!overview) {
     return (
@@ -146,13 +332,6 @@ export default function BrandTop({ brandId }: { brandId: string }) {
       count: counts.lps,
       hint: "セールスページ",
     },
-    {
-      href: `/brands/${brandId}/logos`,
-      label: "ロゴ",
-      description: "Organization配下のロゴ一覧。プレゼンの編集へ。",
-      count: 0,
-      hint: "ロゴ一覧",
-    },
   ];
 
   const kindLabel = BRAND_KIND_LABEL[overview.brandKind] ?? overview.brandKind;
@@ -160,8 +339,53 @@ export default function BrandTop({ brandId }: { brandId: string }) {
     .filter((k) => KNOWN_FIELDS[k.fieldPath] !== undefined || true)
     .sort((a, b) => a.fieldPath.localeCompare(b.fieldPath));
 
+  const openStageDef = pipeline?.stages.find((stage) => stage.id === openStage);
+
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8 md:px-10">
+      {pipeline ? (
+        <div className="-mx-6 -mt-2 md:-mx-10">
+          <PipelineBar
+            stages={pipeline.stages}
+            openStage={openStage}
+            onOpenStage={setOpenStage}
+          />
+        </div>
+      ) : null}
+      {pipeline && openStageDef ? (
+        <StageDrawer
+          title={openStageDef.label}
+          description={openStageDef.summary}
+          onClose={() => setOpenStage(null)}
+        >
+          <BrandPipelinePanel
+            stageId={openStageDef.id}
+            payload={pipeline}
+            onInject={() => {
+              setOpenStage(null);
+              void reimportSite();
+            }}
+            materials={{
+              websiteLabel: overview.website || null,
+              materials,
+              busy,
+              onUploadFile: uploadMaterial,
+              onAddNote: addNote,
+              onRemove: removeMaterial,
+            }}
+          />
+        </StageDrawer>
+      ) : null}
+      {error ? (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-[12px] text-red-700">
+          {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p className="rounded-xl border border-hairline bg-ink/[0.03] px-4 py-2.5 text-[12px] text-ink-muted">
+          {notice}
+        </p>
+      ) : null}
       <header className="border-b border-hairline pb-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <p className="text-xs font-semibold text-ink-muted">BRAND</p>
@@ -210,48 +434,144 @@ export default function BrandTop({ brandId }: { brandId: string }) {
         </dl>
       </header>
 
-      <section aria-labelledby="brand-knowledge" className="flex flex-col gap-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 id="brand-knowledge" className="text-balance text-lg font-semibold">
+      {/* Brand assets: global, and the material every tool below is made of.
+          Two views of one thing — what it looks like, and what its mark is. */}
+      <section aria-labelledby="brand-assets" className="flex flex-col gap-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 id="brand-assets" className="text-balance text-lg font-semibold">
             ブランドアセット
           </h2>
-          <span className="text-xs text-ink-muted">
-            配色・フォント・声のトーンなど、このブランド全体に効くルール
-          </span>
-        </div>
-        {visibleKnowledge.length > 0 ? (
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleKnowledge.map((k) => (
-              <li
-                key={k.fieldPath}
-                className="rounded-2xl border border-hairline bg-white p-4"
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-ink-muted">
+              動画・LP・バナーのすべてが、ここから作られます
+            </span>
+            {overview.website ? (
+              <button
+                type="button"
+                onClick={() => void reimportSite()}
+                disabled={busy}
+                className="shrink-0 rounded-full border border-ink px-4 py-1.5 text-xs font-semibold transition hover:bg-ink hover:text-paper disabled:cursor-wait disabled:opacity-50"
               >
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">
-                  {KNOWN_FIELDS[k.fieldPath] ?? k.fieldPath}
-                </p>
-                <p className="mt-2 text-pretty text-sm font-semibold text-ink">
-                  {formatKnowledgeValue(k.value)}
-                </p>
-                <p className="mt-2 font-mono text-[10px] text-ink-faint">
-                  {k.fieldPath}
-                </p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="rounded-2xl border border-dashed border-hairline px-4 py-5 text-sm text-ink-muted">
-            まだadoptされたデザインルールはありません。トップのCM MakerでBrand Kitを生成すると、ここに整理されます。
-          </p>
-        )}
+                {busy ? "取り込み中…" : "サイトから取り込む"}
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex items-baseline gap-3">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+              デザイン
+            </h3>
+            <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
+          </div>
+          {visibleKnowledge.length > 0 ? (
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleKnowledge.map((k) => {
+                const value = formatKnowledgeValue(k.value);
+                return (
+                  <li
+                    key={k.fieldPath}
+                    className="rounded-2xl border border-hairline bg-white p-4"
+                  >
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">
+                      {KNOWN_FIELDS[k.fieldPath] ?? k.fieldPath}
+                    </p>
+                    <p className="mt-2 flex items-center gap-2 text-pretty text-sm font-semibold text-ink">
+                      {HEX_VALUE.test(value) ? (
+                        <span
+                          aria-hidden="true"
+                          className="inline-block h-4 w-4 shrink-0 rounded border border-hairline"
+                          style={{ backgroundColor: value }}
+                        />
+                      ) : null}
+                      {value}
+                    </p>
+                    <p className="mt-2 font-mono text-[10px] text-ink-faint">
+                      {k.fieldPath}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="rounded-2xl border border-dashed border-hairline px-4 py-5 text-sm text-ink-muted">
+              まだ採用されたデザインルールはありません。
+              {overview.website
+                ? "「サイトから取り込む」でこのブランドのサイトを読み取ると、配色・書体・ロゴがここに入ります。"
+                : "サイトURLを登録すると、そこから配色・書体・ロゴを取り込めます。"}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex items-baseline gap-3">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+              ロゴ
+            </h3>
+            <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
+            {logos.length > 0 ? (
+              <Link
+                href={`/brands/${brandId}/logos`}
+                className="shrink-0 text-[11px] text-accent hover:underline"
+              >
+                すべて管理 →
+              </Link>
+            ) : null}
+          </div>
+          {logos.length > 0 ? (
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {logos.map((logo) => (
+                <li key={logo.id}>
+                  <Link
+                    href={`/brands/${brandId}/logos/${logo.id}`}
+                    className="flex h-full flex-col gap-3 rounded-2xl border border-hairline bg-white p-4 transition hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  >
+                    <span className="flex h-20 items-center justify-center overflow-hidden rounded-lg bg-ink/[0.03]">
+                      {logo.previewUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={logo.previewUrl}
+                          alt=""
+                          className="max-h-16 max-w-[80%] object-contain"
+                        />
+                      ) : (
+                        <span className="text-[11px] text-ink-faint">プレビューなし</span>
+                      )}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13px] font-semibold text-ink">
+                        {logo.title}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11px] text-ink-muted">
+                        {logo.subjectEntityName}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="rounded-2xl border border-dashed border-hairline px-4 py-5 text-sm text-ink-muted">
+              まだロゴがありません。サイトから取り込むか、トップからSVGをアップロードします。
+            </p>
+          )}
+        </div>
       </section>
 
-      <section
-        aria-label="このブランドのアセット"
-        className="grid gap-4 md:grid-cols-3"
-      >
-        {tiles.map((tile) => (
-          <TileLink key={tile.href} tile={tile} />
-        ))}
+      {/* The tools built out of the assets above. */}
+      <section aria-labelledby="brand-tools" className="flex flex-col gap-3">
+        <div className="flex items-baseline gap-3">
+          <h2 id="brand-tools" className="text-balance text-lg font-semibold">
+            マーケティングツール
+          </h2>
+          <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {tiles.map((tile) => (
+            <TileLink key={tile.href} tile={tile} />
+          ))}
+        </div>
       </section>
     </main>
   );

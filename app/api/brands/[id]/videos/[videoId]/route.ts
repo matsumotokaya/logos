@@ -10,6 +10,7 @@ import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server
 import { type VideoState } from "@/lib/video/asset";
 import { VIDEO_TEMPLATES } from "@/lib/video/templates";
 import { renderOutputSignatureToken } from "../../takes/[takeId]/renders/[renderId]/output/route";
+import { resolveBriefMaterialUrls } from "@/lib/takes/materials";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import {
   ensureCanonicalVideoPublication,
@@ -78,6 +79,27 @@ export async function GET(
     if (artifactResult.error || publicationResult.error) {
       return Response.json({ error: "動画の成果物を取得できませんでした" }, { status: 500 });
     }
+    // The client renders this brief in a Remotion Player, so its material
+    // pointers have to become URLs a browser can fetch. Resolving here — while
+    // the caller's token is still in hand — keeps the pinned-input check on the
+    // server and the private R2 keys off the wire.
+    let briefForClient = take.brief;
+    let unresolvedMaterials: string[] = [];
+    try {
+      const resolvedBrief = await resolveBriefMaterialUrls(
+        supabase,
+        brandId,
+        take.id as string,
+        take.brief,
+      );
+      briefForClient = resolvedBrief.brief;
+      unresolvedMaterials = resolvedBrief.unresolved;
+    } catch {
+      // A material read failure must not take the page down: the brief still
+      // describes the video, and the slot list below the player is derived
+      // from the same fields. The player shows what it can fetch.
+    }
+
     const artifact = artifactResult.data;
     const mp4Url = artifact
       ? signedLabsUrl(
@@ -86,7 +108,7 @@ export async function GET(
         )
       : null;
     const briefRecord = take.brief as Record<string, unknown> | null;
-    const eventBrief = take.template_id === "event-promo" ? take.brief : null;
+    const eventBrief = take.template_id === "event-promo" ? briefForClient : null;
     const campaignJobId =
       typeof briefRecord?.campaignJobId === "string"
         ? briefRecord.campaignJobId
@@ -123,8 +145,9 @@ export async function GET(
         published: (publicationResult.data?.length ?? 0) > 0,
         publicUrl: publicationResult.data?.[0]?.url_path ?? null,
         briefSlug: null,
-        brief: take.template_id === "event-promo" ? eventBrief : take.brief,
+        brief: take.template_id === "event-promo" ? eventBrief : briefForClient,
         campaignJobId,
+        unresolvedMaterials,
         state: artifact
           ? "mp4_ready"
           : take.template_id === "product-cm"

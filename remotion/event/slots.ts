@@ -31,7 +31,9 @@ export interface SlotGroup {
   slots: SlotStatus[];
 }
 
-const assetName = (src: string): string => src.split("/").pop() ?? src;
+// A src is a staticFile name, a staged path, or a signed URL — the last path
+// segment is the filename in all three, once any query string is dropped.
+const assetName = (src: string): string => src.split("?")[0].split("/").pop() || src;
 
 export function briefSlots(brief: EventBrief): SlotGroup[] {
   return [

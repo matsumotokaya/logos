@@ -1,0 +1,205 @@
+import "server-only";
+
+import OpenAI from "openai";
+import { zodResponseFormat } from "openai/helpers/zod";
+import { z } from "zod";
+import type { EventBrief } from "@/remotion/event/types";
+import {
+  EVENT_CM_MAX_CHARS,
+  EVENT_CM_MIN_CHARS,
+  EVENT_CM_SCENE_ROLES,
+  EVENT_CM_TARGET_SECONDS,
+  type EventCmScript,
+} from "@/remotion/event-cm/types";
+
+// Write the narration for a narrated event promo.
+//
+// Rules come from deliverable-architecture §17.2: exhaust what is decided
+// before asking the model to decide it. The facts (title, guests, programs,
+// date) are already in the brief and are handed over as fixed truth; what the
+// model does is the one thing rules cannot — choose an angle and compress the
+// evening into five spoken beats.
+//
+// The reason this stage is worth an LLM call: an announcement that lists its
+// own agenda is not a reason to attend. Deciding what the evening actually
+// offers, and saying it in the first four seconds, is a judgment.
+
+const MODEL = "gpt-5.6-terra";
+const LLM_TIMEOUT_MS = 120_000;
+
+const openai = (): OpenAI => new OpenAI({ timeout: LLM_TIMEOUT_MS, maxRetries: 2 });
+
+const SYSTEM = `あなたは日本のイベント告知CMのコピーライター兼構成作家です。30秒のCMナレーション（読み上げ原稿）を書きます。
+
+## 絶対の制約
+
+1. **事実を捏造しない。** 提示された事実だけを話す。日時・会場・料金・人名・肩書き・プログラム内容を推測で補わない。提示されていない情報（例: 会場がnull）は「後日発表」等と言い換えず、単に触れない。
+2. **読み上げる言葉だけを書く。** 見出し、ト書き、記号、括弧書き、英数字の羅列を入れない。数字は読み上げる形にする（「2026.10.2」→「10月2日」）。
+3. **5つの役割をこの順で厳密に1回ずつ**: hook → theme → value → program → cta。
+
+## 各役割の仕事と長さ
+
+**日本語のCMナレーションは1秒あたり約7字です。各シーンの字数は下の予算を守ってください。ここが崩れると映像の配分が崩れます。**
+
+- **hook（誘い・約4秒 / 25〜32字）**: 最初の一言で聞き手を止める。事実の中にある一番強い具体（希少性・意外性・情景）を一つだけ使う。イベント名を名乗らない。
+- **theme（主題・約5秒 / 30〜40字）**: これが何の会かを言う。シリーズ名・主催・タイトルはここ。
+- **value（価値・約7秒 / 45〜55字）**: なぜこの夜に来る価値があるのか。体験として言う。抽象的な理念で終わらせない。
+- **program（中身・約8秒 / 50〜62字）**: 実際に何が起きるか。**全部は言えません。** プログラムと登壇者から、最も具体的で魅力のあるものを選び、流れとして1〜2文で。列挙にしない。
+- **cta（行動・約6秒 / 35〜45字）**: 日付と、次にすること。それだけ。
+
+## 読み上げの整え方
+
+- 数字は読み上げる形に開く。ただし**固有名詞に含まれる数字は開かない**（「レオパレス21」「Miss SAKE 2026」はそのまま名前として扱い、不自然な数詞に分解しない）。
+- **日付に年を含めない。** 近い将来の開催日は月・日・曜日で足りる。「二千二十六年九月十一日」ではなく「九月十一日、金曜日」。
+- **行動喚起は一度だけ言う。** 提示された行動喚起の文言をそのまま貼り付けて重ねない（「詳しくは、詳細とお申し込みは、こちら」のような重複を作らない）。自然な一文にまとめる。
+- 人名は初出でフルネーム、以降は姓のみ。肩書きは短く言い換えてよい（「一社）Miss SAKE 代表理事」→「ミス・サケ代表理事」）。
+- **年齢制限・定員・注記はナレーションで読まない。** 画面に文字で出るので、音声で読むと最後の一押しが濁ります。
+
+## 文体
+
+- 話し言葉。1文は短く。読点で息継ぎができること。
+- 体言止めを多用しない（読み上げると素っ気なく聞こえる）。
+- 誇張した最上級（「最高の」「唯一の」）を使わない。事実の強さで語る。
+- 全体で${EVENT_CM_MIN_CHARS}〜${EVENT_CM_MAX_CHARS}字（約${EVENT_CM_TARGET_SECONDS}秒）。
+
+## angle
+
+台本を書く前に決めた訴求軸を1文で書く。「何を約束する${EVENT_CM_TARGET_SECONDS}秒か」を、書き手の判断として述べる。`;
+
+const DraftSchema = z.object({
+  angle: z
+    .string()
+    .describe(
+      "この台本が約束していることを1文の日本語で。書き手の判断であって、事実の要約ではない",
+    ),
+  scenes: z
+    .array(
+      z.object({
+        role: z.enum(EVENT_CM_SCENE_ROLES),
+        text: z
+          .string()
+          .describe("このシーンで読み上げる言葉そのもの。日本語。ト書き・見出しを含まない"),
+      }),
+    )
+    .describe(
+      `Exactly ${EVENT_CM_SCENE_ROLES.length} scenes, each role once, in order: ${EVENT_CM_SCENE_ROLES.join(" → ")}`,
+    ),
+});
+
+/** The facts, written out for the model. Only what the brief actually holds —
+ *  an absent fact is absent from the prompt, so it cannot be echoed back. */
+export function describeEventFacts(brief: EventBrief): string {
+  const lines: string[] = [];
+  const push = (label: string, value: string | null | undefined) => {
+    if (value && value.trim()) lines.push(`${label}: ${value.trim()}`);
+  };
+
+  push("タイトル", brief.title);
+  push("サブタイトル", brief.subtitle);
+  push("シリーズ", brief.seriesLabel);
+  push("主催", brief.presenter);
+  push("補足コピー", brief.sideCopy);
+  if (brief.valueLines.length) push("価値の訴求", brief.valueLines.join(""));
+  push("価値のチップ", brief.valueChip);
+
+  if (brief.programs.length) {
+    lines.push("プログラム:");
+    for (const program of brief.programs) lines.push(`  - ${program.title}`);
+  }
+  if (brief.guests.length) {
+    lines.push("登壇者:");
+    for (const guest of brief.guests) {
+      lines.push(`  - ${guest.name}（${guest.role.replace(/\n/g, " / ")}）`);
+    }
+  }
+
+  const schedule: string[] = [];
+  if (brief.schedule.date.trim()) schedule.push(brief.schedule.date);
+  if (brief.schedule.weekday.trim()) schedule.push(brief.schedule.weekday);
+  if (brief.schedule.time.trim()) schedule.push(brief.schedule.time);
+  if (schedule.length) lines.push(`開催日時: ${schedule.join(" ")}`);
+  push("会場", brief.schedule.venue);
+  push("参加費", brief.schedule.fee);
+  push("行動喚起", brief.cta);
+  push("注記", brief.footnote);
+
+  const logos = brief.logos.map((logo) => logo.name).filter(Boolean);
+  if (logos.length) lines.push(`関係団体: ${logos.join("、")}`);
+
+  return lines.join("\n");
+}
+
+export interface EventCmScriptDraft {
+  script: EventCmScript;
+  facts: string;
+  usage: { inputTokens: number; outputTokens: number } | null;
+}
+
+export function eventCmScriptAvailable(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY);
+}
+
+/**
+ * Draft a narration from the brief's facts.
+ *
+ * `notes` carries anything the brief cannot hold — the organiser's own words
+ * about who this is for, what happened at the last one. It is injected as
+ * additional source material, under the same no-invention rule.
+ */
+export async function draftEventCmScript(
+  brief: EventBrief,
+  options: { notes?: string | null; now: string } = { now: new Date().toISOString() },
+): Promise<EventCmScriptDraft> {
+  const facts = describeEventFacts(brief);
+  const notes = options.notes?.trim();
+
+  const response = await openai().chat.completions.parse({
+    model: MODEL,
+    max_completion_tokens: 4000,
+    reasoning_effort: "medium",
+    messages: [
+      { role: "system", content: SYSTEM },
+      {
+        role: "user",
+        content: `このイベントについて分かっている事実は以下がすべてです。ここに無い情報は存在しないものとして扱ってください。
+
+${facts}${notes ? `\n\n主催者からの補足（事実として扱ってよい）:\n${notes}` : ""}
+
+30秒のCMナレーションを書いてください。`,
+      },
+    ],
+    response_format: zodResponseFormat(DraftSchema, "event_cm_script"),
+  });
+
+  const parsed = response.choices[0]?.message.parsed;
+  if (!parsed) throw new Error("ナレーション台本を生成できませんでした");
+
+  // Order is part of the contract, and the model is asked for it rather than
+  // trusted with it: sort by the canonical role order before storing.
+  const byRole = new Map(parsed.scenes.map((scene) => [scene.role, scene.text]));
+  const scenes = EVENT_CM_SCENE_ROLES.map((role) => ({
+    role,
+    text: (byRole.get(role) ?? "").trim(),
+  }));
+  const missing = scenes.filter((scene) => !scene.text).map((scene) => scene.role);
+  if (missing.length) {
+    throw new Error(`ナレーションに欠けているシーンがあります: ${missing.join(", ")}`);
+  }
+
+  return {
+    script: {
+      version: 1,
+      scenes,
+      source: "llm",
+      updatedAt: options.now,
+      angle: parsed.angle.trim(),
+    },
+    facts,
+    usage: response.usage
+      ? {
+          inputTokens: response.usage.prompt_tokens,
+          outputTokens: response.usage.completion_tokens,
+        }
+      : null,
+  };
+}

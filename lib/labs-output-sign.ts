@@ -32,7 +32,12 @@ export function signedLabsUrl(pathname: string, token: string): string {
   if (!key) return pathname;
 
   const expiresAt = Math.floor(Date.now() / 1000) + TTL_SECONDS;
-  return `${pathname}?exp=${expiresAt}&sig=${signature(key, token, expiresAt)}`;
+  // Callers that bind an object key pass it in the query string already, so
+  // the separator has to follow what is there. Always using "?" produced
+  // `...?key=X?exp=…`, which parses as a key with the expiry glued onto it —
+  // and only in production, where a secret exists to append anything at all.
+  const separator = pathname.includes("?") ? "&" : "?";
+  return `${pathname}${separator}exp=${expiresAt}&sig=${signature(key, token, expiresAt)}`;
 }
 
 export function verifyLabsSignature(

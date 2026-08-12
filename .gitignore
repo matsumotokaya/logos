@@ -63,3 +63,10 @@ next-env.d.ts
 # python (blender scripts)
 __pycache__/
 *.pyc
+
+# Default asset pool (lib/assets/defaults.ts). The tracks currently placed here
+# are client-supplied placeholders without redistribution rights, so the bytes
+# stay out of git the same way the event material does. The catalog entry that
+# names them IS committed, and marks them unlicensed so they cannot leave in an
+# exported MP4.
+/public/defaults/bgm/*.mp3

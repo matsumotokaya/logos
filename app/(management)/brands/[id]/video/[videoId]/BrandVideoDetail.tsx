@@ -20,6 +20,23 @@ import Link from "next/link";
 import { videoFetch } from "@/lib/video/client";
 import CampaignDetail from "@/app/campaigns/[id]/CampaignDetail";
 import EventVideoWorkspace from "@/components/video/EventVideoWorkspace";
+import EventCmWorkspace from "@/components/video/EventCmWorkspace";
+import type { FactEdit } from "@/components/video/FactList";
+import BriefSourceIntake, { type BriefSource } from "@/components/video/BriefSourceIntake";
+import FactList from "@/components/video/FactList";
+import RunOverlay, { type RunCard } from "@/components/pipeline/RunOverlay";
+import StageAction from "@/components/pipeline/StageAction";
+import { ExtractResults, StructureResults } from "@/components/pipeline/StageResults";
+import type { RunnableStage } from "@/app/api/brands/[id]/videos/[videoId]/run/[stage]/route";
+
+/** What the run card calls each step while it is running. */
+const STAGE_RUN_LABEL: Record<RunnableStage, string> = {
+  extract: "資料を読み取る",
+  structure: "内容を構造化する",
+  map: "動画へ反映する",
+};
+import { eventCmGoalState } from "@/lib/pipeline/event-cm";
+import type { TakeRunRecord } from "@/app/api/brands/[id]/videos/[videoId]/runs/route";
 import PipelineBar from "@/components/pipeline/PipelineBar";
 import StageDrawer from "@/components/pipeline/StageDrawer";
 import VideoPipelinePanel, {
@@ -29,6 +46,7 @@ import type { PipelineStage } from "@/lib/pipeline/stages";
 import { VIDEO_STATE_LABEL, type VideoState } from "@/lib/video/asset";
 import type { VideoTemplateId } from "@/lib/video/templates";
 import type { EventBrief } from "@/remotion/event/types";
+import type { EventCmBrief } from "@/remotion/event-cm/types";
 
 type VideoAsset = {
   id: string;
@@ -41,6 +59,10 @@ type VideoAsset = {
   briefSlug: string | null;
   brief: EventBrief | Record<string, unknown> | null;
   campaignJobId: string | null;
+  /** Materials the brief points at that are not pinned to this take. The
+   *  preview cannot fetch them, so say so rather than let the player fail
+   *  silently — an empty slot here would read as a designed fallback. */
+  unresolvedMaterials?: string[];
   state: VideoState;
   createdAt: string;
   render: { status: "running" | "done" | "error"; error: string | null; renderedAt: string | null } | null;
@@ -119,6 +141,9 @@ export default function BrandVideoDetail({
     (VideoPipelinePayload & { stages: PipelineStage[] }) | null
   >(null);
   const [openStage, setOpenStage] = useState<string | null>(null);
+  const [sources, setSources] = useState<BriefSource[]>([]);
+  const [runs, setRuns] = useState<TakeRunRecord[]>([]);
+  const [runCards, setRunCards] = useState<RunCard[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -200,6 +225,257 @@ export default function BrandVideoDetail({
     }
   }
 
+  // Writing the narration is what turns a seeded film into this event's film:
+  // the scene lengths stop being budgets and start following the words.
+  async function writeScript() {
+    setSaving(true);
+    try {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/script`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "台本を作成できませんでした");
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "台本を作成できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const loadSources = useCallback(async () => {
+    const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/materials`);
+    if (!res.ok) return;
+    const body = (await res.json()) as { materials?: BriefSource[] };
+    setSources(body.materials ?? []);
+  }, [brandId, videoId]);
+
+  const loadRuns = useCallback(async () => {
+    const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/runs`);
+    if (!res.ok) return;
+    const body = (await res.json()) as { runs?: TakeRunRecord[] };
+    setRuns(body.runs ?? []);
+  }, [brandId, videoId]);
+
+  // Kept off the synchronous effect path, same as the take load: setting state
+  // during the effect body triggers cascading renders.
+  useEffect(() => {
+    if (resolved?.kind !== "asset" || resolved.video.template !== "event-cm") return;
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      await loadSources();
+      if (!cancelled) await loadRuns();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resolved, loadSources, loadRuns]);
+
+  async function addSource(body: Record<string, unknown>) {
+    setSaving(true);
+    try {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/materials`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "素材を追加できませんでした");
+      }
+      await loadSources();
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "素材を追加できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeSource(materialId: string) {
+    setSaving(true);
+    try {
+      await videoFetch(
+        `/api/brands/${brandId}/videos/${videoId}/materials?materialId=${materialId}`,
+        { method: "DELETE" },
+      );
+      await loadSources();
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const dismissRun = useCallback(
+    (id: string) => setRunCards((cards) => cards.filter((card) => card.id !== id)),
+    [],
+  );
+
+  const appendLine = (id: string, line: string) =>
+    setRunCards((cards) =>
+      cards.map((card) =>
+        card.id === id ? { ...card, lines: [...card.lines, line] } : card,
+      ),
+    );
+
+  /**
+   * Run one stage, narrating it.
+   *
+   * The card is the answer to pressing a button and seeing nothing: it appears
+   * immediately, says what is happening, and reports what changed. Success
+   * clears itself after ten seconds; failure stays until dismissed. Either way
+   * the run is in take_runs and shows up in the log at the bottom of the stage.
+   */
+  async function runStage(stage: RunnableStage): Promise<boolean> {
+    const id = `${stage}-${Date.now()}`;
+    const label = STAGE_RUN_LABEL[stage];
+    setRunCards((cards) => [
+      ...cards,
+      { id, label, status: "running", lines: [], startedAt: Date.now(), endedAt: null },
+    ]);
+    setSaving(true);
+    setError(null);
+
+    const settle = (status: "succeeded" | "failed", error?: string) =>
+      setRunCards((cards) =>
+        cards.map((card) =>
+          card.id === id ? { ...card, status, endedAt: Date.now(), error } : card,
+        ),
+      );
+
+    try {
+      appendLine(id, `${sources.length}件の資料を対象に開始`);
+      const res = await videoFetch(
+        `/api/brands/${brandId}/videos/${videoId}/run/${stage}`,
+        { method: "POST" },
+      );
+      const json = (await res.json().catch(() => null)) as {
+        error?: string;
+        sources?: Array<{ label: string; mode: string; chars: number }>;
+        applied?: Array<{ label: string; before: string; after: string }>;
+        foundCount?: number;
+        dropped?: Array<{ field: string; value: string; reason: string }>;
+        keptUserValues?: string[];
+        narrationRewritten?: boolean;
+        narrationKept?: boolean;
+        note?: string | null;
+      } | null;
+      if (!res.ok) throw new Error(json?.error ?? "実行できませんでした");
+
+      if (stage === "structure") {
+        appendLine(id, `資料から${json?.foundCount ?? 0}項目を読み取りました`);
+        for (const drop of json?.dropped ?? []) {
+          appendLine(id, `除外: ${drop.value}（${drop.reason}）`);
+        }
+        if (json?.note) appendLine(id, `読み取りメモ: ${json.note}`);
+      } else if (stage === "extract") {
+        for (const source of json?.sources ?? []) {
+          appendLine(
+            id,
+            source.mode === "text"
+              ? `読み取り: ${source.label}（${source.chars}字）`
+              : source.mode === "passthrough"
+                ? `次の段で直接読む: ${source.label}`
+                : `対象外: ${source.label}`,
+          );
+        }
+      } else {
+        const applied = json?.applied ?? [];
+        if (applied.length === 0) {
+          appendLine(id, "資料から新しく分かったことはありませんでした");
+        }
+        for (const field of applied) {
+          appendLine(id, `${field.label}: ${field.before || "（空）"} → ${field.after}`);
+        }
+        for (const kept of json?.keptUserValues ?? []) {
+          appendLine(id, `あなたが決めた値のまま: ${kept}`);
+        }
+        if (json?.narrationRewritten) {
+          appendLine(id, "ナレーションを新しい内容で書き直しました");
+          appendLine(id, "音声は作り直しが必要です");
+        }
+        if (json?.narrationKept) {
+          appendLine(id, "編集済みのナレーションはそのままにしました");
+        }
+        if (json?.note) appendLine(id, `読み取りメモ: ${json.note}`);
+      }
+
+      settle("succeeded");
+      await load();
+      await loadRuns();
+      return true;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "実行できませんでした";
+      appendLine(id, message);
+      settle("failed", message);
+      await loadRuns();
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /**
+   * Everything that has not been done, in order.
+   *
+   * Stops at the first failure rather than carrying on: a structuring step
+   * that could not read the flyer has nothing for the mapping step to apply,
+   * and running it anyway would report a second, confusing error.
+   */
+  async function runAll() {
+    for (const stage of ["extract", "structure", "map"] as const) {
+      const ok = await runStage(stage);
+      if (!ok) return;
+    }
+  }
+
+  // Correcting a fact, or switching one off. The film redraws from the saved
+  // brief, so the change is visible in the player on the next load.
+  async function editFact(edit: FactEdit) {
+    setSaving(true);
+    try {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/facts`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(edit),
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "変更を保存できませんでした");
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "変更を保存できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Speaking replaces the estimated timeline with the measured one.
+  async function speakScript() {
+    setSaving(true);
+    try {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/voice`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "ナレーション音声を作成できませんでした");
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "ナレーション音声を作成できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function togglePublished(next: boolean) {
     if (resolved?.kind !== "asset") return;
     setSaving(true);
@@ -263,12 +539,26 @@ export default function BrandVideoDetail({
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8 md:px-10">
       {pipeline ? (
-        <div className="-mx-6 -mt-2 md:-mx-10">
-          <PipelineBar
-            stages={pipeline.stages}
-            openStage={openStage}
-            onOpenStage={setOpenStage}
-          />
+        <div className="-mx-6 -mt-2 flex flex-wrap items-center gap-3 md:-mx-10">
+          <div className="min-w-0 flex-1">
+            <PipelineBar
+              stages={pipeline.stages}
+              openStage={openStage}
+              onOpenStage={setOpenStage}
+            />
+          </div>
+          {/* Outside the flow on purpose: the stages are one step each, and
+              "do the rest" is a statement about the whole pipeline. */}
+          {video?.template === "event-cm" && sources.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => void runAll()}
+              disabled={saving}
+              className="mr-6 shrink-0 rounded-full bg-ink px-4 py-1.5 text-xs font-semibold text-paper transition hover:bg-accent disabled:opacity-50 md:mr-10"
+            >
+              {saving ? "実行中…" : "未処理をまとめて実行"}
+            </button>
+          ) : null}
         </div>
       ) : null}
       {pipeline && openStageDef ? (
@@ -280,6 +570,47 @@ export default function BrandVideoDetail({
           <VideoPipelinePanel
             stageId={openStageDef.id}
             payload={pipeline}
+            runs={runs}
+            intake={
+              video?.template === "event-cm" ? (
+                <BriefSourceIntake
+                  sources={sources}
+                  busy={saving}
+                  onUpload={(file, data) =>
+                    addSource({ label: file.name, mediaType: file.type, data })
+                  }
+                  onAddText={(text) => addSource({ text })}
+                  onRemove={removeSource}
+                />
+              ) : undefined
+            }
+            extracted={
+              video?.template === "event-cm" ? <ExtractResults runs={runs} /> : undefined
+            }
+            structured={
+              video?.template === "event-cm" ? <StructureResults runs={runs} /> : undefined
+            }
+            action={
+              video?.template === "event-cm" ? (
+                <StageAction
+                  stageId={openStageDef.id}
+                  busy={saving}
+                  disabled={sources.length === 0}
+                  onRun={(stage) => void runStage(stage)}
+                  onRewriteScript={() => void writeScript()}
+                />
+              ) : undefined
+            }
+            facts={
+              video?.template === "event-cm" && video.brief ? (
+                <FactList
+                  brief={video.brief as EventCmBrief}
+                  goalFields={eventCmGoalState(video.brief as EventCmBrief).fields}
+                  busy={saving}
+                  onEdit={(edit) => void editFact(edit)}
+                />
+              ) : undefined
+            }
           />
         </StageDrawer>
       ) : null}
@@ -316,6 +647,20 @@ export default function BrandVideoDetail({
               公開動画 ↗
             </a>
           ) : null}
+          {video.template === "event-cm" ? (
+            // A finishing step, not an authoring one: the script is written in
+            // the pipeline, and speaking it costs money and half a minute, so
+            // it happens once the words are settled — immediately before the
+            // export it feeds.
+            <button
+              type="button"
+              onClick={() => void speakScript()}
+              disabled={saving || !(video.brief as EventCmBrief)?.script?.scenes?.length}
+              className="rounded-full border border-hairline px-4 py-2 text-xs font-semibold transition hover:border-ink disabled:opacity-50"
+            >
+              {(video.brief as EventCmBrief)?.voice ? "読み上げ直す" : "ナレーションを読み上げる"}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => void startRender()}
@@ -343,6 +688,12 @@ export default function BrandVideoDetail({
         <p className="flex items-center gap-2 rounded-xl border border-hairline bg-ink/5 px-4 py-2.5 text-[12px] text-ink-muted">
           <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ink-faint border-t-ink" />
           MP4を作成中（数分）— このページを離れても処理は続き、完成するとここに表示されます
+        </p>
+      ) : null}
+      {video.unresolvedMaterials?.length ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] text-amber-800">
+          このテイクに固定されていない素材が{video.unresolvedMaterials.length}件あります。
+          プレビューではその枠だけが表示されません（書き出しは失敗します）。
         </p>
       ) : null}
       {video.render?.status === "error" && video.render.error ? (
@@ -374,7 +725,13 @@ export default function BrandVideoDetail({
         </section>
       ) : null}
 
-      {video.template === "event-promo" && video.brief ? (
+      {video.template === "event-cm" && video.brief ? (
+        <EventCmWorkspace
+          brief={video.brief as EventCmBrief}
+          onEditFact={(edit) => void editFact(edit)}
+          writing={saving}
+        />
+      ) : video.template === "event-promo" && video.brief ? (
         <EventVideoWorkspace brief={video.brief as EventBrief} />
       ) : video.template === "product-cm" && !hasPinnedProductVoice(video.brief) ? (
         // Product CM without a pinned voice: surface the regeneration actions.
@@ -396,6 +753,10 @@ export default function BrandVideoDetail({
           このイベント動画にはまだブリーフがありません。
         </p>
       )}
+      {/* Last in the tree on purpose: the run log has to stay readable
+          over an open stage drawer, so it must both out-rank it (z-50 vs
+          z-40) and paint after it. */}
+      <RunOverlay runs={runCards} onDismiss={dismissRun} />
     </main>
   );
 }

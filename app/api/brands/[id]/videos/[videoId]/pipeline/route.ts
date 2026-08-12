@@ -88,9 +88,36 @@ export async function GET(
             ? "failed"
             : "empty";
 
+  // The input stage is about what the user supplied, so it is read from the
+  // pins, not from the brief. A seeded take has a brief and no sources.
+  const [sourcesResult, runsResult] = await Promise.all([
+    supabase
+      .from("take_inputs")
+      .select("pinned_at")
+      .eq("take_id", take.id)
+      .eq("role", "brief_source")
+      .order("pinned_at", { ascending: false }),
+    supabase
+      .from("take_runs")
+      .select("stage, finished_at")
+      .eq("take_id", take.id)
+      .eq("status", "succeeded")
+      .in("stage", ["extract", "structure", "map"])
+      .order("finished_at", { ascending: false }),
+  ]);
+  const sources = sourcesResult.data ?? [];
+  const runs: Partial<Record<"extract" | "structure" | "map", string | null>> = {};
+  for (const run of runsResult.data ?? []) {
+    const stage = run.stage as "extract" | "structure" | "map";
+    if (!runs[stage]) runs[stage] = run.finished_at as string | null;
+  }
+
   const pipeline = videoPipeline({
     template: (take.template_id as string) ?? "",
     hasBrief: take.brief != null && typeof take.brief === "object",
+    sourceCount: sources.length,
+    sourcePinnedAt: (sources[0]?.pinned_at as string | null) ?? null,
+    runs,
     briefUpdatedAt: (take.updated_at as string | null) ?? null,
     brief: (take.brief as Record<string, unknown> | null) ?? null,
     renderStatus,

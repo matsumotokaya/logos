@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { EventBriefSchema } from "@/remotion/event/brief-schema";
+import { EventCmBriefSchema } from "@/remotion/event-cm/brief-schema";
+import { CmVoiceTrackSchema } from "./voice-schema";
 
 // The brief schema of each template — the shape of the data that template needs.
 //
@@ -49,21 +51,7 @@ export const CampaignKitBriefSchema = z.object({
   theme: z.string().nullable(),
 });
 
-export const CmVoiceTrackSchema = z
-  .object({
-    version: z.literal(1),
-    generatedAt: z.string(),
-    totalMs: z.number().positive(),
-    sampleRate: z.number().positive(),
-    mock: z.boolean(),
-    provider: z.string(),
-    voice: z.string(),
-    scenes: z.array(z.object({ startMs: z.number(), durationMs: z.number() }).passthrough()),
-    captions: z.array(
-      z.object({ text: z.string(), startMs: z.number(), endMs: z.number() }),
-    ),
-  })
-  .passthrough();
+export { CmVoiceTrackSchema };
 
 export const ProductCmBriefSchema = CampaignKitBriefSchema.extend({
   voice: z.object({
@@ -75,6 +63,7 @@ export const ProductCmBriefSchema = CampaignKitBriefSchema.extend({
 export const BRIEF_SCHEMAS: Record<string, z.ZodType<unknown>> = {
   "logo-presentation": LogoPresentationBriefSchema,
   "event-promo": EventBriefSchema,
+  "event-cm": EventCmBriefSchema,
   "product-cm": ProductCmBriefSchema,
   "campaign-lp": CampaignKitBriefSchema,
 };

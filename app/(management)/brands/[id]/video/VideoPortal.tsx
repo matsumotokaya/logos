@@ -25,10 +25,7 @@ import {
   type VideoTemplateId,
 } from "@/lib/video/templates";
 import { VIDEO_STATE_LABEL, type VideoSummary } from "@/lib/video/asset";
-import { BUNDLED_BRIEFS } from "@/remotion/event/briefs";
 
-const EMPTY_BRIEF_VALUE = "__empty__";
-const TEMPLATE_TAKE_PREFIX = "take:";
 
 export default function VideoPortal({ brandId }: { brandId: string }) {
   const router = useRouter();
@@ -38,9 +35,6 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
   const [adding, setAdding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [template, setTemplate] = useState<VideoTemplateId>("event-promo");
-  const [seed, setSeed] = useState<string>(
-    () => `${TEMPLATE_TAKE_PREFIX}${videos?.[0]?.id ?? ""}` || EMPTY_BRIEF_VALUE,
-  );
   const [title, setTitle] = useState("");
 
   const load = useCallback(async () => {
@@ -57,17 +51,6 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
       setVideos(json.videos);
       setBrandName(json.brand.name);
       setError(null);
-      // Default the seed to the first existing event-promo Take of this brand.
-      // That is the only path that carries real materials into the new Take.
-      setSeed((current) => {
-        if (current !== EMPTY_BRIEF_VALUE && current.startsWith(TEMPLATE_TAKE_PREFIX)) {
-          return current;
-        }
-        const firstEvent = json.videos.find((v) => v.template === "event-promo");
-        return firstEvent
-          ? `${TEMPLATE_TAKE_PREFIX}${firstEvent.id}`
-          : EMPTY_BRIEF_VALUE;
-      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "動画を取得できませんでした");
       setVideos([]);
@@ -94,13 +77,6 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
         template,
         title: title.trim() || undefined,
       };
-      if (template === "event-promo" && seed !== EMPTY_BRIEF_VALUE) {
-        if (seed.startsWith(TEMPLATE_TAKE_PREFIX)) {
-          body.templateTakeId = seed.slice(TEMPLATE_TAKE_PREFIX.length);
-        } else {
-          body.briefSlug = seed;
-        }
-      }
       const res = await videoFetch(`/api/brands/${brandId}/videos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -123,10 +99,6 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
       setSubmitting(false);
     }
   }
-
-  const existingEventTakes = (videos ?? []).filter(
-    (video) => video.template === "event-promo",
-  );
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8 md:px-10">
@@ -172,9 +144,6 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
         <AddVideoOverlay
           template={template}
           onTemplate={setTemplate}
-          seed={seed}
-          onSeed={setSeed}
-          existingTakes={existingEventTakes}
           title={title}
           onTitle={setTitle}
           submitting={submitting}
@@ -218,9 +187,6 @@ function VideoRow({ brandId, video }: { brandId: string; video: VideoSummary }) 
 function AddVideoOverlay({
   template,
   onTemplate,
-  seed,
-  onSeed,
-  existingTakes,
   title,
   onTitle,
   submitting,
@@ -229,9 +195,6 @@ function AddVideoOverlay({
 }: {
   template: VideoTemplateId;
   onTemplate: (id: VideoTemplateId) => void;
-  seed: string;
-  onSeed: (value: string) => void;
-  existingTakes: VideoSummary[];
   title: string;
   onTitle: (value: string) => void;
   submitting: boolean;
@@ -304,41 +267,25 @@ function AddVideoOverlay({
           </div>
         </fieldset>
 
-        {template === "event-promo" ? (
+        {/* The title belongs to the template that needs one. An event has a
+            name before it has anything else, and asking for it at the bottom
+            of the dialog — under a heading reading 任意 — buried the one
+            field this template actually wants. */}
+        {template === "event-cm" || template === "event-promo" ? (
           <label className="mt-5 block">
             <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-              下敷きにする動画
+              イベント名
             </span>
-            <select
-              value={seed}
-              onChange={(e) => onSeed(e.target.value)}
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => onTitle(e.target.value)}
+              placeholder="あとから直せます"
+              autoFocus
               className="mt-2 w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-[13px]"
-            >
-              {existingTakes.length > 0 ? (
-                <optgroup label="このブランドの既存の動画からコピー">
-                  {existingTakes.map((video) => (
-                    <option
-                      key={video.id}
-                      value={`${TEMPLATE_TAKE_PREFIX}${video.id}`}
-                    >
-                      {video.title}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null}
-              {BUNDLED_BRIEFS.length > 0 ? (
-                <optgroup label="サンプルブリーフ">
-                  {BUNDLED_BRIEFS.map((item) => (
-                    <option key={item.slug} value={item.slug}>
-                      {item.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null}
-              <option value={EMPTY_BRIEF_VALUE}>空から作る</option>
-            </select>
+            />
             <span className="mt-1.5 block text-[11px] text-ink-muted">
-              既存の動画を選ぶとそのブリefと素材を複製します。サンプルは素材が入っていないのでレンダーは空になります。
+              未入力でも作れます。資料を読み込むと、そこに書かれた名前で置き換わります。
             </span>
           </label>
         ) : (
@@ -346,19 +293,6 @@ function AddVideoOverlay({
             {selected.requires}が必要です。トップ（CM Maker）でソースから生成したBrand Kitを使います。
           </p>
         )}
-
-        <label className="mt-5 block">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-            タイトル（任意）
-          </span>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => onTitle(e.target.value)}
-            placeholder="未入力ならテンプレートの既定名を使います"
-            className="mt-2 w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-[13px]"
-          />
-        </label>
 
         <div className="mt-6 flex justify-end gap-2">
           <button

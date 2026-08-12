@@ -1,0 +1,210 @@
+// Run one stage of one video's pipeline.
+//
+// One stage per request, and each stage does exactly the one thing its name
+// says. They used to be two: "structure" read the material AND wrote the
+// result into the film, which left the マッピング stage with nothing to do and
+// its drawer with nothing to offer. A stage a person cannot run is not a stage.
+//
+//   extract    read the material as far as rules go
+//   structure  work out the event's facts from it — recorded, not applied
+//   map        put those facts into the film, and rewrite the narration
+//
+// Each run is recorded in take_runs, which already models exactly this
+// (stage, status, input, steps, usage). The map stage is the only one that
+// writes the brief — the brief is the deliverable, and the only thing the
+// renderer reads.
+
+import { guardLabsRequest } from "@/lib/labs-access";
+import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
+import { extractSummary, extractTakeSources } from "@/lib/event-cm/extract";
+import {
+  structureEventFacts,
+  structuringAvailable,
+  type EventFacts,
+} from "@/lib/event-cm/structure";
+import { mapFactsIntoBrief } from "@/lib/event-cm/map";
+import { draftEventCmScript, eventCmScriptAvailable } from "@/lib/event-cm/script";
+import { validateBrief } from "@/lib/templates/brief-schemas";
+import type { EventCmBrief } from "@/remotion/event-cm/types";
+
+const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
+
+export const RUNNABLE_STAGES = ["extract", "structure", "map"] as const;
+export type RunnableStage = (typeof RUNNABLE_STAGES)[number];
+
+const isRunnable = (value: string): value is RunnableStage =>
+  (RUNNABLE_STAGES as readonly string[]).includes(value);
+
+export async function POST(
+  req: Request,
+  ctx: { params: Promise<{ id: string; videoId: string; stage: string }> },
+) {
+  const denied = await guardLabsRequest(req);
+  if (denied) return denied;
+  let user;
+  try {
+    user = await requireUser(req);
+  } catch {
+    return unauthorized();
+  }
+  const { id: brandId, videoId, stage } = await ctx.params;
+  if (!isRunnable(stage)) {
+    return Response.json({ error: `実行できない段です: ${stage}` }, { status: 400 });
+  }
+  const supabase = createServerSupabaseForToken(user.token);
+
+  const { data: take, error } = await supabase
+    .from("takes")
+    .select("id, template_id, brief")
+    .eq("id", videoId)
+    .eq("brand_id", brandId)
+    .eq("tool_kind", "video")
+    .maybeSingle();
+  if (error) {
+    return Response.json({ error: "動画を確認できませんでした" }, { status: 500 });
+  }
+  if (!take) return Response.json({ error: "動画が見つかりません" }, { status: 404 });
+  if (take.template_id !== "event-cm") {
+    return Response.json({ error: "このテンプレートには対応していません" }, { status: 400 });
+  }
+
+  const startedAt = new Date().toISOString();
+  const record = async (
+    status: "succeeded" | "failed",
+    payload: { input?: unknown; steps?: unknown; usage?: unknown; error?: string },
+  ) => {
+    await supabase.from("take_runs").insert({
+      take_id: take.id,
+      stage,
+      status,
+      input: payload.input ?? {},
+      steps: payload.steps ?? [],
+      usage: payload.usage ?? {},
+      error_message: payload.error ?? null,
+      triggered_by: user.id,
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+    });
+  };
+
+  try {
+    if (stage === "extract") {
+      const sources = await extractTakeSources(supabase, take.id as string);
+      const summary = extractSummary(sources);
+      if (summary.every((item) => item.mode === "skipped")) {
+        throw new Error("読み取れる素材がありません。資料かテキストを追加してください");
+      }
+      await record("succeeded", { steps: summary });
+      return Response.json({ ok: true, sources: summary });
+    }
+
+    if (stage === "structure") {
+      if (!structuringAvailable()) {
+        throw new Error("構造化が設定されていません（OPENAI_API_KEY）");
+      }
+      // Bodies are re-read rather than carried on the extract run: a PDF has no
+      // text layer this repo can store, so the model needs the file itself.
+      const sources = await extractTakeSources(supabase, take.id as string);
+      const structured = await structureEventFacts(sources);
+      await record("succeeded", {
+        input: { sources: extractSummary(sources) },
+        steps: {
+          facts: structured.facts,
+          read: structured.readLabels,
+          dropped: structured.dropped,
+        },
+        usage: structured.usage ?? {},
+      });
+      const found = Object.entries(structured.facts).filter(
+        ([key, value]) => key !== "note" && value !== null,
+      );
+      return Response.json({
+        ok: true,
+        facts: structured.facts,
+        foundCount: found.length,
+        dropped: structured.dropped,
+        note: structured.facts.note,
+      });
+    }
+
+    // map: take what structuring worked out and put it into the film.
+    const { data: lastStructure, error: structureError } = await supabase
+      .from("take_runs")
+      .select("steps, finished_at")
+      .eq("take_id", take.id)
+      .eq("stage", "structure")
+      .eq("status", "succeeded")
+      .order("finished_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (structureError) throw new Error("構造化の結果を読めませんでした");
+    const steps = lastStructure?.steps as { facts?: EventFacts; read?: string[] } | null;
+    if (!steps?.facts) {
+      throw new Error("先に構造化を実行してください");
+    }
+
+    const mapped = mapFactsIntoBrief(
+      take.brief as EventCmBrief,
+      steps.facts,
+      (steps.read ?? []).join("、"),
+    );
+
+    // The narration is the film's spine: it decides the scene order and the
+    // scene lengths, so facts that changed without it are a film narrating a
+    // different event. Rewriting it here is what makes 資料 → 事実 →
+    // ナレーション → 映像 one chain instead of two branches.
+    //
+    // An edited script is left alone. That contract is what makes the
+    // unattended path safe: a person who wrote their own words keeps them.
+    let rewrote = false;
+    let briefToSave = mapped.brief;
+    const previous = (take.brief as EventCmBrief).script;
+    if (
+      mapped.applied.length > 0 &&
+      previous.scenes.length > 0 &&
+      previous.source !== "human" &&
+      eventCmScriptAvailable()
+    ) {
+      const draft = await draftEventCmScript(briefToSave, {
+        now: new Date().toISOString(),
+      });
+      briefToSave = { ...briefToSave, script: draft.script };
+      // A rewritten script makes the old recording describe words nobody says
+      // any more, so the voice goes with it.
+      delete briefToSave.voice;
+      rewrote = true;
+    }
+
+    const validated = validateBrief("event-cm", briefToSave);
+    if (!validated.ok) {
+      throw new Error(`読み取った内容を反映できません: ${validated.issues.join(", ")}`);
+    }
+    const saved = await supabase
+      .from("takes")
+      .update({ brief: validated.brief, updated_at: new Date().toISOString() })
+      .eq("id", take.id);
+    if (saved.error) throw new Error(saved.error.message);
+
+    await record("succeeded", {
+      input: { structuredAt: lastStructure?.finished_at ?? null },
+      steps: {
+        applied: mapped.applied,
+        keptUserValues: mapped.keptUserValues,
+        narrationRewritten: rewrote,
+      },
+    });
+
+    return Response.json({
+      ok: true,
+      applied: mapped.applied,
+      keptUserValues: mapped.keptUserValues,
+      narrationRewritten: rewrote,
+      narrationKept: previous.source === "human" && mapped.applied.length > 0,
+    });
+  } catch (runError) {
+    const message =
+      runError instanceof Error ? runError.message : "実行できませんでした";
+    await record("failed", { error: message });
+    return Response.json({ error: message }, { status: 400 });
+  }
+}
