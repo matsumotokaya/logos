@@ -61,7 +61,18 @@ const INPUT_BY_PATH: Record<string, FactInput> = {
   voice: "generated",
 };
 
-export const FACT_FIELDS: FactField[] = EVENT_CM_GOAL.map((field) => ({
+/**
+ * Slots that have their own control elsewhere on the screen.
+ *
+ * BGM is chosen in its own section under the narration, because music is
+ * always present and always the same question ("which one"), which a list of
+ * facts answers badly.
+ */
+const HANDLED_ELSEWHERE = new Set(["bgm"]);
+
+export const FACT_FIELDS: FactField[] = EVENT_CM_GOAL.filter(
+  (field) => !HANDLED_ELSEWHERE.has(field.path),
+).map((field) => ({
   path: field.path,
   label: field.label,
   required: field.required,
@@ -189,6 +200,34 @@ export function applyFactEdit(
       return null;
   }
 }
+
+/**
+ * Point an asset slot at a source.
+ *
+ * Asset slots are not typed into; they are chosen. `bgm` is the one that
+ * matters today, because music is the asset nobody supplies and everybody
+ * expects — and because a take created before the default pool existed has an
+ * empty slot with no way to fill it.
+ *
+ * Deliberately NOT a render-time fallback. Letting the composition reach for
+ * "whatever the pool currently holds" would mean an approved film changes when
+ * the pool does; pinning the choice into the brief keeps a take rendering what
+ * it was approved with.
+ */
+export function applyAssetChoice(
+  brief: EventCmBrief,
+  path: string,
+  src: string | null,
+): EventCmBrief | null {
+  switch (path) {
+    case "bgm":
+      return { ...brief, bgm: src };
+    default:
+      return null;
+  }
+}
+
+export const isAssetSlot = (path: string): boolean => path === "bgm";
 
 /**
  * Record who decided this value. An edit is never overwritten by a re-run.

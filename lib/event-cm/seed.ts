@@ -1,5 +1,5 @@
 import { archetypeFor, subjectFor } from "./archetypes";
-import { pickDefault } from "@/lib/assets/defaults";
+import { defaultAsset } from "@/lib/assets/defaults";
 import type { EventCmBrief, EventCmProvenance } from "@/remotion/event-cm/types";
 
 // Hand someone a finished film before they have told us anything.
@@ -81,9 +81,9 @@ export function seedEventCmBrief(
 
   // Slots the pool can dress. A null here is not a hole: the composition
   // draws a designed substitute, which is the template's whole premise.
-  const inkArt = pickDefault("ink_art", archetype.tone, options.seed);
-  const texture = pickDefault("texture", archetype.tone, options.seed);
-  const bgm = pickDefault("bgm", archetype.tone, options.seed);
+  const inkArt = defaultAsset("ink_art", archetype.tone);
+  const texture = defaultAsset("texture", archetype.tone);
+  const bgm = defaultAsset("bgm", archetype.tone);
   if (inkArt) inferred("visuals.inkArt", "デフォルトアセット");
   if (bgm) inferred("bgm", "デフォルトアセット");
 

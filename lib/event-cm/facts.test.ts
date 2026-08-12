@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  applyAssetChoice,
   applyFactEdit,
+  isAssetSlot,
   applySuppression,
   isSuppressed,
   markUserEdited,
@@ -76,4 +78,25 @@ test("一覧の表示は生のJSONではなく読める形にする", () => {
   assert.equal(previewOf(SEEDED, "programs"), SEEDED.programs.map((p) => p.title).join(" / "));
   assert.equal(previewOf(SEEDED, "guests"), "");
   assert.equal(previewOf(SEEDED, "schedule.date"), SEEDED.schedule.date);
+});
+
+test("音源スロットは選ぶもので、任意の値は書き込めない", () => {
+  const chosen = applyAssetChoice(SEEDED, "bgm", "defaults/bgm/ink-cinematic.mp3");
+  assert.equal(chosen?.bgm, "defaults/bgm/ink-cinematic.mp3");
+
+  // Clearing is a legitimate choice: a film with no music.
+  assert.equal(applyAssetChoice(SEEDED, "bgm", null)?.bgm, null);
+
+  // Only declared asset slots. Text fields are edited, not chosen.
+  assert.equal(applyAssetChoice(SEEDED, "title", "x"), null);
+  assert.equal(isAssetSlot("bgm"), true);
+  assert.equal(isAssetSlot("title"), false);
+});
+
+test("音楽を選ぶと「あなたの入力」になる", () => {
+  const chosen = markUserEdited(
+    applyAssetChoice(SEEDED, "bgm", "defaults/bgm/ink-cinematic.mp3")!,
+    "bgm",
+  );
+  assert.equal(chosen.provenance?.bgm?.origin, "user");
 });

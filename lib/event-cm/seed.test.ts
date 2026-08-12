@@ -112,3 +112,20 @@ test("素材プールが空でもブリーフは成立する", () => {
   assert.ok(brief.title.length > 0);
   assert.ok(brief.programs.length > 0);
 });
+
+test("新しい動画には最初からBGMが入る", () => {
+  // Music is not something a user is asked for; nobody uploads a soundtrack.
+  const brief = seedFor(WEALTHPARK_LAB);
+  assert.equal(brief.bgm, "defaults/bgm/bright-corporate.mp3");
+  assert.equal(brief.provenance?.bgm?.origin, "inferred");
+});
+
+test("既定のBGMはブランドが違っても同じ", () => {
+  // A default that differs between two videos is not a default, it is a
+  // surprise. Variety is what the picker is for.
+  const other = seedEventCmBrief(
+    { name: "別のブランド", industry: "SaaS" },
+    { now: NOW, seed: "take-zzz" },
+  );
+  assert.equal(other.bgm, seedFor(WEALTHPARK_LAB).bgm);
+});

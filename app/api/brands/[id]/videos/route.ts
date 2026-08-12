@@ -11,6 +11,7 @@ import { type VideoState, type VideoSummary } from "@/lib/video/asset";
 import { emptyEventBrief } from "@/remotion/event/briefs";
 import { createTake } from "@/lib/takes/create";
 import { seedEventCmFromBrand } from "@/lib/event-cm/seed-from-brand";
+import { draftEventCmScript, eventCmScriptAvailable } from "@/lib/event-cm/script";
 
 type TakeVideoRow = {
   id: string;
@@ -165,9 +166,31 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     if (!seeded.ok) {
       return Response.json({ error: seeded.error }, { status: 500 });
     }
-    brief = seeded.seeded.brief;
+    let seededBrief = seeded.seeded.brief;
+    if (title.trim()) seededBrief = { ...seededBrief, title: title.trim() };
+
+    // Narration comes with the film, like the music does. The golden path is
+    // that nobody is asked for anything: add a video and it plays, with words
+    // and a soundtrack. Writing it here rather than on first open means the
+    // take is never briefly a silent film with no script.
+    //
+    // A failure here does not fail the creation. The take is complete without
+    // a script — the timeline falls back to the scene budget — and the
+    // narration can be written from the pipeline afterwards.
+    if (eventCmScriptAvailable()) {
+      try {
+        const draft = await draftEventCmScript(seededBrief, {
+          now: new Date().toISOString(),
+        });
+        seededBrief = { ...seededBrief, script: draft.script };
+      } catch {
+        // Left empty on purpose; the screen says the script is missing.
+      }
+    }
+
+    brief = seededBrief;
     pinMaterial = seeded.seeded.logoMaterial;
-    if (!title) title = seeded.seeded.brief.title;
+    if (!title) title = seededBrief.title;
   } else if (template === "event-promo") {
     // The template IS the starting point. Copying an existing take as a
     // "base" was a way of getting materials before the take had its own input

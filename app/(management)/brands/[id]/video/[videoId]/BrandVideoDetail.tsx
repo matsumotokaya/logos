@@ -729,6 +729,7 @@ export default function BrandVideoDetail({
         <EventCmWorkspace
           brief={video.brief as EventCmBrief}
           onEditFact={(edit) => void editFact(edit)}
+          audioSources={sources.filter((source) => source.kind === "audio")}
           writing={saving}
         />
       ) : video.template === "event-promo" && video.brief ? (

@@ -41,6 +41,8 @@ export interface FactEdit {
   path: string;
   lines?: string[];
   suppressed?: boolean;
+  /** Asset slots are chosen, not typed. `null` clears the slot. */
+  src?: string | null;
 }
 
 export default function FactList({

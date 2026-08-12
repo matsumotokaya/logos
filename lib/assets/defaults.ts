@@ -25,6 +25,8 @@ export interface DefaultAsset {
   src: string;
   /** Art-direction family. Templates ask for a tone, not a file. */
   tone: string;
+  /** What a person choosing between tracks reads. */
+  label: string;
   /** Shown when a user asks where a default came from. */
   credit: string;
   /**
@@ -50,19 +52,21 @@ export interface DefaultAsset {
  */
 export const DEFAULT_ASSETS: DefaultAsset[] = [
   {
-    id: "bgm-ink-cinematic",
-    kind: "bgm",
-    src: "defaults/bgm/ink-cinematic.mp3",
-    tone: "ink",
-    credit: "仮素材（レオパレス21×WealthPark Lab 案件の支給BGM）",
-    licensed: false,
-  },
-  {
     id: "bgm-bright-corporate",
     kind: "bgm",
     src: "defaults/bgm/bright-corporate.mp3",
     tone: "ink",
-    credit: "仮素材（CM Makerのサンプル用BGM）",
+    label: "明るい（コーポレート）",
+    credit: "仮素材（製品紹介動画で使っていたBGM）",
+    licensed: false,
+  },
+  {
+    id: "bgm-ink-cinematic",
+    kind: "bgm",
+    src: "defaults/bgm/ink-cinematic.mp3",
+    tone: "ink",
+    label: "和モダン（重厚）",
+    credit: "仮素材（レオパレス21×WealthPark Lab 案件の支給BGM）",
     licensed: false,
   },
 ];
@@ -76,27 +80,18 @@ export const defaultsOfKind = (
   );
 
 /**
- * Pick one default of a kind, stably.
+ * The default of a kind: the first entry that matches.
  *
- * Stable rather than random because a take that renders twice must render the
- * same film: `seed` is the take's own identity, so two brands get different
- * tracks and one brand gets the same track every time. Random selection would
- * make a re-render a different video with no input having changed, which is
- * the same disease as an unstable fingerprint (§16 Phase 2-7).
+ * Ordering is the decision, and it is deliberately not varied per take. An
+ * earlier version picked from a stable hash of the take id so different films
+ * got different tracks — which is a nice property and the wrong one. A default
+ * that differs between two videos of the same brand is not a default; it is a
+ * surprise. Variety is what the picker is for, once a user cares.
  */
-export function pickDefault(
+export const defaultAsset = (
   kind: DefaultAssetKind,
   tone: string,
-  seed: string,
-): DefaultAsset | null {
-  const candidates = defaultsOfKind(kind, tone);
-  if (candidates.length === 0) return null;
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) % 2147483647;
-  }
-  return candidates[hash % candidates.length];
-}
+): DefaultAsset | null => defaultsOfKind(kind, tone)[0] ?? null;
 
 /** Defaults that may not be published — the publish warning lists these. */
 export const unlicensedDefaults = (srcs: readonly string[]): DefaultAsset[] =>

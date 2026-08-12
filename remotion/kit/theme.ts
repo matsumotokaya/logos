@@ -91,8 +91,19 @@ export interface ThemeCaption {
   /** Distance from the bottom of the frame, in composition pixels. */
   bottom: number;
   color: string;
-  /** Plate behind the text. `none` relies on the film being dark enough. */
-  backdrop: "none" | "scrim" | "shadow";
+  /**
+   * What sits behind the text.
+   *
+   * - `plate`  a solid block fitted to the line. Reads as a separate layer,
+   *            which is the point: a subtitle lands on photography and on the
+   *            scene's own typography, and trying to blend produces the one
+   *            outcome that cannot be accepted — a line nobody can read.
+   * - `scrim`  a gradient darkening the lower frame. Gentler, and unreliable
+   *            over a bright photo or a light scene.
+   * - `shadow` glow only. For films that are always dark.
+   * - `none`   nothing.
+   */
+  backdrop: "none" | "scrim" | "shadow" | "plate";
 }
 
 export interface Theme {
@@ -146,7 +157,7 @@ export const SUMI_THEME: Theme = {
   ornament: { rules: true, markGlyph: "—", corner: "none" },
   // Set in the text face rather than the display mincho: a subtitle is read,
   // not composed, and mincho at 34px over moving footage loses its hairlines.
-  caption: { size: 34, bottom: 84, color: "#ffffff", backdrop: "scrim" },
+  caption: { size: 34, bottom: 72, color: "#ffffff", backdrop: "plate" },
 };
 
 export interface BrandThemeInput {

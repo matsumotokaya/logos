@@ -10,7 +10,10 @@
 // believing somebody typed it.
 
 import dynamic from "next/dynamic";
+import { cn } from "@/lib/cn";
 import { eventCmGoalState } from "@/lib/pipeline/event-cm";
+import { DEFAULT_ASSETS } from "@/lib/assets/defaults";
+import type { BriefSource } from "./BriefSourceIntake";
 import FactList, { type FactEdit } from "./FactList";
 import { eventCmTimeline, type TimingSource } from "@/remotion/event-cm/timeline";
 import { scriptChars, scriptIsStale, type EventCmBrief } from "@/remotion/event-cm/types";
@@ -33,11 +36,20 @@ const TIMING_LABEL: Record<TimingSource, string> = {
 export default function EventCmWorkspace({
   brief,
   onEditFact,
+  audioSources = [],
   writing,
 }: {
   brief: EventCmBrief;
   /** Correct a value, or switch a field off. Absent = read only. */
   onEditFact?: (edit: FactEdit) => void;
+  /**
+   * Audio the user uploaded as briefing material.
+   *
+   * The app cannot tell music from narration from a sound effect, and does not
+   * try: whatever a person points at here is what the film plays. Marking it
+   * IS the classification.
+   */
+  audioSources?: BriefSource[];
   writing?: boolean;
 }) {
   const goal = eventCmGoalState(brief);
@@ -108,6 +120,69 @@ export default function EventCmWorkspace({
             台本を書くと尺がその文字数に合い、読み上げると実測に置き換わります。
           </p>
         )}
+      </section>
+
+      <section>
+        <div className="flex items-baseline gap-3">
+          <h2 className="font-display text-base font-semibold tracking-tight">
+            BGM
+          </h2>
+          <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
+          <span className="shrink-0 text-[11px] text-ink-faint">
+            {brief.voice ? "ナレーション中は音量が下がります" : "冒頭から最後まで一定"}
+          </span>
+        </div>
+        {onEditFact ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {DEFAULT_ASSETS.filter((asset) => asset.kind === "bgm").map((asset) => (
+              <button
+                key={asset.id}
+                type="button"
+                onClick={() => onEditFact({ path: "bgm", src: asset.src })}
+                disabled={writing}
+                className={cn(
+                  "rounded-full border px-4 py-1.5 text-xs font-semibold transition disabled:opacity-50",
+                  brief.bgm === asset.src
+                    ? "border-ink bg-ink text-paper"
+                    : "border-hairline hover:border-ink",
+                )}
+              >
+                {asset.label}
+              </button>
+            ))}
+            {audioSources.map((source) => (
+              <button
+                key={source.id}
+                type="button"
+                onClick={() => onEditFact({ path: "bgm", src: `material:${source.id}` })}
+                disabled={writing}
+                className={cn(
+                  "rounded-full border px-4 py-1.5 text-xs font-semibold transition disabled:opacity-50",
+                  brief.bgm === `material:${source.id}`
+                    ? "border-ink bg-ink text-paper"
+                    : "border-hairline hover:border-ink",
+                )}
+              >
+                {source.label}
+              </button>
+            ))}
+            {brief.bgm ? (
+              <button
+                type="button"
+                onClick={() => onEditFact({ path: "bgm", src: null })}
+                disabled={writing}
+                className="text-[11px] text-ink-faint hover:text-ink disabled:opacity-50"
+              >
+                音楽を外す
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        <p className="mt-2 text-[11px] text-ink-faint">
+          {audioSources.length > 0
+            ? "入力ステージにアップロードした音声も選べます。BGMかどうかはこちらでは判定できないので、ここで選んだものがBGMとして使われます。"
+            : "入力ステージに音声をアップロードすると、ここで選べるようになります。"}
+        </p>
       </section>
 
       <section>

@@ -12,11 +12,14 @@ import { guardLabsRequest } from "@/lib/labs-access";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import {
+  applyAssetChoice,
   applyFactEdit,
+  isAssetSlot,
   isEditable,
   markUserEdited,
   setSuppressed,
 } from "@/lib/event-cm/facts";
+import { DEFAULT_ASSETS } from "@/lib/assets/defaults";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 
 const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -36,7 +39,7 @@ export async function PATCH(
   const { id: brandId, videoId } = await ctx.params;
   const supabase = createServerSupabaseForToken(user.token);
 
-  let body: { path?: unknown; lines?: unknown; suppressed?: unknown };
+  let body: { path?: unknown; lines?: unknown; suppressed?: unknown; src?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -62,7 +65,37 @@ export async function PATCH(
 
   let next = take.brief as EventCmBrief;
 
-  if (typeof body.suppressed === "boolean") {
+  if (body.src !== undefined && isAssetSlot(path)) {
+    // Choosing an asset, not typing a value. The source has to be one of two
+    // things: a track from the system pool, or a material pinned to THIS take.
+    // Without that check the brief could be pointed at an arbitrary R2 key.
+    const src = body.src === null ? null : String(body.src);
+    if (src !== null) {
+      const fromPool = DEFAULT_ASSETS.some((asset) => asset.src === src);
+      const materialId = src.startsWith("material:") ? src.slice("material:".length) : null;
+      let pinned = false;
+      if (materialId) {
+        const { data } = await supabase
+          .from("take_inputs")
+          .select("material_id")
+          .eq("take_id", take.id)
+          .eq("material_id", materialId)
+          .maybeSingle();
+        pinned = Boolean(data);
+      }
+      if (!fromPool && !pinned) {
+        return Response.json(
+          { error: "この音源は選べません。デフォルトから選ぶか、素材として追加してください" },
+          { status: 400 },
+        );
+      }
+    }
+    const chosen = applyAssetChoice(next, path, src);
+    if (!chosen) {
+      return Response.json({ error: "この項目は選択できません" }, { status: 400 });
+    }
+    next = markUserEdited(chosen, path);
+  } else if (typeof body.suppressed === "boolean") {
     next = setSuppressed(next, path, body.suppressed);
   } else if (Array.isArray(body.lines)) {
     if (!isEditable(path)) {
@@ -78,7 +111,7 @@ export async function PATCH(
     }
     next = markUserEdited(edited, path);
   } else {
-    return Response.json({ error: "値または表示の指定が必要です" }, { status: 400 });
+    return Response.json({ error: "値・音源・表示のいずれかの指定が必要です" }, { status: 400 });
   }
 
   const validated = validateBrief("event-cm", next);

@@ -4,9 +4,11 @@
 // with the sound off, so a film whose words exist only as audio says nothing
 // to them. It sits above every scene and below nothing.
 //
-// The scrim is a gradient rather than a box because a hard plate cuts the
-// picture in half; a gradient darkens what is behind the letters and leaves
-// the frame whole.
+// The default backdrop is a solid plate rather than a gradient. A gradient is
+// prettier and cannot be trusted: a subtitle lands on photography, on gold
+// rules, and on the scene's own typography, and blending with all of them is
+// not possible. A plate says plainly that the subtitle is a separate layer —
+// which reads better than a line that has half-disappeared into a picture.
 
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
@@ -36,6 +38,8 @@ export const CaptionBand: React.FC<{ captions: Caption[]; theme: Theme }> = ({
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
+  const plate = theme.caption.backdrop === "plate";
+
   return (
     <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center" }}>
       {theme.caption.backdrop === "scrim" ? (
@@ -52,12 +56,19 @@ export const CaptionBand: React.FC<{ captions: Caption[]; theme: Theme }> = ({
         style={{
           position: "relative",
           marginBottom: theme.caption.bottom,
-          maxWidth: 1440,
-          padding: "0 96px",
+          // Fitted to the line rather than spanning the frame: a full-width bar
+          // letterboxes the film, while a fitted block stays a caption.
+          maxWidth: 1320,
+          // Generous horizontal padding so the plate never crops a character's
+          // side bearing, which is what makes a tight box look like a mistake.
+          padding: plate
+            ? `${Math.round(theme.caption.size * 0.42)}px ${Math.round(theme.caption.size * 0.85)}px`
+            : "0 96px",
+          backgroundColor: plate ? "rgba(0,0,0,0.88)" : undefined,
           textAlign: "center",
           fontFamily: theme.textFont,
           fontSize: theme.caption.size,
-          lineHeight: 1.55,
+          lineHeight: 1.5,
           letterSpacing: "0.04em",
           color: theme.caption.color,
           textShadow:
