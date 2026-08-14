@@ -1,6 +1,6 @@
 # Event CM リファクタリング計画(次セッションの出発点)
 
-最終更新: 2026-08-14
+最終更新: 2026-08-14(同日改訂: §4 の構造を確定し A〜D を実装。§9.5=案B・§9.9=案1 を確定。§11 にエンジニア引き継ぎパケットを追加)
 
 ## 0. この文書の位置づけ
 
@@ -107,61 +107,66 @@ brief
 - **操作の失敗で画面を奪わない**。破壊的な操作は結果を残る面で言う
 - 時間のかかる処理は画面上端にバーと文言。**割合は出さない**
 
-## 4. 提案する構造
+## 4. 確定した構造(2026-08-14改訂)
 
-### 4.1 `eventCmFilm(brief)` — 映像の唯一の導出(最重要)
+### 4.1 `eventCmFilm(brief)` — 映像の唯一の導出(最重要・実装済み)
 
-**§2.1 の6手順を1つの関数に閉じ込め、レンダラーと絵コンテと各APIが同じ戻り値を読む。**
+**§2.1 の6手順を1つの関数に閉じ込め、レンダラーと絵コンテと各APIが同じ戻り値を読む。** 実装は [remotion/event-cm/film.ts](../remotion/event-cm/film.ts)。
 
 ```ts
-// remotion/event-cm/film.ts（新規・Reactに依存しない）
+// remotion/event-cm/film.ts（Reactに依存しない）
 export interface FilmScene {
-  key: string;                    // role#index。文字列連結はここだけ
+  key: string;                    // eventCmSceneKey。文字列連結はしない
   role: EventCmSceneRole;
   index?: number;
   narrated: boolean;              // 映像の形が決める（台本の有無ではない）
   fromMs: number;
   durationMs: number;
-  layout: SceneLayout;
-  backdrop?: SceneBackdrop;
-  /** フィッター適用後。落ちた部品も理由付きで持つ */
-  placed: Array<{ component: SceneComponent; emphasis: Emphasis }>;
-  dropped: SceneComponent[];
+  scene: Scene;                   // kitのシーン(layout・components・backdrop)。Stageが描く単位
+  placed: SceneFit["placed"];     // フィッター適用後(emphasis・steppedDown付き)
+  dropped: SceneComponent[];      // フィッターが落とした分 + capacity超過
+  regions: FilmRegion[];          // distribute() 済み。絵コンテの領域描画はこれを読む
+  budget: { min: number; max: number } | null; // 台本の字数予算(narratedのみ)
   narration: string;              // 無ければ ""
   captions: Caption[];            // このコマに閉じる
-  fields: string[];               // このコマが映すbriefのパス
 }
 
 export interface EventCmFilm {
-  scenes: FilmScene[];
+  /** suppression適用済みのブリーフ。**保存してはいけない**(名前がそれを言う) */
+  drawn: EventCmBrief;
   theme: Theme;
+  scenes: FilmScene[];
+  captions: Caption[];            // 全編(CaptionBand用)
   totalMs: number;
   timingSource: TimingSource;
+  narrationStartMs: number;
+  narrationEndMs: number;
   /** 台本にあるが、どのコマも要求していない行 */
   orphanLines: EventCmScene[];
-  /** 喋るのに行が無いコマ */
+  /** 喋るのに行が無いコマ(key) */
   missingLines: string[];
+  staleness: ScriptStaleness;
+  hasVoice: boolean;
 }
 
 export function eventCmFilm(raw: EventCmBrief): EventCmFilm;
 ```
 
-- **`EventCmComposition` は `film.scenes` を `Sequence` に並べるだけ**になる(現在の `applySuppression`/timeline/sceneForRole の手組みが消える)
-- **`eventCmStoryboard` は `film` を人間向けに言い換えるだけ**になる(ラベル・由来バッジ・編集可否だけを足す)。フィッターや suppression を自分で呼ばない = §2.1 のバグが構造的に起きない
-- 台本API・音声APIは `film.missingLines` / `film.scenes.filter(narrated)` を読む
-- **絵コンテと映像の一致テストは「同じ関数を読んでいる」ことの確認に格下げできる**(今は2つの手組みを突き合わせている)
+設計上の決定:
 
-### 4.2 ブリーフの2つの形を型で分ける
+- **`applySuppression` を呼ぶのは film() だけ**(§4.2)。suppression の解釈は「形」= `eventCmScenePlan`(types.ts が自前で読む・先行対応済み)と「値」= film の2箇所に閉じる
+- **Stage([remotion/kit/render/Stage.tsx](../remotion/kit/render/Stage.tsx))は描画時に自分で `fitScene` を回す。これは変えない**——同じ純関数に同じ入力なので結果は一致し、kit部品としての自己完結(「同じシーンは常に同じ舞台になる」)が保たれる。絵コンテが読む `placed` / `regions` は film が**同じ関数で**計算したもの
+- **`EventCmComposition` は `film.scenes` を `Sequence` に並べるだけ**になる(手組みの `applySuppression`/timeline/sceneForRole が消える)
+- **`eventCmStoryboard` は `film` を人間向けに言い換えるだけ**になる(ラベル・由来バッジ・編集可否だけを足す)
+- 台本API・音声APIは `film.missingLines` / `film.scenes.filter(s => s.narrated)` を読む
+- **絵コンテと映像の一致テストは「同じ関数を読んでいる」ことの確認に格下げされる**
 
-```ts
-/** 保存されている値。suppression 未適用 */
-export type StoredBrief = EventCmBrief & { readonly __form?: "stored" };
-/** 映像が描く値。applySuppression 済み */
-export type DrawnBrief = EventCmBrief & { readonly __form: "drawn" };
-export const drawnBrief = (brief: StoredBrief): DrawnBrief => ...
-```
+### 4.2 ブランド型(StoredBrief / DrawnBrief)は**やらない**(2026-08-14改訂)
 
-ブランド型でよい(実行時コストゼロ)。`eventCmFilm` だけが `drawnBrief` を作り、**保存する関数は `StoredBrief` しか受け取らない**(suppression 済みブリーフを保存すると値が消える。今は型が止めてくれない)。
+前版はブリーフの2形をブランド型で分ける案だったが、**廃止**。film() が `applySuppression` の唯一の呼び出し元になった時点で、「複数の呼び出し側が正しく呼ぶこと」という型で守るべき対象そのものが消える。型より強い保証を2つで代替する:
+
+1. `applySuppression` を `lib/event-cm/facts.ts` の公開APIから外し、film だけが使う(**呼べないものは間違えられない**)
+2. film が返すブリーフは `drawn` という名前で持つ。`saveBrief(film.drawn)` は読んだ瞬間に間違いだと分かる(suppression済みを保存すると値が消える)
 
 ### 4.3 シーンキーを型にする
 
@@ -169,7 +174,9 @@ export const drawnBrief = (brief: StoredBrief): DrawnBrief => ...
 
 ### 4.4 描画の定数を1箇所へ
 
-`TREATMENT_FILTER` と `focusPosition` を `remotion/kit/paint.ts`(仮)へ出し、KitComponent・EventComposition・Storyboard が読む。**絵コンテが映像と同じ見え方をする根拠はここ**。
+`TREATMENT_FILTER`(実測: KitComponent / Storyboard の2コピー)と `focusPosition`(2定義 + Stage / Storyboard の3インライン展開)を [remotion/kit/paint.ts](../remotion/kit/paint.ts) へ出し、KitComponent・Stage・Storyboard が読む。**絵コンテが映像と同じ見え方をする根拠はここ**。テーマの導出式 `brief.theme ? themeForBrand(SUMI_THEME, brief.theme) : SUMI_THEME` も3実装あった(`themeOf` / `storyboardTheme` / Storyboard.tsx 内)——**film() の `theme` に一本化**。
+
+[remotion/event/EventComposition.tsx](../remotion/event/EventComposition.tsx)(event-promo・手組み)にも treatment 変換の第3実装(knockout を扱わない)があるが、event-promo は素材整形段で正規化する別契約なので**触らない**(§8 の「kit への載せ替えは別プロジェクト」と同じ判断)。
 
 ### 4.5 ダイアログの殻を共通化
 
@@ -191,19 +198,23 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 - `EVENT_CM_SCENE_BUDGET`(by role)は `eventCmSceneBudget(step)` の**内部データ**にして、timeline も storyboard も script prompt も後者だけを読む
 - `eventCmNarratedRoles` を廃止し `eventCmNarratedSteps` に統一(数えるだけの用途は `.length`)
 
-## 5. 作業順序(各段でテストがgreenを保つ)
+## 5. 作業順序(2026-08-14改訂・各段でテストがgreenを保つ)
 
-| 順 | 内容 | 終わりの合図 |
-| --- | --- | --- |
-| A | `eventCmSceneKey` へ統一・`TREATMENT_FILTER`/`focusPosition` を1箇所へ・`eventCmNarratedRoles` 廃止・予算を1系統へ | 206件green、文字列連結の重複0 |
-| B | `eventCmFilm()` を新設し、**まず絵コンテだけ**を載せ替える | 絵コンテ↔映像の一致テストが「同じ関数」で通る |
-| C | `EventCmComposition` を `film` 消費へ載せ替える | `npm run event:render` と Player が同じ尺・同じ字幕 |
-| D | 台本API・音声API・`panel-actions` を `film` 消費へ | 「消した項目を数えない」テストを film 経由で書き直す |
-| E | `StoredBrief` / `DrawnBrief` を導入し、保存経路を `StoredBrief` に固定 | 型だけで「suppression済みを保存」が書けなくなる |
-| F | `<ActionDialog>` 抽出(Narration / BGM / PanelDelete) | 3つの完了・失敗・フォーカスの挙動が同一 |
-| G | `BrandVideoDetail` をフックへ分解 | 1ファイル400行以下、状態の責務が名前で分かる |
+| 順 | 内容 | 担当 | 終わりの合図 |
+| --- | --- | --- | --- |
+| 0 | §9.5=案B・§9.9=案1 を確定 | 依頼者+AIセッション | **済** |
+| A | `eventCmSceneKey` へ統一(5実装→1)・`paint.ts` 新設・`eventCmNarratedRoles` 廃止・予算を1系統へ(timeline の index 補正漏れも直る) | AIセッション | 全件green、文字列連結の重複0 |
+| B | `eventCmFilm()` を新設し、**まず絵コンテだけ**を載せ替える(テーマ導出の一本化もここ) | AIセッション | 絵コンテ↔映像の一致テストが「同じ関数」で通る |
+| C | `EventCmComposition` を `film` 消費へ載せ替える | AIセッション | Player と CLI レンダーが同じ尺・同じ字幕 |
+| D | 台本API・音声API・画面の尺/staleness表示を `film` 消費へ・`applySuppression` 非公開化 | AIセッション | 生ブリーフから尺・字幕・行数を導出する箇所0 |
+| E | (廃止 — §4.2。film が唯一の呼び出し元になった時点で守る対象が消えた) | — | — |
+| H | `baked_brief`(§9.5 案B・§9.9 案1)の実装 | エンジニア | §11.1 の受入条件 |
+| I | `script` → `scenario` 改名(DB焼き替え含む) | エンジニア | §11.2 |
+| J | `EventCmBrief` を `EventBrief` から分離 | エンジニア | §11.3 |
+| F | `<ActionDialog>` 抽出(Narration / BGM / PanelDelete) | エンジニア | 3つの完了・失敗・フォーカスの挙動が同一 |
+| G | `BrandVideoDetail` をフックへ分解 | エンジニア | 1ファイル400行以下、状態の責務が名前で分かる |
 
-**Aは1〜2時間で終わる純粋な整理**。BとCが本体。**DとEでバグの再発が構造的に止まる**。F・Gは読みやすさ。
+**A〜Dでバグの再発が構造的に止まる**(このセッションの範囲)。**Hがシナリオ中心への転換の本体**で、次のエンジニアセッションの主題。I・Jは今が一番安い破壊的整理(顧客ゼロ・本番Take数件)。F・Gは読みやすさで、次の実動画制作で触るファイルからで良い。
 
 ## 6. テストという資産(206件)
 
@@ -302,7 +313,7 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 - バーの4段目を「出力」として直列に見せるのをやめ、**MP4と公開は別の場所(ヘッダーのボタン群)に置く**。差分は⚠で言う(「書き出したMP4は今のシナリオより古い」)
 - **尺が確定するのは音声を焼いた時点**なので、MP4を「音声より後」に置く依存は残る(§9.9)
 
-### 9.5 プレイヤーが見せるのは「焼き付けた版」(決定・実装は要設計)
+### 9.5 プレイヤーが見せるのは「焼き付けた版」(決定: **案Bで確定**・実装仕様は §11.1)
 
 > **絵コンテというのは作業場**なので、絵コンテを変えただけでは何も起こらないです。それを焼き付けしないと反映しない。**動画が変わるのは右上のすべて実行を押したとき、あるいはパイプラインから一つずつ実行していったときのみ**です。
 
@@ -408,13 +419,13 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 
 「音声は必ずある」を厳密に守るなら、**Take作成の瞬間に台本(LLM)と音声(TTS)を作る**必要がある。ただし現行の売りは「動画を追加した瞬間に、LLMもレンダリングも無しで完成した映像が再生される」ことで、作成に30〜60秒とAPI課金が乗る。候補:
 
-**暫定線は案1**(2026-08-14に依頼者が選択。**確定ではなく、次セッションの議論の出発点**として残す)。
+**案1で確定**(2026-08-14改訂。依頼者がAIの再検討案を承認)。未実行状態の名乗り方は §11.1 で仕様化した——`baked_brief is null` = 未実行、の2状態で足りる。
 
 - **案1(暫定線)**: 作成直後は音声なし(推定尺)のまま。**最初の「実行」で必ず音声が付く**。画面は「実行すると音声が付いて尺が確定します」と案内する(⚠ではなく案内)。1ボタンの原則は守られ、無駄な課金もない。**「音声は必ずある」が破れるのは「一度も実行していない状態」だけ**に限定される
 - 案2: 作成時に自動で台本＋音声まで作る。依頼者の言葉(「最初に適当なダミーですけど音声付きの動画を作成します」)に最も忠実だが、作成に30〜60秒かかり、素材を1つも渡していない段階で課金する
 - 案3: 作成時にモック音声(`CAMPAIGN_TTS_MOCK` 相当)を付ける。**尺は推定と同じ値になるので意味がない**——却下
 
-**次セッションで確認すること**: 案1の「一度も実行していない状態」を、画面がどう名乗るか。`未実行`(=まだ何も焼いていない)と`実行済み`の2状態だけで足りるか、それとも作成直後だけの特別な言い方が要るか。§9.5 の `baked_brief` が無い状態がそれに当たるので、**§9.5の実装案とセットで決める**。
+**確認済み(2026-08-14改訂)**: 「一度も実行していない状態」= `baked_brief is null`。`未実行` / `実行済み` の2状態で足り、作成直後だけの特別な言い方は作らない。画面は⚠ではなく案内で「実行すると音声が付いて尺が確定します」と言う(§11.1)。
 
 ### 9.10 この再定義が波及する範囲
 
@@ -422,8 +433,50 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 - **LP・サイト生成**も「各セクションの主文」が同じ役割を持つ。README の「1コマ=1メッセージ」はテンプレート横断の原則として既に書いてある
 - ただし**共通化を先にやらない**。event-cm で形が固まってから抜く(先に抽象化すると、まだ知らない差異に合わせた抽象になる)
 
-## 10. 次セッションの最初の3手
+## 10. 次セッション(エンジニア)の最初の3手
 
-1. **§9 を読んで、シナリオ中心の言葉で頭を作り直す**。次に §3(変えてはいけない契約)を読む。**§9.5(プレイヤーが見せる版の実装案)と §9.9の「作成直後の一度目」だけは決めてから手を動かす**
-2. **`npm test` で208件green を確認**してから触り始める
-3. **§5 の A から**(純粋な整理)。Aが終わった時点でコミットし、Bに入る前にもう一度全件を通す。§9 の改名(`script` → `scenario`)は**Aと同じ段でやる**——名前が変わるだけで意味が変わらない作業を、意味が変わる作業と混ぜない
+1. **§3(変えてはいけない契約)と §4.1(film の形)を読む**。以後、映像について何かを導出したくなったら、**まず `eventCmFilm()` が既に返していないか見る**——返していなければ film に足す(消費者側で組まない)。これがこのリファクタが守らせたい唯一の習慣
+2. **`npm test` で全件green を確認**してから触り始める
+3. **§11.1(baked_brief)から**。I(改名)・J(brief分離)は互いに独立だが、**どちらもDBの焼き替えを含むため、実行前にSQLをレビューしてユーザーの明示承認を得る**(AGENTS.md の Supabase 安全規則。project ref `xhbdfzceyfrxsmaixkne` の照合も毎回)
+
+## 11. エンジニア引き継ぎパケット
+
+各パケットは独立して1セッションで終わる大きさにしてある。共通の受入条件: `npm test` 全件green、生ブリーフから尺・字幕・シーン数を導出するコードを足さないこと。
+
+### 11.1 baked_brief(§9.5 案B・§9.9 案1) — シナリオ中心への転換の本体
+
+**目的**: 絵コンテ=作業場(`brief` を即時描画)、プレイヤー=成果(最後に実行した版)に分ける。
+
+- **migration 0050**: `takes` に `baked_brief jsonb` と `baked_at timestamptz` を追加。既存の event-cm Take は `baked_brief = brief, baked_at = now()` でバックフィルする(今日の挙動が変わらないため)。新規Takeは null で始まる=**未実行**
+- **読み手の分岐**(これだけで済むのが案Bの利点。書き込み経路は一切触らない):
+  - プレイヤー(BrandVideoDetail の Player)・MP4レンダー・`/v/[id]` は `eventCmFilm(baked_brief ?? brief)` を読む。null(未実行)のときは作業中の値をそのまま描き、**⚠ではなく案内**で「実行すると音声が付いて尺が確定します」と言う
+  - 絵コンテ・FactList・パイプラインドロワーは今までどおり `brief`
+- **書き手**: 「まとめて実行」の最終段として、音声の後に `baked_brief = brief` の写しを保存する。ドロワー内の個別段の実行は焼かない(作業場の更新のみ)
+- **差分**: `brief` と `baked_brief` の deep equal は要らない。§9.7 の3ノード(`factsUpdatedAt` / `script.updatedAt` / `voice` の有無と material 参照)の比較で「まだ焼いていない変更」の種類が言える。読む3箇所: パイプラインバーの点・「まとめて実行」の件数バッジ・プレイヤーの⚠
+- **ボタン**: 「まとめて実行」は MP4 を含まないことが分かる名前へ(候補「動画を作り直す」§9.6)。通す順序: 読み取り → 事実 → シナリオ(`source:"human"` は飛ばし、件数にも入れない §9.8)→ 音声(必ず通る §9.9)→ 焼き付け
+- **受入条件**: シナリオを1行保存してもプレイヤーの尺・字幕が変わらない/実行するとプレイヤーが追いつく/未実行の新規Takeは従来どおり即再生できて案内が出る/MP4書き出しは `baked_brief` を読む
+
+### 11.2 `script` → `scenario` 改名(§9.1)
+
+- 対象: brief キー `script`、型 `EventCmScript` → `EventCmScenario`、`scriptIsStale` 等の関数名、UI文言(いま「ナレーション」と呼ぶものを**シナリオ(本文)**と**読み上げ(音声)**に割る)。読み書き箇所は A〜D で film 経由に集約済みなので、`grep -rn "\bscript\b" remotion/event-cm lib/event-cm lib/storyboard app/api/brands components/video` から始める
+- **DB焼き替えは一度きり・両対応コードは書かない**(顧客ゼロ・本番Take数件の今だけ許される形)。実行前にユーザーの明示承認:
+  ```sql
+  update public.takes
+  set brief = (brief - 'script') || jsonb_build_object('scenario', brief->'script')
+  where brief ? 'script';
+  -- baked_brief 導入後は baked_brief にも同じ式を
+  ```
+  ※ 対象を event 系テンプレートに絞る where 句は docs/data-model.md で列名を確認してから書く
+- **順序: 11.1 の後**(baked_brief も同時に焼き替えるため)
+
+### 11.3 `EventCmBrief` の自立(§8)
+
+- `extends EventBrief` をやめ、event-cm が実際に読むフィールドだけを持つ。実測(2026-08-14): `sideCopy` は LLMプロンプト1箇所のみが読む・`visuals.texture` は完全未使用・`visuals.inkArt` は goal/facts/suppression にだけ居て**映像には一切出ない**
+- 判断: `sideCopy` と `texture` は落とす。`inkArt` は**映像に出ないものを管理させない**——goal/facts からも外す
+- zod スキーマ(brief-schema.ts)が未知キーを strip するか passthrough かを先に確認し、strip なら読み込み時に自然消滅するのでDB焼き替え不要
+
+### 11.4 残っている小さな穴(A〜Dで直したもの以外)
+
+- `brief.script` への optional/非optional アクセスの混在: 型上 required なのに API 側だけ `brief.script?.scenes` と防御している。seed が必ず script を書くので `?.` を外して統一する(11.2 のついでに)
+- `labs/campaign/audio/tts-lib/tts.mjs` の `MAX_SECTION_CHARS = 2000` は [lib/narration/limits.ts](../lib/narration/limits.ts) と値の二重管理。labs は別ランタイムなので許容するが、コメントの相互参照だけ維持する
+- [lib/narration/voice.ts](../lib/narration/voice.ts) の `TTS_MAX_SECTION_CHARS` re-export は入口の二重化——消費者を limits.ts 直importへ寄せて消す

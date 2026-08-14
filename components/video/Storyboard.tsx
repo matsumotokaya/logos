@@ -25,14 +25,17 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import {
   eventCmStoryboard,
+  storyboardTheme,
   type StoryboardBlock,
   type StoryboardPanel,
 } from "@/lib/storyboard/event-cm";
 import { LAYOUTS, REGION_GEOMETRY, STAGE } from "@/remotion/kit/layout";
-import { captionSafeBottom, SUMI_THEME, themeForBrand, type Theme } from "@/remotion/kit/theme";
+import { focusPosition, TREATMENT_FILTER } from "@/remotion/kit/paint";
+import { captionSafeBottom, type Theme } from "@/remotion/kit/theme";
 import {
   EVENT_CM_CHARS_PER_SECOND,
   eventCmSceneBudget,
+  eventCmSceneKey,
   type EventCmBrief,
   type EventCmSceneRole,
 } from "@/remotion/event-cm/types";
@@ -65,13 +68,6 @@ const LAYOUT_LABELS: Record<string, string> = {
 };
 
 const seconds = (ms: number) => (ms / 1000).toFixed(1);
-
-/** The same filters the renderer applies to a mark on the ink ground. */
-const TREATMENT_FILTER: Record<string, string | undefined> = {
-  light: undefined,
-  invert: "invert(1)",
-  knockout: "brightness(0) invert(1)",
-};
 
 /** What the film sets when a mark has no artwork: the name, quietly. Not a
  *  placeholder — this IS the design (components.ts EMPTY_BEHAVIOUR.logo). */
@@ -217,7 +213,7 @@ function Block({ block, theme }: { block: StoryboardBlock; theme: Theme }) {
                     width: "100%",
                     height: "100%",
                     objectFit: "cover",
-                    objectPosition: `${(figure.focus?.x ?? 0.5) * 100}% ${(figure.focus?.y ?? 0.5) * 100}%`,
+                    objectPosition: focusPosition(figure),
                     transform: `scale(${figure.zoom ?? 1})`,
                   }}
                 />
@@ -324,7 +320,7 @@ function Artboard({ panel, theme }: { panel: StoryboardPanel; theme: Theme }) {
             width: "100%",
             height: "100%",
             objectFit: "cover",
-            objectPosition: `${panel.backdrop.focus.x * 100}% ${panel.backdrop.focus.y * 100}%`,
+            objectPosition: focusPosition(panel.backdrop),
             opacity: theme.backdrop.opacity[panel.backdrop.weight],
           }}
         />
@@ -820,7 +816,7 @@ function PanelCard({
                 // Remounted when the saved line changes — a draft belongs to the
                 // words it was started from, and must never be carried onto a
                 // different picture or over a line rewritten elsewhere.
-                key={`${panel.role}#${panel.index ?? ""}:${panel.narration}`}
+                key={`${eventCmSceneKey(panel)}:${panel.narration}`}
                 role={panel.role}
                 index={panel.index}
                 text={panel.narration}
@@ -892,7 +888,7 @@ export default function Storyboard({
   imageSources?: BriefSource[];
 }) {
   const storyboard = eventCmStoryboard(brief);
-  const theme = brief.theme ? themeForBrand(SUMI_THEME, brief.theme) : SUMI_THEME;
+  const theme = storyboardTheme(brief);
 
   return (
     <section>
@@ -933,7 +929,7 @@ export default function Storyboard({
             // different content, and the narration textarea kept the deleted
             // panel's draft — one click away from writing it over the next
             // picture's line.
-            key={panel.index === undefined ? panel.role : `${panel.role}#${panel.index}`}
+            key={eventCmSceneKey(panel)}
             panel={panel}
             theme={theme}
             brief={brief}

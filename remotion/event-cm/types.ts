@@ -128,7 +128,7 @@ export const EVENT_CM_CHARS_PER_SECOND = 7;
  * twelve-second scene where eight were designed. Told to the writer AND
  * checked after, since a model asked for 62 characters returns 89.
  */
-export const EVENT_CM_SCENE_BUDGET: Record<EventCmSceneRole, { min: number; max: number }> = {
+const SCENE_BUDGET: Record<EventCmSceneRole, { min: number; max: number }> = {
   // Silent. Their length is fixed by the timeline, not by anything written.
   logoIn: { min: 0, max: 0 },
   logoOut: { min: 0, max: 0 },
@@ -158,7 +158,7 @@ export function eventCmSceneBudget(scene: {
   if (scene.role === "program" && scene.index !== undefined) {
     return scene.index === 0 ? { min: 30, max: 58 } : { min: 18, max: 40 };
   }
-  return EVENT_CM_SCENE_BUDGET[scene.role];
+  return SCENE_BUDGET[scene.role];
 }
 
 /**
@@ -225,12 +225,6 @@ export function eventCmScenePlan(brief: PlanInput): EventCmSceneStep[] {
 export const eventCmNarratedSteps = (
   brief: Pick<EventBrief, "guests" | "programs">,
 ): EventCmSceneStep[] => eventCmScenePlan(brief).filter((scene) => scene.narrated);
-
-/** The roles those pictures use. May repeat — three programmes are three
- *  `program` lines — so this answers "how many" and never "which one". */
-export const eventCmNarratedRoles = (
-  brief: Pick<EventBrief, "guests" | "programs">,
-): EventCmSceneRole[] => eventCmNarratedSteps(brief).map((scene) => scene.role);
 
 /** Beats outside their budget, with the direction they went. Empty = on spec. */
 export function scriptBudgetIssues(

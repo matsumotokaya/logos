@@ -18,7 +18,7 @@ import { applySuppression } from "@/lib/event-cm/facts";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import { EVENT_CM_SCENE_GAP_MS } from "@/remotion/event-cm/timeline";
 import {
-  eventCmNarratedRoles,
+  eventCmNarratedSteps,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 
@@ -80,7 +80,7 @@ export async function POST(
   // is announced, one per programme when several are listed, and none for a
   // field the user switched off (which is why the suppressed brief is what gets
   // counted — the film draws that one).
-  const expected = eventCmNarratedRoles(applySuppression(brief)).length;
+  const expected = eventCmNarratedSteps(applySuppression(brief)).length;
   if (scenes.length !== expected) {
     // Says which state it is in. A partial script is the ordinary state while
     // somebody is writing, and 「先に台本を作成してください」 reads as though

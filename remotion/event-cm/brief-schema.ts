@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { EventBriefSchema } from "@/remotion/event/brief-schema";
 import { CmVoiceTrackSchema } from "@/lib/templates/voice-schema";
-import { EVENT_CM_NARRATED_ROLES } from "./types";
+import {
+  EVENT_CM_NARRATED_ROLES,
+  eventCmSceneKey,
+  type EventCmSceneRole,
+} from "./types";
 
 // Runtime shape of an EventCmBrief. Like the event-promo schema this validates
 // STRUCTURE, not completeness.
@@ -44,7 +48,7 @@ export const EventCmScriptSchema = z
       // check is: role positions never go backwards, an index appears only where
       // the role legitimately repeats, and no two pictures are the same picture.
       const keys = script.scenes.map((scene) =>
-        scene.index === undefined ? scene.role : `${scene.role}#${scene.index}`,
+        eventCmSceneKey({ role: scene.role as EventCmSceneRole, index: scene.index }),
       );
       if (new Set(keys).size !== keys.length) return false;
       const positions = script.scenes.map((scene) =>

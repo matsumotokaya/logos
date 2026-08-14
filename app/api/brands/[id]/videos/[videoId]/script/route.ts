@@ -18,6 +18,7 @@ import {
   eventCmNarratedSteps,
   eventCmSceneKey,
   type EventCmBrief,
+  type EventCmSceneRole,
 } from "@/remotion/event-cm/types";
 
 const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -160,10 +161,10 @@ export async function PATCH(
     if (!raw || typeof raw !== "object") continue;
     const scene = raw as { role?: unknown; index?: unknown; text?: unknown };
     if (typeof scene.role === "string" && typeof scene.text === "string") {
-      const key =
-        typeof scene.index === "number"
-          ? `${scene.role}#${scene.index}`
-          : scene.role;
+      const key = eventCmSceneKey({
+        role: scene.role as EventCmSceneRole,
+        index: typeof scene.index === "number" ? scene.index : undefined,
+      });
       texts.set(key, scene.text.trim());
     }
   }

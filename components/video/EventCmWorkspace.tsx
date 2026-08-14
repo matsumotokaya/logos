@@ -16,6 +16,7 @@ import FactList, { type FactEdit } from "./FactList";
 import Storyboard from "./Storyboard";
 import { eventCmStoryboard } from "@/lib/storyboard/event-cm";
 import {
+  eventCmSceneKey,
   scriptChars,
   scriptStaleness,
   type EventCmBrief,
@@ -116,7 +117,7 @@ export default function EventCmWorkspace({
           {storyboard.orphanLines.length > 0 ? (
             <ul className="mt-2 flex flex-col gap-1">
               {storyboard.orphanLines.map((line) => (
-                <li key={`${line.role}#${line.index ?? ""}`} className="text-pretty">
+                <li key={eventCmSceneKey(line)} className="text-pretty">
                   <span className="mr-2 rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold">
                     使われていない行
                   </span>

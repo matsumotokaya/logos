@@ -1,6 +1,6 @@
 import {
   EVENT_CM_CHARS_PER_SECOND,
-  EVENT_CM_SCENE_BUDGET,
+  eventCmSceneBudget,
   eventCmSceneKey,
   eventCmScenePlan,
   type EventCmBrief,
@@ -13,7 +13,7 @@ import {
 // The film exists before the narration does, and before the voice does. So the
 // timeline is derived from whatever is known, and each stage sharpens it:
 //
-//   nothing written  → the scene budget (lib: EVENT_CM_SCENE_BUDGET)
+//   nothing written  → the scene budget (types.ts eventCmSceneBudget)
 //   script written   → the characters actually written, at reading pace
 //   voice recorded   → the measured track, which is the truth
 //
@@ -43,8 +43,11 @@ export interface EventCmTimeline {
   narrationEndMs: number;
 }
 
-const budgetMs = (role: EventCmSceneRole): number => {
-  const budget = EVENT_CM_SCENE_BUDGET[role];
+// Per picture, not per role: the second and third programme pictures carry a
+// shorter line than a lone programme list, and their unwritten fallback should
+// say so too (types.ts eventCmSceneBudget).
+const budgetMs = (step: EventCmSceneStep): number => {
+  const budget = eventCmSceneBudget(step);
   const chars = (budget.min + budget.max) / 2;
   return (
     Math.round((chars / EVENT_CM_CHARS_PER_SECOND) * 1000) + EVENT_CM_SCENE_GAP_MS
@@ -112,7 +115,7 @@ export function eventCmTimeline(brief: EventCmBrief): EventCmTimeline {
   // because of that one would throw away timings that are still right.
   const writtenMs = (step: EventCmSceneStep): number => {
     const text = (spoken.get(eventCmSceneKey(step)) ?? "").replace(/\s/g, "");
-    if (text.length === 0) return budgetMs(step.role);
+    if (text.length === 0) return budgetMs(step);
     return (
       Math.max(
         MIN_SCENE_MS,
@@ -142,7 +145,7 @@ export function eventCmTimeline(brief: EventCmBrief): EventCmTimeline {
   let cursor = 0;
   for (const step of plan) {
     const durationMs = step.narrated
-      ? (byKey.get(eventCmSceneKey(step))?.durationMs ?? budgetMs(step.role))
+      ? (byKey.get(eventCmSceneKey(step))?.durationMs ?? budgetMs(step))
       : silentMs(step.role);
     // Laid end to end whatever the source: the measured spans are already
     // contiguous, and reading them through the cursor keeps one rule for where a

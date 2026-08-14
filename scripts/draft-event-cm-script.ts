@@ -12,7 +12,7 @@ import {
   EVENT_CM_CHARS_PER_SECOND,
   EVENT_CM_MAX_CHARS,
   EVENT_CM_MIN_CHARS,
-  EVENT_CM_SCENE_BUDGET,
+  eventCmSceneBudget,
   scriptBudgetIssues,
   scriptChars,
 } from "@/remotion/event-cm/types";
@@ -62,7 +62,7 @@ async function main() {
   console.log("\n── ナレーション ──");
   for (const [i, scene] of draft.script.scenes.entries()) {
     const sceneChars = scene.text.replace(/\s/g, "").length;
-    const budget = EVENT_CM_SCENE_BUDGET[scene.role];
+    const budget = eventCmSceneBudget(scene);
     const onSpec = sceneChars >= budget.min && sceneChars <= budget.max;
     console.log(
       `\n${String(i + 1).padStart(2, "0")} ${scene.role}  (${sceneChars}字 / 約${(sceneChars / CHARS_PER_SECOND).toFixed(1)}秒)  予算 ${budget.min}〜${budget.max}字 ${onSpec ? "✓" : "✗"}`,

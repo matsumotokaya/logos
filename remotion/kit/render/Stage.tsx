@@ -17,6 +17,7 @@ import {
   type SceneBackdrop,
 } from "../layout";
 import { fitScene } from "../fit";
+import { focusPosition } from "../paint";
 import { captionSafeBottom, type Theme } from "../theme";
 import { KitComponent } from "./KitComponent";
 import { enterDelay, sceneFade } from "./motion";
@@ -44,7 +45,6 @@ const Backdrop: React.FC<{
 }> = ({ backdrop, theme, length }) => {
   const frame = useCurrentFrame();
   const [from, to] = theme.backdrop.push;
-  const focus = backdrop.photo.focus ?? { x: 0.5, y: 0.5 };
   return (
     <AbsoluteFill>
       <Img
@@ -53,7 +53,7 @@ const Backdrop: React.FC<{
           width: "100%",
           height: "100%",
           objectFit: "cover",
-          objectPosition: `${focus.x * 100}% ${focus.y * 100}%`,
+          objectPosition: focusPosition(backdrop.photo),
           opacity: theme.backdrop.opacity[backdrop.weight],
           transform: `scale(${interpolate(frame, [0, Math.max(length, 1)], [from, to], {
             extrapolateRight: "clamp",

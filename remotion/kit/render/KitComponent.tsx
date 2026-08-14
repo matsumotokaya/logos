@@ -22,12 +22,9 @@ import {
 import type { LogoTreatment } from "@/remotion/event/types";
 import type { Theme } from "../theme";
 import { enterStyle } from "./motion";
+import { focusPosition, TREATMENT_FILTER } from "../paint";
 
 const resolveSrc = (src: string): string => src;
-
-/** Focus point of a photo as CSS object-position. */
-const focusPosition = (photo: { focus?: { x: number; y: number } }): string =>
-  `${(photo.focus?.x ?? 0.5) * 100}% ${(photo.focus?.y ?? 0.5) * 100}%`;
 
 function typeStyle(theme: Theme, emphasis: Emphasis, display: boolean): React.CSSProperties {
   const step = theme.scale[emphasis];
@@ -190,21 +187,9 @@ const PersonBlock: React.FC<{ theme: Theme; person: PersonParams; size: number }
   </div>
 );
 
-/** A logo image, or its name set as a credit — the designed substitute. */
-/**
- * How a mark is made legible on the stage it lands on.
- *
- * This was missing entirely: a brief could say `treatment: "invert"` and the kit
- * drew the artwork raw, so a black SVG on the ink ground was a black rectangle
- * nobody could see. `knockout` is the default here rather than `invert` because
- * inverting a mark that was already light breaks it just as badly.
- */
-const TREATMENT_FILTER: Record<LogoTreatment, string | undefined> = {
-  light: undefined,
-  invert: "invert(1)",
-  knockout: "brightness(0) invert(1)",
-};
-
+/** A logo image, or its name set as a credit — the designed substitute.
+ *  The treatment filter itself lives in ../paint.ts, shared with the
+ *  storyboard. */
 const LogoMark: React.FC<{
   theme: Theme;
   src: string | null;
