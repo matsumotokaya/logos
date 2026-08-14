@@ -62,16 +62,16 @@ const INPUT_BY_PATH: Record<string, FactInput> = {
   "visuals.closing": "asset",
   "visuals.inkArt": "asset",
   bgm: "asset",
-  script: "generated",
+  scenario: "generated",
   voice: "generated",
 };
 
 /**
  * Slots that have their own control elsewhere on the screen.
  *
- * BGM is chosen in its own section under the narration, because music is
- * always present and always the same question ("which one"), which a list of
- * facts answers badly.
+ * BGM is chosen in its own dialog from the header, next to the reading-aloud
+ * one, because music is always present and always the same question ("which
+ * one") — which a list of facts answers badly.
  */
 const HANDLED_ELSEWHERE = new Set(["bgm"]);
 
@@ -141,9 +141,9 @@ export function previewOf(brief: EventCmBrief, path: string): string {
       return brief.visuals.inkArt ? "あり" : "";
     case "bgm":
       return brief.bgm ? "あり" : "";
-    case "script":
-      return brief.script.scenes.length > 0
-        ? brief.script.scenes.map((scene) => scene.text).join("").slice(0, 60)
+    case "scenario":
+      return brief.scenario.scenes.length > 0
+        ? brief.scenario.scenes.map((scene) => scene.text).join("").slice(0, 60)
         : "";
     case "voice":
       return brief.voice ? `${Math.round(brief.voice.track.totalMs / 1000)}秒` : "";
@@ -343,7 +343,7 @@ export function markUserEdited(
  * Fields the narration could be reading.
  *
  * `factsUpdatedAt` exists for one job: telling the narration that it is
- * describing an older event (`scriptIsStale`). So it must move when a spoken
+ * describing an older event (`scenarioIsStale`). So it must move when a spoken
  * fact changes — and must not move for something the film only shows or plays.
  * Picking a different music track used to stamp it, which put 「ナレーションが
  * 書き直されていません」 on a film whose words were perfectly current. A warning

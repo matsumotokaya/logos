@@ -3,12 +3,12 @@
 // Same subject as `event-promo`, opposite spine. event-promo is a fixed 30s
 // timeline (remotion/event/palette.ts EVENT_SCENES) that BGM and typography
 // carry alone. Here the narration is written first and its timing decides the
-// film: scene order comes from the script's roles, scene length from the TTS
+// film: scene order comes from the scenario's roles, scene length from the TTS
 // track, exactly as product-cm does (remotion/cm/CmComposition.tsx).
 //
 // The art direction does not change — ink black × gold × mincho, the treatment
 // proven by 世界が恋する日本酒. So the brief is an EventBrief (facts, photos,
-// logos, BGM, all of it) plus a script and, once fixed, a voice.
+// logos, BGM, all of it) plus a scenario and, once fixed, a voice.
 //
 // Facts are still never invented (docs/deliverable-architecture.md §17.2): the
 // narration may only speak what the brief already knows. A null venue is not
@@ -20,7 +20,7 @@ import type { CmVoiceTrackOf } from "@/lib/campaign/cm-types";
 /**
  * The film, scene by scene, always in this order.
  *
- * One message per picture, and one line of narration per picture. That single
+ * One message per picture, and one line of scenario per picture. That single
  * rule is what the earlier version got wrong: `program` produced two pictures
  * from one line, so a sentence ran across a cut and the storyboard and the film
  * disagreed about how many times the screen changes. A presentation does not
@@ -47,7 +47,7 @@ export const EVENT_CM_SCENES = [
   /** 中身 — what actually happens. */
   { role: "program", narrated: true, optional: false },
   /** 登壇 — who speaks. Dropped entirely when nobody is announced: a picture
-   *  with no people in it is not a speaker line-up, and a narration line about
+   *  with no people in it is not a speaker line-up, and a scenario line about
    *  guests who do not exist is worse than silence. */
   { role: "guests", narrated: true, optional: true },
   /** 行動 — when, where, and what to do. */
@@ -63,7 +63,7 @@ export const EVENT_CM_SCENE_ROLES = EVENT_CM_SCENES.map(
   (scene) => scene.role,
 ) as readonly EventCmSceneRole[];
 
-/** The roles that carry a narration line, for any brief. */
+/** The roles that carry a scenario line, for any brief. */
 export const EVENT_CM_NARRATED_ROLES = EVENT_CM_SCENES.filter(
   (scene) => scene.narrated,
 ).map((scene) => scene.role) as readonly EventCmSceneRole[];
@@ -76,7 +76,7 @@ export interface EventCmScene {
    * Only `program` repeats today: an evening with three programmes gets three
    * pictures, one each, because "one message per picture" applies to programmes
    * as much as to anything else — a numbered list of three is three messages
-   * crammed onto one slide, and the narration line for it can only say
+   * crammed onto one slide, and the scenario line for it can only say
    * 「いろいろあります」. Absent when the role appears once, which keeps every
    * single-programme take exactly as it was.
    */
@@ -90,7 +90,7 @@ export interface EventCmScene {
  *
  * This is what replaced "a scene IS a role". The moment a role can appear more
  * than once, everything that has to agree about the film — the timeline, the
- * captions, the storyboard panel, the line of narration — has to agree about
+ * captions, the storyboard panel, the line of scenario — has to agree about
  * WHICH picture, and the role alone stopped being able to say.
  */
 export interface EventCmSceneStep {
@@ -165,9 +165,9 @@ export function eventCmSceneBudget(scene: {
  * The scenes this particular brief produces, in film order.
  *
  * Optional scenes are decided by the facts, not by the writer: with nobody
- * announced there is no speaker picture and no speaker line, so the script is
+ * announced there is no speaker picture and no speaker line, so the scenario is
  * four beats instead of five. Anything that walks the film — timeline, captions,
- * storyboard, the narration prompt — asks this rather than assuming the full
+ * storyboard, the scenario prompt — asks this rather than assuming the full
  * list, which is what keeps them agreeing with each other.
  */
 /**
@@ -193,7 +193,7 @@ const isOff = (brief: PlanInput, path: string): boolean =>
  * Reads suppression itself rather than trusting the caller to have emptied the
  * brief first. That was the bug behind a warning nobody could clear: the film
  * was drawn from the suppressed brief (no speaker picture, six narrated lines)
- * while `scriptIsStale` was computed from the stored one (speakers present,
+ * while `scenarioIsStale` was computed from the stored one (speakers present,
  * seven lines expected) — so a correct, freshly written and recorded narration
  * was reported as out of date for ever.
  */
@@ -221,16 +221,16 @@ export function eventCmScenePlan(brief: PlanInput): EventCmSceneStep[] {
   return steps;
 }
 
-/** The pictures this brief needs a narration line for, in film order. */
+/** The pictures this brief needs a scenario line for, in film order. */
 export const eventCmNarratedSteps = (
   brief: Pick<EventBrief, "guests" | "programs">,
 ): EventCmSceneStep[] => eventCmScenePlan(brief).filter((scene) => scene.narrated);
 
 /** Beats outside their budget, with the direction they went. Empty = on spec. */
-export function scriptBudgetIssues(
-  script: EventCmScript,
+export function scenarioBudgetIssues(
+  scenario: EventCmScenario,
 ): Array<{ role: EventCmSceneRole; chars: number; over: boolean }> {
-  return script.scenes.flatMap((scene) => {
+  return scenario.scenes.flatMap((scene) => {
     const budget = eventCmSceneBudget(scene);
     const chars = sceneChars(scene);
     if (chars >= budget.min && chars <= budget.max) return [];
@@ -238,13 +238,13 @@ export function scriptBudgetIssues(
   });
 }
 
-export interface EventCmScript {
+export interface EventCmScenario {
   version: 1;
   scenes: EventCmScene[];
   /** Who last wrote this text. A human edit is never silently regenerated. */
   source: "llm" | "human";
   updatedAt: string;
-  /** The angle the writer committed to, in one line. Shown next to the script
+  /** The angle the writer committed to, in one line. Shown next to the scenario
    *  so a reader can tell whether the take is arguing the right thing before
    *  reading five paragraphs to find out. */
   angle: string;
@@ -292,8 +292,8 @@ export interface EventCmBrief extends EventBrief {
    * Exists so the narration can be known to be out of date. The narration is
    * written FROM the facts, so a fact that changes after it was written means
    * the film is now saying something about a different event. Comparing
-   * against `takes.updated_at` would not work: writing the script updates the
-   * take too, so every script would immediately look current.
+   * against `takes.updated_at` would not work: writing the scenario updates the
+   * take too, so every scenario would immediately look current.
    */
   factsUpdatedAt?: string;
   /**
@@ -304,11 +304,11 @@ export interface EventCmBrief extends EventBrief {
    * is a fact about the take, not about the machine that asked.
    */
   titleDeclined?: string | null;
-  script: EventCmScript;
-  /** Present once the script has been spoken. Nothing waits for a human to
-   *  approve the text: the golden path runs script → voice → film unattended,
+  scenario: EventCmScenario;
+  /** Present once the scenario has been spoken. Nothing waits for a human to
+   *  approve the text: the golden path runs scenario → voice → film unattended,
    *  and editing is what you reach for after seeing the result, not before.
-   *  `script.source` is what keeps a re-run from overwriting an edit. */
+   *  `scenario.source` is what keeps a re-run from overwriting an edit. */
   voice?: {
     track: CmVoiceTrackOf<EventCmScene>;
     /** material:<uuid> of the mixed WAV, pinned through take_inputs. */
@@ -319,7 +319,7 @@ export interface EventCmBrief extends EventBrief {
 /**
  * Whether the narration still describes the facts it was written from.
  *
- * The narration is the film's spine — it decides the scene order and the scene
+ * The scenario is the film's spine — it decides the scene order and the scene
  * lengths — so a narration written before the facts changed does not merely
  * contain a stale sentence: the whole film is about a different event. This is
  * what went wrong when reading a flyer changed the title and left the voice
@@ -329,18 +329,18 @@ export interface EventCmBrief extends EventBrief {
  * Why the narration and the film disagree, when they do.
  *
  * Two different problems, and telling them apart matters because the fix is
- * different. `shape` means the film gained or lost a picture and the script has
+ * different. `shape` means the film gained or lost a picture and the scenario has
  * the wrong set of lines; `facts` means the words are about an older version of
  * the same event. The single boolean said 「変わる前の内容を読み上げています」 for
  * both, which was wrong for the first case and unfixable when the comparison
  * itself was wrong.
  */
-export type ScriptStaleness = "shape" | "facts" | null;
+export type ScenarioStaleness = "shape" | "facts" | null;
 
-export function scriptStaleness(brief: EventCmBrief): ScriptStaleness {
-  if (brief.script.scenes.length === 0) return null;
+export function scenarioStaleness(brief: EventCmBrief): ScenarioStaleness {
+  if (brief.scenario.scenes.length === 0) return null;
   const expected = eventCmNarratedSteps(brief).map(eventCmSceneKey);
-  const actual = brief.script.scenes.map(eventCmSceneKey);
+  const actual = brief.scenario.scenes.map(eventCmSceneKey);
   if (
     actual.length !== expected.length ||
     actual.some((key, index) => key !== expected[index])
@@ -348,14 +348,14 @@ export function scriptStaleness(brief: EventCmBrief): ScriptStaleness {
     return "shape";
   }
   if (!brief.factsUpdatedAt) return null;
-  return brief.script.updatedAt < brief.factsUpdatedAt ? "facts" : null;
+  return brief.scenario.updatedAt < brief.factsUpdatedAt ? "facts" : null;
 }
 
-export const scriptIsStale = (brief: EventCmBrief): boolean =>
-  scriptStaleness(brief) !== null;
+export const scenarioIsStale = (brief: EventCmBrief): boolean =>
+  scenarioStaleness(brief) !== null;
 
-export const scriptText = (script: EventCmScript): string =>
-  script.scenes.map((scene) => scene.text).join("");
+export const scenarioText = (scenario: EventCmScenario): string =>
+  scenario.scenes.map((scene) => scene.text).join("");
 
-export const scriptChars = (script: EventCmScript): number =>
-  scriptText(script).replace(/\s/g, "").length;
+export const scenarioChars = (scenario: EventCmScenario): number =>
+  scenarioText(scenario).replace(/\s/g, "").length;

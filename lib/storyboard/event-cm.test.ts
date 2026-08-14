@@ -51,7 +51,7 @@ const briefWith = (extra: Partial<EventCmBrief> = {}): EventCmBrief => {
   const brief = { ...base(), ...extra };
   return {
     ...brief,
-    script: {
+    scenario: {
       version: 1,
       source: "llm",
       updatedAt: "2026-08-13T00:00:00Z",
@@ -103,7 +103,7 @@ test("ロゴのコマは無音で、それ以外は必ず1行を持つ", () => {
     const silent = panel.role === "logoIn" || panel.role === "logoOut";
     assert.equal(panel.narrated, !silent, `${panel.role} の narrated が違う`);
     assert.equal(
-      panel.narration.length > 0,
+      panel.scenario.length > 0,
       !silent,
       `${panel.role} のナレーションの有無が違う`,
     );
@@ -184,12 +184,12 @@ test("ロゴのコマは主催のマークを見せ、画像が無くても欠�
 });
 
 test("台本があれば尺の根拠は台本、無ければ想定尺", () => {
-  assert.equal(eventCmStoryboard(briefWith()).timingSource, "script");
-  const noScript = {
+  assert.equal(eventCmStoryboard(briefWith()).timingSource, "scenario");
+  const noScenario = {
     ...base(),
-    script: { version: 1 as const, scenes: [], source: "llm" as const, updatedAt: "", angle: "" },
+    scenario: { version: 1 as const, scenes: [], source: "llm" as const, updatedAt: "", angle: "" },
   };
-  assert.equal(eventCmStoryboard(noScript).timingSource, "budget");
+  assert.equal(eventCmStoryboard(noScenario).timingSource, "budget");
 });
 
 test("値のある部品は、どのフィールドを映しているか言える", () => {
@@ -388,7 +388,7 @@ test("絵コンテは、映像が実際に描くものと同じ部品・同じ�
 test("画面から消した項目は、絵コンテからも消える", () => {
   // Suppressing the speakers removes a whole scene from the film. A storyboard
   // that kept the panel would not merely show one stale block: it would show a
-  // picture, its seconds and its narration line that the film does not have.
+  // picture, its seconds and its scenario line that the film does not have.
   const brief = briefWith({ guests: GUESTS });
   const off = setSuppressed(brief, "guests", true);
 
@@ -450,7 +450,7 @@ test("登壇者の写真も、絵コンテがその画像を持つ", () => {
 
 test("コマが喋るかどうかは映像の形で決まる（台本の有無ではない）", () => {
   // The bug this exists to catch: three programme pictures appeared silent —
-  // no line, no subtitle, no editor to write one in — because the stored script
+  // no line, no subtitle, no editor to write one in — because the stored scenario
   // still held a single unindexed `program` line. A picture that speaks speaks
   // whether or not anybody has written its words yet.
   const brief = briefWith({
@@ -458,8 +458,8 @@ test("コマが喋るかどうかは映像の形で決まる（台本の有無�
   });
   const stale: EventCmBrief = {
     ...brief,
-    script: {
-      ...brief.script,
+    scenario: {
+      ...brief.scenario,
       source: "human",
       // Written before the programmes were split into their own pictures.
       scenes: [
@@ -476,7 +476,7 @@ test("コマが喋るかどうかは映像の形で決まる（台本の有無�
   assert.equal(programs.length, 3);
   for (const panel of programs) {
     assert.equal(panel.narrated, true, `プログラム${panel.index} が無音扱いになっている`);
-    assert.equal(panel.narration, "", "まだ書かれていない行は空で出る");
+    assert.equal(panel.scenario, "", "まだ書かれていない行は空で出る");
   }
 
   // And the words that no longer have a picture are reported rather than

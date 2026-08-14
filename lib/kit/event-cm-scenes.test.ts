@@ -58,7 +58,7 @@ const SAKE: EventCmBrief = {
     texture: "material:l",
   },
   bgm: "material:m",
-  script: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
+  scenario: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
 };
 
 const allScenes = (brief: EventCmBrief) =>
@@ -295,7 +295,7 @@ test("プログラムが1つなら、コマも1つ（既存のTakeは変わら�
   const one: EventCmBrief = { ...SAKE, programs: [SAKE.programs[0]] };
   const plan = eventCmScenePlan(one);
   assert.equal(plan.filter((step) => step.role === "program").length, 1);
-  // Unindexed, so a script written before this change still lines up.
+  // Unindexed, so a scenario written before this change still lines up.
   assert.equal(plan.find((step) => step.role === "program")?.index, undefined);
   const scene = sceneForRole("program", one);
   assert.ok(scene.components.some((component) => component.kind === "list"));

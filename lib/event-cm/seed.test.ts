@@ -6,7 +6,7 @@ import { eventCmGoalState } from "@/lib/pipeline/event-cm";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import {
   eventCmNarratedSteps,
-  scriptIsStale,
+  scenarioIsStale,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 
@@ -42,8 +42,8 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      script: {
-        ...brief.script,
+      scenario: {
+        ...brief.scenario,
         scenes: eventCmNarratedSteps(brief).map(({ role, index }) => ({
           role,
           ...(index === undefined ? {} : { index }),
@@ -58,7 +58,7 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      script: { ...brief.script, scenes: [{ role: "logoIn", text: "…" }] },
+      scenario: { ...brief.scenario, scenes: [{ role: "logoIn", text: "…" }] },
     }).ok,
     false,
   );
@@ -69,8 +69,8 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      script: {
-        ...brief.script,
+      scenario: {
+        ...brief.scenario,
         scenes: [
           { role: "title", text: "…" },
           { role: "program", index: 0, text: "…" },
@@ -84,8 +84,8 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      script: {
-        ...brief.script,
+      scenario: {
+        ...brief.scenario,
         scenes: [
           { role: "program", index: 1, text: "…" },
           { role: "program", index: 0, text: "…" },
@@ -100,8 +100,8 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      script: {
-        ...brief.script,
+      scenario: {
+        ...brief.scenario,
         scenes: [
           { role: "title", text: "…" },
           { role: "title", text: "…" },
@@ -113,8 +113,8 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      script: {
-        ...brief.script,
+      scenario: {
+        ...brief.scenario,
         scenes: [
           { role: "cta", text: "…" },
           { role: "title", text: "…" },
@@ -127,13 +127,13 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
 
 test("シーンが増えたら、保存を拒まず「台本が古い」と言う", () => {
   // The flow this protects: drop in a flyer that names a speaker. The film gains
-  // a scene the script has no line for, and refusing to save the speaker would
+  // a scene the scenario has no line for, and refusing to save the speaker would
   // be the wrong answer to a fact somebody just supplied.
   const brief = seedFor(WEALTHPARK_LAB);
-  const scripted: EventCmBrief = {
+  const written: EventCmBrief = {
     ...brief,
-    script: {
-      ...brief.script,
+    scenario: {
+      ...brief.scenario,
       scenes: eventCmNarratedSteps(brief).map(({ role, index }) => ({
         role,
         ...(index === undefined ? {} : { index }),
@@ -142,14 +142,14 @@ test("シーンが増えたら、保存を拒まず「台本が古い」と言�
       updatedAt: "2026-08-13T00:00:00.000Z",
     },
   };
-  assert.equal(scriptIsStale(scripted), false);
+  assert.equal(scenarioIsStale(written), false);
 
   const withGuest: EventCmBrief = {
-    ...scripted,
+    ...written,
     guests: [{ name: "宮尾 佳明", role: "宮尾酒造 十一代目当主", photo: null }],
   };
   assert.equal(validateBrief("event-cm", withGuest).ok, true, "保存は通る");
-  assert.equal(scriptIsStale(withGuest), true, "台本は古いと分かる");
+  assert.equal(scenarioIsStale(withGuest), true, "台本は古いと分かる");
 });
 
 test("提案する日付は4週間以上先の最初の金曜日", () => {
@@ -172,7 +172,7 @@ test("シードだけで台本以外の必須項目が埋まる", () => {
   const state = eventCmGoalState(seedFor(WEALTHPARK_LAB));
   assert.deepEqual(
     state.progress.missingRequired.map((field) => field.path),
-    ["script"],
+    ["scenario"],
     "残る必須項目はナレーション台本だけ",
   );
 });

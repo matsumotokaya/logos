@@ -126,7 +126,7 @@ export const TEMPLATES: TemplateEntry[] = [
     rendererRevision: "remotion/event@2026-08-04",
     name: "イベント動画",
     summary:
-      "イベント・セミナー告知の30秒PV。和モダンの固定タイムラインで、ナレーションを持たずBGMとタイポグラフィで成立させます。素材が無いスロットは設計済みのフォールバックで描かれます。",
+      "イベント・セミナー告知の30秒PV。和モダンの固定タイムラインで、読み上げを持たずBGMとタイポグラフィで成立させます。素材が無いスロットは設計済みのフォールバックで描かれます。",
     requires: "イベントの文言・日時・登壇者（EventBrief）",
     duration: "30秒",
     narration: false,
@@ -150,9 +150,9 @@ export const TEMPLATES: TemplateEntry[] = [
     rendererRevision: "remotion/event-cm@2026-08-11",
     name: "イベント紹介動画",
     summary:
-      "イベント告知の30秒CM。ナレーションを先に書き、その読み上げのタイミングが画面の尺と並びを決めます。絵は和モダン（墨黒×金×明朝）で、素材が無いスロットは設計済みのフォールバックで描かれます。",
-    requires: "イベントの事実（EventBrief）と、そこから書いたナレーション台本",
-    duration: "30秒前後（ナレーション長で決まる）",
+      "イベント告知の30秒CM。シナリオを先に書き、その読み上げのタイミングが画面の尺と並びを決めます。絵は和モダン（墨黒×金×明朝）で、素材が無いスロットは設計済みのフォールバックで描かれます。",
+    requires: "イベントの事実（EventBrief）と、そこから書いたシナリオ",
+    duration: "30秒前後（シナリオと読み上げの長さで決まる）",
     narration: true,
     // The script is written by an LLM from the brief, then spoken. Both are
     // charged, and both re-run only when asked.

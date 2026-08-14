@@ -335,32 +335,32 @@ export default function BrandVideoDetail({
     }
   }
 
-  // Writing the narration is what turns a seeded film into this event's film:
+  // Writing the scenario is what turns a seeded film into this event's film:
   // the scene lengths stop being budgets and start following the words.
   /**
-   * Draft the whole narration again.
+   * Draft the whole scenario again.
    *
    * `force` is what makes this reachable at all once somebody has edited a line:
-   * the endpoint refuses to overwrite a hand-written script unless told to, and a
-   * film whose shape changed under a human-edited script would otherwise have no
-   * way back to a complete narration. The caller is the one that warns.
+   * the endpoint refuses to overwrite a hand-written scenario unless told to, and a
+   * film whose shape changed under a human-edited scenario would otherwise have no
+   * way back to a complete scenario. The caller is the one that warns.
    */
-  async function writeScript(force = false): Promise<boolean> {
-    busy("ナレーションを書いています…");
+  async function writeScenario(force = false): Promise<boolean> {
+    busy("シナリオを書いています…");
     try {
-      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/script`, {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/scenario`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(force ? { force: true } : {}),
       });
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(json?.error ?? "台本を作成できませんでした");
+        throw new Error(json?.error ?? "シナリオを作成できませんでした");
       }
       await load();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "台本を作成できませんでした");
+      setError(e instanceof Error ? e.message : "シナリオを作成できませんでした");
       return false;
     } finally {
       idle();
@@ -396,31 +396,31 @@ export default function BrandVideoDetail({
   }
 
   /**
-   * Save one panel's narration line.
+   * Save one panel's scenario line.
    *
-   * The server marks the whole script `human` and drops the recording, which is
+   * The server marks the whole scenario `human` and drops the recording, which is
    * what makes the shape of the work right: correct a few lines, then re-record
    * once. A voice still reading the old words would be worse than silence.
    */
-  async function editNarration(
+  async function editScenario(
     scene: { role: EventCmSceneRole; index?: number },
     text: string,
   ): Promise<boolean> {
-    busy("台本を保存しています…");
+    busy("シナリオを保存しています…");
     try {
-      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/script`, {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/scenario`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scenes: [{ ...scene, text }] }),
       });
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(json?.error ?? "台本を保存できませんでした");
+        throw new Error(json?.error ?? "シナリオを保存できませんでした");
       }
       await load();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "台本を保存できませんでした");
+      setError(e instanceof Error ? e.message : "シナリオを保存できませんでした");
       return false;
     } finally {
       idle();
@@ -457,7 +457,7 @@ export default function BrandVideoDetail({
     }
     // A programme picture exists because the programme does, so the picture goes
     // when the item does. The narration then describes an evening with one fewer
-    // item, which `scriptIsStale` reports and the mapping stage rewrites.
+    // item, which `scenarioIsStale` reports and the mapping stage rewrites.
     const removed = brief.programs[decision.index]?.title ?? "";
     const ok = await editFact({
       path: "programs",
@@ -467,7 +467,7 @@ export default function BrandVideoDetail({
     });
     if (ok) {
       setNotice(
-        `プログラム「${removed}」のコマを削除しました。言う内容が変わったので、ナレーションは書き直しが必要です`,
+        `プログラム「${removed}」のコマを削除しました。言う内容が変わったので、シナリオは書き直しが必要です`,
       );
     }
     return ok;
@@ -623,8 +623,8 @@ export default function BrandVideoDetail({
         foundCount?: number;
         dropped?: Array<{ field: string; value: string; reason: string }>;
         keptUserValues?: string[];
-        narrationRewritten?: boolean;
-        narrationKept?: boolean;
+        scenarioRewritten?: boolean;
+        scenarioKept?: boolean;
         images?: { sent: number; judged: number };
         placedImages?: Array<{ label: string; materialLabel: string; reason: string }>;
         unusedImages?: Array<{ label: string; reason: string }>;
@@ -675,12 +675,12 @@ export default function BrandVideoDetail({
         for (const image of json?.unusedImages ?? []) {
           appendLine(id, `未使用: ${image.label}（${image.reason}）`);
         }
-        if (json?.narrationRewritten) {
-          appendLine(id, "ナレーションを新しい内容で書き直しました");
+        if (json?.scenarioRewritten) {
+          appendLine(id, "シナリオを新しい内容で書き直しました");
           appendLine(id, "音声は作り直しが必要です");
         }
-        if (json?.narrationKept) {
-          appendLine(id, "編集済みのナレーションはそのままにしました");
+        if (json?.scenarioKept) {
+          appendLine(id, "編集済みのシナリオはそのままにしました");
         }
         if (json?.note) appendLine(id, `読み取りメモ: ${json.note}`);
       }
@@ -735,7 +735,7 @@ export default function BrandVideoDetail({
 
     // Decided from the brief the reading stages just wrote, not from the one
     // the page held when the button was pressed: the mapping stage may have
-    // rewritten the narration, which changes what is left to do.
+    // rewritten the scenario, which changes what is left to do.
     const fresh = await load();
     const working = fresh?.video.brief as EventCmBrief | undefined;
     if (!working || fresh?.video.template !== "event-cm") return;
@@ -747,10 +747,10 @@ export default function BrandVideoDetail({
 
     for (const step of steps) {
       const ok =
-        step === "script"
-          ? await writeScript()
+        step === "scenario"
+          ? await writeScenario()
           : step === "voice"
-            ? await speakScript()
+            ? await speakScenario()
             : await bakeFilm();
       if (!ok) return;
     }
@@ -815,8 +815,8 @@ export default function BrandVideoDetail({
 
   // Speaking replaces the estimated timeline with the measured one. Returns
   // whether it worked, so the dialog that asked can say so and close itself.
-  async function speakScript(voiceId?: string): Promise<boolean> {
-    busy("ナレーション音声を作成しています…");
+  async function speakScenario(voiceId?: string): Promise<boolean> {
+    busy("読み上げを作成しています…");
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/voice`, {
         method: "POST",
@@ -825,12 +825,12 @@ export default function BrandVideoDetail({
       });
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(json?.error ?? "ナレーション音声を作成できませんでした");
+        throw new Error(json?.error ?? "読み上げを作成できませんでした");
       }
       await load();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "ナレーション音声を作成できませんでした");
+      setError(e instanceof Error ? e.message : "読み上げを作成できませんでした");
       return false;
     } finally {
       idle();
@@ -840,19 +840,19 @@ export default function BrandVideoDetail({
   /** Off: the film stops speaking and goes back to music and subtitles. The
    *  recording stays pinned to the take, so this is reversible. */
   async function turnNarrationOff(): Promise<boolean> {
-    busy("ナレーションを外しています…");
+    busy("読み上げを外しています…");
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/voice`, {
         method: "DELETE",
       });
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(json?.error ?? "ナレーションを外せませんでした");
+        throw new Error(json?.error ?? "読み上げを外せませんでした");
       }
       await load();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "ナレーションを外せませんでした");
+      setError(e instanceof Error ? e.message : "読み上げを外せませんでした");
       return false;
     } finally {
       idle();
@@ -883,7 +883,7 @@ export default function BrandVideoDetail({
   // The whole page is only replaced when there is no page: a video that could
   // not be loaded has nothing else to show. An action that failed — a line that
   // would not save, a run that errored — must NOT take the screen away. Saving
-  // one narration line used to throw the user onto an error page with a 「←
+  // one scenario line used to throw the user onto an error page with a 「←
   // 動画一覧へ」 link, which reads as "this video is broken" rather than "that
   // save was refused", and loses the work in the textarea.
   if (error && !resolved) {
@@ -917,7 +917,7 @@ export default function BrandVideoDetail({
   const mp4Behind = renderIsBehind(video.render?.renderedAt ?? null, video.bakedAt);
 
   // Aspect, pixels, length. Computed here because the timeline is the film's
-  // own (a script shortens or lengthens it), and shown with the other metadata
+  // own (a scenario shortens or lengthens it), and shown with the other metadata
   // rather than over the picture. Read through eventCmFilm so the number here
   // is the number the player runs to — a raw-brief timeline once disagreed
   // with the film the moment a field was switched off.
@@ -1053,7 +1053,7 @@ export default function BrandVideoDetail({
                     void (stage === "structure" ? runStructureAndMap() : runStage(stage))
                   }
                   onOpenStage={(stage) => setOpenStage(stage)}
-                  onRewriteScript={() => void writeScript()}
+                  onRewriteScenario={() => void writeScenario()}
                 />
               ) : undefined
             }
@@ -1176,7 +1176,7 @@ export default function BrandVideoDetail({
             : null}
           {video.template === "event-cm"
             ? (() => {
-                // A finishing step, not an authoring one: the script is written
+                // A finishing step, not an authoring one: the scenario is written
                 // in the pipeline, and speaking it costs money and half a
                 // minute, so it happens once the words are settled — right
                 // before the export it feeds. The control keeps one name and
@@ -1189,9 +1189,9 @@ export default function BrandVideoDetail({
                     currentVoiceId={narrationVoiceByName(track?.voice)?.id ?? null}
                     totalMs={track?.totalMs ?? null}
                     mock={Boolean(track?.mock)}
-                    canSpeak={Boolean(brief?.script?.scenes?.length)}
+                    canSpeak={Boolean(brief?.scenario.scenes.length)}
                     busy={saving}
-                    onSpeak={(voiceId) => speakScript(voiceId)}
+                    onSpeak={(voiceId) => speakScenario(voiceId)}
                     onTurnOff={() => turnNarrationOff()}
                   />
                 );
@@ -1305,9 +1305,9 @@ export default function BrandVideoDetail({
           playing={eventCm.baked ?? eventCm.working}
           bake={bake}
           onEditFact={(edit) => void editFact(edit)}
-          onEditNarration={(scene, text) => editNarration(scene, text)}
+          onEditScenario={(scene, text) => editScenario(scene, text)}
           onDeletePanel={(scene) => deletePanel(scene)}
-          onRewriteScript={(force) => void writeScript(force)}
+          onRewriteScenario={(force) => void writeScenario(force)}
           // Photographs and marks alike: which slot a picture suits is the
           // user's call here, exactly as it is for audio.
           imageSources={sources.filter(

@@ -21,7 +21,7 @@ const EMPTY: EventCmBrief = {
   logos: [],
   visuals: { inkArt: null, value: null, programs: null, closing: null, texture: null },
   bgm: null,
-  script: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
+  scenario: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
 };
 
 const seeded: EventCmBrief = {
@@ -33,7 +33,7 @@ const seeded: EventCmBrief = {
   schedule: { date: "2026.9.11", weekday: "FRI", time: "18:00 START", venue: null, fee: null },
   cta: "詳細・お申し込みはこちら",
   logos: [{ name: "WealthPark Lab", src: null }],
-  script: {
+  scenario: {
     version: 1,
     scenes: [{ role: "title", text: "数字の向こうに、投資の意味がある。" }],
     source: "llm",
@@ -47,7 +47,7 @@ const seeded: EventCmBrief = {
     programs: { origin: "inferred" },
     valueLines: { origin: "inferred" },
     cta: { origin: "inferred" },
-    script: { origin: "inferred" },
+    scenario: { origin: "inferred" },
     presenter: { origin: "brand" },
     logos: { origin: "brand" },
   },
@@ -70,7 +70,7 @@ test("シード済みブリーフは必須を満たし、推定値だけを暫�
   assert.deepEqual(state.progress.missingRequired, []);
   assert.deepEqual(
     state.provisional.map((field) => field.path).sort(),
-    ["cta", "programs", "schedule.date", "schedule.time", "script", "title", "valueLines"],
+    ["cta", "programs", "scenario", "schedule.date", "schedule.time", "title", "valueLines"],
   );
   // Brand-derived values are settled: they are not warned about on publish.
   const presenter = state.fields.find((field) => field.path === "presenter");

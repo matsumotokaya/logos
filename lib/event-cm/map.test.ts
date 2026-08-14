@@ -7,8 +7,8 @@ import { validateBrief } from "@/lib/templates/brief-schemas";
 import {
   eventCmNarratedSteps,
   eventCmSceneKey,
-  scriptIsStale,
-  scriptStaleness,
+  scenarioIsStale,
+  scenarioStaleness,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 import type { EventFacts } from "./structure";
@@ -18,9 +18,9 @@ const SEEDED = seedEventCmBrief(
   { now: new Date("2026-08-11T09:00:00+09:00"), seed: "take-1" },
 );
 
-const withScript = (brief: EventCmBrief, at: string, source: "llm" | "human" = "llm"): EventCmBrief => ({
+const withScenario = (brief: EventCmBrief, at: string, source: "llm" | "human" = "llm"): EventCmBrief => ({
   ...brief,
-  script: {
+  scenario: {
     version: 1,
     scenes: eventCmNarratedSteps(brief).map(({ role, index }) => ({
       role,
@@ -157,23 +157,23 @@ test("資料を読み直しても、登壇者に置かれた写真は消えな�
 test("事実が変わるとナレーションが古くなる", () => {
   // The bug this exists to catch: reading a flyer changed the event and left
   // the film narrating the seeded proposal.
-  const scripted = withScript(SEEDED, "2026-08-11T10:00:00.000Z");
-  assert.equal(scriptIsStale(scripted), false);
+  const written = withScenario(SEEDED, "2026-08-11T10:00:00.000Z");
+  assert.equal(scenarioIsStale(written), false);
 
   const result = mapFactsIntoBrief(
-    scripted,
+    written,
     { ...EMPTY_FACTS, title: "世界が恋する日本酒" },
     "フライヤー.pdf",
     NOW,
   );
 
-  assert.equal(scriptIsStale(result.brief), true);
+  assert.equal(scenarioIsStale(result.brief), true);
 });
 
 test("項目を手で直してもナレーションが古くなる", () => {
-  const scripted = withScript(SEEDED, "2026-08-11T10:00:00.000Z");
-  const edited = markUserEdited(scripted, "schedule.date", NOW);
-  assert.equal(scriptIsStale(edited), true);
+  const written = withScenario(SEEDED, "2026-08-11T10:00:00.000Z");
+  const edited = markUserEdited(written, "schedule.date", NOW);
+  assert.equal(scenarioIsStale(edited), true);
 });
 
 test("台本が無いうちは「古い」にならない", () => {
@@ -183,19 +183,19 @@ test("台本が無いうちは「古い」にならない", () => {
     "フライヤー.pdf",
     NOW,
   );
-  assert.equal(result.brief.script.scenes.length, 0);
-  assert.equal(scriptIsStale(result.brief), false);
+  assert.equal(result.brief.scenario.scenes.length, 0);
+  assert.equal(scenarioIsStale(result.brief), false);
 });
 
 test("台本の1行だけを直せる（役割で対応し、位置で対応しない）", () => {
-  // What the PATCH endpoint does, as data: the script holds the narrated roles
+  // What the PATCH endpoint does, as data: the scenario holds the narrated roles
   // for this brief, so an edit is looked up by role and the rest is carried
   // over. Indexing by array position used to line line 1 up against scene 0 and
   // demand words for the two silent mark scenes.
   const brief: EventCmBrief = {
     ...SEEDED,
     guests: [{ name: "宮尾 佳明", role: "宮尾酒造 十一代目当主", photo: null }],
-    script: {
+    scenario: {
       version: 1,
       source: "llm",
       updatedAt: NOW,
@@ -213,7 +213,7 @@ test("台本の1行だけを直せる（役割で対応し、位置で対応し�
 
   const steps = eventCmNarratedSteps(brief);
   const previous = new Map(
-    brief.script.scenes.map((scene) => [eventCmSceneKey(scene), scene.text]),
+    brief.scenario.scenes.map((scene) => [eventCmSceneKey(scene), scene.text]),
   );
   const edited = new Map([["value", "書き直した価値の行"]]);
   const scenes = steps.map((step) => {
@@ -239,7 +239,7 @@ test("台本は1行だけでも保存できる（書きかけは正常な状態�
   // refused with 「空のコマがあります」.
   const brief: EventCmBrief = {
     ...SEEDED,
-    script: { version: 1, source: "llm", updatedAt: NOW, angle: "", scenes: [] },
+    scenario: { version: 1, source: "llm", updatedAt: NOW, angle: "", scenes: [] },
   };
   const steps = eventCmNarratedSteps(brief);
   assert.ok(steps.length > 2, "このブリーフは複数のコマを持つ");
@@ -256,12 +256,12 @@ test("台本は1行だけでも保存できる（書きかけは正常な状態�
   // Stored as one line, in the film's order, and legal to save.
   assert.equal(scenes.length, 1);
   assert.equal(
-    validateBrief("event-cm", { ...brief, script: { ...brief.script, scenes } }).ok,
+    validateBrief("event-cm", { ...brief, scenario: { ...brief.scenario, scenes } }).ok,
     true,
   );
   // Still reported as unfinished, which is what the screen warns about.
   assert.equal(
-    scriptIsStale({ ...brief, script: { ...brief.script, scenes } }),
+    scenarioIsStale({ ...brief, scenario: { ...brief.scenario, scenes } }),
     true,
   );
 });
@@ -287,10 +287,10 @@ test("消した項目は、映像の形の判定にも反映される", () => {
     "消した登壇者のコマがまだ数えられている",
   );
 
-  // A script written for the film as drawn is therefore not stale.
+  // A scenario written for the film as drawn is therefore not stale.
   const written: EventCmBrief = {
     ...off,
-    script: {
+    scenario: {
       version: 1,
       source: "human",
       updatedAt: NOW,
@@ -302,14 +302,14 @@ test("消した項目は、映像の形の判定にも反映される", () => {
       })),
     },
   };
-  assert.equal(scriptStaleness(written), null, "正しい台本が古い扱いになっている");
+  assert.equal(scenarioStaleness(written), null, "正しい台本が古い扱いになっている");
 });
 
 test("食い違いの種類を言い分ける（形が違う／事実が新しい）", () => {
   const base: EventCmBrief = {
     ...SEEDED,
     factsUpdatedAt: "2026-08-14T00:00:00.000Z",
-    script: {
+    scenario: {
       version: 1,
       source: "llm",
       updatedAt: "2026-08-13T00:00:00.000Z",
@@ -322,12 +322,12 @@ test("食い違いの種類を言い分ける（形が違う／事実が新し�
     },
   };
   // Right set of lines, written before the facts changed.
-  assert.equal(scriptStaleness(base), "facts");
+  assert.equal(scenarioStaleness(base), "facts");
 
   // Wrong set of lines: a picture has no line, or a line has no picture.
   const shape: EventCmBrief = {
     ...base,
-    script: { ...base.script, scenes: base.script.scenes.slice(0, 2) },
+    scenario: { ...base.scenario, scenes: base.scenario.scenes.slice(0, 2) },
   };
-  assert.equal(scriptStaleness(shape), "shape");
+  assert.equal(scenarioStaleness(shape), "shape");
 });

@@ -1,6 +1,6 @@
 // Speak this video's narration.
 //
-// The last step that turns a proposal into a film: the script is read aloud,
+// The last step that turns a proposal into a film: the scenario is read aloud,
 // the WAV is pinned to the take, and the timeline stops estimating from
 // character counts and starts following the measured track.
 
@@ -73,22 +73,22 @@ export async function POST(
   }
 
   const brief = take.brief as EventCmBrief;
-  const scenes = brief.script?.scenes ?? [];
+  const scenes = brief.scenario.scenes;
   // The film's own shape decides how many lines are expected: four when nobody
   // is announced, one per programme when several are listed, and none for a
   // field the user switched off. The film object is the one place that shape
   // is derived, so the count comes from it.
   const expected = eventCmFilm(brief).scenes.filter((scene) => scene.narrated).length;
   if (scenes.length !== expected) {
-    // Says which state it is in. A partial script is the ordinary state while
-    // somebody is writing, and 「先に台本を作成してください」 reads as though
+    // Says which state it is in. A partial scenario is the ordinary state while
+    // somebody is writing, and 「先にシナリオを書いてください」 reads as though
     // nothing had been written at all.
     return Response.json(
       {
         error:
           scenes.length === 0
-            ? "先に台本を作成してください"
-            : `読み上げる言葉が無いコマがあります（${scenes.length}/${expected}コマ）。残りを書いてから読み上げてください`,
+            ? "先にシナリオを書いてください"
+            : `シナリオが書かれていないコマがあります（${scenes.length}/${expected}コマ）。残りを書いてから読み上げてください`,
       },
       { status: 409 },
     );
@@ -128,8 +128,8 @@ export async function POST(
       wav,
       track,
       role: "event_cm_voice",
-      label: "イベント紹介動画のナレーション",
-      sourceRef: { script_updated_at: brief.script.updatedAt },
+      label: "イベント紹介動画の読み上げ",
+      sourceRef: { scenario_updated_at: brief.scenario.updatedAt },
     });
     return Response.json({
       ok: true,
@@ -145,7 +145,7 @@ export async function POST(
         error:
           voiceError instanceof Error
             ? voiceError.message
-            : "ナレーション音声を作成できませんでした",
+            : "読み上げを作成できませんでした",
       },
       { status: 502 },
     );
@@ -159,7 +159,7 @@ export async function POST(
  * the take, because deleting the recording would make "off" an irreversible
  * act — and because the material list is where a person looks for what this
  * take is made of. Off means the film stops speaking: the timeline falls back
- * to estimating from the script, the captions come from the script's own text,
+ * to estimating from the scenario, the captions come from the scenario's own text,
  * and the music plays at full level throughout. All three of those are
  * behaviours the composition already had for a take that had never been read
  * aloud (remotion/event-cm/timeline.ts), which is why this needs nothing else.
@@ -211,7 +211,7 @@ export async function DELETE(
   const validated = validateBrief("event-cm", brief);
   if (!validated.ok) {
     return Response.json(
-      { error: `ナレーションを外せません: ${validated.issues.join(", ")}` },
+      { error: `読み上げを外せません: ${validated.issues.join(", ")}` },
       { status: 400 },
     );
   }

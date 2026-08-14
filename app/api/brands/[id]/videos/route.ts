@@ -12,7 +12,7 @@ import { emptyEventBrief } from "@/remotion/event/briefs";
 import { createTake } from "@/lib/takes/create";
 import { seedEventCmFromBrand } from "@/lib/event-cm/seed-from-brand";
 import { UNTITLED_VIDEO } from "@/lib/event-cm/title";
-import { draftEventCmScript, eventCmScriptAvailable } from "@/lib/event-cm/script";
+import { draftEventCmScenario, eventCmScenarioAvailable } from "@/lib/event-cm/scenario";
 
 type TakeVideoRow = {
   id: string;
@@ -173,19 +173,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     // Narration comes with the film, like the music does. The golden path is
     // that nobody is asked for anything: add a video and it plays, with words
     // and a soundtrack. Writing it here rather than on first open means the
-    // take is never briefly a silent film with no script.
+    // take is never briefly a silent film with no scenario.
     //
     // A failure here does not fail the creation. The take is complete without
-    // a script — the timeline falls back to the scene budget — and the
+    // a scenario — the timeline falls back to the scene budget — and the
     // narration can be written from the pipeline afterwards.
-    if (eventCmScriptAvailable()) {
+    if (eventCmScenarioAvailable()) {
       try {
-        const draft = await draftEventCmScript(seededBrief, {
+        const draft = await draftEventCmScenario(seededBrief, {
           now: new Date().toISOString(),
         });
-        seededBrief = { ...seededBrief, script: draft.script };
+        seededBrief = { ...seededBrief, scenario: draft.scenario };
       } catch {
-        // Left empty on purpose; the screen says the script is missing.
+        // Left empty on purpose; the screen says the scenario is missing.
       }
     }
 

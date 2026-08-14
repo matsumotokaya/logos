@@ -19,7 +19,7 @@
     "takes:audit-event-work": "NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/audit-event-work.ts",
     "brand:inspect-site": "NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/inspect-brand-site.ts",
     "event-cm:seed": "NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/seed-event-cm.ts",
-    "event-cm:draft":"NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/draft-event-cm-script.ts",
+    "event-cm:draft":"NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/draft-event-cm-scenario.ts",
     "event:render": "remotion render remotion/index.ts event var/event-lab/sake-2026.mp4",
     "event:studio": "remotion studio remotion/index.ts"
   },

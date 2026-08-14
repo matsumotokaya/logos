@@ -14,15 +14,15 @@ import {
 // states rather than one:
 //
 //   0 scenes — not written yet. A seeded take is created before the narration
-//              stage runs, and the goal reports the script as the one thing
+//              stage runs, and the goal reports the scenario as the one thing
 //              still missing (lib/pipeline/event-cm.ts).
 //   written  — one line per narrated scene, in film order, no repeats. Which
 //              scenes those are depends on the facts: with nobody announced
-//              there is no speaker picture, so a four-beat script is complete
+//              there is no speaker picture, so a four-beat scenario is complete
 //              (types.ts `eventCmScenePlan`). What is never legal is a line for
 //              a scene the film does not have, or the same scene twice.
 //
-// A half-written script is what nothing produces on purpose and no renderer can
+// A half-written scenario is what nothing produces on purpose and no renderer can
 // use, so the schema refuses it rather than rendering a film with a silent gap.
 
 export const EventCmSceneSchema = z.object({
@@ -32,7 +32,7 @@ export const EventCmSceneSchema = z.object({
   text: z.string(),
 });
 
-export const EventCmScriptSchema = z
+export const EventCmScenarioSchema = z
   .object({
     version: z.literal(1),
     scenes: z.array(EventCmSceneSchema),
@@ -41,17 +41,17 @@ export const EventCmScriptSchema = z
     angle: z.string(),
   })
   .refine(
-    (script) => {
-      if (script.scenes.length === 0) return true;
+    (scenario) => {
+      if (scenario.scenes.length === 0) return true;
       // Roles keep the film's order, and a role may repeat ONLY as consecutive
       // indexed pictures — which is what a programme per picture is. So the
       // check is: role positions never go backwards, an index appears only where
       // the role legitimately repeats, and no two pictures are the same picture.
-      const keys = script.scenes.map((scene) =>
+      const keys = scenario.scenes.map((scene) =>
         eventCmSceneKey({ role: scene.role as EventCmSceneRole, index: scene.index }),
       );
       if (new Set(keys).size !== keys.length) return false;
-      const positions = script.scenes.map((scene) =>
+      const positions = scenario.scenes.map((scene) =>
         (EVENT_CM_NARRATED_ROLES as readonly string[]).indexOf(scene.role),
       );
       if (positions.some((position) => position < 0)) return false;
@@ -62,9 +62,9 @@ export const EventCmScriptSchema = z
         // Same role twice: allowed when both are indexed and the index advances.
         return (
           position === previous &&
-          script.scenes[at].index !== undefined &&
-          script.scenes[at - 1].index !== undefined &&
-          (script.scenes[at].index as number) > (script.scenes[at - 1].index as number)
+          scenario.scenes[at].index !== undefined &&
+          scenario.scenes[at - 1].index !== undefined &&
+          (scenario.scenes[at].index as number) > (scenario.scenes[at - 1].index as number)
         );
       });
     },
@@ -101,7 +101,7 @@ export const EventCmBriefSchema = EventBriefSchema.extend({
   theme: EventCmThemeSchema.optional(),
   factsUpdatedAt: z.string().optional(),
   titleDeclined: z.string().nullable().optional(),
-  script: EventCmScriptSchema,
+  scenario: EventCmScenarioSchema,
   voice: z
     .object({
       track: CmVoiceTrackSchema,
@@ -110,11 +110,11 @@ export const EventCmBriefSchema = EventBriefSchema.extend({
     .optional(),
 });
 
-// Deliberately NOT validated here: whether the script covers exactly the scenes
+// Deliberately NOT validated here: whether the scenario covers exactly the scenes
 // this brief needs. Reading a flyer that names a speaker adds a scene, and the
-// stored script — written when there was no speaker — would instantly become
+// stored scenario — written when there was no speaker — would instantly become
 // invalid. Refusing to save a fact somebody just supplied is the wrong answer to
-// it; `scriptIsStale` reports the mismatch and the map stage rewrites. The film
+// it; `scenarioIsStale` reports the mismatch and the map stage rewrites. The film
 // keeps playing in the meantime, with the budget standing in for the line that
 // has not been written yet (timeline.ts).
 

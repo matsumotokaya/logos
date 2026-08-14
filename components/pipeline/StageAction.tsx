@@ -35,7 +35,7 @@ export default function StageAction({
   disabled,
   onRun,
   onOpenStage,
-  onRewriteScript,
+  onRewriteScenario,
 }: {
   stageId: PipelineStageId;
   /** Every stage's freshness — what decides whether either button has work. */
@@ -53,9 +53,9 @@ export default function StageAction({
    * Offered on the structuring stage because that is where the words are
    * decided. Applying facts already rewrites the narration; this is for
    * wanting a different take on the same facts, which is the commonest reason
-   * to touch a script at all.
+   * to touch a scenario at all.
    */
-  onRewriteScript?: () => void;
+  onRewriteScenario?: () => void;
 }) {
   const own = OWN_STEP[stageId];
   const advance = ADVANCE[stageId];
@@ -76,14 +76,14 @@ export default function StageAction({
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
-      {stageId === "structure" && onRewriteScript ? (
+      {stageId === "structure" && onRewriteScenario ? (
         <button
           type="button"
-          onClick={onRewriteScript}
+          onClick={onRewriteScenario}
           disabled={busy}
           className="mr-auto text-xs text-accent hover:underline disabled:opacity-50"
         >
-          ナレーションだけ書き直す
+          シナリオだけ書き直す
         </button>
       ) : null}
 

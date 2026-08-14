@@ -1,20 +1,20 @@
 // Draft the narration for a narrated event promo, from an existing take's brief.
 //
-// A reading tool, not a writing one: it prints the script and never stores it.
+// A reading tool, not a writing one: it prints the scenario and never stores it.
 // The point is to judge the words — the angle, whether it invents anything,
 // whether it lands near 30 seconds — before the screen work starts.
 //
 //   npm run event-cm:draft -- --take <UUID> [--notes "主催者の補足"]
 
 import { createAdminSupabase } from "@/lib/supabase/server";
-import { draftEventCmScript, eventCmScriptAvailable } from "@/lib/event-cm/script";
+import { draftEventCmScenario, eventCmScenarioAvailable } from "@/lib/event-cm/scenario";
 import {
   EVENT_CM_CHARS_PER_SECOND,
   EVENT_CM_MAX_CHARS,
   EVENT_CM_MIN_CHARS,
   eventCmSceneBudget,
-  scriptBudgetIssues,
-  scriptChars,
+  scenarioBudgetIssues,
+  scenarioChars,
 } from "@/remotion/event-cm/types";
 import type { EventBrief } from "@/remotion/event/types";
 
@@ -29,7 +29,7 @@ const CHARS_PER_SECOND = EVENT_CM_CHARS_PER_SECOND;
 async function main() {
   const takeId = flag("take");
   if (!takeId) throw new Error("--take <UUID> が必要です");
-  if (!eventCmScriptAvailable()) {
+  if (!eventCmScenarioAvailable()) {
     throw new Error("OPENAI_API_KEY が設定されていません");
   }
 
@@ -46,21 +46,21 @@ async function main() {
   }
 
   const brief = data.brief as EventBrief;
-  const draft = await draftEventCmScript(brief, {
+  const draft = await draftEventCmScenario(brief, {
     notes: flag("notes"),
     now: new Date().toISOString(),
   });
 
-  const chars = scriptChars(draft.script);
+  const chars = scenarioChars(draft.scenario);
   const seconds = (chars / CHARS_PER_SECOND).toFixed(1);
 
   console.log(`\n■ ${data.title}  (${data.id})`);
   console.log("\n── 渡した事実 ──");
   console.log(draft.facts);
   console.log("\n── 訴求軸 ──");
-  console.log(draft.script.angle);
+  console.log(draft.scenario.angle);
   console.log("\n── ナレーション ──");
-  for (const [i, scene] of draft.script.scenes.entries()) {
+  for (const [i, scene] of draft.scenario.scenes.entries()) {
     const sceneChars = scene.text.replace(/\s/g, "").length;
     const budget = eventCmSceneBudget(scene);
     const onSpec = sceneChars >= budget.min && sceneChars <= budget.max;
@@ -75,7 +75,7 @@ async function main() {
       withinBudget ? "✓ 予算内" : `✗ 予算(${EVENT_CM_MIN_CHARS}〜${EVENT_CM_MAX_CHARS}字)外`
     }`,
   );
-  const issues = scriptBudgetIssues(draft.script);
+  const issues = scenarioBudgetIssues(draft.scenario);
   if (issues.length) {
     console.log(
       `シーン予算外: ${issues

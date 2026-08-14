@@ -48,7 +48,7 @@ export default function EventVideoWorkspace({ brief }: { brief: EventBrief }) {
             : "日時未設定"}
         </p>
         <p className="text-[11px] text-ink-faint">
-          16:9 / 1920×1080 / {seconds}秒 / ナレーションなし
+          16:9 / 1920×1080 / {seconds}秒 / 読み上げなし
         </p>
       </div>
 

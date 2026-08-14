@@ -25,9 +25,9 @@ const SPOKEN: Record<string, string> = {
   cta: "十月三日、土曜日、午後一時から。ご案内は、ホームページをご覧ください。",
 };
 
-const scripted: EventCmBrief = {
+const written: EventCmBrief = {
   ...SEEDED,
-  script: {
+  scenario: {
     version: 1,
     scenes: eventCmNarratedSteps(SEEDED).map(({ role, index }) => ({
       role,
@@ -47,11 +47,11 @@ test("文で割る（句点を残す）", () => {
 });
 
 test("台本があれば、音声を待たずに字幕が出る", () => {
-  // The whole reason subtitles are derived from the script: a film watched
+  // The whole reason subtitles are derived from the scenario: a film watched
   // muted must be readable before anyone has paid for TTS.
-  const captions = captionsFor(scripted);
+  const captions = captionsFor(written);
   assert.ok(
-    captions.length > scripted.script.scenes.length,
+    captions.length > written.scenario.scenes.length,
     "シーン数より多い＝文単位で割れている",
   );
   // The first thing anyone reads is the title call.
@@ -63,7 +63,7 @@ test("台本が無ければ字幕も無い", () => {
 });
 
 test("字幕は重ならず、隙間なく続く", () => {
-  const captions = captionsFor(scripted);
+  const captions = captionsFor(written);
   for (let i = 1; i < captions.length; i += 1) {
     assert.ok(
       captions[i].fromMs >= captions[i - 1].toMs,
@@ -76,7 +76,7 @@ test("字幕は重ならず、隙間なく続く", () => {
 });
 
 test("字幕は冒頭のロゴシーンには出ない", () => {
-  const captions = captionsFor(scripted);
+  const captions = captionsFor(written);
   assert.equal(captions[0].fromMs, EVENT_CM_INTRO_MS);
   assert.equal(captionAt(captions, 0), null);
   assert.equal(captionAt(captions, EVENT_CM_INTRO_MS - 1), null);
@@ -85,8 +85,8 @@ test("字幕は冒頭のロゴシーンには出ない", () => {
 test("字幕は締めのロゴシーンには残らない", () => {
   // The film ends on the mark, alone. A subtitle still on screen over it would
   // be a line whose picture has already gone.
-  const captions = captionsFor(scripted);
-  const timeline = eventCmTimeline(scripted);
+  const captions = captionsFor(written);
+  const timeline = eventCmTimeline(written);
   const last = captions[captions.length - 1];
   assert.equal(last.toMs, timeline.narrationEndMs, "最後の字幕はナレーションの終わりで消える");
   assert.ok(last.toMs < timeline.totalMs);
@@ -97,7 +97,7 @@ test("長い文には長く出る（文字数で配分する）", () => {
   // absorbs the rounding so its subtitle ends exactly where the scene does.
   const brief: EventCmBrief = {
     ...SEEDED,
-    script: {
+    scenario: {
       version: 1,
       scenes: eventCmNarratedSteps(SEEDED).map(({ role, index }) => ({
         role,
@@ -123,8 +123,8 @@ test("長い文には長く出る（文字数で配分する）", () => {
 });
 
 test("どの瞬間にも字幕は最大1枚", () => {
-  const captions = captionsFor(scripted);
-  const total = eventCmTimeline(scripted).totalMs;
+  const captions = captionsFor(written);
+  const total = eventCmTimeline(written).totalMs;
   for (let ms = 0; ms < total; ms += 250) {
     const showing = captions.filter(
       (caption) => ms >= caption.fromMs && ms < caption.toMs,
@@ -133,12 +133,12 @@ test("どの瞬間にも字幕は最大1枚", () => {
   }
 });
 
-/** The same script, with one picture's line replaced. */
+/** The same scenario, with one picture's line replaced. */
 const briefWith = (valueText: string): EventCmBrief => ({
-  ...scripted,
-  script: {
-    ...scripted.script,
-    scenes: scripted.script.scenes.map((scene) =>
+  ...written,
+  scenario: {
+    ...written.scenario,
+    scenes: written.scenario.scenes.map((scene) =>
       scene.role === "value" ? { ...scene, text: valueText } : scene,
     ),
   },

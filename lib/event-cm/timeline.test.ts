@@ -14,7 +14,7 @@ import {
 import { seedEventCmBrief } from "./seed";
 
 // The seeded brief announces nobody: people are never invented (seed.ts), so
-// this film has no speaker picture and four narration lines.
+// this film has no speaker picture and four scenario lines.
 const SEEDED = seedEventCmBrief(
   { name: "WealthPark Lab", industry: "金融教育メディア" },
   { now: new Date("2026-08-11T09:00:00+09:00"), seed: "take-1" },
@@ -25,10 +25,10 @@ const GUESTS = [
   { name: "大西 美香", role: "Miss SAKE 代表理事", photo: null },
 ];
 
-const withScript = (brief: EventCmBrief, texts: string[]): EventCmBrief => ({
+const withScenario = (brief: EventCmBrief, texts: string[]): EventCmBrief => ({
   ...brief,
-  script: {
-    ...brief.script,
+  scenario: {
+    ...brief.scenario,
     // One line per narrated PICTURE. A brief that lists three programmes has
     // three programme pictures, so a fixture handing over four lines pads with
     // its last one rather than leaving scenes wordless (which would silently
@@ -77,7 +77,7 @@ test("ナレーションは2番目のシーンから始まり、締めのロゴ�
 });
 
 test("登壇者が居なければそのシーンは存在しない", () => {
-  // A speaker picture with nobody in it is not a line-up, and a narration line
+  // A speaker picture with nobody in it is not a line-up, and a scenario line
   // about guests who do not exist is worse than silence.
   const withoutGuests = eventCmTimeline(SEEDED).scenes.map((scene) => scene.role);
   const withGuests = eventCmTimeline({ ...SEEDED, guests: GUESTS }).scenes.map(
@@ -109,7 +109,7 @@ test("章のあいだに間がある", () => {
   // Each picture is a chapter. Without air between them the next line starts
   // before the last one has landed.
   const line = "あ".repeat(35);
-  const timeline = eventCmTimeline(withScript(SEEDED, [line, line, line, line]));
+  const timeline = eventCmTimeline(withScenario(SEEDED, [line, line, line, line]));
   const spokenMs = Math.round((35 / 7) * 1000);
   for (const scene of timeline.scenes) {
     if (scene.role === "logoIn" || scene.role === "logoOut") continue;
@@ -131,13 +131,13 @@ test("30秒を超えてよい——正しい尺が要件", () => {
 });
 
 test("台本を書くと尺がその文字数に従う", () => {
-  const short = withScript(SEEDED, [
+  const short = withScenario(SEEDED, [
     "あ".repeat(28),
     "い".repeat(45),
     "う".repeat(44),
     "え".repeat(36),
   ]);
-  const long = withScript(SEEDED, [
+  const long = withScenario(SEEDED, [
     "あ".repeat(28),
     "い".repeat(45),
     "う".repeat(140),
@@ -147,7 +147,7 @@ test("台本を書くと尺がその文字数に従う", () => {
   const shortTimeline = eventCmTimeline(short);
   const longTimeline = eventCmTimeline(long);
 
-  assert.equal(shortTimeline.source, "script");
+  assert.equal(shortTimeline.source, "scenario");
   const shortProgram = shortTimeline.scenes.find((s) => s.role === "program")!;
   const longProgram = longTimeline.scenes.find((s) => s.role === "program")!;
   assert.ok(longProgram.durationMs > shortProgram.durationMs * 2, "長い台本は長いシーンになる");
@@ -155,10 +155,10 @@ test("台本を書くと尺がその文字数に従う", () => {
 });
 
 test("無音のシーンは台本の長さに影響されない", () => {
-  // Their job is fixed: establish the mark, and let it go. A long script must
+  // Their job is fixed: establish the mark, and let it go. A long scenario must
   // not stretch the opening logo.
   const timeline = eventCmTimeline(
-    withScript(SEEDED, ["あ".repeat(200), "い", "う", "え"]),
+    withScenario(SEEDED, ["あ".repeat(200), "い", "う", "え"]),
   );
   assert.equal(timeline.scenes[0].durationMs, EVENT_CM_INTRO_MS);
   assert.equal(
@@ -168,7 +168,7 @@ test("無音のシーンは台本の長さに影響されない", () => {
 });
 
 test("短すぎる一行でも読める最小の尺を確保する", () => {
-  const terse = withScript(SEEDED, ["短い", "短い", "短い", "短い"]);
+  const terse = withScenario(SEEDED, ["短い", "短い", "短い", "短い"]);
   const timeline = eventCmTimeline(terse);
   const narrated = eventCmNarratedSteps(SEEDED).map((step) => step.role);
   assert.ok(
@@ -181,9 +181,9 @@ test("短すぎる一行でも読める最小の尺を確保する", () => {
 
 test("音声があれば実測が台本の推定を上書きする", () => {
   const roles = eventCmNarratedSteps(SEEDED).map((step) => step.role);
-  const scripted = withScript(SEEDED, roles.map((_, i) => "あ".repeat(30 + i)));
+  const written = withScenario(SEEDED, roles.map((_, i) => "あ".repeat(30 + i)));
   const spoken: EventCmBrief = {
-    ...scripted,
+    ...written,
     voice: {
       audio: "material:00000000-0000-0000-0000-000000000000",
       track: {

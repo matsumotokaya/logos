@@ -10,7 +10,7 @@ import type { EventCmBrief } from "@/remotion/event-cm/types";
 //
 //   1. **A fact never overwrites a person.** A field whose origin is `user`
 //      was typed or confirmed by someone; re-reading the flyer must not undo
-//      that. Same contract as the narration script's `source: "human"`.
+//      that. Same contract as the narration scenario's `source: "human"`.
 //   2. **A null never overwrites anything.** The structuring stage returns
 //      null for what the material does not say, and null means "no new
 //      information", not "the material says this is empty". The seeded

@@ -10,8 +10,8 @@
 // kept — they live in the kit's components now, where a second template can
 // reach them and a brand's values can change them.
 //
-// The spine is still the narration: scene order comes from the script's roles
-// and scene length from the timeline, which sharpens from budget to script to
+// The spine is still the narration: scene order comes from the scenario's roles
+// and scene length from the timeline, which sharpens from budget to scenario to
 // measured voice (timeline.ts).
 
 import React, { useMemo } from "react";

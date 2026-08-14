@@ -24,8 +24,8 @@ import Storyboard from "./Storyboard";
 import { eventCmStoryboard } from "@/lib/storyboard/event-cm";
 import {
   eventCmSceneKey,
-  scriptChars,
-  scriptStaleness,
+  scenarioChars,
+  scenarioStaleness,
   type EventCmBrief,
   type EventCmSceneRole,
 } from "@/remotion/event-cm/types";
@@ -44,9 +44,9 @@ export default function EventCmWorkspace({
   playing,
   bake,
   onEditFact,
-  onEditNarration,
+  onEditScenario,
   onDeletePanel,
-  onRewriteScript,
+  onRewriteScenario,
   imageSources = [],
   writing,
 }: {
@@ -57,8 +57,8 @@ export default function EventCmWorkspace({
   bake: BakeState;
   /** Correct a value, or switch a field off. Absent = read only. */
   onEditFact?: (edit: FactEdit) => void;
-  /** Save one picture's narration line, from the storyboard panel. */
-  onEditNarration?: (
+  /** Save one picture's scenario line, from the storyboard panel. */
+  onEditScenario?: (
     scene: { role: EventCmSceneRole; index?: number },
     text: string,
   ) => Promise<boolean>;
@@ -67,15 +67,15 @@ export default function EventCmWorkspace({
     role: EventCmSceneRole;
     index?: number;
   }) => Promise<boolean>;
-  /** Draft the whole narration again. `force` replaces hand-edited lines. */
-  onRewriteScript?: (force: boolean) => void;
+  /** Draft the whole scenario again. `force` replaces hand-edited lines. */
+  onRewriteScenario?: (force: boolean) => void;
   /** Images pinned to this video: the candidate list for every photo slot. */
   imageSources?: BriefSource[];
   writing?: boolean;
 }) {
   const goal = eventCmGoalState(brief);
-  const chars = scriptChars(brief.script);
-  const stale = scriptStaleness(brief);
+  const chars = scenarioChars(brief.scenario);
+  const stale = scenarioStaleness(brief);
   const storyboard = eventCmStoryboard(brief);
 
   return (
@@ -120,9 +120,9 @@ export default function EventCmWorkspace({
       </div>
 
       {/* Directly under the goal: what the film is made of, picture by picture.
-          The narration used to sit here as five paragraphs of text, which said
+          The scenario used to sit here as five paragraphs of text, which said
           what would be *heard* and nothing about what would be seen. */}
-      {/* The narration and the film disagree. Two different disagreements, and
+      {/* The scenario and the film disagree. Two different disagreements, and
           the second one is the one that used to be invisible: a line with no
           picture to be read over is not a stale sentence, it is text the user
           wrote that the film has nowhere to put. Saying so — with the words
@@ -136,13 +136,13 @@ export default function EventCmWorkspace({
               changed. */}
           <p>
             {stale === "facts"
-              ? "資料や項目が変わったあと、ナレーションが書き直されていません。いまの映像は、変わる前の内容を読み上げています。"
-              : "映像のコマとナレーションの行が合っていません。"}
+              ? "資料や項目が変わったあと、シナリオが書き直されていません。いまの映像は、変わる前の内容を語っています。"
+              : "映像のコマとシナリオの行が合っていません。"}
             {storyboard.orphanLines.length > 0
               ? "いま映像に無いコマの行が残っています。"
               : null}
-            {storyboard.panels.some((panel) => panel.narrated && !panel.narration)
-              ? "読み上げる言葉が無いコマがあります。"
+            {storyboard.panels.some((panel) => panel.narrated && !panel.scenario)
+              ? "シナリオが書かれていないコマがあります。"
               : null}
           </p>
           {storyboard.orphanLines.length > 0 ? (
@@ -157,17 +157,17 @@ export default function EventCmWorkspace({
               ))}
             </ul>
           ) : null}
-          {onRewriteScript ? (
+          {onRewriteScenario ? (
             <button
               type="button"
-              onClick={() => onRewriteScript(brief.script.source === "human")}
+              onClick={() => onRewriteScenario(brief.scenario.source === "human")}
               disabled={writing}
               className="mt-3 rounded-full border border-amber-400 bg-white px-4 py-1.5 text-[11px] font-semibold text-amber-900 transition hover:border-amber-600 disabled:opacity-50"
             >
-              {writing ? "書き直しています…" : "台本を書き直す"}
+              {writing ? "書き直しています…" : "シナリオを書き直す"}
             </button>
           ) : null}
-          {brief.script.source === "human" ? (
+          {brief.scenario.source === "human" ? (
             <p className="mt-1.5 text-[11px]">
               手で直した行も置き換わります。残したい言葉は先にコピーしてください。
             </p>
@@ -180,19 +180,19 @@ export default function EventCmWorkspace({
         goalFields={goal.fields}
         busy={writing}
         onEditFact={onEditFact}
-        onEditNarration={onEditNarration}
+        onEditScenario={onEditScenario}
         onDeletePanel={onDeletePanel}
         imageSources={imageSources}
       />
 
-      {brief.script.scenes.length === 0 ? (
+      {brief.scenario.scenes.length === 0 ? (
         <p className="rounded-xl border border-dashed border-hairline px-4 py-4 text-[12px] text-ink-muted">
-          まだ台本がありません。いまの映像は各シーンの想定尺で並んでいます。
-          台本を書くと尺がその文字数に合い、読み上げると実測に置き換わります。
+          まだシナリオがありません。いまの映像は各シーンの想定尺で並んでいます。
+          シナリオを書くと尺がその文字数に合い、読み上げると実測に置き換わります。
         </p>
-      ) : brief.script.angle ? (
+      ) : brief.scenario.angle ? (
         <p className="text-pretty text-[12px] text-ink-muted">
-          訴求軸: {brief.script.angle}
+          訴求軸: {brief.scenario.angle}
           <span className="mx-1.5 text-ink-faint">・</span>
           <span className="tabular-nums">{chars}字</span>
         </p>

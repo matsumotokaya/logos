@@ -1,12 +1,16 @@
 "use client";
 
-// The narration control: one button, always the same button.
+// The reading-aloud control: one button, always the same button.
 //
-// Reading a script aloud is not a step that completes. The words change, the
+// Reading a scenario aloud is not a step that completes. The words change, the
 // delivery can be wrong, a different voice may suit the event better — so the
 // control does not advertise a state ("読み上げる" → "読み上げ直す") and does not
-// go away once a recording exists. It says ナレーション, it opens, and inside
-// you can record over whatever is there as many times as you like.
+// go away once a recording exists. It says 読み上げ, it opens, and inside you can
+// record over whatever is there as many times as you like.
+//
+// It is called 読み上げ and not ナレーション because the words themselves are the
+// SCENARIO (§9.1). One word for the story and its recording is what let three
+// surfaces argue about which one the film was made from.
 //
 // Off is a first-class choice, not a failure to record: an event film with
 // music and subtitles and no voice is a finished thing. Turning it off keeps
@@ -32,7 +36,7 @@ export default function NarrationDialog({
   currentVoiceId: string | null;
   totalMs: number | null;
   mock: boolean;
-  /** False while there is no script to read. */
+  /** False while there is no scenario to read. */
   canSpeak: boolean;
   busy: boolean;
   /** Resolves true when the take actually changed. */
@@ -78,7 +82,7 @@ export default function NarrationDialog({
         }
       >
         <span className="inline-flex items-center gap-2">
-          ナレーション
+          読み上げ
           {/* The dot says whether the film currently speaks. The label does not
               change, because the action available is the same either way. */}
           <span
@@ -99,7 +103,7 @@ export default function NarrationDialog({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <Dialog.Title className="font-display text-base font-semibold">
-                  ナレーション
+                  読み上げ
                 </Dialog.Title>
                 <Dialog.Description className="mt-1 text-[12px] text-ink-muted">
                   {hasVoice
@@ -173,11 +177,11 @@ export default function NarrationDialog({
                 {hasVoice ? (
                   <button
                     type="button"
-                    onClick={() => void run(onTurnOff, "ナレーションをオフにしました")}
+                    onClick={() => void run(onTurnOff, "読み上げをオフにしました")}
                     disabled={busy || Boolean(done)}
                     className="rounded-full border border-hairline px-4 py-2 text-xs font-semibold transition hover:border-ink disabled:opacity-50"
                   >
-                    ナレーションをオフにする
+                    読み上げをオフにする
                   </button>
                 ) : null}
                 <button
@@ -185,11 +189,11 @@ export default function NarrationDialog({
                   onClick={() =>
                     void run(
                       () => onSpeak(chosen),
-                      hasVoice ? "ナレーションを作り直しました" : "ナレーションが完成しました",
+                      hasVoice ? "読み上げを作り直しました" : "読み上げが完成しました",
                     )
                   }
                   disabled={busy || !canSpeak || Boolean(done)}
-                  title={canSpeak ? undefined : "先に台本を作成してください"}
+                  title={canSpeak ? undefined : "先にシナリオを書いてください"}
                   className="ml-auto rounded-full bg-ink px-4 py-2 text-xs font-semibold text-paper transition hover:bg-accent disabled:opacity-50"
                 >
                   {busy ? "作成中…" : hasVoice ? "この声で作り直す" : "この声で読み上げる"}

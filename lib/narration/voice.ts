@@ -1,6 +1,10 @@
 import "server-only";
 
-// Speaking a script — shared by every narrated template.
+// Reading words aloud — shared by every narrated template.
+//
+// Template-neutral on purpose, so the words it is handed are just words: event-cm
+// calls them the scenario (remotion/event-cm/types.ts), product-cm still calls
+// them `cm_script`. This module never learns which.
 //
 // This used to live inside lib/campaign/voice.ts, reachable only through a
 // Service Brand Kit: `generateCmVoice(kit)` read `kit.cm_script`. The work it
@@ -30,7 +34,10 @@ export const TTS_PROVIDER = "gemini";
 export const TTS_MODEL = "gemini-3.1-flash-tts-preview";
 /** Even delivery — the default narrator for a 30s spot. */
 export const TTS_VOICE = "Schedar";
-export { TTS_MAX_SECTION_CHARS } from "./limits";
+// The section limit is NOT re-exported. It had two doorways, and a caller that
+// reached it through here read "how the voice module happens to be configured"
+// instead of "how long a section may be" — which is a fact about the provider
+// (./limits.ts, mirrored in labs/campaign/audio/tts-lib/tts.mjs).
 const MIX_SAMPLE_RATE = 24000; // Gemini TTS native rate; no resampling needed
 
 export interface NarrationVoiceOptions {
@@ -61,7 +68,7 @@ export async function generateNarration<Scene extends { text: string }>(
     options.onProgress?.(message, level);
 
   if (scenes.length === 0) {
-    throw new Error("ナレーション台本がありません");
+    throw new Error("読み上げる本文がありません");
   }
 
   // Checked before a single request goes out.
@@ -77,7 +84,7 @@ export async function generateNarration<Scene extends { text: string }>(
   );
   if (tooLong >= 0) {
     throw new Error(
-      `${tooLong + 1}番目のナレーションが長すぎて読み上げられません（${
+      `${tooLong + 1}番目の本文が長すぎて読み上げられません（${
         speechText(scenes[tooLong].text).length
       }字 / 上限${TTS_MAX_SECTION_CHARS}字）。短く分けてください`,
     );
@@ -89,7 +96,7 @@ export async function generateNarration<Scene extends { text: string }>(
   const voice = options.voice ?? TTS_VOICE;
   const sections: { f32: Float32Array; sampleRate: number }[] = [];
   for (const [i, scene] of scenes.entries()) {
-    progress(`シーン${i + 1}/${scenes.length}のナレーションを作成中…`);
+    progress(`シーン${i + 1}/${scenes.length}の読み上げを作成中…`);
     const { pcm, sampleRate } = await synthesizeSection({
       text: speechText(scene.text),
       voice,
@@ -128,7 +135,7 @@ export async function generateNarration<Scene extends { text: string }>(
     mix.sectionDurationsMs,
   ) as { id: string; start_ms: number; text: string }[];
 
-  progress("ナレーションが完成しました", "success");
+  progress("読み上げが完成しました", "success");
 
   return {
     wav,

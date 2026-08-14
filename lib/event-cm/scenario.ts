@@ -11,11 +11,11 @@ import {
   eventCmSceneBudget,
   eventCmSceneKey,
   EVENT_CM_TARGET_SECONDS,
-  type EventCmScript,
+  type EventCmScenario,
   type EventCmSceneStep,
 } from "@/remotion/event-cm/types";
 
-// Write the narration for a narrated event promo.
+// Write the scenario for a narrated event promo.
 //
 // Rules come from deliverable-architecture §17.2: exhaust what is decided
 // before asking the model to decide it. The facts (title, guests, programs,
@@ -206,27 +206,27 @@ export function describeEventFacts(brief: EventBrief): string {
   return lines.join("\n");
 }
 
-export interface EventCmScriptDraft {
-  script: EventCmScript;
+export interface EventCmScenarioDraft {
+  scenario: EventCmScenario;
   facts: string;
   usage: { inputTokens: number; outputTokens: number } | null;
 }
 
-export function eventCmScriptAvailable(): boolean {
+export function eventCmScenarioAvailable(): boolean {
   return Boolean(process.env.OPENAI_API_KEY);
 }
 
 /**
- * Draft a narration from the brief's facts.
+ * Draft a scenario from the brief's facts.
  *
  * `notes` carries anything the brief cannot hold — the organiser's own words
  * about who this is for, what happened at the last one. It is injected as
  * additional source material, under the same no-invention rule.
  */
-export async function draftEventCmScript(
+export async function draftEventCmScenario(
   brief: EventBrief,
   options: { notes?: string | null; now: string } = { now: new Date().toISOString() },
-): Promise<EventCmScriptDraft> {
+): Promise<EventCmScenarioDraft> {
   const facts = describeEventFacts(brief);
   const notes = options.notes?.trim();
   // Which lines this brief needs. With nobody announced there is no speaker
@@ -257,11 +257,11 @@ ${facts}${notes ? `\n\n主催者からの補足（事実として扱ってよい
 30秒のCMナレーションを書いてください。`,
       },
     ],
-    response_format: zodResponseFormat(draftSchemaFor(keys), "event_cm_script"),
+    response_format: zodResponseFormat(draftSchemaFor(keys), "event_cm_scenario"),
   });
 
   const parsed = response.choices[0]?.message.parsed;
-  if (!parsed) throw new Error("ナレーション台本を生成できませんでした");
+  if (!parsed) throw new Error("シナリオを生成できませんでした");
 
   // Order is part of the contract, and the model is asked for it rather than
   // trusted with it: rebuild in the canonical scene order before storing.
@@ -275,11 +275,11 @@ ${facts}${notes ? `\n\n主催者からの補足（事実として扱ってよい
     .filter((scene) => !scene.text)
     .map((scene) => eventCmSceneKey(scene));
   if (missing.length) {
-    throw new Error(`ナレーションに欠けているシーンがあります: ${missing.join(", ")}`);
+    throw new Error(`シナリオに欠けているシーンがあります: ${missing.join(", ")}`);
   }
 
   return {
-    script: {
+    scenario: {
       version: 1,
       scenes,
       source: "llm",

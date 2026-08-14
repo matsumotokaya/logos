@@ -102,6 +102,22 @@ Takeは以下を必須とする。
 
 分けた理由は、**編集が即座に成果物へ届いてしまう**状態を無くすため——シナリオを1行保存すると、その場でプレイヤーの尺と字幕が変わっていた。「作業場と成果は違っていてよい。違いは画面が言う」が現在の契約で、差分判定の正本は [../lib/event-cm/bake.ts](../lib/event-cm/bake.ts)(設計の経緯は [event-cm-refactor-plan.md §9.5 / §11.1](event-cm-refactor-plan.md))。
 
+**2つある列は、briefのキーを改名するときも2つある**。migration 0051(`script` → `scenario`)は同じ式を`brief`と`baked_brief`の両方に当てている。片方だけ改名すると既存の動画が「シナリオ空」として想定尺へ落ちるので、以後 brief のキーを変える migration はこの2列を必ずセットで扱う。
+
+### 4.2 event-cm briefの語彙(`scenario` / 字幕 / `voice`)
+
+`event-cm`の`brief`が持つ主要フィールドは3語に割れている(migration 0051 で改名。経緯は [event-cm-refactor-plan.md §9.1](event-cm-refactor-plan.md))。
+
+| フィールド | 実体 | 型 |
+| --- | --- | --- |
+| `brief.scenario` | 各コマの**主文**。字幕・尺・シーン構成を規定する**主**(旧 `brief.script`) | `EventCmScenario`([../remotion/event-cm/types.ts](../remotion/event-cm/types.ts)) |
+| — (導出) | 字幕。`scenario`を28字カードへ割った表示単位で、DBには持たない | [../remotion/event-cm/captions.ts](../remotion/event-cm/captions.ts) |
+| `brief.voice` | **読み上げ**。`scenario`を声にした派生物で、BGMと同じくオフにできる(オフは`provenance.voice`のsuppressionとして記録) | `{ track, audio: "material:<uuid>" }` |
+
+`brief.scenario`は**必須**(zodスキーマ [../remotion/event-cm/brief-schema.ts](../remotion/event-cm/brief-schema.ts) で non-optional)。読み手が`scenario?.`と防御しないのはこのため——例外は`eventCmFilm()`の1箇所だけで、そこは「常に答える導出」であることを守るために欠損を空シナリオとして扱う。
+
+**`product-cm`はまだ`cm_script`のまま**。同じ「各シーンの主文」構造だが、共通語彙にするかは未決定([event-cm-refactor-plan.md §9.10](event-cm-refactor-plan.md))。共有コードの [../lib/narration/voice.ts](../lib/narration/voice.ts) はどちらの綴りも知らない。
+
 ## 5. Templateと成果物
 
 テンプレート定義のコード正本は [../lib/templates/catalog.ts](../lib/templates/catalog.ts)、production台帳は`template_versions`。production版のdefinition hashがコードと異なる状態では新規Takeを作らない。

@@ -18,7 +18,7 @@
 import { isSuppressed } from "./facts";
 import {
   eventCmSceneKey,
-  scriptStaleness,
+  scenarioStaleness,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 
@@ -51,10 +51,10 @@ export interface BakeState {
  * `bake` is the fixing itself: copying the working brief over the played one.
  * It is last because the two before it change what would be copied.
  */
-export type FilmStep = "script" | "voice" | "bake";
+export type FilmStep = "scenario" | "voice" | "bake";
 
 export const FILM_STEP_LABEL: Record<FilmStep, string> = {
-  script: "シナリオを書く",
+  scenario: "シナリオを書く",
   voice: "読み上げる",
   bake: "動画に反映する",
 };
@@ -72,7 +72,7 @@ export const FILM_STEP_LABEL: Record<FilmStep, string> = {
 export function voiceReadsScenario(brief: EventCmBrief): boolean {
   const track = brief.voice?.track;
   if (!track) return false;
-  const lines = brief.script?.scenes ?? [];
+  const lines = brief.scenario.scenes;
   if (track.scenes.length !== lines.length) return false;
   const spoken = new Map(
     track.scenes.map((scene) => [eventCmSceneKey(scene), scene.text] as const),
@@ -108,7 +108,7 @@ export function bakeState(
   if ((working.factsUpdatedAt ?? "") !== (baked.factsUpdatedAt ?? "")) {
     changes.push("facts");
   }
-  if ((working.script?.updatedAt ?? "") !== (baked.script?.updatedAt ?? "")) {
+  if (working.scenario.updatedAt !== baked.scenario.updatedAt) {
     changes.push("scenario");
   }
   // The recording's own stamp, never `voice.audio`: the pointer is rewritten as
@@ -157,23 +157,23 @@ export function pendingFilmSteps(
 ): FilmStep[] {
   const steps: FilmStep[] = [];
 
-  const handWritten = working.script?.source === "human";
-  const unwritten = (working.script?.scenes.length ?? 0) === 0;
-  const scriptPending =
-    !handWritten && (options.redo || unwritten || scriptStaleness(working) !== null);
-  if (scriptPending) steps.push("script");
+  const handWritten = working.scenario.source === "human";
+  const unwritten = working.scenario.scenes.length === 0;
+  const scenarioPending =
+    !handWritten && (options.redo || unwritten || scenarioStaleness(working) !== null);
+  if (scenarioPending) steps.push("scenario");
 
   // Always reached unless it was switched off or there is nothing to read: the
   // length of the film is not known until something has been spoken, so "no
   // recording" is pending work rather than a finished state.
   //
-  // `scriptPending` counts as words-to-come, which is what keeps the badge a
+  // `scenarioPending` counts as words-to-come, which is what keeps the badge a
   // projection: writing the scenario is what makes the recording necessary. But
   // a scenario nobody is going to write — hand-authored and still empty — has
   // nothing to read, and listing it would promise a step that answers 409.
   const voicePending =
     !narrationIsOff(working) &&
-    (scriptPending ||
+    (scenarioPending ||
       (!unwritten &&
         (options.redo || !working.voice || !voiceReadsScenario(working))));
   if (voicePending) steps.push("voice");
@@ -183,7 +183,7 @@ export function pendingFilmSteps(
     options.redo ||
     !state.baked ||
     state.changes.length > 0 ||
-    scriptPending ||
+    scenarioPending ||
     voicePending
   ) {
     steps.push("bake");

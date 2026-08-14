@@ -13,9 +13,9 @@ import {
 // The film exists before the narration does, and before the voice does. So the
 // timeline is derived from whatever is known, and each stage sharpens it:
 //
-//   nothing written  → the scene budget (types.ts eventCmSceneBudget)
-//   script written   → the characters actually written, at reading pace
-//   voice recorded   → the measured track, which is the truth
+//   nothing written   → the scene budget (types.ts eventCmSceneBudget)
+//   scenario written  → the characters actually written, at reading pace
+//   voice recorded    → the measured track, which is the truth
 //
 // This is why a seeded take can be handed over as a finished film with no LLM
 // call and no render: "add a video" produces something that plays. Writing the
@@ -30,7 +30,7 @@ export interface SceneTiming {
   durationMs: number;
 }
 
-export type TimingSource = "budget" | "script" | "voice";
+export type TimingSource = "budget" | "scenario" | "voice";
 
 export interface EventCmTimeline {
   scenes: SceneTiming[];
@@ -99,9 +99,9 @@ export function eventCmTimeline(brief: EventCmBrief): EventCmTimeline {
   // different lines, and looking them up by role would give all three the first
   // one's length.
   const spoken = new Map(
-    brief.script.scenes.map((scene) => [eventCmSceneKey(scene), scene.text]),
+    brief.scenario.scenes.map((scene) => [eventCmSceneKey(scene), scene.text]),
   );
-  // Any line at all means the timing is being read from the script; a scene with
+  // Any line at all means the timing is being read from the scenario; a scene with
   // nothing written falls back to its budget on its own (see `writtenMs`).
   const written = narrated.some(
     (step) => (spoken.get(eventCmSceneKey(step)) ?? "").trim().length > 0,
@@ -110,7 +110,7 @@ export function eventCmTimeline(brief: EventCmBrief): EventCmTimeline {
   const track = brief.voice?.track;
   const measured = track && track.scenes.length === narrated.length ? track : null;
 
-  // Per role, not per film. A flyer that names a speaker adds a scene the script
+  // Per role, not per film. A flyer that names a speaker adds a scene the scenario
   // has no line for yet, and collapsing every other scene back to its budget
   // because of that one would throw away timings that are still right.
   const writtenMs = (step: EventCmSceneStep): number => {
@@ -166,7 +166,7 @@ export function eventCmTimeline(brief: EventCmBrief): EventCmTimeline {
   return {
     scenes,
     totalMs: cursor,
-    source: measured ? "voice" : written ? "script" : "budget",
+    source: measured ? "voice" : written ? "scenario" : "budget",
     narrationStartMs: first?.fromMs ?? EVENT_CM_INTRO_MS,
     narrationEndMs: last ? last.fromMs + last.durationMs : cursor,
   };

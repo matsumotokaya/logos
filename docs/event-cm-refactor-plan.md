@@ -257,7 +257,7 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 
 2026-08-14 の対話で、**この製品の中心が言語化された**。§4 の `eventCmFilm()` より上位の話なので、次セッションはここから設計する。
 
-### 9.1 用語がひっくり返っている
+### 9.1 用語がひっくり返っている(**2026-08-15 解消** → §11.2)
 
 > ナレーションと呼んでいる部分は本質的には**字幕(サブタイトル)の部分**であり、この字幕が動画の絵コンテの中の各シーンに入っていて、**これが物語の一番メインのシナリオ**になります。これは別の製品(サイト等)においても全部そうです。
 
@@ -271,8 +271,8 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 
 **実装は既にこの向きに近い**——字幕は音声からではなく**シナリオの文から**作られ、音声は尺の精度を上げるだけ(`captionsFor` は `scene.text` を割り、`eventCmTimeline` が実測を使う)。**ずれているのは名前と説明**であって、データの流れではない。だから改名は安全に効く:
 
-- `EventCmScript` → `EventCmScenario`、`script` → `scenario`(brief のキー名変更 = DB移行が必要。**やるなら読み取り側で両対応**)
-- 画面の文言も「ナレーション」を**シナリオ(本文)**と**読み上げ(音声)**に割る。いまはどちらも「ナレーション」で、右上のボタンだけが音声を意味している
+- `EventCmScript` → `EventCmScenario`、`script` → `scenario`(brief のキー名変更 = DB移行が必要)。**実際にやったときは両対応にしなかった**——顧客ゼロ・3行なので一度きりで焼き替えた。両対応にすると旧名が型に残り続け、この改名の目的そのものが達成できない(§11.2)
+- 画面の文言も「ナレーション」を**シナリオ(本文)**と**読み上げ(音声)**に割る。いまはどちらも「ナレーション」で、右上のボタンだけが音声を意味している → **画面から「ナレーション」という語を消した**(ボタンは「読み上げ」)
 - **この再定義は event-cm 固有ではない**。product-cm も、将来のサイト生成も「各シーンの主文が成果物を規定する」構造なので、`lib/scenario/` のような共通語彙になる可能性がある(§9.10)
 
 ### 9.2 編集は溜まる。焼き付けはユーザーのタイミング(**2026-08-15 実装済み**)
@@ -442,8 +442,8 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 ## 10. 次セッション(エンジニア)の最初の3手
 
 1. **§3(変えてはいけない契約)と §4.1(film の形)を読む**。以後、映像について何かを導出したくなったら、**まず `eventCmFilm()` が既に返していないか見る**——返していなければ film に足す(消費者側で組まない)。これがこのリファクタが守らせたい唯一の習慣。**§11.1 でこれに2つ目の習慣が加わった**: 「作業場と成果のどちらの話か」を先に決める。差分の量を答えるのは [lib/event-cm/bake.ts](../lib/event-cm/bake.ts) 1箇所だけで、画面はそれを言い換える
-2. **`npm test` で全件green を確認**してから触り始める(2026-08-15時点で225件)
-3. **§11.2(`script` → `scenario` 改名)から**。J(brief分離 §11.3)とは互いに独立。**どちらもDBの焼き替えを含むため、実行前にSQLをレビューしてユーザーの明示承認を得る**(AGENTS.md の Supabase 安全規則。project ref `xhbdfzceyfrxsmaixkne` の照合も毎回)。**改名は `baked_brief` にも同じ式を当てる**(§11.2 のSQL参照)
+2. **`npm test` で全件green を確認**してから触り始める(2026-08-15時点で226件)
+3. **§11.3(`EventCmBrief` の自立)から**。§11.2(`script` → `scenario` 改名)は済んでいるので、**語彙は3語(シナリオ/字幕/読み上げ)に確定している**——新しく名前を付けるときはこの3語に寄せる。§11.3 は zod が未知キーを strip するなら**DB焼き替えなし**で終わる可能性があるので、まずそれを確かめる。**焼き替えが必要だと分かった場合は、実行前にSQLをレビューしてユーザーの明示承認を得る**(AGENTS.md の Supabase 安全規則。project ref `xhbdfzceyfrxsmaixkne` の照合も毎回)。**briefのキーを変える migration は `brief` と `baked_brief` の両方に当てる**(§11.2 で確立した規則)
 
 ## 11. エンジニア引き継ぎパケット
 
@@ -478,18 +478,35 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 
 **未検証**: 実ブラウザでの通し操作。テスト225件green・型・lintはクリア。
 
-### 11.2 `script` → `scenario` 改名(§9.1)
+### 11.2 `script` → `scenario` 改名(§9.1) ✅ **2026-08-15 実装済み**
 
-- 対象: brief キー `script`、型 `EventCmScript` → `EventCmScenario`、`scriptIsStale` 等の関数名、UI文言(いま「ナレーション」と呼ぶものを**シナリオ(本文)**と**読み上げ(音声)**に割る)。読み書き箇所は A〜D で film 経由に集約済みなので、`grep -rn "\bscript\b" remotion/event-cm lib/event-cm lib/storyboard app/api/brands components/video` から始める
-- **DB焼き替えは一度きり・両対応コードは書かない**(顧客ゼロ・本番Take数件の今だけ許される形)。実行前にユーザーの明示承認:
-  ```sql
-  update public.takes
-  set brief = (brief - 'script') || jsonb_build_object('scenario', brief->'script')
-  where brief ? 'script';
-  -- baked_brief 導入後は baked_brief にも同じ式を
-  ```
-  ※ 対象を event 系テンプレートに絞る where 句は docs/data-model.md で列名を確認してから書く
-- **順序: 11.1 の後**(baked_brief も同時に焼き替えるため)
+**目的**: 名前が逆向きだったのを直す。「script」と呼んでいたものは各コマの主文=**シナリオ**で、読み上げはその派生物。データの流れは既にこの向きだったので(字幕は `scene.text` から切られ、録音からは切られない)、改名は名前と説明だけを動かした。
+
+**語彙は3語に確定**。正本の一覧は [README.md の event-cm 節](../README.md) と [docs/data-model.md §4.2](data-model.md):
+
+| 語 | 実体 | コード |
+| --- | --- | --- |
+| **シナリオ** | 各コマの主文。字幕・尺・シーン構成を規定する主 | `brief.scenario` / `EventCmScenario` |
+| **字幕** | シナリオを28字カードへ割った表示単位(DBに持たない) | `captionsFor()` |
+| **読み上げ** | シナリオを声にした派生物。BGMと同じ階層 | `brief.voice` / `lib/narration/` |
+
+実装したもの:
+
+- **migration 0051**(適用済み): `brief` と `baked_brief` の**両方**に同じ式。片方だけだと既存Takeが「シナリオ空」として想定尺へ落ち、0050 が終わらせた不整合が戻る。3件が改名され、行数16のまま(欠落なし)、他テンプレート4件は無変更。**両対応の読み取りコードは書いていない**——書くと旧名が型に残り続ける
+- **識別子**: `EventCmScript*` → `EventCmScenario*`、`scriptStaleness` / `ScriptStaleness` / `scriptIsStale` / `scriptText` / `scriptChars` / `scriptBudgetIssues` / `draftEventCmScript` / `eventCmScriptAvailable` → `scenario*`。`TimingSource` と `FilmStep` の `"script"` 値、goal パス `script`、`take_runs` へ書く `sourceRef.script_updated_at` も同様
+- **ファイル**: `lib/event-cm/script.ts` → `scenario.ts`、API `.../videos/[videoId]/script/` → `.../scenario/`(レスポンスキーも `{ scenario }`)、`scripts/draft-event-cm-script.ts` → `-scenario.ts`(`npm run event-cm:draft`、`event-cm:seed -- --scenario`)
+- **「言葉」を指す `narration` も `scenario` へ**: `FilmScene.narration` / `StoryboardPanel.narration` → `.scenario`、`onEditNarration` → `onEditScenario`、`NarrationLine` → `ScenarioLine`、run API のレスポンス `narrationRewritten` / `narrationKept` → `scenarioRewritten` / `scenarioKept`。**音声を指すものは変えていない**——`narrationStartMs` / `narrationEndMs`(音楽が退く区間)、`narrationIsOff`、`lib/narration/*`、`NarrationDialog`(音声モジュールとしての `narration` は一貫している)
+- **UI文言**: 「台本」は全廃。ヘッダーのボタンは**「ナレーション」→「読み上げ」**——ラベルが状態を宣伝しない理由(§11.1)は「読み上げる/読み上げ直す」を出さないことなので、静的な名詞である「読み上げ」はその理由を保ったまま曖昧さを消す。画面から「ナレーション」という語が消えた
+- **§11.4 の1つ目も同時に解消**: `brief.scenario?.` の防御を全廃した。型・zodスキーマ・seed のいずれでも必須で、欠損は壊れた行であって正常な状態ではない。**例外は `eventCmFilm()` の1箇所だけ**で、そこは「常に答える唯一の導出」を守るために空シナリオとして扱う(理由をコメントに書いてある)
+- **§11.4 の3つ目も**: `lib/narration/voice.ts` の `TTS_MAX_SECTION_CHARS` re-export を削除(消費者は既に `limits.ts` 直import だった)
+
+**計画に無かったが必要だった判断**:
+
+- **§11.1 が残した嘘を1つ見つけて直した**。絵コンテの編集欄は「保存すると音声は外れます。直し終えたらヘッダーの『ナレーション』で読み上げ直してください」と言い続けていた——`delete brief.voice` は §11.1 で撤去済みなので、これは既に起きないこと。「保存しても再生中の動画は変わりません。直し終えたら『動画を作り直す』を押してください」に差し替えた(README の同じ記述も直した)
+- **`lib/narration/voice.ts` はテンプレート中立にした**。product-cm が `cm_script` のままなので、共有コードに「シナリオ」語彙を持ち込むと片方だけ正しい名前になる。渡された言葉を読むだけのモジュールだと明記した
+- **LLMプロンプト本文は触っていない**([lib/event-cm/scenario.ts](../lib/event-cm/scenario.ts))。「CMナレーション（読み上げ原稿）を書きます」等はモデルへの指示で、文言を変えると出力が変わる。テストが押さえていないので改名の対象から外した——**残タスク**として §11.4 に置く
+
+**検証**: テスト226件green、`tsc --noEmit` / eslint クリア、本番ビルド成功。DBは改名後の3件で `scenario` キー・source(llm/llm/human)・行数16を確認。**未検証**: 実ブラウザでの通し操作。
 
 ### 11.3 `EventCmBrief` の自立(§8)
 
@@ -499,6 +516,8 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 
 ### 11.4 残っている小さな穴(A〜Dで直したもの以外)
 
-- `brief.script` への optional/非optional アクセスの混在: 型上 required なのに API 側だけ `brief.script?.scenes` と防御している。seed が必ず script を書くので `?.` を外して統一する(11.2 のついでに)
+- ~~`brief.script` への optional/非optional アクセスの混在~~ ✅ **2026-08-15 解消**(§11.2)。`brief.scenario?.` を全廃。例外は `eventCmFilm()` の1箇所だけで、そこは「常に答える唯一の導出」を守るための意図的な許容
+- ~~[lib/narration/voice.ts](../lib/narration/voice.ts) の `TTS_MAX_SECTION_CHARS` re-export~~ ✅ **2026-08-15 解消**(§11.2)。消費者は既に limits.ts 直importだったので削除した
 - `labs/campaign/audio/tts-lib/tts.mjs` の `MAX_SECTION_CHARS = 2000` は [lib/narration/limits.ts](../lib/narration/limits.ts) と値の二重管理。labs は別ランタイムなので許容するが、コメントの相互参照だけ維持する
-- [lib/narration/voice.ts](../lib/narration/voice.ts) の `TTS_MAX_SECTION_CHARS` re-export は入口の二重化——消費者を limits.ts 直importへ寄せて消す
+- **LLMプロンプト本文の語彙が旧いまま**([lib/event-cm/scenario.ts](../lib/event-cm/scenario.ts))。「30秒のCMナレーション（読み上げ原稿）を書きます」「台本を書く前に決めた訴求軸を…」など、モデルへの指示文だけが「ナレーション/台本」を使う。**意図的に触っていない**——プロンプトの文言を変えると出力が変わるのに、それを押さえるテストが無い。直すなら「シナリオへの改名」ではなく「プロンプトの改稿」として、出来上がりを比べながらやる作業
+- **`--scenario` フラグの改名は破壊的**(`npm run event-cm:seed -- --scenario`)。旧 `--script` は黙って無視される(フラグが無い扱い=シナリオを書かずに終わる)。開発用スクリプトなので受け入れたが、次に触るときは未知フラグを拒否させる方が親切

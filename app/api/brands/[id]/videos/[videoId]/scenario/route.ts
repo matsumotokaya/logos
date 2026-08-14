@@ -1,6 +1,11 @@
-// The narration script of one video.
+// The scenario of one video — the main sentence of each panel (§9.1).
 //
 // POST writes a fresh draft from the take's own facts. PATCH stores an edit.
+//
+// This is the words, never the recording. Reading them aloud is a separate
+// endpoint (./voice) because the voice is derived from this and not the other
+// way round: subtitles are cut from these sentences whether or not anybody has
+// paid for TTS, and the film's shape is decided here.
 //
 // The two differ in one field that decides everything downstream: `source`. A
 // draft is `llm` and may be replaced by another draft; an edit is `human` and
@@ -11,7 +16,7 @@
 
 import { guardLabsRequest } from "@/lib/labs-access";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
-import { draftEventCmScript, eventCmScriptAvailable } from "@/lib/event-cm/script";
+import { draftEventCmScenario, eventCmScenarioAvailable } from "@/lib/event-cm/scenario";
 import { eventCmFilm } from "@/remotion/event-cm/film";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import {
@@ -37,7 +42,7 @@ async function loadTake(
   if (error) return { error: "動画を確認できませんでした", status: 500 } as const;
   if (!data) return { error: "動画が見つかりません", status: 404 } as const;
   if (data.template_id !== "event-cm") {
-    return { error: "このテンプレートは台本を持ちません", status: 400 } as const;
+    return { error: "このテンプレートはシナリオを持ちません", status: 400 } as const;
   }
   return { take: data } as const;
 }
@@ -50,7 +55,7 @@ async function saveBrief(
 ) {
   const validated = validateBrief("event-cm", brief);
   if (!validated.ok) {
-    return { error: `台本が不正です: ${validated.issues.join(", ")}`, status: 400 } as const;
+    return { error: `シナリオが不正です: ${validated.issues.join(", ")}`, status: 400 } as const;
   }
   const { error } = await supabase
     .from("takes")
@@ -79,15 +84,15 @@ export async function POST(
   if ("error" in loaded) {
     return Response.json({ error: loaded.error }, { status: loaded.status });
   }
-  if (!eventCmScriptAvailable()) {
-    return Response.json({ error: "台本の生成が設定されていません" }, { status: 503 });
+  if (!eventCmScenarioAvailable()) {
+    return Response.json({ error: "シナリオの生成が設定されていません" }, { status: 503 });
   }
 
   const brief = loaded.take.brief as EventCmBrief;
   const body = (await req.json().catch(() => ({}))) as { force?: unknown };
-  if (brief.script?.source === "human" && body.force !== true) {
+  if (brief.scenario.source === "human" && body.force !== true) {
     return Response.json(
-      { error: "編集済みの台本があります。上書きするには force を指定してください" },
+      { error: "編集済みのシナリオがあります。上書きするには force を指定してください" },
       { status: 409 },
     );
   }
@@ -96,15 +101,15 @@ export async function POST(
   try {
     // Written against the brief AS THE FILM SEES IT. A field switched off is not
     // on screen, so it must not be spoken either — and, more mechanically, the
-    // shape of the script has to match the shape of the film: with the speakers
+    // shape of the scenario has to match the shape of the film: with the speakers
     // switched off there is no speaker picture, and a line written for one would
     // have nowhere to go.
-    draft = await draftEventCmScript(eventCmFilm(brief).drawn, {
+    draft = await draftEventCmScenario(eventCmFilm(brief).drawn, {
       now: new Date().toISOString(),
     });
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "台本を生成できませんでした" },
+      { error: error instanceof Error ? error.message : "シナリオを生成できませんでした" },
       { status: 502 },
     );
   }
@@ -118,13 +123,13 @@ export async function POST(
   // result. Now the result does not move at all until it is baked, and the
   // disagreement is SAID instead — `voiceReadsScenario` (lib/event-cm/bake.ts)
   // is what the screen reads to say it.
-  const next: EventCmBrief = { ...brief, script: draft.script };
+  const next: EventCmBrief = { ...brief, scenario: draft.scenario };
 
   const saved = await saveBrief(supabase, loaded.take.id as string, next);
   if ("error" in saved) {
     return Response.json({ error: saved.error }, { status: saved.status });
   }
-  return Response.json({ script: draft.script });
+  return Response.json({ scenario: draft.scenario });
 }
 
 export async function PATCH(
@@ -154,7 +159,7 @@ export async function PATCH(
     return Response.json({ error: "リクエストを解釈できませんでした" }, { status: 400 });
   }
   if (!Array.isArray(body.scenes)) {
-    return Response.json({ error: "台本のシーンが必要です" }, { status: 400 });
+    return Response.json({ error: "シナリオのシーンが必要です" }, { status: 400 });
   }
 
   // Keyed by scene identity: a caller editing the second programme's line sends
@@ -173,7 +178,7 @@ export async function PATCH(
     }
   }
   const brief = loaded.take.brief as EventCmBrief;
-  // The script holds the narrated PICTURES of this brief — four with nobody
+  // The scenario holds the narrated PICTURES of this brief — four with nobody
   // announced, one per programme when several are listed — not all seven scenes.
   // Walking every role and reading the previous text by array index did both
   // wrong: it demanded words for the two silent mark scenes, and it lined line 1
@@ -185,18 +190,18 @@ export async function PATCH(
   // decision to hide it, never to delete it.
   const steps = eventCmFilm(brief).scenes.filter((scene) => scene.narrated);
   const previous = new Map(
-    (brief.script?.scenes ?? []).map(
+    brief.scenario.scenes.map(
       (scene) => [eventCmSceneKey(scene), scene.text] as const,
     ),
   );
-  // A partial script is a legal, ordinary state — not an error.
+  // A partial scenario is a legal, ordinary state — not an error.
   //
   // This used to demand a line for every narrated picture, which made saving ONE
   // line impossible the moment the film gained a picture nobody had written yet:
   // splitting three programmes into three pictures left two of them blank, so
   // every single-line save was refused with 「空のコマがあります」. Everything
   // downstream already handles a missing line: the timeline falls back to that
-  // scene's budget, the captions skip it, and `scriptIsStale` reports that the
+  // scene's budget, the captions skip it, and `scenarioIsStale` reports that the
   // narration is not finished. So lines with no words are simply not stored, and
   // the order of the ones that are is the film's order.
   const scenes = steps
@@ -208,14 +213,14 @@ export async function PATCH(
     .filter((scene) => scene.text.length > 0);
   if (scenes.length === 0) {
     return Response.json(
-      { error: "読み上げる言葉がありません" },
+      { error: "シナリオの本文がありません" },
       { status: 400 },
     );
   }
 
   const next: EventCmBrief = {
     ...brief,
-    script: {
+    scenario: {
       version: 1,
       scenes,
       // The edit is the point of the record: a later draft will refuse to
@@ -223,7 +228,7 @@ export async function PATCH(
       source: "human",
       updatedAt: new Date().toISOString(),
       angle:
-        typeof body.angle === "string" ? body.angle.trim() : (brief.script?.angle ?? ""),
+        typeof body.angle === "string" ? body.angle.trim() : (brief.scenario.angle ?? ""),
     },
   };
   // The recording stays — see the POST handler. Saving one line is the smallest
@@ -233,5 +238,5 @@ export async function PATCH(
   if ("error" in saved) {
     return Response.json({ error: saved.error }, { status: saved.status });
   }
-  return Response.json({ script: next.script });
+  return Response.json({ scenario: next.scenario });
 }

@@ -141,7 +141,7 @@ export function seedEventCmBrief(
     },
     provenance,
     // Written by the narration stage. Seeded empty so the brief is valid and
-    // the goal reports the script as the one thing still missing.
-    script: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
+    // the goal reports the scenario as the one thing still missing.
+    scenario: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
   };
 }

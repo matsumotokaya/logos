@@ -9,7 +9,7 @@ import {
 } from "./stages";
 import {
   EVENT_CM_SUPPRESSED_NOTE,
-  scriptChars,
+  scenarioChars,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 
@@ -56,7 +56,7 @@ export const EVENT_CM_GOAL: readonly GoalField[] = [
   { path: "visuals.inkArt", label: "背景のアート", required: false },
   { path: "bgm", label: "BGM", required: false },
   // What it says
-  { path: "script", label: "ナレーション台本", required: true },
+  { path: "scenario", label: "シナリオ", required: true },
   { path: "voice", label: "読み上げ音声", required: false },
 ];
 
@@ -90,7 +90,7 @@ function filledPaths(brief: EventCmBrief): string[] {
   if (brief.visuals?.closing) paths.push("visuals.closing");
   text("visuals.inkArt", brief.visuals?.inkArt);
   text("bgm", brief.bgm);
-  if (brief.script && scriptChars(brief.script) > 0) paths.push("script");
+  if (scenarioChars(brief.scenario) > 0) paths.push("scenario");
   if (brief.voice) paths.push("voice");
 
   return paths;

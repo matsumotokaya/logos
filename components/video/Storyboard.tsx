@@ -430,16 +430,18 @@ function ScaledArtboard({ panel, theme }: { panel: StoryboardPanel; theme: Theme
 }
 
 /**
- * The narration line for one picture, editable in place.
+ * The scenario line for one picture, editable in place.
  *
- * Saving marks the script `human`, which is the contract that keeps a later
- * re-run from overwriting the words somebody wrote (lib/event-cm/script.ts).
- * It also drops the recording, because a voice reading the old line is worse
- * than no voice at all — so the note says what to do next rather than leaving
- * the film quietly silent. Editing several lines and then re-recording once is
- * the intended shape of the work.
+ * Saving marks the scenario `human`, which is the contract that keeps a later
+ * re-run from overwriting the words somebody wrote (lib/event-cm/scenario.ts).
+ *
+ * It does NOT touch the recording, and it does not touch the film. Saving used
+ * to delete the voice on the reasoning that a reading of replaced words is a
+ * lie; the reasoning was right and the remedy was wrong — the film went silent
+ * in the middle of an edit (§9.2). The film only moves when the user runs it, so
+ * the note below points at that button instead of describing a deletion.
  */
-function NarrationLine({
+function ScenarioLine({
   role,
   index,
   text,
@@ -475,7 +477,7 @@ function NarrationLine({
           setSaved(false);
         }}
         rows={Math.max(2, Math.ceil(draft.length / 34))}
-        aria-label="このコマで読み上げる言葉"
+        aria-label="このコマのシナリオ"
         className="w-full rounded-xl border border-hairline px-3 py-2.5 text-[13px] leading-relaxed outline-none focus:border-ink"
       />
       <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -514,15 +516,15 @@ function NarrationLine({
         ) : null}
         {saved ? (
           <span role="status" className="text-[11px] font-semibold text-emerald-700">
-            保存しました。読み上げ直すとこの言葉になります
+            保存しました。「動画を作り直す」を押すと映像に反映されます
           </span>
         ) : !text ? (
           <span className="text-[11px] text-amber-700">
-            このコマの読み上げはまだありません。書いて保存するか、上の「台本を書き直す」でまとめて書けます
+            このコマのシナリオはまだありません。書いて保存するか、上の「シナリオを書き直す」でまとめて書けます
           </span>
         ) : dirty ? (
           <span className="text-[11px] text-ink-faint">
-            保存すると音声は外れます。直し終えたらヘッダーの「ナレーション」で読み上げ直してください
+            保存しても再生中の動画は変わりません。直し終えたら「動画を作り直す」を押してください
           </span>
         ) : null}
       </div>
@@ -675,7 +677,7 @@ function PanelCard({
   goalFields,
   busy,
   onEditFact,
-  onEditNarration,
+  onEditScenario,
   onDeletePanel,
   imageSources,
 }: {
@@ -685,8 +687,8 @@ function PanelCard({
   goalFields: GoalFieldState[];
   busy?: boolean;
   onEditFact?: (edit: FactEdit) => void;
-  /** Save one panel's narration line. Absent = read only. */
-  onEditNarration?: (
+  /** Save one panel's scenario line. Absent = read only. */
+  onEditScenario?: (
     scene: { role: EventCmSceneRole; index?: number },
     text: string,
   ) => Promise<boolean>;
@@ -765,9 +767,9 @@ function PanelCard({
               {panel.captions.map((caption) => `「${caption.text}」`).join(" ")}
             </p>
           ) : panel.narrated ? (
-            <p className="mt-1 text-[12px] text-ink-faint">字幕なし（台本がまだありません）</p>
+            <p className="mt-1 text-[12px] text-ink-faint">字幕なし（シナリオがまだありません）</p>
           ) : (
-            <p className="mt-1 text-[12px] text-ink-faint">音楽だけ・ナレーションなし</p>
+            <p className="mt-1 text-[12px] text-ink-faint">音楽だけ・読み上げなし</p>
           )}
           {panel.dropped.length > 0 ? (
             <p className="mt-1 text-[11px] text-amber-700">
@@ -808,23 +810,23 @@ function PanelCard({
 
             {/* The line read over this picture, in the place you change it.
                 One panel, one message, one line — so the narration belongs to
-                the panel rather than to a separate script screen, and reading
+                the panel rather than to a separate scenario screen, and reading
                 「この日付は仮です」 and fixing it are already not two screens. */}
-            {panel.narrated && onEditNarration ? (
-              <NarrationLine
+            {panel.narrated && onEditScenario ? (
+              <ScenarioLine
                 // Remounted when the saved line changes — a draft belongs to the
                 // words it was started from, and must never be carried onto a
                 // different picture or over a line rewritten elsewhere.
-                key={`${eventCmSceneKey(panel)}:${panel.narration}`}
+                key={`${eventCmSceneKey(panel)}:${panel.scenario}`}
                 role={panel.role}
                 index={panel.index}
-                text={panel.narration}
+                text={panel.scenario}
                 busy={busy}
-                onSave={onEditNarration}
+                onSave={onEditScenario}
               />
-            ) : panel.narration ? (
+            ) : panel.scenario ? (
               <p className="mt-4 text-pretty text-[13px] leading-relaxed">
-                {panel.narration}
+                {panel.scenario}
               </p>
             ) : null}
 
@@ -868,7 +870,7 @@ export default function Storyboard({
   goalFields,
   busy,
   onEditFact,
-  onEditNarration,
+  onEditScenario,
   onDeletePanel,
   imageSources,
 }: {
@@ -876,7 +878,7 @@ export default function Storyboard({
   goalFields: GoalFieldState[];
   busy?: boolean;
   onEditFact?: (edit: FactEdit) => void;
-  onEditNarration?: (
+  onEditScenario?: (
     scene: { role: EventCmSceneRole; index?: number },
     text: string,
   ) => Promise<boolean>;
@@ -927,7 +929,7 @@ export default function Storyboard({
             // Keyed by WHICH PICTURE, never by its position. Deleting the sixth
             // panel used to renumber the seventh into its place, so React reused
             // the same component instance: the open dialog stayed open showing
-            // different content, and the narration textarea kept the deleted
+            // different content, and the scenario textarea kept the deleted
             // panel's draft — one click away from writing it over the next
             // picture's line.
             key={eventCmSceneKey(panel)}
@@ -937,7 +939,7 @@ export default function Storyboard({
             goalFields={goalFields}
             busy={busy}
             onEditFact={onEditFact}
-            onEditNarration={onEditNarration}
+            onEditScenario={onEditScenario}
             onDeletePanel={onDeletePanel}
             imageSources={imageSources}
           />

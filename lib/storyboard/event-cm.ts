@@ -13,7 +13,7 @@
 // "the storyboard describes a film nobody is making" structurally impossible
 // rather than merely tested against.
 //
-// One panel per scene, one scene per narration line. The two silent scenes —
+// One panel per scene, one scene per scenario line. The two silent scenes —
 // the presenter's mark, opening and closing — are panels too: they are what the
 // film shows, and a storyboard that skipped them would not add up to the film.
 
@@ -167,7 +167,7 @@ export interface StoryboardPanel {
   /** The subtitles on screen while this panel is. */
   captions: Caption[];
   /** The line read over this picture. Empty for the silent mark scenes. */
-  narration: string;
+  scenario: string;
   counts: PanelCounts;
 }
 
@@ -181,9 +181,9 @@ export interface PanelCounts {
 }
 
 /**
- * A line of narration with no picture to be read over.
+ * A line of scenario with no picture to be read over.
  *
- * Happens when the film's shape changes under a script: three programmes
+ * Happens when the film's shape changes under a scenario: three programmes
  * replace one programme picture, or a field is switched off. The words are not
  * deleted — they are still in the brief — and saying so is the difference
  * between "your text is gone" and "your text no longer has a place".
@@ -199,10 +199,10 @@ export interface Storyboard {
   /** The theme the film is drawn under — the same object the renderer paints
    *  with, so the panels and the film measure against one type scale. */
   theme: Theme;
-  /** Script lines the current film has no picture for. */
+  /** Scenario lines the current film has no picture for. */
   orphanLines: StoryboardOrphanLine[];
   totalMs: number;
-  /** Whether the durations come from the scene budget, the script, or the
+  /** Whether the durations come from the scene budget, the scenario, or the
    *  measured voice. The storyboard says which rather than implying precision. */
   timingSource: TimingSource;
   counts: PanelCounts;
@@ -392,7 +392,7 @@ export function eventCmStoryboard(raw: EventCmBrief): Storyboard {
         : null,
       dropped: scene.dropped.map((component) => component.kind),
       captions: scene.captions,
-      narration: scene.narration,
+      scenario: scene.scenario,
       counts: countBlocks(blocks),
     };
   });

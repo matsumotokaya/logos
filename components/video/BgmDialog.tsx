@@ -109,7 +109,7 @@ export default function BgmDialog({
                 <Dialog.Description className="mt-1 text-[12px] text-ink-muted">
                   {current
                     ? `オン ・ ${currentLabel ?? "この動画の音源"} ・ ${
-                        ducks ? "ナレーション中は音量が下がります" : "冒頭から最後まで一定"
+                        ducks ? "読み上げ中は音量が下がります" : "冒頭から最後まで一定"
                       }`
                     : "オフ（無音の映像になります）"}
                 </Dialog.Description>
