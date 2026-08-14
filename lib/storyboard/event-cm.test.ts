@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { eventCmStoryboard, storyboardTheme } from "./event-cm";
+import { eventCmStoryboard } from "./event-cm";
+import { eventCmFilm } from "@/remotion/event-cm/film";
 import { fitScene } from "@/remotion/kit/fit";
 import { sceneForRole } from "@/remotion/kit/scenes/event-cm";
 import { applySuppression, setSuppressed } from "@/lib/event-cm/facts";
@@ -365,7 +366,9 @@ test("絵コンテは、映像が実際に描くものと同じ部品・同じ�
   });
 
   const storyboard = eventCmStoryboard(long);
-  const theme = storyboardTheme(long);
+  // Independent re-derivation through the kit's own functions — NOT through
+  // film.ts — so this still catches film.ts itself mis-fitting a scene.
+  const theme = eventCmFilm(long).theme;
   for (const panel of storyboard.panels) {
     const fit = fitScene(
       sceneForRole(panel.role, applySuppression(long), panel.index).components,

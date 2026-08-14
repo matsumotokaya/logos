@@ -21,13 +21,9 @@ import { EventBackground } from "@/remotion/event/EventBackground";
 import { resolveMediaSrc } from "@/remotion/event/EventComposition";
 import { EVENT_FPS, EVENT_HEIGHT, EVENT_WIDTH } from "@/remotion/event/palette";
 import { Stage } from "@/remotion/kit/render/Stage";
-import { sceneForRole } from "@/remotion/kit/scenes/event-cm";
-import { SUMI_THEME, themeForBrand, type Theme } from "@/remotion/kit/theme";
 import { CaptionBand } from "@/remotion/kit/render/CaptionBand";
-import { applySuppression } from "@/lib/event-cm/facts";
-import { captionsFor } from "./captions";
-import { eventCmTimeline, msToFrame, msToFrames } from "./timeline";
-import { eventCmSceneKey } from "./types";
+import { eventCmFilm } from "./film";
+import { msToFrame, msToFrames } from "./timeline";
 import type { EventCmBrief } from "./types";
 
 export { EVENT_FPS, EVENT_WIDTH, EVENT_HEIGHT };
@@ -36,19 +32,14 @@ export type EventCmVideoProps = {
   brief: EventCmBrief;
 };
 
-/** The theme this brief renders under: the reference art direction, wearing
- *  whatever the brand actually has. */
-export const themeOf = (brief: EventCmBrief): Theme =>
-  brief.theme ? themeForBrand(SUMI_THEME, brief.theme) : SUMI_THEME;
-
 export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) => {
   const frame = useCurrentFrame();
   const { durationInFrames, fps } = useVideoConfig();
-  // A field the user switched off is emptied before anything is built, so the
-  // components' existing empty behaviour carries the decision.
-  const brief = applySuppression(raw);
-  const timeline = eventCmTimeline(brief);
-  const theme = themeOf(brief);
+  // The whole film, derived once (film.ts). This component only sequences it —
+  // suppression, timing, scene building and captions are not its business.
+  const film = eventCmFilm(raw);
+  const brief = film.drawn;
+  const theme = film.theme;
 
   // Music opens alone, steps back under the narration, and comes up again for
   // the close. Ducking costs nothing here — Remotion takes volume as a
@@ -58,11 +49,11 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
   // With no voice yet there is nothing to duck under, and the music carries
   // the film at full level. The same composition therefore works at every
   // stage of the take's life, which is the point (timeline.ts).
-  const hasVoice = Boolean(brief.voice);
+  const hasVoice = film.hasVoice;
   const FULL = 0.62;
   const UNDER_VOICE = 0.16;
-  const startFrame = msToFrame(timeline.narrationStartMs, fps);
-  const endFrame = msToFrame(timeline.narrationEndMs, fps);
+  const startFrame = msToFrame(film.narrationStartMs, fps);
+  const endFrame = msToFrame(film.narrationEndMs, fps);
   const duckIn = Math.round(fps * 0.5);
   const duckOut = Math.round(fps * 0.8);
 
@@ -98,38 +89,29 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
       )}
       {brief.voice ? (
         // Held back by the lead-in so the opening belongs to the music.
-        <Sequence from={msToFrame(timeline.narrationStartMs, fps)}>
+        <Sequence from={msToFrame(film.narrationStartMs, fps)}>
           <Audio src={resolveMediaSrc(brief.voice.audio)} />
         </Sequence>
       ) : null}
-      {timeline.scenes.map((beat) => {
-        // One picture per scene. The film's shape is the timeline's shape.
-        //
-        // Keyed by scene identity rather than by role: three programme pictures
-        // share a role, and React would have treated them as one Sequence
-        // re-rendered three times.
-        const from = msToFrame(beat.fromMs, fps);
-        const length = msToFrames(beat.durationMs, fps);
+      {film.scenes.map((scene) => {
+        // One picture per scene. The film's shape is the film's shape here too:
+        // keyed by scene identity rather than by role, because three programme
+        // pictures share a role and React would have treated them as one
+        // Sequence re-rendered three times.
+        const from = msToFrame(scene.fromMs, fps);
+        const length = msToFrames(scene.durationMs, fps);
         return (
-          <Sequence
-            key={eventCmSceneKey(beat)}
-            from={from}
-            durationInFrames={length}
-          >
-            <Stage
-              scene={sceneForRole(beat.role, brief, beat.index)}
-              theme={theme}
-              length={length}
-            />
+          <Sequence key={scene.key} from={from} durationInFrames={length}>
+            <Stage scene={scene.scene} theme={theme} length={length} />
           </Sequence>
         );
       })}
       {/* Above every scene. Subtitles are not one scene's business. */}
-      <CaptionBand captions={captionsFor(brief)} theme={theme} />
+      <CaptionBand captions={film.captions} theme={theme} />
     </AbsoluteFill>
   );
 };
 
 /** Total frames for this brief — the Player and the renderer must agree. */
 export const eventCmDurationInFrames = (brief: EventCmBrief, fps = EVENT_FPS): number =>
-  msToFrames(eventCmTimeline(brief).totalMs, fps);
+  msToFrames(eventCmFilm(brief).totalMs, fps);

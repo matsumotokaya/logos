@@ -6,11 +6,12 @@
 // FOR is deciding the scenario and the composition: which beat says what, what
 // is on screen while it says it, and what is missing.
 //
-// Everything here is derived from what the renderer itself consumes — the same
-// `sceneForRole`, the same `distribute`, the same timeline and captions — so
-// the storyboard cannot describe a film that is no longer being made. The one
-// thing it adds is the link back to the brief (`fields` on each component), and
-// that is what turns the enlarged panel into the place you correct things.
+// Everything here is a RE-SAYING of `eventCmFilm()` — the same derivation the
+// renderer sequences (remotion/event-cm/film.ts). This module derives nothing
+// about the film itself; it only adds the human layer: labels, provenance
+// badges, and which fields the enlarged panel can correct. That is what makes
+// "the storyboard describes a film nobody is making" structurally impossible
+// rather than merely tested against.
 //
 // One panel per scene, one scene per narration line. The two silent scenes —
 // the presenter's mark, opening and closing — are panels too: they are what the
@@ -18,34 +19,21 @@
 
 import {
   EMPTY_BEHAVIOUR,
-  emphasisOf,
   isEmpty,
   textOf,
   type ComponentKind,
   type Emphasis,
   type SceneComponent,
 } from "@/remotion/kit/components";
-import { distribute, LAYOUTS, overCapacity, type LayoutSlot, type SceneLayout } from "@/remotion/kit/layout";
-import { fitScene } from "@/remotion/kit/fit";
-import { SUMI_THEME, themeForBrand, type Theme } from "@/remotion/kit/theme";
-import { sceneForRole } from "@/remotion/kit/scenes/event-cm";
-import { captionsFor, type Caption } from "@/remotion/event-cm/captions";
-import { eventCmTimeline, type TimingSource } from "@/remotion/event-cm/timeline";
-import {
-  eventCmNarratedSteps,
-  eventCmSceneKey,
-  type EventCmBrief,
-  type EventCmSceneRole,
-} from "@/remotion/event-cm/types";
+import type { LayoutSlot, SceneLayout } from "@/remotion/kit/layout";
+import type { Theme } from "@/remotion/kit/theme";
+import type { Caption } from "@/remotion/event-cm/captions";
+import { eventCmFilm } from "@/remotion/event-cm/film";
+import type { TimingSource } from "@/remotion/event-cm/timeline";
+import type { EventCmBrief, EventCmSceneRole } from "@/remotion/event-cm/types";
 import type { LogoTreatment } from "@/remotion/event/types";
-import { eventCmGoalState } from "@/lib/pipeline/event-cm";
-import {
-  applySuppression,
-  FACT_FIELDS,
-  isPhotoSlot,
-  isSuppressed,
-} from "@/lib/event-cm/facts";
-import { EVENT_CM_GOAL } from "@/lib/pipeline/event-cm";
+import { EVENT_CM_GOAL, eventCmGoalState } from "@/lib/pipeline/event-cm";
+import { FACT_FIELDS, isPhotoSlot, isSuppressed } from "@/lib/event-cm/facts";
 import type { FieldOrigin } from "@/lib/pipeline/stages";
 
 /** What each component kind is called on the storyboard. The vocabulary is
@@ -158,7 +146,8 @@ export interface StoryboardBackdrop {
 }
 
 export interface StoryboardPanel {
-  /** 1-based, in film order. */
+  /** 1-based, in film order. A LABEL — never an identity (React keys and API
+   *  calls use the scene key; a deleted panel renumbers everything after it). */
   no: number;
   role: EventCmSceneRole;
   /** Which item this picture is about, when the role repeats (programmes). */
@@ -207,6 +196,9 @@ export interface StoryboardOrphanLine {
 
 export interface Storyboard {
   panels: StoryboardPanel[];
+  /** The theme the film is drawn under — the same object the renderer paints
+   *  with, so the panels and the film measure against one type scale. */
+  theme: Theme;
   /** Script lines the current film has no picture for. */
   orphanLines: StoryboardOrphanLine[];
   totalMs: number;
@@ -351,112 +343,59 @@ function countBlocks(blocks: StoryboardBlock[]): PanelCounts {
 }
 
 /**
- * The storyboard for one brief.
+ * The storyboard for one brief: `eventCmFilm()`, said in human words.
  *
- * Panel boundaries are the timeline's own, which is what the composition
- * sequences from — so a panel's stated span is the film's actual cut.
+ * Panel boundaries, sizes, drops, subtitles and narration all come from the
+ * film object itself. What this adds is labels, provenance and editability —
+ * the link back to the brief that turns the enlarged panel into the place you
+ * correct things.
  */
-/** The theme this brief is drawn under. The same one the composition builds
- *  (EventCmComposition.themeOf) — exported so the panel and the model cannot
- *  end up measuring against different type scales. */
-export const storyboardTheme = (brief: EventCmBrief): Theme =>
-  brief.theme ? themeForBrand(SUMI_THEME, brief.theme) : SUMI_THEME;
-
 export function eventCmStoryboard(raw: EventCmBrief): Storyboard {
-  // Everything below is built from the brief AS THE FILM SEES IT.
-  //
-  // Two things used to be read differently here than in the composition, and
-  // both made the storyboard describe a film nobody was making:
-  //
-  //   1. Suppression. The composition empties switched-off fields before
-  //      building anything; the storyboard read the raw brief, so a field the
-  //      user took off screen still had a block — and if `guests` was the field,
-  //      the storyboard had a whole panel and a whole scene's worth of seconds
-  //      that the film does not contain.
-  //   2. The fitter. The stage sets each component as loudly as it can and
-  //      DROPS what cannot be set even two steps down (remotion/kit/fit.ts).
-  //      The storyboard drew every component at the size the scene asked for,
-  //      so a long programme list appeared large and complete in the panel and
-  //      came out smaller — or absent — in the film.
-  const brief = applySuppression(raw);
-  const theme = storyboardTheme(brief);
-  const timeline = eventCmTimeline(brief);
-  const captions = captionsFor(brief);
+  const film = eventCmFilm(raw);
+  // The film's own view of the brief (suppressed fields emptied), so a block's
+  // words and figures match what the renderer will set. Provenance survives
+  // suppression, so origin badges still read correctly from this copy.
+  const brief = film.drawn;
   const goal = eventCmGoalState(brief);
   const origins = new Map<string, FieldOrigin | null>(
     goal.fields.map((field) => [field.path, field.origin]),
   );
-  // By scene identity: with a picture per programme, three lines share the role
-  // `program` and only their index tells them apart.
-  const narrationOf = new Map(
-    brief.script.scenes.map((scene) => [eventCmSceneKey(scene), scene.text] as const),
-  );
-  // Whether a picture SPEAKS is a fact about the film, not about whether anybody
-  // has written its line yet. Deriving it from the script's contents made the
-  // three new programme pictures claim to be silent — no line, no subtitle, and
-  // no editor to write one in — because the stored script still held a single
-  // unindexed `program` line.
-  const narratedKeys = new Set(eventCmNarratedSteps(brief).map(eventCmSceneKey));
 
-  const panels: StoryboardPanel[] = [];
-
-  for (const beat of timeline.scenes) {
-    const scene = sceneForRole(beat.role, brief, beat.index);
-    const spec = LAYOUTS[scene.layout];
-    const fromMs = beat.fromMs;
-    const durationMs = beat.durationMs;
-
-    // The same fit the stage runs, on the same theme. `placed` may hold copies
-    // of components (a second `hero` is demoted), so the map is keyed by what
-    // the fitter returns and the panel draws those same objects.
-    const fit = fitScene(scene.components, theme);
-    const emphasisFor = new Map<SceneComponent, Emphasis>(
-      fit.placed.map((item) => [item.component, item.emphasis]),
-    );
-    const kept = { ...scene, components: fit.placed.map((item) => item.component) };
-
-    const regions: StoryboardRegion[] = distribute(kept).map((group, slotIndex) => ({
-      region: spec.slots[slotIndex].region,
-      blocks: group.map((component) =>
-        blockOf(component, brief, origins, emphasisFor.get(component) ?? emphasisOf(component)),
+  const panels: StoryboardPanel[] = film.scenes.map((scene, at) => {
+    const regions: StoryboardRegion[] = scene.regions.map((region) => ({
+      region: region.region,
+      blocks: region.blocks.map(({ component, emphasis }) =>
+        blockOf(component, brief, origins, emphasis),
       ),
     }));
     const blocks = regions.flatMap((region) => region.blocks);
 
-    panels.push({
-      no: panels.length + 1,
-      role: beat.role,
-      ...(beat.index === undefined ? {} : { index: beat.index }),
-      narrated: narratedKeys.has(eventCmSceneKey(beat)),
-      fromMs,
-      durationMs,
-      layout: scene.layout,
-      capacity: spec.capacity,
+    return {
+      no: at + 1,
+      role: scene.role,
+      ...(scene.index === undefined ? {} : { index: scene.index }),
+      narrated: scene.narrated,
+      fromMs: scene.fromMs,
+      durationMs: scene.durationMs,
+      layout: scene.scene.layout,
+      capacity: scene.capacity,
       regions,
-      backdrop: scene.backdrop
+      backdrop: scene.scene.backdrop
         ? {
-            src: scene.backdrop.photo.src,
-            weight: scene.backdrop.weight,
-            focus: scene.backdrop.photo.focus ?? { x: 0.5, y: 0.5 },
-            fields: (scene.backdrop.fields ?? []).map((path) =>
+            src: scene.scene.backdrop.photo.src,
+            weight: scene.scene.backdrop.weight,
+            focus: scene.scene.backdrop.photo.focus ?? { x: 0.5, y: 0.5 },
+            fields: (scene.scene.backdrop.fields ?? []).map((path) =>
               fieldOf(brief, path, origins),
             ),
           }
         : null,
-      // What the film actually leaves out. The fitter's decision comes first
-      // because that is the one the renderer obeys; the arrangement's capacity
-      // is advisory (the stage draws past it) and is reported separately.
-      dropped: [
-        ...fit.dropped.map((component) => component.kind),
-        ...overCapacity(kept).map((component) => component.kind),
-      ],
-      captions: captions.filter(
-        (caption) => caption.fromMs < fromMs + durationMs && caption.toMs > fromMs,
-      ),
-      narration: narrationOf.get(eventCmSceneKey(beat)) ?? "",
+      dropped: scene.dropped.map((component) => component.kind),
+      captions: scene.captions,
+      narration: scene.narration,
       counts: countBlocks(blocks),
-    });
-  }
+    };
+  });
 
   const counts = panels.reduce((total, panel) => {
     total.blocks += panel.counts.blocks;
@@ -471,15 +410,14 @@ export function eventCmStoryboard(raw: EventCmBrief): Storyboard {
 
   return {
     panels,
-    orphanLines: brief.script.scenes
-      .filter((scene) => !narratedKeys.has(eventCmSceneKey(scene)))
-      .map((scene) => ({
-        role: scene.role,
-        ...(scene.index === undefined ? {} : { index: scene.index }),
-        text: scene.text,
-      })),
-    totalMs: timeline.totalMs,
-    timingSource: timeline.source,
+    theme: film.theme,
+    orphanLines: film.orphanLines.map((line) => ({
+      role: line.role,
+      ...(line.index === undefined ? {} : { index: line.index }),
+      text: line.text,
+    })),
+    totalMs: film.totalMs,
+    timingSource: film.timingSource,
     counts,
   };
 }

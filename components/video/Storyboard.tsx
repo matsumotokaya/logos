@@ -25,7 +25,6 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import {
   eventCmStoryboard,
-  storyboardTheme,
   type StoryboardBlock,
   type StoryboardPanel,
 } from "@/lib/storyboard/event-cm";
@@ -888,7 +887,9 @@ export default function Storyboard({
   imageSources?: BriefSource[];
 }) {
   const storyboard = eventCmStoryboard(brief);
-  const theme = storyboardTheme(brief);
+  // The film's own theme: the storyboard model carries it so the panels and
+  // the renderer cannot measure against different type scales.
+  const theme = storyboard.theme;
 
   return (
     <section>
