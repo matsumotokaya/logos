@@ -53,7 +53,6 @@ export const EVENT_CM_GOAL: readonly GoalField[] = [
   // defect (§6), so a video with no scene photography is finished, not short.
   { path: "visuals.programs", label: "プログラムの背景", required: false },
   { path: "visuals.closing", label: "締めの背景", required: false },
-  { path: "visuals.inkArt", label: "背景のアート", required: false },
   { path: "bgm", label: "BGM", required: false },
   // What it says
   { path: "scenario", label: "シナリオ", required: true },
@@ -88,7 +87,6 @@ function filledPaths(brief: EventCmBrief): string[] {
   if (brief.visuals?.value) paths.push("visuals.value");
   if (brief.visuals?.programs) paths.push("visuals.programs");
   if (brief.visuals?.closing) paths.push("visuals.closing");
-  text("visuals.inkArt", brief.visuals?.inkArt);
   text("bgm", brief.bgm);
   if (scenarioChars(brief.scenario) > 0) paths.push("scenario");
   if (brief.voice) paths.push("voice");

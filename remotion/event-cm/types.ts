@@ -7,14 +7,26 @@
 // track, exactly as product-cm does (remotion/cm/CmComposition.tsx).
 //
 // The art direction does not change — ink black × gold × mincho, the treatment
-// proven by 世界が恋する日本酒. So the brief is an EventBrief (facts, photos,
-// logos, BGM, all of it) plus a scenario and, once fixed, a voice.
+// proven by 世界が恋する日本酒.
+//
+// The brief USED to be `extends EventBrief`, which was convenient and wrong: it
+// gave event-cm three fields no event-cm scene draws (`sideCopy`,
+// `visuals.inkArt`, `visuals.texture` — event-promo's), and they surfaced in the
+// goal and the fact list as things a user was invited to manage. Nothing on
+// screen would ever change. So the two templates now share the VALUE types
+// (a photo is a photo, a logo is a logo) and not each other's field lists.
 //
 // Facts are still never invented (docs/deliverable-architecture.md §17.2): the
 // narration may only speak what the brief already knows. A null venue is not
 // narrated as "会場は後日発表" — it is simply not said.
 
-import type { EventBrief } from "@/remotion/event/types";
+import type {
+  EventGuest,
+  EventLogo,
+  EventPhoto,
+  EventProgram,
+  EventSchedule,
+} from "@/remotion/event/types";
 import type { CmVoiceTrackOf } from "@/lib/campaign/cm-types";
 
 /**
@@ -180,7 +192,7 @@ export function eventCmSceneBudget(scene: {
  */
 export const EVENT_CM_SUPPRESSED_NOTE = "__suppressed__";
 
-type PlanInput = Pick<EventBrief, "guests" | "programs"> & {
+type PlanInput = Pick<EventCmBrief, "guests" | "programs"> & {
   provenance?: EventCmProvenance;
 };
 
@@ -223,7 +235,7 @@ export function eventCmScenePlan(brief: PlanInput): EventCmSceneStep[] {
 
 /** The pictures this brief needs a scenario line for, in film order. */
 export const eventCmNarratedSteps = (
-  brief: Pick<EventBrief, "guests" | "programs">,
+  brief: Pick<EventCmBrief, "guests" | "programs">,
 ): EventCmSceneStep[] => eventCmScenePlan(brief).filter((scene) => scene.narrated);
 
 /** Beats outside their budget, with the direction they went. Empty = on spec. */
@@ -281,8 +293,55 @@ export interface EventCmThemeInput {
   bodyFont?: string | null;
 }
 
-/** Everything the narrated event video renders from. */
-export interface EventCmBrief extends EventBrief {
+/**
+ * The photographs an event-cm scene stands on.
+ *
+ * Three, because the film has three scenes that take a ground: the value scene
+ * (hero), the programme scenes and the closing card (both support). event-promo's
+ * `inkArt` and `texture` are not here — this film's ground is the drifting ink
+ * the theme paints, and a slot nothing draws is a slot a user is invited to fill
+ * for nothing (see the file header).
+ */
+export interface EventCmVisuals {
+  /** Full-bleed photo behind the value scene. */
+  value: EventPhoto | null;
+  /** Full-bleed photo behind the programme scenes, heavily dimmed. */
+  programs: EventPhoto | null;
+  /** Full-bleed photo behind the closing card. */
+  closing: EventPhoto | null;
+}
+
+/**
+ * Everything the narrated event video renders from.
+ *
+ * The field list is exactly what `remotion/kit/scenes/event-cm.ts` reads plus
+ * what the take needs to know about itself (provenance, theme, timestamps,
+ * scenario, voice). If a field is added here and no scene reads it, the goal and
+ * the fact list will offer it to the user and nothing will happen — which is the
+ * mistake `extends EventBrief` made three times over.
+ */
+export interface EventCmBrief {
+  /** Who presents this — the mark scenes and the closing credit. */
+  presenter: string;
+  seriesLabel: string;
+  title: string;
+  subtitle: string;
+  /** The single strongest value, one line per array entry. */
+  valueLines: string[];
+  /** Small gold chip under the value lines. */
+  valueChip: string | null;
+  programsHeading: string;
+  programs: EventProgram[];
+  guestsHeading: string;
+  guests: EventGuest[];
+  schedule: EventSchedule;
+  cta: string;
+  /** Small print on the closing scene, e.g. age restriction. */
+  footnote: string | null;
+  logos: EventLogo[];
+  visuals: EventCmVisuals;
+  /** material:<uuid> or a staticFile name of the BGM; null = silent. */
+  bgm: string | null;
   provenance?: EventCmProvenance;
   theme?: EventCmThemeInput;
   /**

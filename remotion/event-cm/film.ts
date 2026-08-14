@@ -167,11 +167,9 @@ function applySuppression(brief: EventCmBrief): EventCmBrief {
       fee: off("schedule.fee") ? null : brief.schedule.fee,
     },
     visuals: {
-      ...brief.visuals,
       value: off("visuals.value") ? null : brief.visuals.value,
       programs: off("visuals.programs") ? null : brief.visuals.programs,
       closing: off("visuals.closing") ? null : brief.visuals.closing,
-      inkArt: off("visuals.inkArt") ? null : brief.visuals.inkArt,
     },
   };
 }

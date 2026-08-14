@@ -8,7 +8,6 @@ const EMPTY: EventCmBrief = {
   seriesLabel: "",
   title: "",
   subtitle: "",
-  sideCopy: null,
   valueLines: [],
   valueChip: null,
   programsHeading: "",
@@ -19,7 +18,7 @@ const EMPTY: EventCmBrief = {
   cta: "",
   footnote: null,
   logos: [],
-  visuals: { inkArt: null, value: null, programs: null, closing: null, texture: null },
+  visuals: { value: null, programs: null, closing: null },
   bgm: null,
   scenario: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
 };

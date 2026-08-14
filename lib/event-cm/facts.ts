@@ -60,7 +60,6 @@ const INPUT_BY_PATH: Record<string, FactInput> = {
   "visuals.value": "asset",
   "visuals.programs": "asset",
   "visuals.closing": "asset",
-  "visuals.inkArt": "asset",
   bgm: "asset",
   scenario: "generated",
   voice: "generated",
@@ -137,8 +136,6 @@ export function previewOf(brief: EventCmBrief, path: string): string {
       return brief.visuals.programs ? "写真あり" : "";
     case "visuals.closing":
       return brief.visuals.closing ? "写真あり" : "";
-    case "visuals.inkArt":
-      return brief.visuals.inkArt ? "あり" : "";
     case "bgm":
       return brief.bgm ? "あり" : "";
     case "scenario":

@@ -3,7 +3,6 @@ import "server-only";
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import type { EventBrief } from "@/remotion/event/types";
 import {
   EVENT_CM_MAX_CHARS,
   EVENT_CM_MIN_CHARS,
@@ -11,6 +10,7 @@ import {
   eventCmSceneBudget,
   eventCmSceneKey,
   EVENT_CM_TARGET_SECONDS,
+  type EventCmBrief,
   type EventCmScenario,
   type EventCmSceneStep,
 } from "@/remotion/event-cm/types";
@@ -165,7 +165,7 @@ const draftSchemaFor = (roles: readonly string[]) =>
 
 /** The facts, written out for the model. Only what the brief actually holds —
  *  an absent fact is absent from the prompt, so it cannot be echoed back. */
-export function describeEventFacts(brief: EventBrief): string {
+export function describeEventFacts(brief: EventCmScenarioInput): string {
   const lines: string[] = [];
   const push = (label: string, value: string | null | undefined) => {
     if (value && value.trim()) lines.push(`${label}: ${value.trim()}`);
@@ -175,7 +175,6 @@ export function describeEventFacts(brief: EventBrief): string {
   push("サブタイトル", brief.subtitle);
   push("シリーズ", brief.seriesLabel);
   push("主催", brief.presenter);
-  push("補足コピー", brief.sideCopy);
   if (brief.valueLines.length) push("価値の訴求", brief.valueLines.join(""));
   push("価値のチップ", brief.valueChip);
 
@@ -212,6 +211,17 @@ export interface EventCmScenarioDraft {
   usage: { inputTokens: number; outputTokens: number } | null;
 }
 
+/**
+ * What writing a scenario needs: the facts, and the shape they imply.
+ *
+ * Not the scenario — that is the output, and asking for it as input is how a
+ * caller ends up handing over the words it is about to replace. Not the
+ * recording either. Narrow on purpose so an `event-promo` brief can be drafted
+ * against too (scripts/draft-event-cm-scenario.ts reads real takes of both
+ * templates to see what the model does with them).
+ */
+export type EventCmScenarioInput = Omit<EventCmBrief, "scenario" | "voice">;
+
 export function eventCmScenarioAvailable(): boolean {
   return Boolean(process.env.OPENAI_API_KEY);
 }
@@ -224,7 +234,7 @@ export function eventCmScenarioAvailable(): boolean {
  * additional source material, under the same no-invention rule.
  */
 export async function draftEventCmScenario(
-  brief: EventBrief,
+  brief: EventCmScenarioInput,
   options: { notes?: string | null; now: string } = { now: new Date().toISOString() },
 ): Promise<EventCmScenarioDraft> {
   const facts = describeEventFacts(brief);

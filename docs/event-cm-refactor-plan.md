@@ -246,8 +246,8 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 ## 8. 残っている小さな負債(リファクタリング中に片付ける候補)
 
 - `image` コンポーネントは event-cm では未使用になった(背景写真が地になったため)。他テンプレート用に語彙としては残す
-- `sideCopy` / `visuals.texture` / `visuals.inkArt` は event-cm のどのシーンも読んでいない。event-promo 専用フィールドなので、**ブリーフの型が2テンプレート分を抱えている**(`EventCmBrief extends EventBrief` の副作用)。分ける価値はあるが、DBのブリーフ移行が必要
-- `panelDeletion` はクライアント判定のみ。[lib/brand-tree-actions.ts](../lib/brand-tree-actions.ts) と同じく**サーバーがもう一度数える**形に揃える
+- ~~`sideCopy` / `visuals.texture` / `visuals.inkArt` は event-cm のどのシーンも読んでいない~~ ✅ **2026-08-15 解消**(§11.3)。`EventCmBrief` は `extends EventBrief` をやめて自立し、3フィールドは型・zod・goal・facts から消えた。**DB焼き替えは不要**(zod が strip する・3件とも値は null)
+- `panelDeletion` はクライアント判定のみ。[lib/brand-tree-actions.ts](../lib/brand-tree-actions.ts) と同じく**サーバーがもう一度数える**形に揃える。※ドロワーのボタン判定は §11.3b で [lib/pipeline/stage-actions.ts](../lib/pipeline/stage-actions.ts) へ出した(こちらは押せるかどうかだけなので、サーバーの再確認は各エンドポイントが既に持っている)
 - `VIDEO_STATE_LABEL` の状態導出がAPIルートにテンプレート分岐で書かれている(`product-cm` / event系)。テンプレートの関心はテンプレート側へ
 - 絵コンテの `no`(通し番号)はラベル用途。**識別には使わない**ことを型で示せると良い(削除時のバグの原因)
 - `lib/narration/voices.ts` の男女ラベルは未検証(Geminiは性別を公開していない)。耳で確認して直す
@@ -354,7 +354,7 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 
 **2026-08-15 実装済み**。ボタンは**「動画を作り直す」**。ドロワー内の段ごとの実行ボタンは残した(読み取り・構造化・反映)。
 
-**残っている小さな問い**: シナリオ・読み上げ・焼き付けには**ドロワー内の実行ボタンがまだ無い**(それぞれヘッダーの「ナレーション」ボタンと1つのボタンからしか実行できない)。`StageAction` の `ADVANCE` は `map → output` を持っていないので、4段目のドロワーは状態を見せるだけ。段ごとに押せる方が「どこで何が起きたか分かる」という原則には合うが、`RunnableStage` を広げる必要があるので次段。
+**残っていた問いも解消済み**(→ §11.3b)。シナリオ・読み上げ・焼き付けに**個別のボタンは足さなかった**——`pendingFilmSteps` の判定を2箇所に置くとバッジと食い違うため。代わりに `ADVANCE` に `map → film` を足し、マッピングのドロワーから映像段へ進めるようにした。判定は [lib/pipeline/stage-actions.ts](../lib/pipeline/stage-actions.ts) が正本。
 
 ### 9.7 差分(stale)の定義と、それを読む3箇所
 
@@ -442,8 +442,17 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 ## 10. 次セッション(エンジニア)の最初の3手
 
 1. **§3(変えてはいけない契約)と §4.1(film の形)を読む**。以後、映像について何かを導出したくなったら、**まず `eventCmFilm()` が既に返していないか見る**——返していなければ film に足す(消費者側で組まない)。これがこのリファクタが守らせたい唯一の習慣。**§11.1 でこれに2つ目の習慣が加わった**: 「作業場と成果のどちらの話か」を先に決める。差分の量を答えるのは [lib/event-cm/bake.ts](../lib/event-cm/bake.ts) 1箇所だけで、画面はそれを言い換える
-2. **`npm test` で全件green を確認**してから触り始める(2026-08-15時点で226件)
-3. **§11.3(`EventCmBrief` の自立)から**。§11.2(`script` → `scenario` 改名)は済んでいるので、**語彙は3語(シナリオ/字幕/読み上げ)に確定している**——新しく名前を付けるときはこの3語に寄せる。§11.3 は zod が未知キーを strip するなら**DB焼き替えなし**で終わる可能性があるので、まずそれを確かめる。**焼き替えが必要だと分かった場合は、実行前にSQLをレビューしてユーザーの明示承認を得る**(AGENTS.md の Supabase 安全規則。project ref `xhbdfzceyfrxsmaixkne` の照合も毎回)。**briefのキーを変える migration は `brief` と `baked_brief` の両方に当てる**(§11.2 で確立した規則)
+2. **`npm test` で全件green を確認**してから触り始める(2026-08-15時点で237件)
+3. **§11 のパケットは全部終わっている**(11.1 / 11.2 / 11.3 / 11.3b)。残っているのは §11.4 の小さな穴と §8 の負債で、どれも1セッション未満。**この計画書の主題は完了した**ので、次にこのテンプレートを触るときは §3(変えてはいけない契約)と §4.1(film の形)、それに**§11.2 で確定した3語**(シナリオ/字幕/読み上げ)を読んでから始める
+
+**確立した規則(以後これに従う)**:
+
+- 映像について何かを導出したくなったら、**まず `eventCmFilm()` が既に返していないか見る**。返していなければ film に足す(消費者側で組まない)
+- 「作業場(`brief`)と成果(`baked_brief`)のどちらの話か」を先に決める。差分の量を答えるのは [lib/event-cm/bake.ts](../lib/event-cm/bake.ts) 1箇所だけ
+- **briefのキーを変える migration は `brief` と `baked_brief` の両方に当てる**(§11.2)
+- **ブリーフに足したフィールドは、どこかのシーンが読むこと**。読まないフィールドは goal と fact list に並んで、埋めても何も起きない(§11.3)
+- **押せる/押せないの判定はデータにしてテストする**。画面に出ない誤りだから(§11.3b、[lib/pipeline/stage-actions.ts](../lib/pipeline/stage-actions.ts))
+- リモートDBへ書く前に project ref `xhbdfzceyfrxsmaixkne` を照合し、SQLをレビューしてユーザーの明示承認を得る(AGENTS.md)
 
 ## 11. エンジニア引き継ぎパケット
 
@@ -508,11 +517,32 @@ NarrationDialog / BgmDialog / PanelDelete に共通する挙動:「ドット付�
 
 **検証**: テスト226件green、`tsc --noEmit` / eslint クリア、本番ビルド成功。DBは改名後の3件で `scenario` キー・source(llm/llm/human)・行数16を確認。**未検証**: 実ブラウザでの通し操作。
 
-### 11.3 `EventCmBrief` の自立(§8)
+### 11.3 `EventCmBrief` の自立(§8) ✅ **2026-08-15 実装済み**
 
-- `extends EventBrief` をやめ、event-cm が実際に読むフィールドだけを持つ。実測(2026-08-14): `sideCopy` は LLMプロンプト1箇所のみが読む・`visuals.texture` は完全未使用・`visuals.inkArt` は goal/facts/suppression にだけ居て**映像には一切出ない**
-- 判断: `sideCopy` と `texture` は落とす。`inkArt` は**映像に出ないものを管理させない**——goal/facts からも外す
-- zod スキーマ(brief-schema.ts)が未知キーを strip するか passthrough かを先に確認し、strip なら読み込み時に自然消滅するのでDB焼き替え不要
+**目的**: `extends EventBrief` をやめ、event-cm が実際に読むフィールドだけを持つ。
+
+**再実測(2026-08-15)**: `remotion/kit/scenes/event-cm.ts` が読むのは `presenter` / `seriesLabel` / `title` / `subtitle` / `valueLines` / `valueChip` / `programsHeading` / `programs` / `guestsHeading` / `guests` / `schedule.*` / `cta` / `footnote` / `logos` / `visuals.{value,programs,closing}`、コンポジションが `bgm` / `voice`。**`sideCopy` / `visuals.inkArt` / `visuals.texture` はどのシーンも読まない**(2026-08-14の実測どおり)。
+
+実装したもの:
+
+- **`EventCmBrief` は独立した interface**。共有するのは**値の型**(`EventPhoto` / `EventLogo` / `EventGuest` / `EventProgram` / `EventSchedule`)だけで、**フィールドの一覧は共有しない**。写真は写真、ロゴはロゴという共有は正しい種類の共有だが、相手のフィールド一覧を継承するのはそうではなかった
+- **`EventCmVisuals` は3枚**(`value` / `programs` / `closing`)。地を受け取るシーンの数と一致する
+- **zod も自立**([remotion/event-cm/brief-schema.ts](../remotion/event-cm/brief-schema.ts))。`EventBriefSchema.extend` をやめ、値のスキーマだけを import する
+- **落とした3フィールドは goal / facts / suppression からも消えた**。`visuals.inkArt` は「背景のアート」として一覧に並び、埋めても画面が変わらなかった——**映像に出ないものを管理させない**
+- `draftEventCmScenario` の入力型は `EventCmScenarioInput = Omit<EventCmBrief, "scenario" | "voice">`。**出力を入力に要求しない**ためで、副産物として event-promo Take に対しても下書きを試せる状態が保たれた(`scripts/draft-event-cm-scenario.ts` は両テンプレートの実Takeを読む)
+- `BrandVideoDetail` の `brief` 型は `EventBrief | EventCmBrief | Record<string, unknown> | null`。2つが別の型になったので、union がそう言う
+
+**DB焼き替えは不要だった**(計画どおり)。zod 4 の `z.object()` は未知キーを strip し、書き込み経路はすべて `validateBrief` の**出力**を保存するので、次に保存された時点で3フィールドは消える。加えて**3件すべてで3フィールドは null**、provenance にも登場しないので、保存を待つあいだも失われる情報が無い。テストで固定した(`seed.test.ts`「古いブリーフを保存すると、死んだフィールドは落ちる」)。
+
+**検証**: テスト228件green(新規2件)、型・lint・本番ビルドクリア。
+
+### 11.3b §9.6 の残り — 映像段への「進む」ボタン ✅ **2026-08-15 実装済み**
+
+§9.6 が残していた問い(シナリオ・読み上げ・焼き付けにドロワー内の実行ボタンが無い)に答えた。**3つのボタンは足していない**——足すと `pendingFilmSteps` が既に下している判定を2箇所で下すことになり、バッジと食い違える。代わりに**既存の「段の外へ出るボタン」パターンをもう1段ぶん延ばした**: `input → structure → map →` **`film`**。マッピングのドロワーが映像段のドロワーを開き、`pendingFilmSteps` が返した工程だけを通す。ラベルもその工程から作る(「読み上げる・動画に反映する →」)ので、残り1工程のときに嘘をつかない。
+
+**判定は [lib/pipeline/stage-actions.ts](../lib/pipeline/stage-actions.ts) へ出した**(テスト [stage-actions.test.ts](../lib/pipeline/stage-actions.test.ts) 9件)。[lib/brand-tree-actions.ts](../lib/brand-tree-actions.ts) / [lib/event-cm/panel-actions.ts](../lib/event-cm/panel-actions.ts) と同じ形で、コンポーネントは描くだけになった。出した理由は**書いている途中で1つ間違いを見つけたから**: `disabled`(=資料が1件も無い)が全ボタンを無効にしていて、そのままだと**資料ゼロのシード済みTakeで映像段が押せない**。資料を読まない工程に資料を要求していたわけで、スクリーンショットには写らない種類の誤りなので、データとして書いてテストで固定した。
+
+`RunnableStage` は広げていない。最後の段は `run/[stage]` の段ではなく3つの別エンドポイントなので、`run: "film"` はページへ処理を返す印であって新しいAPI段ではない。
 
 ### 11.4 残っている小さな穴(A〜Dで直したもの以外)
 

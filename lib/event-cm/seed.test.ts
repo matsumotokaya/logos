@@ -229,3 +229,49 @@ test("既定のBGMはブランドが違っても同じ", () => {
   );
   assert.equal(other.bgm, seedFor(WEALTHPARK_LAB).bgm);
 });
+
+test("event-promo のフィールドは持たない", () => {
+  // `EventCmBrief extends EventBrief` をやめた本体の確認
+  // (remotion/event-cm/types.ts、docs/event-cm-refactor-plan.md §11.3)。
+  //
+  // Three fields no event-cm scene draws used to arrive here for free, and the
+  // goal and the fact list offered all three to the user. Filling one changed
+  // nothing on screen — which is worse than not offering it, because it teaches
+  // that this list does not mean anything.
+  const brief = seedFor(WEALTHPARK_LAB) as unknown as Record<string, unknown>;
+  assert.equal("sideCopy" in brief, false, "sideCopy は event-promo の縦組みコピー");
+  const visuals = brief.visuals as Record<string, unknown>;
+  assert.deepEqual(
+    Object.keys(visuals).sort(),
+    ["closing", "programs", "value"],
+    "地を受け取るのは3シーンだけ（inkArt / texture は event-promo）",
+  );
+});
+
+test("古いブリーフを保存すると、死んだフィールドは落ちる", () => {
+  // Why §11.3 needed no migration. Every write path saves `validateBrief`'s
+  // OUTPUT, and zod strips what the schema does not name — so a brief stored
+  // before this change loses the three fields the next time it is saved, and
+  // keeps everything else exactly as it was.
+  const stored = {
+    ...seedFor(WEALTHPARK_LAB),
+    sideCopy: "縦組みの補足コピー",
+    visuals: {
+      ...seedFor(WEALTHPARK_LAB).visuals,
+      inkArt: "defaults/art/sumi.png",
+      texture: "defaults/photos/slate.jpg",
+    },
+  };
+  const result = validateBrief("event-cm", stored);
+  assert.equal(result.ok, true, result.ok ? "" : result.issues.join(" / "));
+  if (!result.ok) return;
+  const cleaned = result.brief as Record<string, unknown>;
+  assert.equal("sideCopy" in cleaned, false);
+  assert.deepEqual(
+    Object.keys(cleaned.visuals as Record<string, unknown>).sort(),
+    ["closing", "programs", "value"],
+  );
+  // The living fields survive: stripping is not a reset.
+  assert.equal(cleaned.title, stored.title);
+  assert.equal(cleaned.bgm, stored.bgm);
+});

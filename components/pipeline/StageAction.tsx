@@ -6,27 +6,19 @@
 // input-stage shortcut may chain structure -> map in the page, because a user
 // asking to structure new material expects the storyboard to update as well.
 //
-// The explicit map-stage action remains available for re-running application
-// without calling the model again.
+// **What can be pressed, and what is said when it cannot, is decided in
+// [lib/pipeline/stage-actions.ts](../../lib/pipeline/stage-actions.ts)** (tested
+// there). This file only draws it. The decision left this component because one
+// of its rules was wrong in a way no screenshot shows: "no material yet"
+// disabled every button, including the film step, which does not read material.
 //
 // Running everything at once still belongs outside the flow, as a single
-// control over the whole pipeline (see the "まとめて実行" button).
+// control over the whole pipeline (the "動画を作り直す" button).
 
+import { stageActions, type StageRun } from "@/lib/pipeline/stage-actions";
+import type { FilmStep } from "@/lib/event-cm/bake";
 import type { PipelineStage, PipelineStageId } from "@/lib/pipeline/stages";
 import type { RunnableStage } from "@/app/api/brands/[id]/videos/[videoId]/run/[stage]/route";
-
-/** The work a stage does in place, re-runnable while it has something new. */
-const OWN_STEP: Partial<Record<PipelineStageId, { run: RunnableStage; label: string }>> = {
-  input: { run: "extract", label: "入力・抽出を実行" },
-};
-
-/** The step out of a stage: what it runs, and where it takes you. */
-const ADVANCE: Partial<
-  Record<PipelineStageId, { to: PipelineStageId; run: RunnableStage; label: string }>
-> = {
-  input: { to: "structure", run: "structure", label: "構造化して反映する" },
-  structure: { to: "map", run: "map", label: "動画へ反映する" },
-};
 
 export default function StageAction({
   stageId,
@@ -34,6 +26,8 @@ export default function StageAction({
   busy,
   disabled,
   onRun,
+  onRunFilm,
+  filmSteps,
   onOpenStage,
   onRewriteScenario,
 }: {
@@ -41,38 +35,50 @@ export default function StageAction({
   /** Every stage's freshness — what decides whether either button has work. */
   stages: PipelineStage[];
   busy: boolean;
-  /** No material yet: there is nothing for any of these steps to work on. */
+  /** No material pinned yet. Gates the reading steps, never the film step. */
   disabled: boolean;
   onRun: (stage: RunnableStage) => void;
+  /**
+   * Run the film half of the chain: scenario → reading aloud → fix.
+   *
+   * Absent for templates with no fixing step (product-cm, event-promo), which is
+   * what takes the mapping stage's button away — nothing follows the mapping
+   * there.
+   */
+  onRunFilm?: () => void;
+  /**
+   * What that step would actually do, from `pendingFilmSteps`.
+   *
+   * Passed in rather than computed here so this button, the badge on the one
+   * button and the notice under the player are three phrasings of ONE answer
+   * (§9.7).
+   */
+  filmSteps?: FilmStep[];
   /** Open another stage's drawer. The advance button uses it before running,
    *  so the progress appears where the work is happening. */
   onOpenStage: (stage: PipelineStageId) => void;
   /**
-   * Rewrite the narration without re-reading anything.
+   * Rewrite the scenario without re-reading anything.
    *
    * Offered on the structuring stage because that is where the words are
-   * decided. Applying facts already rewrites the narration; this is for
-   * wanting a different take on the same facts, which is the commonest reason
-   * to touch a scenario at all.
+   * decided. Applying facts already rewrites the scenario; this is for wanting a
+   * different take on the same facts, which is the commonest reason to touch a
+   * scenario at all.
    */
   onRewriteScenario?: () => void;
 }) {
-  const own = OWN_STEP[stageId];
-  const advance = ADVANCE[stageId];
+  const { own, advance } = stageActions({
+    stageId,
+    stages,
+    hasMaterial: !disabled,
+    filmSteps: onRunFilm ? (filmSteps ?? []) : null,
+  });
   if (!own && !advance) return null;
 
-  const here = stages.find((stage) => stage.id === stageId);
-  const next = advance
-    ? stages.find((stage) => stage.id === advance.to)
-    : undefined;
-  // Nothing new to read: the last run already covers everything supplied.
-  const ownDone = here?.status === "ready";
-  // The next step consumes this stage's output, so it waits for it. It also
-  // becomes unavailable once that next step is already current; a completed
-  // pipeline should not offer a button that merely repeats the same work.
-  const advanceDone = next?.status === "ready";
-  const advanceBlocked = Boolean(advance) &&
-    (here?.status !== "ready" || advanceDone);
+  const run = (step: StageRun) => {
+    if (step === "film") onRunFilm?.();
+    else onRun(step);
+  };
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
@@ -89,17 +95,11 @@ export default function StageAction({
 
       {own ? (
         <>
-          <span className="text-[11px] text-ink-faint">
-            {disabled
-              ? "先に資料かテキストを追加してください"
-              : ownDone
-                ? "すべて読み取り済みです"
-                : ""}
-          </span>
+          <span className="text-[11px] text-ink-faint">{own.reason ?? ""}</span>
           <button
             type="button"
-            onClick={() => onRun(own.run)}
-            disabled={busy || disabled || ownDone}
+            onClick={() => run(own.run)}
+            disabled={busy || !own.enabled}
             className="rounded-full border border-hairline px-5 py-2 text-xs font-semibold transition hover:border-ink disabled:cursor-not-allowed disabled:text-ink-faint disabled:hover:border-hairline"
           >
             {busy ? "実行中…" : own.label}
@@ -109,12 +109,8 @@ export default function StageAction({
 
       {advance ? (
         <>
-          {advanceBlocked ? (
-            <span className="text-[11px] text-ink-faint">
-              {advanceDone
-                ? `${advance.label}は反映済みです`
-                : `${here?.label ?? "前の段"}が最新になると実行できます`}
-            </span>
+          {advance.reason ? (
+            <span className="text-[11px] text-ink-faint">{advance.reason}</span>
           ) : null}
           <button
             type="button"
@@ -123,9 +119,9 @@ export default function StageAction({
               // progress shows up in the stage that is doing the work rather
               // than in the one you just left.
               onOpenStage(advance.to);
-              onRun(advance.run);
+              run(advance.run);
             }}
-            disabled={busy || disabled || advanceBlocked}
+            disabled={busy || !advance.enabled}
             className="rounded-full bg-ink px-5 py-2 text-xs font-semibold text-paper transition hover:bg-accent disabled:cursor-not-allowed disabled:bg-hairline disabled:text-ink-faint"
           >
             {advance.label} →

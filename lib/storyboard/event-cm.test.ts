@@ -296,11 +296,9 @@ test("絵コンテの尺はタイムラインと同じものを見ている", ()
 test("写真のあるコマは、その写真を絵コンテでも敷く", () => {
   const brief = briefWith({
     visuals: {
-      inkArt: null,
       value: { src: "material:key", focus: { x: 0.5, y: 0.4 } },
       programs: { src: "material:room" },
       closing: null,
-      texture: null,
     },
   });
   const storyboard = eventCmStoryboard(brief);
@@ -319,11 +317,9 @@ test("写真のあるコマは、その写真を絵コンテでも敷く", () =>
 test("地はどのフィールドから来たかを言えるので、その場で直せる", () => {
   const brief = briefWith({
     visuals: {
-      inkArt: null,
       value: null,
       programs: { src: "material:room" },
       closing: null,
-      texture: null,
     },
   });
   const panel = eventCmStoryboard(brief).panels.find((entry) => entry.role === "program");

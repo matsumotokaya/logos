@@ -22,7 +22,6 @@ const SAKE: EventCmBrief = {
   seriesLabel: "「文化資本と投資」シリーズ 第3弾",
   title: "世界が恋する日本酒",
   subtitle: "〜次世代へつなぐ、文化資本への投資〜",
-  sideCopy: "特別な日本酒を楽しみながら、日本の文化資本の未来を考える",
   valueLines: ["百貨店には並ばない、", "蔵出しの特別な日本酒。"],
   valueChip: "特別な5種を、テイスティングで",
   programsHeading: "3つのプログラム",
@@ -51,11 +50,9 @@ const SAKE: EventCmBrief = {
     { name: "Miss SAKE", src: "material:g", scale: 1.35 },
   ],
   visuals: {
-    inkArt: "material:h",
     value: { src: "material:i", focus: { x: 0.5, y: 0.45 } },
     programs: { src: "material:j", focus: { x: 0.55, y: 0.68 } },
     closing: { src: "material:k", focus: { x: 0.45, y: 0.5 } },
-    texture: "material:l",
   },
   bgm: "material:m",
   scenario: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
@@ -200,7 +197,7 @@ test("写真があれば地として敷き、無ければ墨の地のまま", ()
 
   const bare: EventCmBrief = {
     ...SAKE,
-    visuals: { inkArt: null, value: null, programs: null, closing: null, texture: null },
+    visuals: { value: null, programs: null, closing: null },
   };
   for (const role of ["value", "program", "cta"] as const) {
     assert.equal(sceneForRole(role, bare).backdrop, undefined);
@@ -218,7 +215,7 @@ test("素材がゼロでも全シーンが成立する", () => {
     ...SAKE,
     guests: SAKE.guests.map((guest) => ({ ...guest, photo: null })),
     logos: SAKE.logos.map((logo) => ({ ...logo, src: null })),
-    visuals: { inkArt: null, value: null, programs: null, closing: null, texture: null },
+    visuals: { value: null, programs: null, closing: null },
     bgm: null,
   };
   for (const scene of allScenes(bare)) {

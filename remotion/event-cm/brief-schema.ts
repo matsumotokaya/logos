@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { EventBriefSchema } from "@/remotion/event/brief-schema";
+import {
+  EventGuestSchema,
+  EventLogoSchema,
+  EventPhotoSchema,
+  EventProgramSchema,
+  EventScheduleSchema,
+} from "@/remotion/event/brief-schema";
 import { CmVoiceTrackSchema } from "@/lib/templates/voice-schema";
 import {
   EVENT_CM_NARRATED_ROLES,
@@ -96,7 +102,43 @@ export const EventCmThemeSchema = z.object({
   bodyFont: z.string().nullable().optional(),
 });
 
-export const EventCmBriefSchema = EventBriefSchema.extend({
+/** Three grounds, matching the three scenes that take one. See types.ts. */
+export const EventCmVisualsSchema = z.object({
+  value: EventPhotoSchema.nullable(),
+  programs: EventPhotoSchema.nullable(),
+  closing: EventPhotoSchema.nullable(),
+});
+
+/**
+ * Its own object, not `EventBriefSchema.extend(...)`.
+ *
+ * Sharing the value schemas (a photo, a logo, a schedule) is the right kind of
+ * sharing; inheriting event-promo's FIELD LIST was not — it is what gave
+ * event-cm `sideCopy`, `visuals.inkArt` and `visuals.texture`, none of which any
+ * event-cm scene draws (types.ts header).
+ *
+ * The rename does the cleanup by itself: zod strips unknown keys and every write
+ * path saves `validateBrief`'s output, so the three dead fields leave the stored
+ * briefs the next time one is saved. No migration — they are null in every row
+ * and nothing reads them, so there is nothing to preserve or to break.
+ */
+export const EventCmBriefSchema = z.object({
+  presenter: z.string(),
+  seriesLabel: z.string(),
+  title: z.string(),
+  subtitle: z.string(),
+  valueLines: z.array(z.string()),
+  valueChip: z.string().nullable(),
+  programsHeading: z.string(),
+  programs: z.array(EventProgramSchema),
+  guestsHeading: z.string(),
+  guests: z.array(EventGuestSchema),
+  schedule: EventScheduleSchema,
+  cta: z.string(),
+  footnote: z.string().nullable(),
+  logos: z.array(EventLogoSchema),
+  visuals: EventCmVisualsSchema,
+  bgm: z.string().nullable(),
   provenance: EventCmProvenanceSchema.optional(),
   theme: EventCmThemeSchema.optional(),
   factsUpdatedAt: z.string().optional(),

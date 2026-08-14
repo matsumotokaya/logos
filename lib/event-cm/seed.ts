@@ -79,12 +79,13 @@ export function seedEventCmBrief(
   inferred("schedule.time", `${archetype.kind}に多い開始時刻`);
   inferred("cta");
 
-  // Slots the pool can dress. A null here is not a hole: the composition
+  // The one slot the pool can dress. A null here is not a hole: the composition
   // draws a designed substitute, which is the template's whole premise.
-  const inkArt = defaultAsset("ink_art", archetype.tone);
-  const texture = defaultAsset("texture", archetype.tone);
+  //
+  // Ink art and texture used to be seeded here too. Neither is drawn by any
+  // event-cm scene — they were event-promo's, inherited by an `extends` that has
+  // since been removed (remotion/event-cm/types.ts).
   const bgm = defaultAsset("bgm", archetype.tone);
-  if (inkArt) inferred("visuals.inkArt", "デフォルトアセット");
   if (bgm) inferred("bgm", "デフォルトアセット");
 
   if (brand.logoSrc) fromBrand("logos");
@@ -106,7 +107,6 @@ export function seedEventCmBrief(
     seriesLabel: archetype.seriesLabel,
     title: archetype.titleFor(subject),
     subtitle: archetype.subtitle,
-    sideCopy: null,
     valueLines: [...archetype.valueLines],
     valueChip: archetype.valueChip,
     programsHeading: `${archetype.programs.length}つのプログラム`,
@@ -127,11 +127,9 @@ export function seedEventCmBrief(
     footnote: null,
     logos: [{ name: brand.name, src: brand.logoSrc ?? null }],
     visuals: {
-      inkArt: inkArt?.src ?? null,
       value: null,
       programs: null,
       closing: null,
-      texture: texture?.src ?? null,
     },
     bgm: bgm?.src ?? null,
     theme: {

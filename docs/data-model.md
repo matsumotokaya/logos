@@ -116,6 +116,10 @@ Takeは以下を必須とする。
 
 `brief.scenario`は**必須**(zodスキーマ [../remotion/event-cm/brief-schema.ts](../remotion/event-cm/brief-schema.ts) で non-optional)。読み手が`scenario?.`と防御しないのはこのため——例外は`eventCmFilm()`の1箇所だけで、そこは「常に答える導出」であることを守るために欠損を空シナリオとして扱う。
 
+**`EventCmBrief`は`EventBrief`(event-promo)を継承しない**。共有するのは値の型(`EventPhoto` / `EventLogo` / `EventGuest` / `EventProgram` / `EventSchedule`)だけで、フィールドの一覧は別。継承していた頃は`sideCopy` / `visuals.inkArt` / `visuals.texture`という**どのシーンも描かない3つ**を持ち、それが goal と fact list に並んでいた。以後の規則: **ブリーフに足したフィールドは、どこかのシーンが読むこと**。
+
+**briefのキーを消すときは migration が要らないことが多い**。zod 4 の `z.object()` は未知キーを strip し、書き込み経路はすべて `validateBrief` の**出力**を保存するので、次に保存された時点で消える。**キーを増やす/改名するときは焼き替えが必要**(strip では足せない)——その場合は上記のとおり`brief`と`baked_brief`の両方に当てる。
+
 **`product-cm`はまだ`cm_script`のまま**。同じ「各シーンの主文」構造だが、共通語彙にするかは未決定([event-cm-refactor-plan.md §9.10](event-cm-refactor-plan.md))。共有コードの [../lib/narration/voice.ts](../lib/narration/voice.ts) はどちらの綴りも知らない。
 
 ## 5. Templateと成果物

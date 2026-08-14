@@ -76,7 +76,10 @@ type VideoAsset = {
   published: boolean;
   publicUrl: string | null;
   briefSlug: string | null;
-  brief: EventBrief | Record<string, unknown> | null;
+  /** One of the known template shapes, or an unknown record for the rest. Both
+   *  event briefs are named because they are no longer one type: `EventCmBrief`
+   *  stopped extending `EventBrief` (remotion/event-cm/types.ts). */
+  brief: EventBrief | EventCmBrief | Record<string, unknown> | null;
   /** The brief a run fixed — what the player runs. Null = never run. */
   bakedBrief: Record<string, unknown> | null;
   bakedAt: string | null;
@@ -732,17 +735,29 @@ export default function BrandVideoDetail({
       const ok = await runStage(stage);
       if (!ok) return;
     }
+    await runFilmSteps({ redo });
+  }
 
-    // Decided from the brief the reading stages just wrote, not from the one
-    // the page held when the button was pressed: the mapping stage may have
-    // rewritten the scenario, which changes what is left to do.
+  /**
+   * The film half of the chain: scenario → voice → fix.
+   *
+   * Its own function because two controls reach it — the one button, and the
+   * mapping drawer's step into the film stage (§9.6). Both ask
+   * `pendingFilmSteps` rather than deciding for themselves, so a drawer cannot
+   * run something the badge did not count.
+   *
+   * Reads the brief BACK before deciding, never the one the page was holding:
+   * the mapping stage may have just rewritten the scenario, which changes what
+   * is left to do.
+   */
+  async function runFilmSteps(options: { redo?: boolean } = {}): Promise<boolean> {
     const fresh = await load();
     const working = fresh?.video.brief as EventCmBrief | undefined;
-    if (!working || fresh?.video.template !== "event-cm") return;
+    if (!working || fresh?.video.template !== "event-cm") return false;
     const steps = pendingFilmSteps(
       working,
       (fresh.video.bakedBrief ?? null) as EventCmBrief | null,
-      { redo },
+      options,
     );
 
     for (const step of steps) {
@@ -752,8 +767,9 @@ export default function BrandVideoDetail({
           : step === "voice"
             ? await speakScenario()
             : await bakeFilm();
-      if (!ok) return;
+      if (!ok) return false;
     }
+    return true;
   }
 
   // The API keeps structure and map as separate, auditable runs. From the
@@ -1052,6 +1068,13 @@ export default function BrandVideoDetail({
                   onRun={(stage) =>
                     void (stage === "structure" ? runStructureAndMap() : runStage(stage))
                   }
+                  // The last step of the chain, reachable from the stage before
+                  // it — same shape as every other drawer's step out (§9.6).
+                  // Never `redo`: an explicit re-run of a finished film is the
+                  // page-level button's job, and this one is disabled once the
+                  // film has nothing outstanding.
+                  onRunFilm={() => void runFilmSteps()}
+                  filmSteps={filmSteps}
                   onOpenStage={(stage) => setOpenStage(stage)}
                   onRewriteScenario={() => void writeScenario()}
                 />

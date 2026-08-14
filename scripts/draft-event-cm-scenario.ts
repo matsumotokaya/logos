@@ -7,7 +7,11 @@
 //   npm run event-cm:draft -- --take <UUID> [--notes "主催者の補足"]
 
 import { createAdminSupabase } from "@/lib/supabase/server";
-import { draftEventCmScenario, eventCmScenarioAvailable } from "@/lib/event-cm/scenario";
+import {
+  draftEventCmScenario,
+  eventCmScenarioAvailable,
+  type EventCmScenarioInput,
+} from "@/lib/event-cm/scenario";
 import {
   EVENT_CM_CHARS_PER_SECOND,
   EVENT_CM_MAX_CHARS,
@@ -16,7 +20,6 @@ import {
   scenarioBudgetIssues,
   scenarioChars,
 } from "@/remotion/event-cm/types";
-import type { EventBrief } from "@/remotion/event/types";
 
 const args = process.argv.slice(2);
 const flag = (name: string): string | null => {
@@ -45,7 +48,7 @@ async function main() {
     throw new Error(`イベントTakeではありません: ${data.template_id}`);
   }
 
-  const brief = data.brief as EventBrief;
+  const brief = data.brief as EventCmScenarioInput;
   const draft = await draftEventCmScenario(brief, {
     notes: flag("notes"),
     now: new Date().toISOString(),

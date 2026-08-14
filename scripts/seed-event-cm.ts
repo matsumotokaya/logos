@@ -86,7 +86,7 @@ async function main() {
   console.log(`登壇者     ${brief.guests.length === 0 ? "—（捏造しない）" : ""}`);
   console.log(`CTA        ${brief.cta}`);
   console.log(
-    `素材       ロゴ ${brief.logos[0]?.src ?? "なし（明朝のクレジットで代替）"} / BGM ${brief.bgm ?? "なし"} / 墨書 ${brief.visuals.inkArt ?? "なし"}`,
+    `素材       ロゴ ${brief.logos[0]?.src ?? "なし（明朝のクレジットで代替）"} / BGM ${brief.bgm ?? "なし"}`,
   );
 
   const state = eventCmGoalState(brief);
