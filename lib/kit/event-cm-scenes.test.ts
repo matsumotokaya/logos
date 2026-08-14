@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { scenesForRole } from "@/remotion/kit/scenes/event-cm";
+import { sceneForRole } from "@/remotion/kit/scenes/event-cm";
 import { fitScene } from "@/remotion/kit/fit";
 import { LAYOUTS, overCapacity } from "@/remotion/kit/layout";
 import { SUMI_THEME, themeForBrand } from "@/remotion/kit/theme";
-import { EVENT_CM_SCENE_ROLES, type EventCmBrief } from "@/remotion/event-cm/types";
+import {
+  eventCmNarratedSteps,
+  eventCmSceneBudget,
+  eventCmSceneKey,
+  eventCmScenePlan,
+  type EventCmBrief,
+} from "@/remotion/event-cm/types";
 import { seedEventCmBrief } from "@/lib/event-cm/seed";
 
 // The acceptance test for the whole rewrite: can the vocabulary rebuild
@@ -56,19 +62,56 @@ const SAKE: EventCmBrief = {
 };
 
 const allScenes = (brief: EventCmBrief) =>
-  EVENT_CM_SCENE_ROLES.flatMap((role) => scenesForRole(role, brief));
+  eventCmScenePlan(brief).map((step) => sceneForRole(step.role, brief));
 
-test("日本酒のブリーフはすべての拍でシーンを生む", () => {
-  for (const role of EVENT_CM_SCENE_ROLES) {
-    const scenes = scenesForRole(role, SAKE);
-    assert.ok(scenes.length > 0, `${role} にシーンが無い`);
-    assert.ok(scenes.every((scene) => scene.components.length > 0), `${role} が空`);
+test("日本酒のブリーフはすべてのシーンに中身がある", () => {
+  for (const step of eventCmScenePlan(SAKE)) {
+    const scene = sceneForRole(step.role, SAKE);
+    assert.ok(scene.components.length > 0, `${step.role} が空`);
   }
 });
 
-test("登壇者がいる拍は2シーンに割れる", () => {
-  assert.equal(scenesForRole("program", SAKE).length, 2);
-  assert.equal(scenesForRole("program", { ...SAKE, guests: [] }).length, 1);
+test("墨の地に乗るロゴは白抜きになる", () => {
+  // The bug this exists to catch: the kit ignored `treatment` entirely, so a
+  // black brand SVG was drawn as a black mark on the ink ground.
+  const mark = sceneForRole("logoIn", SAKE).components.find(
+    (component) => component.kind === "logo",
+  );
+  assert.ok(mark && mark.kind === "logo");
+  assert.equal(mark.treatment, "knockout", "冒頭のロゴが白抜き指定になっていない");
+
+  // The brief's own instruction wins where it has one.
+  const stated = sceneForRole("logoIn", {
+    ...SAKE,
+    logos: [{ name: "レオパレス21", src: "material:d", treatment: "light" }],
+  }).components.find((component) => component.kind === "logo");
+  assert.ok(stated && stated.kind === "logo");
+  assert.equal(stated.treatment, "light");
+
+  // The closing credits row sits on the same ground.
+  const row = sceneForRole("cta", SAKE).components.find(
+    (component) => component.kind === "logoRow",
+  );
+  assert.ok(row && row.kind === "logoRow");
+  assert.equal(
+    row.logos.every((logo) => logo.treatment !== undefined),
+    true,
+    "クレジット列に扱いの指定が無いロゴがある",
+  );
+});
+
+test("1つの役割は1枚の絵になる", () => {
+  // One picture per role, always. Speakers are their own scene, and the plan —
+  // not the builder — is what drops them when nobody is announced.
+  assert.equal(
+    eventCmScenePlan(SAKE).filter((step) => step.role === "guests").length,
+    1,
+  );
+  assert.equal(
+    eventCmScenePlan({ ...SAKE, guests: [] }).filter((step) => step.role === "guests")
+      .length,
+    0,
+  );
 });
 
 test("実データのどのシーンも、部品を落とさずに組める", () => {
@@ -123,7 +166,7 @@ test("配置が一種類に偏らない（スライドデッキに見えない�
 });
 
 test("未確定の事実は画面に出ない", () => {
-  const cta = scenesForRole("cta", SAKE)[0];
+  const cta = sceneForRole("cta", SAKE);
   const texts = cta.components.flatMap((component) =>
     component.kind === "body" ? [component.text] : [],
   );
@@ -133,6 +176,41 @@ test("未確定の事実は画面に出ない", () => {
     cta.components.some((component) => component.kind === "datetime"),
     true,
   );
+});
+
+test("写真があれば地として敷き、無ければ墨の地のまま", () => {
+  // The sake film's own treatment: the promise stands ON its photograph, the
+  // programme list stands IN the room it was photographed in.
+  const value = sceneForRole("value", SAKE);
+  assert.equal(value.backdrop?.photo.src, "material:i");
+  assert.equal(value.backdrop?.weight, "hero");
+
+  const program = sceneForRole("program", SAKE);
+  assert.equal(program.backdrop?.photo.src, "material:j");
+  assert.equal(program.backdrop?.weight, "support");
+
+  const cta = sceneForRole("cta", SAKE);
+  assert.equal(cta.backdrop?.photo.src, "material:k");
+  assert.equal(cta.backdrop?.weight, "support");
+
+  // The two silent plates never take one: they exist to show whose film this
+  // is, and a photograph behind the mark answers a different question.
+  assert.equal(sceneForRole("logoIn", SAKE).backdrop, undefined);
+  assert.equal(sceneForRole("logoOut", SAKE).backdrop, undefined);
+
+  const bare: EventCmBrief = {
+    ...SAKE,
+    visuals: { inkArt: null, value: null, programs: null, closing: null, texture: null },
+  };
+  for (const role of ["value", "program", "cta"] as const) {
+    assert.equal(sceneForRole(role, bare).backdrop, undefined);
+  }
+});
+
+test("地の減光はテーマが決める（シーンは役割だけを言う）", () => {
+  assert.ok(SUMI_THEME.backdrop.opacity.hero > SUMI_THEME.backdrop.opacity.support);
+  const [from, to] = SUMI_THEME.backdrop.push;
+  assert.ok(to > from, "寄りが止まっている");
 });
 
 test("素材がゼロでも全シーンが成立する", () => {
@@ -176,4 +254,65 @@ test("すべての配置が実際に使われているわけではない（未�
   // Not a failure — a record. Left-right splits are unused by this film, so
   // the next template that needs one is exercising untested ground.
   assert.ok(unused.length > 0);
+});
+
+test("プログラムが複数あれば、1つずつ1コマで紹介する", () => {
+  const plan = eventCmScenePlan(SAKE);
+  const roles = plan.map((step) => step.role);
+  // Three programmes, three programme pictures — and the speaker scene still
+  // exists because speakers were announced.
+  assert.deepEqual(roles, [
+    "logoIn",
+    "title",
+    "value",
+    "program",
+    "program",
+    "program",
+    "guests",
+    "cta",
+    "logoOut",
+  ]);
+  assert.deepEqual(
+    plan.filter((step) => step.role === "program").map((step) => step.index),
+    [0, 1, 2],
+  );
+
+  // Each picture shows its own programme, numbered, and nothing about the
+  // others: the number reads as "which of how many" without a word.
+  const second = sceneForRole("program", SAKE, 1);
+  const lines = second.components.find((component) => component.kind === "lines");
+  assert.deepEqual(lines?.kind === "lines" ? lines.lines : [], [SAKE.programs[1].title]);
+  const stat = second.components.find((component) => component.kind === "stat");
+  assert.equal(stat?.kind === "stat" ? stat.value : null, "2");
+  assert.equal(stat?.kind === "stat" ? stat.unit : null, "/ 3");
+  for (const scene of [sceneForRole("program", SAKE, 0), second]) {
+    const fit = fitScene(scene.components, SUMI_THEME);
+    assert.deepEqual(fit.dropped, [], "プログラムのコマで部品が落ちている");
+  }
+});
+
+test("プログラムが1つなら、コマも1つ（既存のTakeは変わらない）", () => {
+  const one: EventCmBrief = { ...SAKE, programs: [SAKE.programs[0]] };
+  const plan = eventCmScenePlan(one);
+  assert.equal(plan.filter((step) => step.role === "program").length, 1);
+  // Unindexed, so a script written before this change still lines up.
+  assert.equal(plan.find((step) => step.role === "program")?.index, undefined);
+  const scene = sceneForRole("program", one);
+  assert.ok(scene.components.some((component) => component.kind === "list"));
+});
+
+test("プログラムのコマは、その分だけ台本の行を要求する", () => {
+  const steps = eventCmNarratedSteps(SAKE);
+  assert.deepEqual(steps.map(eventCmSceneKey), [
+    "title",
+    "value",
+    "program#0",
+    "program#1",
+    "program#2",
+    "guests",
+    "cta",
+  ]);
+  // The first programme picture gets more room because it also introduces the
+  // set; the others say one thing each.
+  assert.ok(eventCmSceneBudget(steps[2]).max > eventCmSceneBudget(steps[3]).max);
 });

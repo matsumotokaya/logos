@@ -23,6 +23,10 @@ export async function videoFetch(path: string, init?: RequestInit): Promise<Resp
   if (!token) throw new VideoAuthRequiredError();
   return fetch(path, {
     ...init,
+    // Video detail and pipeline reads are mutable read models. Without this,
+    // a post-save reload can reuse the previous brief and leave the storyboard
+    // behind even though the database and the rendered video are current.
+    cache: init?.cache ?? "no-store",
     headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
   });
 }

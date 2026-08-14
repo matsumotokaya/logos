@@ -1,10 +1,11 @@
 import {
   EVENT_CM_CHARS_PER_SECOND,
   EVENT_CM_SCENE_BUDGET,
-  EVENT_CM_SCENE_ROLES,
-  sceneChars,
+  eventCmSceneKey,
+  eventCmScenePlan,
   type EventCmBrief,
   type EventCmSceneRole,
+  type EventCmSceneStep,
 } from "./types";
 
 // How long each scene runs.
@@ -23,6 +24,8 @@ import {
 
 export interface SceneTiming {
   role: EventCmSceneRole;
+  /** Which item, when the role repeats (programmes). */
+  index?: number;
   fromMs: number;
   durationMs: number;
 }
@@ -43,69 +46,141 @@ export interface EventCmTimeline {
 const budgetMs = (role: EventCmSceneRole): number => {
   const budget = EVENT_CM_SCENE_BUDGET[role];
   const chars = (budget.min + budget.max) / 2;
-  return Math.round((chars / EVENT_CM_CHARS_PER_SECOND) * 1000);
+  return (
+    Math.round((chars / EVENT_CM_CHARS_PER_SECOND) * 1000) + EVENT_CM_SCENE_GAP_MS
+  );
 };
 
 /** A beat needs long enough to be read even when its line is short. */
 const MIN_SCENE_MS = 2500;
 
 /**
- * Music alone before anyone speaks.
+ * The opening: the presenter's mark, with music alone.
  *
- * A film that starts talking on frame one has no opening. The lead-in is what
- * lets the BGM establish the tone and then step back — which is also the only
- * moment in the film where the music is at full level.
+ * A film that starts talking on frame one has no opening, and a viewer who
+ * reaches the end without knowing whose film it was has been told nothing about
+ * the brand. This is also the only moment where the music plays at full level.
+ *
+ * Four seconds, not the second and a half it started as. A mark that appears and
+ * vanishes inside a second reads as a glitch rather than a credit — long enough
+ * to be recognised is the whole requirement.
  */
-export const EVENT_CM_INTRO_MS = 1400;
+export const EVENT_CM_INTRO_MS = 4000;
+
+/** The close: the mark again, fading, with the music coming back up. */
+export const EVENT_CM_OUTRO_MS = 4000;
+
+/**
+ * The pause after each narrated scene.
+ *
+ * Each picture is a chapter, and chapters need air between them: without it the
+ * film reads as one breathless run-on, and the next line starts before the last
+ * one has landed. The music does not stop — only the voice waits.
+ *
+ * The voice generator inserts the same gap between its sections
+ * (app/api/.../voice/route.ts), so the pre-recording estimate and the measured
+ * track describe the same rhythm rather than two different films.
+ *
+ * The consequence is a longer film: 30 seconds was never the requirement, the
+ * right length is. Forty-five is fine.
+ */
+export const EVENT_CM_SCENE_GAP_MS = 900;
+
+const silentMs = (role: EventCmSceneRole): number =>
+  role === "logoIn" ? EVENT_CM_INTRO_MS : EVENT_CM_OUTRO_MS;
 
 export function eventCmTimeline(brief: EventCmBrief): EventCmTimeline {
-  const intro = EVENT_CM_INTRO_MS;
-  const voiceScenes = brief.voice?.track.scenes;
+  const plan = eventCmScenePlan(brief);
+  const narrated = plan.filter((step) => step.narrated);
+  // Keyed by scene identity, not by role: three programme pictures are three
+  // different lines, and looking them up by role would give all three the first
+  // one's length.
+  const spoken = new Map(
+    brief.script.scenes.map((scene) => [eventCmSceneKey(scene), scene.text]),
+  );
+  // Any line at all means the timing is being read from the script; a scene with
+  // nothing written falls back to its budget on its own (see `writtenMs`).
+  const written = narrated.some(
+    (step) => (spoken.get(eventCmSceneKey(step)) ?? "").trim().length > 0,
+  );
 
-  if (voiceScenes && voiceScenes.length === EVENT_CM_SCENE_ROLES.length) {
-    // Measured timing, pushed back by the lead-in so the music opens alone.
-    const scenes = EVENT_CM_SCENE_ROLES.map((role, i) => ({
-      role,
-      fromMs: voiceScenes[i].startMs + (i === 0 ? 0 : intro),
-      durationMs: voiceScenes[i].durationMs + (i === 0 ? intro : 0),
-    }));
-    const voiceTotal =
-      brief.voice?.track.totalMs ??
-      voiceScenes.reduce((total, scene) => total + scene.durationMs, 0);
-    return {
-      scenes,
-      totalMs: voiceTotal + intro,
-      source: "voice",
-      narrationStartMs: intro,
-      narrationEndMs: intro + voiceTotal,
-    };
+  const track = brief.voice?.track;
+  const measured = track && track.scenes.length === narrated.length ? track : null;
+
+  // Per role, not per film. A flyer that names a speaker adds a scene the script
+  // has no line for yet, and collapsing every other scene back to its budget
+  // because of that one would throw away timings that are still right.
+  const writtenMs = (step: EventCmSceneStep): number => {
+    const text = (spoken.get(eventCmSceneKey(step)) ?? "").replace(/\s/g, "");
+    if (text.length === 0) return budgetMs(step.role);
+    return (
+      Math.max(
+        MIN_SCENE_MS,
+        Math.round((text.length / EVENT_CM_CHARS_PER_SECOND) * 1000),
+      ) + EVENT_CM_SCENE_GAP_MS
+    );
+  };
+
+  // Measured: the narration's own boundaries decide the cuts, so a scene lasts
+  // until the next line starts rather than until its own audio stops. A gap
+  // between lines would otherwise show an empty stage for a beat.
+  const spans = measured
+    ? narrated.map((step, at) => {
+        const start = EVENT_CM_INTRO_MS + measured.scenes[at].startMs;
+        const nextStart =
+          at + 1 < measured.scenes.length
+            ? EVENT_CM_INTRO_MS + measured.scenes[at + 1].startMs
+            : EVENT_CM_INTRO_MS +
+              (measured.totalMs ??
+                measured.scenes.reduce((total, scene) => total + scene.durationMs, 0));
+        return { step, durationMs: Math.max(1, nextStart - start) };
+      })
+    : narrated.map((step) => ({ step, durationMs: writtenMs(step) }));
+
+  const byKey = new Map(spans.map((span) => [eventCmSceneKey(span.step), span]));
+  const scenes: SceneTiming[] = [];
+  let cursor = 0;
+  for (const step of plan) {
+    const durationMs = step.narrated
+      ? (byKey.get(eventCmSceneKey(step))?.durationMs ?? budgetMs(step.role))
+      : silentMs(step.role);
+    // Laid end to end whatever the source: the measured spans are already
+    // contiguous, and reading them through the cursor keeps one rule for where a
+    // scene starts.
+    scenes.push({
+      role: step.role,
+      ...(step.index === undefined ? {} : { index: step.index }),
+      fromMs: cursor,
+      durationMs,
+    });
+    cursor += durationMs;
   }
 
-  const written = brief.script.scenes.length === EVENT_CM_SCENE_ROLES.length;
-  let fromMs = 0;
-  const scenes = EVENT_CM_SCENE_ROLES.map((role, i) => {
-    const spoken = written
-      ? Math.max(
-          MIN_SCENE_MS,
-          Math.round((sceneChars(brief.script.scenes[i]) / EVENT_CM_CHARS_PER_SECOND) * 1000),
-        )
-      : budgetMs(role);
-    // The lead-in rides on the opening scene, so the film's first picture is
-    // already up while the music plays alone.
-    const durationMs = i === 0 ? spoken + intro : spoken;
-    const timing = { role, fromMs, durationMs };
-    fromMs += durationMs;
-    return timing;
-  });
+  const spokenScenes = scenes.filter((scene) => scene.role !== "logoIn" && scene.role !== "logoOut");
+  const first = spokenScenes[0];
+  const last = spokenScenes[spokenScenes.length - 1];
 
   return {
     scenes,
-    totalMs: fromMs,
-    source: written ? "script" : "budget",
-    narrationStartMs: intro,
-    narrationEndMs: fromMs,
+    totalMs: cursor,
+    source: measured ? "voice" : written ? "script" : "budget",
+    narrationStartMs: first?.fromMs ?? EVENT_CM_INTRO_MS,
+    narrationEndMs: last ? last.fromMs + last.durationMs : cursor,
   };
 }
 
+/**
+ * A length in frames. Never zero — a scene that rounds to no frames at all
+ * would silently not exist.
+ */
 export const msToFrames = (ms: number, fps: number): number =>
   Math.max(1, Math.round((ms / 1000) * fps));
+
+/**
+ * A moment in frames. Distinct from `msToFrames` because a *timestamp* of zero
+ * is zero: clamping it to one frame started the film's first scene at frame 1
+ * and left frame 0 with nothing on it but the background. Invisible at 1/30s,
+ * and wrong — the storyboard found it by asking where the first cut is.
+ */
+export const msToFrame = (ms: number, fps: number): number =>
+  Math.max(0, Math.round((ms / 1000) * fps));

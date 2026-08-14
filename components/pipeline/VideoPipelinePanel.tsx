@@ -75,7 +75,8 @@ export interface VideoPipelinePayload {
 }
 
 const STAGE_DESCRIPTION: Record<PipelineStageId, string> = {
-  input: "この動画のもとになる資料。何も入れていないときは、内容はすべてこちらの提案です。",
+  input:
+    "この動画のもとになる資料を登録し、次の段が読める形へ機械的に展開します。テキストはそのまま読み、PDFや画像は「次の段で直接見る」と印をつけて運びます。内容の意味はここでは判断しません。",
   extract: "資料を機械的に読み取ります。テキストはそのまま読み、PDFや画像は次の段でモデルが直接見ます。",
   structure: "読み取った資料からイベントの事実を取り出し、動画に反映します。資料に書かれていないことは埋めません。",
   map: "いま動画が何でできているか。各項目の由来と、まだ埋まっていないものの一覧です。",
@@ -139,11 +140,13 @@ export default function VideoPipelinePanel({
       {/* The input UI belongs to the input stage and nowhere else. Putting a
           file picker inside 構造化 asked the user to supply material at a step
           that consumes it. */}
+      {/* Input and extraction are one stage: what was supplied, and what
+          reading it produced, read as one thing. */}
       {stageId === "input" && intake ? (
         <section className="border-t border-hairline pt-5">{intake}</section>
       ) : null}
 
-      {stageId === "extract" && extracted ? (
+      {stageId === "input" && extracted ? (
         <section className="border-t border-hairline pt-5">{extracted}</section>
       ) : null}
 

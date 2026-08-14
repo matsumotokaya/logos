@@ -4,7 +4,11 @@ import { proposedDate, seedEventCmBrief } from "./seed";
 import { archetypeFor } from "./archetypes";
 import { eventCmGoalState } from "@/lib/pipeline/event-cm";
 import { validateBrief } from "@/lib/templates/brief-schemas";
-import { EVENT_CM_SCENE_ROLES } from "@/remotion/event-cm/types";
+import {
+  eventCmNarratedSteps,
+  scriptIsStale,
+  type EventCmBrief,
+} from "@/remotion/event-cm/types";
 
 /** The real brand, as it stands in the database after the site import. */
 const WEALTHPARK_LAB = {
@@ -25,31 +29,127 @@ test("シードしたブリーフはテンプレートの形式を満たす", ()
   assert.equal(result.ok, true, result.ok ? "" : result.issues.join(" / "));
 });
 
-test("台本は未着手か5役そろっているかのどちらかしか許さない", () => {
+test("スキーマが拒むのは、映像に置き場のない行だけ", () => {
   const brief = seedFor(WEALTHPARK_LAB);
+  const narrated = eventCmNarratedSteps(brief).map((step) => step.role);
+
   // Not written yet: legal, and what a seeded take looks like.
   assert.equal(validateBrief("event-cm", brief).ok, true);
 
-  // Fully written: legal.
+  // Fully written for this brief. The seeded one announces nobody, so the
+  // speaker scene does not exist and neither does its line.
+  assert.equal(narrated.includes("guests"), false);
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
       script: {
         ...brief.script,
-        scenes: EVENT_CM_SCENE_ROLES.map((role) => ({ role, text: "…" })),
+        scenes: eventCmNarratedSteps(brief).map(({ role, index }) => ({
+          role,
+          ...(index === undefined ? {} : { index }),
+          text: "…",
+        })),
       },
     }).ok,
     true,
   );
 
-  // Half written: nothing produces this on purpose and no renderer can use it.
+  // A line for a silent scene has no picture to sit on.
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      script: { ...brief.script, scenes: [{ role: "hook", text: "…" }] },
+      script: { ...brief.script, scenes: [{ role: "logoIn", text: "…" }] },
     }).ok,
     false,
   );
+
+  // A role may repeat, but only as consecutive indexed pictures — that is what
+  // one-programme-per-picture is. Unindexed repeats are still the same picture
+  // written twice.
+  assert.equal(
+    validateBrief("event-cm", {
+      ...brief,
+      script: {
+        ...brief.script,
+        scenes: [
+          { role: "title", text: "…" },
+          { role: "program", index: 0, text: "…" },
+          { role: "program", index: 1, text: "…" },
+          { role: "cta", text: "…" },
+        ],
+      },
+    }).ok,
+    true,
+  );
+  assert.equal(
+    validateBrief("event-cm", {
+      ...brief,
+      script: {
+        ...brief.script,
+        scenes: [
+          { role: "program", index: 1, text: "…" },
+          { role: "program", index: 0, text: "…" },
+        ],
+      },
+    }).ok,
+    false,
+    "番号が戻るのは並び違い",
+  );
+
+  // The same scene twice, and scenes out of film order.
+  assert.equal(
+    validateBrief("event-cm", {
+      ...brief,
+      script: {
+        ...brief.script,
+        scenes: [
+          { role: "title", text: "…" },
+          { role: "title", text: "…" },
+        ],
+      },
+    }).ok,
+    false,
+  );
+  assert.equal(
+    validateBrief("event-cm", {
+      ...brief,
+      script: {
+        ...brief.script,
+        scenes: [
+          { role: "cta", text: "…" },
+          { role: "title", text: "…" },
+        ],
+      },
+    }).ok,
+    false,
+  );
+});
+
+test("シーンが増えたら、保存を拒まず「台本が古い」と言う", () => {
+  // The flow this protects: drop in a flyer that names a speaker. The film gains
+  // a scene the script has no line for, and refusing to save the speaker would
+  // be the wrong answer to a fact somebody just supplied.
+  const brief = seedFor(WEALTHPARK_LAB);
+  const scripted: EventCmBrief = {
+    ...brief,
+    script: {
+      ...brief.script,
+      scenes: eventCmNarratedSteps(brief).map(({ role, index }) => ({
+        role,
+        ...(index === undefined ? {} : { index }),
+        text: "…",
+      })),
+      updatedAt: "2026-08-13T00:00:00.000Z",
+    },
+  };
+  assert.equal(scriptIsStale(scripted), false);
+
+  const withGuest: EventCmBrief = {
+    ...scripted,
+    guests: [{ name: "宮尾 佳明", role: "宮尾酒造 十一代目当主", photo: null }],
+  };
+  assert.equal(validateBrief("event-cm", withGuest).ok, true, "保存は通る");
+  assert.equal(scriptIsStale(withGuest), true, "台本は古いと分かる");
 });
 
 test("提案する日付は4週間以上先の最初の金曜日", () => {

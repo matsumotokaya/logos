@@ -2,7 +2,7 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import AppHeader from "@/components/AppHeader";
 import { authedFetch } from "@/app/campaigns/campaign-ui";
@@ -12,6 +12,26 @@ import type {
 } from "@/lib/brand-hierarchy";
 import { cn } from "@/lib/cn";
 import { BRAND_TREE_REFRESH_EVENT } from "@/lib/brand-events";
+import {
+  brandActions,
+  logoActions,
+  organizationActions,
+  takeActions,
+  type TreeActionId,
+} from "@/lib/brand-tree-actions";
+import RowActionsMenu from "./RowActionsMenu";
+import TreeDeleteDialog, {
+  type AtRiskMaterial,
+  type MaterialChoice,
+} from "./TreeDeleteDialog";
+import {
+  deleteTreeNode,
+  duplicateTreeNode,
+  pathAfterDelete,
+  pathAfterDuplicate,
+  viewingTarget,
+  type TreeTarget,
+} from "./tree-row-actions";
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
@@ -99,6 +119,34 @@ function countBrands(organizations: BrandOrganizationSummary[]) {
   );
 }
 
+/** What blocks this Organization's deletion, counted from the tree the sidebar
+ *  already has. The DELETE route counts the same things again — this is the
+ *  sentence in the menu, not the authority. */
+function organizationFacts(organization: BrandOrganizationSummary) {
+  // The Organization's own primary corporate brand goes with it (that is what
+  // the DELETE route removes); every other brand has to be moved first.
+  const retained = organization.brands.filter(
+    (brand) => brand.kind === "corporate" && brand.isPrimary,
+  );
+  return {
+    movableBrandCount: organization.brands.length - retained.length,
+    retainedLogoCount: retained.reduce(
+      (total, brand) =>
+        total +
+        brand.logos.filter((logo) => logo.subjectEntityId === brand.id).length,
+      0,
+    ),
+    retainedAssetCount: retained.reduce(
+      (total, brand) =>
+        total +
+        brand.assets.filter(
+          (asset) => asset.kind === "video" || asset.kind === "lp",
+        ).length,
+      0,
+    ),
+  };
+}
+
 function TreeLink({
   href,
   active,
@@ -139,6 +187,7 @@ function BrandTree({
   prefix,
   onToggle,
   onNavigate,
+  onAction,
 }: {
   brand: BrandSummary;
   pathname: string;
@@ -146,6 +195,7 @@ function BrandTree({
   prefix: string;
   onToggle: () => void;
   onNavigate: () => void;
+  onAction: (target: TreeTarget, action: TreeActionId) => void;
 }) {
 const regionId = `${prefix}-brand-${brand.id}`;
   const brandActive = pathname === `/brands/${brand.id}`;
@@ -202,6 +252,25 @@ const regionId = `${prefix}-brand-${brand.id}`;
             </span>
           </TreeLink>
         </div>
+        <RowActionsMenu
+          label={brand.name}
+          actions={brandActions({
+            logoCount: ownedLogos.length,
+            videoCount: videoAssets.length,
+            lpCount: lpAssets.length,
+          })}
+          onSelect={(action) =>
+            onAction(
+              {
+                kind: "brand",
+                id: brand.id,
+                name: brand.name,
+                organizationId: brand.organizationId,
+              },
+              action,
+            )
+          }
+        />
       </div>
 
       <ul id={regionId} hidden={!open} className="mt-1 space-y-1">
@@ -221,15 +290,33 @@ const regionId = `${prefix}-brand-${brand.id}`;
           {ownedLogos.length > 0 ? (
             <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-hairline pl-2">
               {ownedLogos.map((logo) => (
-                <li key={logo.id}>
-                  <TreeLink
-                    href={`/brands/${brand.id}/logos/${logo.id}`}
-                    active={pathname === `/brands/${brand.id}/logos/${logo.id}`}
-                    depth={2}
-                    onNavigate={onNavigate}
-                  >
-                    {logo.title}
-                  </TreeLink>
+                <li key={logo.id} className="flex min-w-0 items-center gap-0.5">
+                  <div className="min-w-0 flex-1">
+                    <TreeLink
+                      href={`/brands/${brand.id}/logos/${logo.id}`}
+                      active={pathname === `/brands/${brand.id}/logos/${logo.id}`}
+                      depth={2}
+                      onNavigate={onNavigate}
+                    >
+                      {logo.title}
+                    </TreeLink>
+                  </div>
+                  <RowActionsMenu
+                    label={logo.title}
+                    actions={logoActions()}
+                    compact
+                    onSelect={(action) =>
+                      onAction(
+                        {
+                          kind: "logo",
+                          id: logo.id,
+                          name: logo.title,
+                          brandId: brand.id,
+                        },
+                        action,
+                      )
+                    }
+                  />
                 </li>
               ))}
             </ul>
@@ -254,15 +341,41 @@ const regionId = `${prefix}-brand-${brand.id}`;
               {videoAssets.map((asset) => {
                 const videoPath = `/brands/${brand.id}/video/${asset.id}`;
                 return (
-                  <li key={`video-asset-${asset.id}`}>
-                    <TreeLink
-                      href={videoPath}
-                      active={pathname === videoPath}
-                      depth={2}
-                      onNavigate={onNavigate}
-                    >
-                      {asset.title}
-                    </TreeLink>
+                  <li
+                    key={`video-asset-${asset.id}`}
+                    className="flex min-w-0 items-center gap-0.5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <TreeLink
+                        href={videoPath}
+                        active={pathname === videoPath}
+                        depth={2}
+                        onNavigate={onNavigate}
+                      >
+                        {asset.title}
+                      </TreeLink>
+                    </div>
+                    <RowActionsMenu
+                      label={asset.title}
+                      actions={takeActions("video", {
+                        // publicPath is set only by a live canonical
+                        // publication, which is exactly what delete_take
+                        // refuses on.
+                        published: asset.publicPath !== null,
+                      })}
+                      compact
+                      onSelect={(action) =>
+                        onAction(
+                          {
+                            kind: "video",
+                            id: asset.id,
+                            name: asset.title,
+                            brandId: brand.id,
+                          },
+                          action,
+                        )
+                      }
+                    />
                   </li>
                 );
               })}
@@ -302,16 +415,37 @@ const regionId = `${prefix}-brand-${brand.id}`;
             <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-hairline pl-2">
               {lpAssets.map((asset) => {
                 const lpPath = `/brands/${brand.id}/lp/${asset.id}`;
+                const lpTitle = asset.title.replace(/\s+LP$/, "");
                 return (
-                  <li key={asset.id}>
-                    <TreeLink
-                      href={lpPath}
-                      active={pathname === lpPath}
-                      depth={2}
-                      onNavigate={onNavigate}
-                    >
-                      {asset.title.replace(/\s+LP$/, "")}
-                    </TreeLink>
+                  <li key={asset.id} className="flex min-w-0 items-center gap-0.5">
+                    <div className="min-w-0 flex-1">
+                      <TreeLink
+                        href={lpPath}
+                        active={pathname === lpPath}
+                        depth={2}
+                        onNavigate={onNavigate}
+                      >
+                        {lpTitle}
+                      </TreeLink>
+                    </div>
+                    <RowActionsMenu
+                      label={lpTitle}
+                      actions={takeActions("lp", {
+                        published: asset.publicPath !== null,
+                      })}
+                      compact
+                      onSelect={(action) =>
+                        onAction(
+                          {
+                            kind: "lp",
+                            id: asset.id,
+                            name: lpTitle,
+                            brandId: brand.id,
+                          },
+                          action,
+                        )
+                      }
+                    />
                   </li>
                 );
               })}
@@ -332,6 +466,7 @@ function ManagementTree({
   onToggleOrganization,
   onToggleBusiness,
   onNavigate,
+  onAction,
 }: {
   organizations: BrandOrganizationSummary[];
   pathname: string;
@@ -341,6 +476,7 @@ function ManagementTree({
   onToggleOrganization: (id: string) => void;
   onToggleBusiness: (id: string) => void;
   onNavigate: () => void;
+  onAction: (target: TreeTarget, action: TreeActionId) => void;
 }) {
   return (
     <nav aria-label="Organization、事業、ブランドアセット">
@@ -372,6 +508,20 @@ function ManagementTree({
                     {organization.name}
                   </TreeLink>
                 </div>
+                <RowActionsMenu
+                  label={organization.name}
+                  actions={organizationActions(organizationFacts(organization))}
+                  onSelect={(action) =>
+                    onAction(
+                      {
+                        kind: "organization",
+                        id: organization.id,
+                        name: organization.name,
+                      },
+                      action,
+                    )
+                  }
+                />
               </div>
 
               <ul
@@ -388,6 +538,7 @@ function ManagementTree({
                     prefix={prefix}
                     onToggle={() => onToggleBusiness(brand.id)}
                     onNavigate={onNavigate}
+                    onAction={onAction}
                   />
                 ))}
                 {organization.brands.length === 0 ? (
@@ -416,6 +567,7 @@ function SidebarContent({
   onToggleBusiness,
   onNavigate,
   onRetry,
+  onAction,
 }: {
   organizations: BrandOrganizationSummary[];
   pathname: string;
@@ -428,6 +580,7 @@ function SidebarContent({
   onToggleBusiness: (id: string) => void;
   onNavigate: () => void;
   onRetry: () => void;
+  onAction: (target: TreeTarget, action: TreeActionId) => void;
 }) {
   return (
     // pb-28 keeps ~100px of breathing room below the last item so it never
@@ -491,6 +644,7 @@ function SidebarContent({
             onToggleOrganization={onToggleOrganization}
             onToggleBusiness={onToggleBusiness}
             onNavigate={onNavigate}
+            onAction={onAction}
           />
         ) : (
           <div>
@@ -513,12 +667,26 @@ function SidebarContent({
 
 export default function ManagementShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [organizations, setOrganizations] = useState<
     BrandOrganizationSummary[]
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Row actions. The tree is rendered twice (desktop aside, mobile drawer), so
+  // the pending target and its dialog live here — once — rather than inside the
+  // menu that opened them.
+  const [pendingDelete, setPendingDelete] = useState<TreeTarget | null>(null);
+  const [atRiskMaterials, setAtRiskMaterials] = useState<AtRiskMaterial[] | null>(
+    null,
+  );
+  const [materialChoice, setMaterialChoice] = useState<MaterialChoice | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(
+    null,
+  );
   const [expandedOrganizations, setExpandedOrganizations] = useState<
     Set<string>
   >(() => new Set());
@@ -579,6 +747,77 @@ export default function ManagementShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(BRAND_TREE_REFRESH_EVENT, refresh);
   }, [load]);
 
+  // A success notice is not worth a permanent place on screen; an error is not
+  // worth losing before it has been read. Both go after the same delay because
+  // the tree behind them already shows the outcome.
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  const runDuplicate = useCallback(
+    async (target: TreeTarget) => {
+      setNotice({ tone: "ok", text: `「${target.name}」を複製しています…` });
+      const result = await duplicateTreeNode(target);
+      if (!result.ok) {
+        setNotice({ tone: "error", text: result.error });
+        return;
+      }
+      await load();
+      setNotice({ tone: "ok", text: "複製しました" });
+      // Opening the copy is the point: a duplicate you have to go find is a
+      // duplicate you cannot tell apart from the original.
+      setMobileOpen(false);
+      router.push(pathAfterDuplicate(target, result.id));
+    },
+    [load, router],
+  );
+
+  const handleAction = useCallback(
+    (target: TreeTarget, action: TreeActionId) => {
+      if (action === "delete") {
+        setPendingDelete(target);
+        setAtRiskMaterials(null);
+        setMaterialChoice(null);
+        setDeleteError(null);
+        return;
+      }
+      void runDuplicate(target);
+    },
+    [runDuplicate],
+  );
+
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const result = await deleteTreeNode(pendingDelete, materialChoice);
+    setDeleting(false);
+    if (!result.ok) {
+      // The server asked what happens to the material. Staying open turns this
+      // dialog into that question instead of making the user start over — and
+      // the question is not an error, so it does not also appear in red.
+      if (result.atRisk) {
+        setAtRiskMaterials(result.atRisk);
+        setDeleteError(null);
+      } else {
+        setDeleteError(result.error);
+      }
+      return;
+    }
+    const target = pendingDelete;
+    setPendingDelete(null);
+    setAtRiskMaterials(null);
+    setMaterialChoice(null);
+    await load();
+    setNotice({ tone: "ok", text: `「${target.name}」を削除しました` });
+    if (viewingTarget(pathname, target)) {
+      setMobileOpen(false);
+      router.push(pathAfterDelete(target));
+    }
+  }, [pendingDelete, materialChoice, load, pathname, router]);
+
   const toggleOrganization = (id: string) => {
     setExpandedOrganizations((current) => {
       const next = new Set(current);
@@ -607,6 +846,7 @@ export default function ManagementShell({ children }: { children: ReactNode }) {
     onToggleOrganization: toggleOrganization,
     onToggleBusiness: toggleBusiness,
     onRetry: () => void load(),
+    onAction: handleAction,
   };
 
   return (
@@ -674,6 +914,41 @@ export default function ManagementShell({ children }: { children: ReactNode }) {
           {children}
         </div>
       </div>
+
+      {pendingDelete ? (
+        <TreeDeleteDialog
+          open
+          kind={pendingDelete.kind}
+          name={pendingDelete.name}
+          atRiskMaterials={atRiskMaterials}
+          materialChoice={materialChoice}
+          deleting={deleting}
+          error={deleteError}
+          onMaterialChoice={setMaterialChoice}
+          onCancel={() => {
+            setPendingDelete(null);
+            setAtRiskMaterials(null);
+            setMaterialChoice(null);
+            setDeleteError(null);
+          }}
+          onConfirm={() => void confirmDelete()}
+        />
+      ) : null}
+
+      {notice ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={cn(
+            "fixed inset-x-4 bottom-4 z-30 mx-auto w-fit max-w-[min(28rem,calc(100vw-2rem))] rounded-full border px-5 py-2.5 text-pretty text-xs shadow-lg",
+            notice.tone === "error"
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-hairline bg-ink text-white",
+          )}
+        >
+          {notice.text}
+        </div>
+      ) : null}
     </div>
   );
 }

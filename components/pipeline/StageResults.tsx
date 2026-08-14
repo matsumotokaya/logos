@@ -39,33 +39,44 @@ export function ExtractResults({ runs }: { runs: TakeRunRecord[] }) {
 
   if (!run) {
     return (
-      <p className="text-[12px] text-ink-muted">
-        まだ読み取っていません。資料を入れてから実行してください。
-      </p>
+      <div className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium text-ink">抽出ステージの結果</h3>
+        <p className="text-[12px] text-ink-muted">
+          まだ読み取っていません。上の登録資料を入れてから実行してください。
+        </p>
+      </div>
     );
   }
   return (
-    <ul className="flex flex-col gap-1.5">
-      {rows.map((row, i) => (
-        <li
-          key={`${row.label}-${i}`}
-          className="flex items-center gap-3 rounded-lg border border-hairline px-3 py-2 text-sm"
-        >
-          <span
-            className={cn(
-              "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
-              MODE_STYLE[row.mode],
-            )}
+    <div className="flex flex-col gap-3">
+      <div>
+        <h3 className="text-sm font-medium text-ink">抽出ステージの結果</h3>
+        <p className="mt-1 text-[11px] text-ink-muted">
+          上の登録資料を、次の構造化ステージへどう渡したかを表示しています。
+        </p>
+      </div>
+      <ul className="flex flex-col gap-1.5">
+        {rows.map((row, i) => (
+          <li
+            key={`${row.label}-${i}`}
+            className="flex items-center gap-3 rounded-lg border border-hairline px-3 py-2 text-sm"
           >
-            {MODE_LABEL[row.mode]}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-ink">{row.label}</span>
-          <span className="shrink-0 tabular-nums text-[11px] text-ink-faint">
-            {row.mode === "text" ? `${row.chars}字` : (row.note ?? "")}
-          </span>
-        </li>
-      ))}
-    </ul>
+            <span
+              className={cn(
+                "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                MODE_STYLE[row.mode],
+              )}
+            >
+              {MODE_LABEL[row.mode]}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-ink">{row.label}</span>
+            <span className="shrink-0 tabular-nums text-[11px] text-ink-faint">
+              {row.mode === "text" ? `${row.chars}字` : (row.note ?? "")}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

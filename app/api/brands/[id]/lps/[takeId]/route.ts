@@ -2,6 +2,7 @@ import { guardLabsRequest } from "@/lib/labs-access";
 import { signedLabsUrl } from "@/lib/labs-output-sign";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { currentTemplate } from "@/lib/templates/catalog";
+import { deleteTake, parseMaterialDisposition } from "@/lib/takes/delete";
 import {
   ensureCanonicalPublication,
   retireCanonicalPublications,
@@ -213,4 +214,66 @@ export async function PATCH(
     );
   }
   return Response.json({ ok: true });
+}
+
+// Removing an LP for good. Same contract as the video route: `delete_take`
+// decides, this route only proves the take is an LP of this brand.
+export async function DELETE(
+  req: Request,
+  ctx: { params: Promise<{ id: string; takeId: string }> },
+) {
+  const denied = await guardLabsRequest(req);
+  if (denied) return denied;
+  let user;
+  try {
+    user = await requireUser(req);
+  } catch {
+    return unauthorized();
+  }
+  const { id: brandId, takeId } = await ctx.params;
+  const supabase = createServerSupabaseForToken(user.token);
+
+  const url = new URL(req.url);
+  const disposition = parseMaterialDisposition(url.searchParams.get("materials"));
+  if (!disposition) {
+    return Response.json({ error: "素材の扱いが不正です" }, { status: 400 });
+  }
+
+  const { data: take, error: takeError } = await supabase
+    .from("takes")
+    .select("id")
+    .eq("id", takeId)
+    .eq("brand_id", brandId)
+    .eq("tool_kind", "lp")
+    .maybeSingle();
+  if (takeError) {
+    return Response.json({ error: "LPを確認できませんでした" }, { status: 500 });
+  }
+  if (!take) {
+    return Response.json({ error: "LPが見つかりません" }, { status: 404 });
+  }
+
+  const outcome = await deleteTake(supabase, {
+    brandId,
+    takeId: take.id as string,
+    disposition,
+  });
+  if (!outcome.ok) {
+    return Response.json(
+      {
+        error: outcome.error.replace(/^動画/, "LP"),
+        needsMaterialDecision: outcome.needsMaterialDecision,
+      },
+      { status: outcome.status },
+    );
+  }
+
+  return Response.json(
+    {
+      ok: true,
+      cleanupPending: outcome.cleanupPending,
+      promotedMaterials: outcome.promotedMaterials,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

@@ -35,7 +35,7 @@ const seeded: EventCmBrief = {
   logos: [{ name: "WealthPark Lab", src: null }],
   script: {
     version: 1,
-    scenes: [{ role: "hook", text: "数字の向こうに、投資の意味がある。" }],
+    scenes: [{ role: "title", text: "数字の向こうに、投資の意味がある。" }],
     source: "llm",
     updatedAt: "2026-08-11T00:00:00.000Z",
     angle: "投資を人生の側から考え直す夜",

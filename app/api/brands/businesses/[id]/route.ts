@@ -380,3 +380,95 @@ export async function PATCH(
     );
   }
 }
+
+// Removing one Brand.
+//
+// Postgres already refuses this while takes, works or materials point at the
+// brand (`on delete restrict`), and that refusal is the design: a brand is not
+// a folder you can throw away with its contents inside. What Postgres would
+// *not* stop is the quiet damage — `logos.subject_entity_id` and
+// `brand_entities.parent_brand_id` are `on delete set null`, so deleting a brand
+// that still owns a logo or has a child brand would leave them alive and
+// unreachable from any tree. Both are checked here, in front of the FK, so the
+// answer is one sentence about what to do rather than a constraint name.
+export async function DELETE(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const denied = await guardLabsRequest(req);
+  if (denied) return denied;
+  const user = await requireUser(req);
+  const { id } = await ctx.params;
+  const supabase = createServerSupabaseForToken(user.token);
+
+  try {
+    const brand = await supabase
+      .from("brand_entities")
+      .select("id, name, brand_organization_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (brand.error) throw new Error("ブランドを確認できませんでした");
+    if (!brand.data) {
+      return Response.json({ error: "ブランドが見つかりません" }, { status: 404 });
+    }
+
+    const [takes, works, materials, logos, children] = await Promise.all([
+      supabase.from("takes").select("id", { count: "exact", head: true }).eq("brand_id", id),
+      supabase.from("works").select("id", { count: "exact", head: true }).eq("brand_id", id),
+      supabase
+        .from("brand_materials")
+        .select("id", { count: "exact", head: true })
+        .eq("brand_id", id),
+      supabase
+        .from("logos")
+        .select("id", { count: "exact", head: true })
+        .eq("subject_entity_id", id),
+      supabase
+        .from("brand_entities")
+        .select("id", { count: "exact", head: true })
+        .eq("parent_brand_id", id),
+    ]);
+    const countError =
+      takes.error ?? works.error ?? materials.error ?? logos.error ?? children.error;
+    if (countError) throw new Error("関連データを確認できませんでした");
+
+    const blocking: string[] = [];
+    if ((logos.count ?? 0) > 0) blocking.push(`ロゴ${logos.count}件`);
+    if ((takes.count ?? 0) > 0) blocking.push(`動画・LP${takes.count}件`);
+    if ((works.count ?? 0) > 0) blocking.push(`Work${works.count}件`);
+    if ((materials.count ?? 0) > 0) blocking.push(`素材${materials.count}件`);
+    if ((children.count ?? 0) > 0) blocking.push(`子ブランド${children.count}件`);
+    if (blocking.length > 0) {
+      return Response.json(
+        {
+          error: `${blocking.join("・")}が残っているため削除できません。先に削除または移動してください`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const deleted = await supabase
+      .from("brand_entities")
+      .delete()
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
+    if (deleted.error) throw new Error("ブランドを削除できませんでした");
+    if (!deleted.data) {
+      return Response.json(
+        { error: "このブランドを削除する権限がありません" },
+        { status: 403 },
+      );
+    }
+
+    return Response.json(
+      { ok: true, organizationId: brand.data.brand_organization_id },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : "削除できませんでした" },
+      { status: 500 },
+    );
+  }
+}

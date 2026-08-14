@@ -85,7 +85,12 @@ export async function PATCH(
       }
       if (!fromPool && !pinned) {
         return Response.json(
-          { error: "この音源は選べません。デフォルトから選ぶか、素材として追加してください" },
+          {
+            error:
+              path === "bgm"
+                ? "この音源は選べません。デフォルトから選ぶか、素材として追加してください"
+                : "この素材は選べません。先にこの動画へ素材として追加してください",
+          },
           { status: 400 },
         );
       }

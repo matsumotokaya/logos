@@ -1,6 +1,6 @@
 # Logos data model
 
-更新日: 2026-08-10
+更新日: 2026-08-13
 ステータス: **V2稼働構造の正本**
 
 V2の設計・移行判断の履歴は [schema-v2.md](schema-v2.md)、アカウントとRLSの原則は [account-design.md](account-design.md)、成果物アーキテクチャの背景は [deliverable-architecture.md](deliverable-architecture.md) を参照する。本書はmigration 0046適用後の現在形だけを記す。
@@ -114,12 +114,11 @@ event-promo は **Take と `take_inputs` がペアで作成される**設計に�
 
 POST `/api/brands/{id}/videos` の `templateTakeId` パラメータがこの経路を駆動する。`briefSlug`(bundled seed ブリーフ)は互換のため残し、サブセレクト「下敷きにする動画」で brand_organizations 配下の既存 event-promo Takeが選べる。
 
-### 5.2 動画パイプライン(動画詳細の5ステージ)
+### 5.2 動画パイプライン(動画詳細の4ステージ)
 
-`/brands/[id]/video/[videoId]` ページ上部に、Slide-Factory 流の5段ステージを表示する(`lib/pipeline/video.ts` + `components/pipeline/VideoPipelinePanel.tsx`)。
+`/brands/[id]/video/[videoId]` ページ上部に、Slide-Factory 流のステージを表示する(`lib/pipeline/video.ts` + `components/pipeline/VideoPipelinePanel.tsx`)。**入力と抽出は1段**(2026-08-13統合)。
 
-- **input** — `take.brief` の有無
-- **extract** — ブリーフから素材を抽出(現状は将来の予約枠、常 `empty`)
+- **input(入力・抽出)** — pinされた素材と、その読み取り実行。素材があって未読み取りなら `stale`。テキストは決定論で読み、PDF・画像は「次の段で直接見る」と印をつけて運ぶだけ(`lib/event-cm/extract.ts`)。分けていたときは「読み取り成功」で止まった利用者が、反映されない動画を見ることになった
 - **structure** — テンプレートのブリーフスキーマに対する充足率(EventBriefは title / kind / startsAt / venue / headline / ctaLabel 必須)
 - **map** — テンプレートの選択状況(event-promo / product-cm)
 - **output** — `take_renders.status` と `render_artifacts.created_at`(timestamp差分で `stale` 判定)
@@ -138,7 +137,24 @@ POST `/api/brands/{id}/videos` の `templateTakeId` パラメータがこの経�
 
 `presentation_asset_definitions`は利用可能なassetの版と`draft / production`を管理する。ロゴごとの表示順・有効状態・パラメータは`logo-presentation` Takeの`brief.presentation.layout.mappings`、実行履歴は`logo_asset_runs`、現在の生成画像は`logo_mockups`が担う。
 
-## 8. RLSと所有権
+## 8. 削除と複製
+
+削除の可否はスキーマが決めている。`on delete restrict` が置かれているのは「これがあると親を消せない」という宣言であり、UIはそれを言い直すだけで、独自の閾値を持たない。
+
+| 対象 | 削除を止めるもの | 一緒に消えるもの |
+| --- | --- | --- |
+| `brand_organizations` | 子Organization、配下の`brand_entities` | (行のみ。DELETE `/api/brands/[id]` が自分のprimary corporate Brandだけを同時に消す) |
+| `brand_entities` | `takes` / `works` / `brand_materials`。加えて`logos.subject_entity_id`と`brand_entities.parent_brand_id`は`set null`なので、**APIが先に数えて拒否する**(でないと到達不能な行が残る) | Knowledge claims/values、`brand_variants`、`brand_access_grants`、`canonical_slots` |
+| `takes` | 参照している`canonical_slots`、`live`な`publications` | `take_renders` → `render_artifacts`、`take_inputs`、`take_runs`、take scopeの`brand_materials` |
+| `logos` | — | `logo_candidates`、tags/credits/trademarks、`logo_activities`、`canonical_slots`、プレゼンTake |
+
+- **Takeの削除は`delete_take(p_take_id, p_material_disposition)`が唯一の経路**(`takes`にDELETEポリシーは無い)。`require_decision`(既定)は、そのTakeだけが持つ`upload` / `url_fetch` / `ai_generated`素材があると`TAKE_DELETE_NEEDS_MATERIAL_DECISION`で止まり、DETAILに対象一覧を入れる。`promote`はscopeをbrand/workへ上げて残し、`discard`はR2ごと消す。参照数が0になったキーだけが`private.r2_deletion_queue`へ入る
+- HTTP面は `DELETE /api/brands/[id]/videos/[videoId]`、`DELETE /api/brands/[id]/lps/[takeId]`(`?materials=promote|discard`)、`DELETE /api/brands/businesses/[id]`、`DELETE /api/brands/[id]`。実装は [../lib/takes/delete.ts](../lib/takes/delete.ts) がRPCの例外をHTTPステータスへ写す
+- **ロゴの削除は`delete_logo_with_presentation`**。Logo・candidate・プレゼンTake・canonical slotを1トランザクションで消す。呼び出しはブラウザrepo(`repo.deleteLogo`)で、mockupのR2削除を先に済ませる
+- **複製はTake(動画・LP)だけ**。[../lib/takes/duplicate.ts](../lib/takes/duplicate.ts) が`brief`と`take_inputs`(material_id + checksum)を写し、`createTake`で**現行のproduction版**に固定する。R2オブジェクトは共有され、`take_renders`は空から始まる。複製が元Takeのtake scope素材を指すため、元を`discard`で消すと複製が素材を失う——`promote`がその場合の正解であり、`delete_take`が選択を要求する理由でもある
+- Organization / Brand / Logoに複製は無い。器のコピーは中身を持たず、ロゴの複製は別途master SVGの複写を要する
+
+## 9. RLSと所有権
 
 - 閲覧: Brand Organizationを閲覧できる利用者、Brand共有を受けた利用者、対象Logoを閲覧できる利用者。
 - 編集: Organizationのowner/admin、またはBrand/Logoに明示された編集権限。
@@ -147,7 +163,7 @@ POST `/api/brands/{id}/videos` の `templateTakeId` パラメータがこの経�
 
 Supabase作業では必ずproject ref `xhbdfzceyfrxsmaixkne`を照合する。DB書き込みはSQLと影響範囲をレビューし、明示承認を得てから行う。
 
-## 9. 現在の保全データ
+## 10. 現在の保全データ
 
 V2切替時にダミーデータを削除し、次の閉包だけを保全した。
 

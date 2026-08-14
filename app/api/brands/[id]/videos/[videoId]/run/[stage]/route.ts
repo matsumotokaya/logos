@@ -23,6 +23,10 @@ import {
   type EventFacts,
 } from "@/lib/event-cm/structure";
 import { mapFactsIntoBrief } from "@/lib/event-cm/map";
+import {
+  placeImagesIntoBrief,
+  type ImageMaterial,
+} from "@/lib/event-cm/place-images";
 import { draftEventCmScript, eventCmScriptAvailable } from "@/lib/event-cm/script";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
@@ -94,7 +98,19 @@ export async function POST(
       if (summary.every((item) => item.mode === "skipped")) {
         throw new Error("読み取れる素材がありません。資料かテキストを追加してください");
       }
-      await record("succeeded", { steps: summary });
+      await record("succeeded", {
+        // What it was handed, before deciding what it could do with each item.
+        // Without this the log says "3 files read" and cannot say which three.
+        input: {
+          pinned: sources.map((source) => ({
+            materialId: source.materialId,
+            label: source.label,
+            mediaType: source.mediaType,
+            bytes: source.bytes,
+          })),
+        },
+        steps: summary,
+      });
       return Response.json({ ok: true, sources: summary });
     }
 
@@ -112,17 +128,21 @@ export async function POST(
           facts: structured.facts,
           read: structured.readLabels,
           dropped: structured.dropped,
+          images: structured.imageCounts,
         },
         usage: structured.usage ?? {},
       });
+      // Images are a list, not a value: counting them among "facts found"
+      // would report a reading even when every field came back null.
       const found = Object.entries(structured.facts).filter(
-        ([key, value]) => key !== "note" && value !== null,
+        ([key, value]) => key !== "note" && key !== "images" && value !== null,
       );
       return Response.json({
         ok: true,
         facts: structured.facts,
         foundCount: found.length,
         dropped: structured.dropped,
+        images: structured.imageCounts,
         note: structured.facts.note,
       });
     }
@@ -130,7 +150,7 @@ export async function POST(
     // map: take what structuring worked out and put it into the film.
     const { data: lastStructure, error: structureError } = await supabase
       .from("take_runs")
-      .select("steps, finished_at")
+      .select("input, steps, finished_at")
       .eq("take_id", take.id)
       .eq("stage", "structure")
       .eq("status", "succeeded")
@@ -143,10 +163,41 @@ export async function POST(
       throw new Error("先に構造化を実行してください");
     }
 
-    const mapped = mapFactsIntoBrief(
-      take.brief as EventCmBrief,
-      steps.facts,
-      (steps.read ?? []).join("、"),
+    const readLabel = (steps.read ?? []).join("、");
+    const mapped = mapFactsIntoBrief(take.brief as EventCmBrief, steps.facts, readLabel);
+
+    // The pictures go in against the facts that were just applied — speaker
+    // names have to exist before a portrait can be matched to one, which is
+    // why this runs after the facts and not as a stage of its own.
+    //
+    // What the extraction stage measured (brightness, proportions) rides on the
+    // same run row, so no material is re-read to place an image.
+    type MeasuredSource = {
+      materialId: string;
+      label: string;
+      mode: string;
+      note?: string;
+      image?: { luminance: number | null; opaque?: boolean; aspect: number };
+    };
+    const measured = (lastStructure?.input as { sources?: MeasuredSource[] } | null)?.sources;
+    const imageMaterials: ImageMaterial[] = (measured ?? [])
+      .filter((entry) => entry.image)
+      .map((entry) => ({
+        materialId: entry.materialId,
+        label: entry.label,
+        luminance: entry.image?.luminance ?? null,
+        // Older runs recorded no opacity. Treating those as opaque keeps a mark
+        // knocked out, which is the treatment that cannot fail on ink.
+        opaque: entry.image?.opaque ?? true,
+        aspect: entry.image?.aspect ?? 0,
+        sent: entry.mode === "passthrough",
+        note: entry.note,
+      }));
+    const images = placeImagesIntoBrief(
+      mapped.brief,
+      steps.facts.images ?? [],
+      imageMaterials,
+      readLabel,
     );
 
     // The narration is the film's spine: it decides the scene order and the
@@ -157,7 +208,7 @@ export async function POST(
     // An edited script is left alone. That contract is what makes the
     // unattended path safe: a person who wrote their own words keeps them.
     let rewrote = false;
-    let briefToSave = mapped.brief;
+    let briefToSave = images.brief;
     const previous = (take.brief as EventCmBrief).script;
     if (
       mapped.applied.length > 0 &&
@@ -191,6 +242,16 @@ export async function POST(
         applied: mapped.applied,
         keptUserValues: mapped.keptUserValues,
         narrationRewritten: rewrote,
+        // Both halves, always. A run that placed nothing has to be able to say
+        // why each picture was left alone, or "画像が反映されない" comes back
+        // as a mystery instead of as a sentence.
+        placedImages: images.placed,
+        unusedImages: images.unused,
+        imageCounts: {
+          judged: (steps.facts.images ?? []).length,
+          placed: images.placed.length,
+          unused: images.unused.length,
+        },
       },
     });
 
@@ -200,6 +261,8 @@ export async function POST(
       keptUserValues: mapped.keptUserValues,
       narrationRewritten: rewrote,
       narrationKept: previous.source === "human" && mapped.applied.length > 0,
+      placedImages: images.placed,
+      unusedImages: images.unused,
     });
   } catch (runError) {
     const message =

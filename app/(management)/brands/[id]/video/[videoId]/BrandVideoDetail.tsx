@@ -15,15 +15,26 @@
 // bar is what shows the user what each stage is waiting on
 // (deliverable-architecture §17.3, §17.6).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { videoFetch } from "@/lib/video/client";
+import { cn } from "@/lib/cn";
 import CampaignDetail from "@/app/campaigns/[id]/CampaignDetail";
 import EventVideoWorkspace from "@/components/video/EventVideoWorkspace";
 import EventCmWorkspace from "@/components/video/EventCmWorkspace";
+import NarrationDialog from "@/components/video/NarrationDialog";
+import BgmDialog from "@/components/video/BgmDialog";
+import { DEFAULT_ASSETS } from "@/lib/assets/defaults";
+import { narrationVoiceByName } from "@/lib/narration/voices";
+import { panelDeletion } from "@/lib/event-cm/panel-actions";
+import { eventCmTimeline } from "@/remotion/event-cm/timeline";
+import { EVENT_WIDTH, EVENT_HEIGHT } from "@/remotion/event/palette";
 import type { FactEdit } from "@/components/video/FactList";
 import BriefSourceIntake, { type BriefSource } from "@/components/video/BriefSourceIntake";
+import TitleOffer from "@/components/video/TitleOffer";
+import { titleOffer } from "@/lib/event-cm/title";
 import FactList from "@/components/video/FactList";
+import BusyBar from "@/components/pipeline/BusyBar";
 import RunOverlay, { type RunCard } from "@/components/pipeline/RunOverlay";
 import StageAction from "@/components/pipeline/StageAction";
 import { ExtractResults, StructureResults } from "@/components/pipeline/StageResults";
@@ -46,11 +57,13 @@ import type { PipelineStage } from "@/lib/pipeline/stages";
 import { VIDEO_STATE_LABEL, type VideoState } from "@/lib/video/asset";
 import type { VideoTemplateId } from "@/lib/video/templates";
 import type { EventBrief } from "@/remotion/event/types";
-import type { EventCmBrief } from "@/remotion/event-cm/types";
+import type { EventCmBrief, EventCmSceneRole } from "@/remotion/event-cm/types";
 
 type VideoAsset = {
   id: string;
   brandId: string;
+  /** The brand this video belongs to, for the breadcrumb. */
+  brandName: string | null;
   title: string;
   template: VideoTemplateId;
   templateName: string;
@@ -63,6 +76,8 @@ type VideoAsset = {
    *  preview cannot fetch them, so say so rather than let the player fail
    *  silently — an empty slot here would read as a designed fallback. */
   unresolvedMaterials?: string[];
+  /** material:<uuid> → the signed URL the server resolved it to. */
+  materialUrls?: Record<string, string>;
   state: VideoState;
   createdAt: string;
   render: { status: "running" | "done" | "error"; error: string | null; renderedAt: string | null } | null;
@@ -83,6 +98,36 @@ function hasPinnedProductVoice(brief: VideoAsset["brief"]): boolean {
     typeof (voice as Record<string, unknown>).track === "object" &&
     typeof (voice as Record<string, unknown>).audio === "string"
   );
+}
+
+/**
+ * Return the work that the unattended path can still do.
+ *
+ * The map stage has a seeded brief from the moment a Take is created, so its
+ * raw status can look ready while it is still waiting for structure to finish.
+ * Count that dependency here as well; the number must match what the button
+ * will actually run, not just what the seeded brief happens to contain.
+ */
+function pendingRunStages(
+  stages: PipelineStage[],
+  sourceCount: number,
+): RunnableStage[] {
+  if (sourceCount === 0) return [];
+
+  const input = stages.find((stage) => stage.id === "input");
+  const structure = stages.find((stage) => stage.id === "structure");
+  const map = stages.find((stage) => stage.id === "map");
+  if (!input || !structure || !map) return [];
+
+  const pending: RunnableStage[] = [];
+  const inputPending = input.status !== "ready";
+  const structurePending = inputPending || structure.status !== "ready";
+  const mapPending = structurePending || map.status !== "ready";
+
+  if (inputPending) pending.push("extract");
+  if (structurePending) pending.push("structure");
+  if (mapPending) pending.push("map");
+  return pending;
 }
 
 function ProductCmInputSection({
@@ -136,7 +181,38 @@ export default function BrandVideoDetail({
 }) {
   const [resolved, setResolved] = useState<Resolved | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * What just happened, said where it can still be read.
+   *
+   * A destructive action cannot report itself from the surface it destroys: the
+   * panel that held 「削除する」 unmounts the moment the brief comes back, so a
+   * confirmation inside it would flash and vanish. Deleting the sixth picture
+   * gave no feedback at all for exactly that reason. Announced as a status and
+   * given focus, because the thing the user was looking at is gone and the
+   * keyboard needs somewhere to land.
+   */
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeRef = useRef<HTMLParagraphElement | null>(null);
   const [saving, setSaving] = useState(false);
+  /**
+   * What the page is waiting for, in the user's words.
+   *
+   * Paired with `saving` rather than replacing it: `saving` disables controls,
+   * this names the reason. Set through `busy()` so no long step can be added
+   * without saying what it is.
+   */
+  const [busyLabel, setBusyLabel] = useState<string | null>(null);
+  const busy = (label: string) => {
+    setSaving(true);
+    setBusyLabel(label);
+    // A new attempt clears the last complaint: a banner left over from the
+    // previous failure reads as though this one had failed too.
+    setError(null);
+  };
+  const idle = () => {
+    setSaving(false);
+    setBusyLabel(null);
+  };
   const [pipeline, setPipeline] = useState<
     (VideoPipelinePayload & { stages: PipelineStage[] }) | null
   >(null);
@@ -208,7 +284,7 @@ export default function BrandVideoDetail({
   }, [resolved, brandId, videoId, rendering]);
 
   async function startRender() {
-    setSaving(true);
+    busy("MP4を書き出しています…");
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/render`, {
         method: "POST",
@@ -221,19 +297,27 @@ export default function BrandVideoDetail({
     } catch (e) {
       setError(e instanceof Error ? e.message : "MP4の作成を開始できませんでした");
     } finally {
-      setSaving(false);
+      idle();
     }
   }
 
   // Writing the narration is what turns a seeded film into this event's film:
   // the scene lengths stop being budgets and start following the words.
-  async function writeScript() {
-    setSaving(true);
+  /**
+   * Draft the whole narration again.
+   *
+   * `force` is what makes this reachable at all once somebody has edited a line:
+   * the endpoint refuses to overwrite a hand-written script unless told to, and a
+   * film whose shape changed under a human-edited script would otherwise have no
+   * way back to a complete narration. The caller is the one that warns.
+   */
+  async function writeScript(force = false) {
+    busy("ナレーションを書いています…");
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/script`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify(force ? { force: true } : {}),
       });
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -243,9 +327,94 @@ export default function BrandVideoDetail({
     } catch (e) {
       setError(e instanceof Error ? e.message : "台本を作成できませんでした");
     } finally {
-      setSaving(false);
+      idle();
     }
   }
+
+  /**
+   * Save one panel's narration line.
+   *
+   * The server marks the whole script `human` and drops the recording, which is
+   * what makes the shape of the work right: correct a few lines, then re-record
+   * once. A voice still reading the old words would be worse than silence.
+   */
+  async function editNarration(
+    scene: { role: EventCmSceneRole; index?: number },
+    text: string,
+  ): Promise<boolean> {
+    busy("台本を保存しています…");
+    try {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/script`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scenes: [{ ...scene, text }] }),
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "台本を保存できませんでした");
+      }
+      await load();
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "台本を保存できませんでした");
+      return false;
+    } finally {
+      idle();
+    }
+  }
+
+  /**
+   * Remove one picture from the film.
+   *
+   * The rule is the template's (lib/event-cm/panel-actions.ts) and it is applied
+   * through the ordinary fact edits, so nothing here is a second way to write a
+   * brief: switching the speakers off is the same suppression the list does, and
+   * removing a programme is the same edit as retyping the list without it.
+   */
+  async function deletePanel(scene: {
+    role: EventCmSceneRole;
+    index?: number;
+  }): Promise<boolean> {
+    const brief = resolved?.video.brief as EventCmBrief | undefined;
+    if (!brief) return false;
+    const decision = panelDeletion(brief, scene);
+    // Not reported through `setError`: that replaces the whole page, and a
+    // refused delete is not a page that failed to load.
+    if (!decision.can) return false;
+
+    if (decision.kind === "suppress") {
+      const ok = await editFact({ path: decision.path, suppressed: true });
+      if (ok) {
+        setNotice(
+          "登壇者のコマを削除しました。登壇者の情報は残っているので、下の一覧から戻せます",
+        );
+      }
+      return ok;
+    }
+    // A programme picture exists because the programme does, so the picture goes
+    // when the item does. The narration then describes an evening with one fewer
+    // item, which `scriptIsStale` reports and the mapping stage rewrites.
+    const removed = brief.programs[decision.index]?.title ?? "";
+    const ok = await editFact({
+      path: "programs",
+      lines: brief.programs
+        .filter((_, index) => index !== decision.index)
+        .map((program) => program.title),
+    });
+    if (ok) {
+      setNotice(
+        `プログラム「${removed}」のコマを削除しました。言う内容が変わったので、ナレーションは書き直しが必要です`,
+      );
+    }
+    return ok;
+  }
+
+  useEffect(() => {
+    if (!notice) return;
+    noticeRef.current?.focus();
+    const timer = setTimeout(() => setNotice(null), 8000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   const loadSources = useCallback(async () => {
     const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/materials`);
@@ -277,13 +446,14 @@ export default function BrandVideoDetail({
     };
   }, [resolved, loadSources, loadRuns]);
 
-  async function addSource(body: Record<string, unknown>) {
-    setSaving(true);
+  async function submitSource(
+    init: RequestInit,
+    options: { showError?: boolean } = {},
+  ): Promise<boolean> {
+    busy("資料を登録しています…");
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/materials`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        ...init,
       });
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -291,15 +461,42 @@ export default function BrandVideoDetail({
       }
       await loadSources();
       await load();
+      return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "素材を追加できませんでした");
+      if (options.showError !== false) {
+        setError(e instanceof Error ? e.message : "素材を追加できませんでした");
+      }
+      return false;
     } finally {
-      setSaving(false);
+      idle();
     }
   }
 
+  async function addSource(
+    body: Record<string, unknown>,
+    options: { showError?: boolean } = {},
+  ): Promise<boolean> {
+    return submitSource(
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+      options,
+    );
+  }
+
+  async function addFileSource(file: File, label: string): Promise<boolean> {
+    const form = new FormData();
+    form.append("file", file, label);
+    form.append("label", label);
+    form.append("mediaType", file.type);
+    form.append("lastModified", String(file.lastModified));
+    return submitSource({ method: "POST", body: form }, { showError: false });
+  }
+
   async function removeSource(materialId: string) {
-    setSaving(true);
+    busy("資料を外しています…");
     try {
       await videoFetch(
         `/api/brands/${brandId}/videos/${videoId}/materials?materialId=${materialId}`,
@@ -308,7 +505,7 @@ export default function BrandVideoDetail({
       await loadSources();
       await load();
     } finally {
-      setSaving(false);
+      idle();
     }
   }
 
@@ -339,7 +536,7 @@ export default function BrandVideoDetail({
       ...cards,
       { id, label, status: "running", lines: [], startedAt: Date.now(), endedAt: null },
     ]);
-    setSaving(true);
+    busy(`${label}…`);
     setError(null);
 
     const settle = (status: "succeeded" | "failed", error?: string) =>
@@ -364,12 +561,21 @@ export default function BrandVideoDetail({
         keptUserValues?: string[];
         narrationRewritten?: boolean;
         narrationKept?: boolean;
+        images?: { sent: number; judged: number };
+        placedImages?: Array<{ label: string; materialLabel: string; reason: string }>;
+        unusedImages?: Array<{ label: string; reason: string }>;
         note?: string | null;
       } | null;
       if (!res.ok) throw new Error(json?.error ?? "実行できませんでした");
 
       if (stage === "structure") {
         appendLine(id, `資料から${json?.foundCount ?? 0}項目を読み取りました`);
+        if (json?.images && json.images.sent > 0) {
+          appendLine(
+            id,
+            `画像${json.images.sent}枚を渡し、${json.images.judged}枚を判定しました`,
+          );
+        }
         for (const drop of json?.dropped ?? []) {
           appendLine(id, `除外: ${drop.value}（${drop.reason}）`);
         }
@@ -396,6 +602,15 @@ export default function BrandVideoDetail({
         for (const kept of json?.keptUserValues ?? []) {
           appendLine(id, `あなたが決めた値のまま: ${kept}`);
         }
+        // Both halves of the picture pass. A run that placed nothing still has
+        // to say what it did with each image, or "画像が反映されない" has no
+        // answer anywhere on the screen.
+        for (const image of json?.placedImages ?? []) {
+          appendLine(id, `${image.label}: ${image.materialLabel}（${image.reason}）`);
+        }
+        for (const image of json?.unusedImages ?? []) {
+          appendLine(id, `未使用: ${image.label}（${image.reason}）`);
+        }
         if (json?.narrationRewritten) {
           appendLine(id, "ナレーションを新しい内容で書き直しました");
           appendLine(id, "音声は作り直しが必要です");
@@ -417,28 +632,49 @@ export default function BrandVideoDetail({
       await loadRuns();
       return false;
     } finally {
-      setSaving(false);
+      idle();
     }
   }
 
   /**
-   * Everything that has not been done, in order.
+   * Run the pipeline, in order.
+   *
+   * Unfinished steps first. With nothing unfinished it runs the whole thing
+   * again from the top, because "everything has been done" is not the same as
+   * "there is nothing you could want to do": every stage here is a model call,
+   * and a reading that came out slightly wrong is an ordinary reason to ask
+   * again. A button that refuses at exactly that moment makes the user hunt for
+   * a way to re-run something they can see is re-runnable.
    *
    * Stops at the first failure rather than carrying on: a structuring step
    * that could not read the flyer has nothing for the mapping step to apply,
    * and running it anyway would report a second, confusing error.
    */
   async function runAll() {
-    for (const stage of ["extract", "structure", "map"] as const) {
+    const pending = pendingRunStages(pipeline?.stages ?? [], sources.length);
+    const stages: RunnableStage[] =
+      pending.length > 0 ? pending : ["extract", "structure", "map"];
+    for (const stage of stages) {
       const ok = await runStage(stage);
       if (!ok) return;
     }
   }
 
+  // The API keeps structure and map as separate, auditable runs. From the
+  // input drawer they are one user intention: new material should reach the
+  // storyboard. Keep the explicit map-stage button for users who want to
+  // apply an already-recorded structure again.
+  async function runStructureAndMap() {
+    const structured = await runStage("structure");
+    if (!structured) return;
+    setOpenStage("map");
+    await runStage("map");
+  }
+
   // Correcting a fact, or switching one off. The film redraws from the saved
   // brief, so the change is visible in the player on the next load.
-  async function editFact(edit: FactEdit) {
-    setSaving(true);
+  async function editFact(edit: FactEdit): Promise<boolean> {
+    busy("変更を保存しています…");
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/facts`, {
         method: "PATCH",
@@ -450,35 +686,86 @@ export default function BrandVideoDetail({
         throw new Error(json?.error ?? "変更を保存できませんでした");
       }
       await load();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "変更を保存できませんでした");
+      return false;
     } finally {
-      setSaving(false);
+      idle();
     }
   }
 
-  // Speaking replaces the estimated timeline with the measured one.
-  async function speakScript() {
-    setSaving(true);
+  /** Answer the "rename this video to the event's title?" question. The server
+   *  decides what each answer writes (lib/event-cm/title.ts). */
+  async function answerTitleOffer(answer: "accept" | "decline") {
+    busy("タイトルを保存しています…");
+    try {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titleOffer: answer }),
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "タイトルを変更できませんでした");
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "タイトルを変更できませんでした");
+    } finally {
+      idle();
+    }
+  }
+
+  // Speaking replaces the estimated timeline with the measured one. Returns
+  // whether it worked, so the dialog that asked can say so and close itself.
+  async function speakScript(voiceId?: string): Promise<boolean> {
+    busy("ナレーション音声を作成しています…");
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/voice`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(voiceId ? { voiceId } : {}),
       });
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(json?.error ?? "ナレーション音声を作成できませんでした");
       }
       await load();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "ナレーション音声を作成できませんでした");
+      return false;
     } finally {
-      setSaving(false);
+      idle();
+    }
+  }
+
+  /** Off: the film stops speaking and goes back to music and subtitles. The
+   *  recording stays pinned to the take, so this is reversible. */
+  async function turnNarrationOff(): Promise<boolean> {
+    busy("ナレーションを外しています…");
+    try {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/voice`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "ナレーションを外せませんでした");
+      }
+      await load();
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "ナレーションを外せませんでした");
+      return false;
+    } finally {
+      idle();
     }
   }
 
   async function togglePublished(next: boolean) {
     if (resolved?.kind !== "asset") return;
-    setSaving(true);
+    busy(next ? "公開しています…" : "公開を終了しています…");
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}`, {
         method: "PATCH",
@@ -493,14 +780,23 @@ export default function BrandVideoDetail({
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新できませんでした");
     } finally {
-      setSaving(false);
+      idle();
     }
   }
 
-  if (error) {
+  // The whole page is only replaced when there is no page: a video that could
+  // not be loaded has nothing else to show. An action that failed — a line that
+  // would not save, a run that errored — must NOT take the screen away. Saving
+  // one narration line used to throw the user onto an error page with a 「←
+  // 動画一覧へ」 link, which reads as "this video is broken" rather than "that
+  // save was refused", and loses the work in the textarea.
+  if (error && !resolved) {
     return (
       <main className="mx-auto max-w-3xl px-6 py-10 md:px-10">
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-[12px] text-red-700">
+        <p
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-[12px] text-red-700"
+        >
           {error}
         </p>
         <Link href={`/brands/${brandId}/video`} className="mt-5 inline-block text-xs text-accent">
@@ -516,6 +812,19 @@ export default function BrandVideoDetail({
 
   const video = resolved.video;
   const openStageDef = pipeline?.stages.find((stage) => stage.id === openStage);
+  const pendingStages = pendingRunStages(pipeline?.stages ?? [], sources.length);
+  const pendingCount = pendingStages.length;
+
+  // Aspect, pixels, length. Computed here because the timeline is the film's
+  // own (a script shortens or lengthens it), and shown with the other metadata
+  // rather than over the picture.
+  const eventCmMeta = (() => {
+    if (video.template !== "event-cm" || !video.brief) return null;
+    const timeline = eventCmTimeline(video.brief as EventCmBrief);
+    const seconds = (timeline.totalMs / 1000).toFixed(1);
+    const measured = timeline.source === "voice";
+    return `16:9 / ${EVENT_WIDTH}×${EVENT_HEIGHT} / ${measured ? "" : "約"}${seconds}秒`;
+  })();
 
   // A Product CM Take is created before narration is generated. Keep that
   // draft in the established authoring screen until the voice RPC pins the
@@ -537,7 +846,11 @@ export default function BrandVideoDetail({
   }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8 md:px-10">
+    // Full width on purpose. The storyboard is the working surface now, and a
+    // 1024px column meant three pictures could never sit side by side — at which
+    // point the overview says little more than one enlarged panel does. Anything
+    // that reads badly wide (the title block, the player) caps itself.
+    <main className="flex w-full flex-col gap-6 px-6 py-8 md:px-10">
       {pipeline ? (
         <div className="-mx-6 -mt-2 flex flex-wrap items-center gap-3 md:-mx-10">
           <div className="min-w-0 flex-1">
@@ -549,14 +862,43 @@ export default function BrandVideoDetail({
           </div>
           {/* Outside the flow on purpose: the stages are one step each, and
               "do the rest" is a statement about the whole pipeline. */}
-          {video?.template === "event-cm" && sources.length > 0 ? (
+          {video?.template === "event-cm" ? (
             <button
               type="button"
               onClick={() => void runAll()}
-              disabled={saving}
-              className="mr-6 shrink-0 rounded-full bg-ink px-4 py-1.5 text-xs font-semibold text-paper transition hover:bg-accent disabled:opacity-50 md:mr-10"
+              // Only two things stop it: a run already going, and no material
+              // to read. "Nothing is pending" is not one of them — the badge
+              // says whether there is new work, and the button stays available
+              // for the re-run that a model result often deserves.
+              disabled={saving || sources.length === 0}
+              aria-label={
+                pendingCount > 0
+                  ? `まとめて実行（未処理${pendingCount}件）`
+                  : "まとめて実行（すべて実行し直す）"
+              }
+              title={
+                sources.length === 0
+                  ? "先に資料を追加してください"
+                  : pendingCount > 0
+                    ? `未処理の${pendingCount}件を順番に実行`
+                    : "未処理はありません。もう一度すべて実行し直します"
+              }
+              className={cn(
+                "mr-6 inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60 md:mr-10",
+                pendingCount > 0
+                  ? "border-ink bg-ink text-paper hover:bg-accent"
+                  : "border-hairline bg-paper text-ink-muted hover:border-ink hover:text-ink",
+              )}
             >
-              {saving ? "実行中…" : "未処理をまとめて実行"}
+              <span>{saving ? "実行中…" : "まとめて実行"}</span>
+              {pendingCount > 0 ? (
+                <span
+                  aria-hidden="true"
+                  className="inline-flex size-5 items-center justify-center rounded-full bg-red-500 font-mono text-[10px] font-bold leading-none text-white tabular-nums"
+                >
+                  {pendingCount}
+                </span>
+              ) : null}
             </button>
           ) : null}
         </div>
@@ -576,10 +918,10 @@ export default function BrandVideoDetail({
                 <BriefSourceIntake
                   sources={sources}
                   busy={saving}
-                  onUpload={(file, data) =>
-                    addSource({ label: file.name, mediaType: file.type, data })
-                  }
-                  onAddText={(text) => addSource({ text })}
+                  onUpload={addFileSource}
+                  onAddText={async (text) => {
+                    await addSource({ text });
+                  }}
                   onRemove={removeSource}
                 />
               ) : undefined
@@ -594,9 +936,13 @@ export default function BrandVideoDetail({
               video?.template === "event-cm" ? (
                 <StageAction
                   stageId={openStageDef.id}
+                  stages={pipeline.stages}
                   busy={saving}
                   disabled={sources.length === 0}
-                  onRun={(stage) => void runStage(stage)}
+                  onRun={(stage) =>
+                    void (stage === "structure" ? runStructureAndMap() : runStage(stage))
+                  }
+                  onOpenStage={(stage) => setOpenStage(stage)}
                   onRewriteScript={() => void writeScript()}
                 />
               ) : undefined
@@ -616,7 +962,7 @@ export default function BrandVideoDetail({
       ) : null}
       <nav aria-label="パンくず" className="flex flex-wrap items-center gap-2 text-[11px] text-ink-muted">
         <Link href={`/brands/${brandId}`} className="hover:text-ink">
-          ブランド
+          {video.brandName ?? "ブランド"}
         </Link>
         <span aria-hidden className="text-ink-faint">/</span>
         <Link href={`/brands/${brandId}/video`} className="hover:text-ink">
@@ -630,9 +976,33 @@ export default function BrandVideoDetail({
         <div className="min-w-0 max-w-3xl">
           <p className="text-xs font-semibold text-ink-muted">{video.templateName.toUpperCase()}</p>
           <h1 className="mt-2 text-balance font-display text-3xl font-semibold">{video.title}</h1>
+          {video.template === "event-cm" && video.brief
+            ? (() => {
+                const proposed = titleOffer(
+                  video.title,
+                  video.brief as EventCmBrief,
+                );
+                return proposed ? (
+                  <TitleOffer
+                    proposed={proposed}
+                    busy={saving}
+                    onAccept={() => void answerTitleOffer("accept")}
+                    onDecline={() => void answerTitleOffer("decline")}
+                  />
+                ) : null;
+              })()
+            : null}
           <p className="mt-3 text-[12px] text-ink-muted">
             {VIDEO_STATE_LABEL[video.state]}
             {video.published ? " ・ 公開中" : " ・ 未公開"}
+            {/* The file's own properties, with the rest of the metadata. They
+                used to sit above the player, where they read as part of the
+                film. Aspect, size, length — and nothing about how the length
+                was arrived at: a duration does not need to explain itself.
+                Estimated lengths are marked 「約」 rather than described, since
+                claiming 41.1 seconds to a tenth before anything has been read
+                aloud would be precision the number does not have. */}
+            {eventCmMeta ? ` ・ ${eventCmMeta}` : ""}
             {video.briefSlug ? ` ・ ブリーフ: ${video.briefSlug}` : ""}
           </p>
         </div>
@@ -647,20 +1017,54 @@ export default function BrandVideoDetail({
               公開動画 ↗
             </a>
           ) : null}
-          {video.template === "event-cm" ? (
-            // A finishing step, not an authoring one: the script is written in
-            // the pipeline, and speaking it costs money and half a minute, so
-            // it happens once the words are settled — immediately before the
-            // export it feeds.
-            <button
-              type="button"
-              onClick={() => void speakScript()}
-              disabled={saving || !(video.brief as EventCmBrief)?.script?.scenes?.length}
-              className="rounded-full border border-hairline px-4 py-2 text-xs font-semibold transition hover:border-ink disabled:opacity-50"
-            >
-              {(video.brief as EventCmBrief)?.voice ? "読み上げ直す" : "ナレーションを読み上げる"}
-            </button>
-          ) : null}
+          {video.template === "event-cm"
+            ? (() => {
+                // The brief arrives with its pointers resolved so the player can
+                // fetch them, so `brief.bgm` is a signed URL. Inverting the map
+                // gives back the pointer the picker compares against.
+                const brief = video.brief as EventCmBrief;
+                const uriByUrl = new Map(
+                  Object.entries(video.materialUrls ?? {}).map(([uri, url]) => [url, uri]),
+                );
+                const current = brief?.bgm
+                  ? (uriByUrl.get(brief.bgm) ?? brief.bgm)
+                  : null;
+                return (
+                  <BgmDialog
+                    current={current}
+                    pool={DEFAULT_ASSETS.filter((asset) => asset.kind === "bgm")}
+                    uploads={sources.filter((source) => source.kind === "audio")}
+                    ducks={Boolean(brief?.voice)}
+                    busy={saving}
+                    onChoose={(src) => editFact({ path: "bgm", src })}
+                    onTurnOff={() => editFact({ path: "bgm", src: null })}
+                  />
+                );
+              })()
+            : null}
+          {video.template === "event-cm"
+            ? (() => {
+                // A finishing step, not an authoring one: the script is written
+                // in the pipeline, and speaking it costs money and half a
+                // minute, so it happens once the words are settled — right
+                // before the export it feeds. The control keeps one name and
+                // one place whether or not a recording exists.
+                const brief = video.brief as EventCmBrief;
+                const track = brief?.voice?.track;
+                return (
+                  <NarrationDialog
+                    hasVoice={Boolean(brief?.voice)}
+                    currentVoiceId={narrationVoiceByName(track?.voice)?.id ?? null}
+                    totalMs={track?.totalMs ?? null}
+                    mock={Boolean(track?.mock)}
+                    canSpeak={Boolean(brief?.script?.scenes?.length)}
+                    busy={saving}
+                    onSpeak={(voiceId) => speakScript(voiceId)}
+                    onTurnOff={() => turnNarrationOff()}
+                  />
+                );
+              })()
+            : null}
           <button
             type="button"
             onClick={() => void startRender()}
@@ -688,6 +1092,31 @@ export default function BrandVideoDetail({
         <p className="flex items-center gap-2 rounded-xl border border-hairline bg-ink/5 px-4 py-2.5 text-[12px] text-ink-muted">
           <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ink-faint border-t-ink" />
           MP4を作成中（数分）— このページを離れても処理は続き、完成するとここに表示されます
+        </p>
+      ) : null}
+      {error ? (
+        <p
+          role="alert"
+          className="flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-[12px] text-red-700"
+        >
+          <span className="min-w-0 flex-1">{error}</span>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="shrink-0 rounded-full border border-red-300 px-3 py-1 text-[11px] font-semibold hover:bg-red-100"
+          >
+            閉じる
+          </button>
+        </p>
+      ) : null}
+      {notice ? (
+        <p
+          ref={noticeRef}
+          tabIndex={-1}
+          role="status"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-[12px] font-medium text-emerald-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          {notice}
         </p>
       ) : null}
       {video.unresolvedMaterials?.length ? (
@@ -729,7 +1158,14 @@ export default function BrandVideoDetail({
         <EventCmWorkspace
           brief={video.brief as EventCmBrief}
           onEditFact={(edit) => void editFact(edit)}
-          audioSources={sources.filter((source) => source.kind === "audio")}
+          onEditNarration={(scene, text) => editNarration(scene, text)}
+          onDeletePanel={(scene) => deletePanel(scene)}
+          onRewriteScript={(force) => void writeScript(force)}
+          // Photographs and marks alike: which slot a picture suits is the
+          // user's call here, exactly as it is for audio.
+          imageSources={sources.filter(
+            (source) => source.kind === "photo" || source.kind === "logo",
+          )}
           writing={saving}
         />
       ) : video.template === "event-promo" && video.brief ? (
@@ -757,6 +1193,7 @@ export default function BrandVideoDetail({
       {/* Last in the tree on purpose: the run log has to stay readable
           over an open stage drawer, so it must both out-rank it (z-50 vs
           z-40) and paint after it. */}
+      <BusyBar label={busyLabel} />
       <RunOverlay runs={runCards} onDismiss={dismissRun} />
     </main>
   );

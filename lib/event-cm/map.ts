@@ -1,5 +1,6 @@
 import type { EventFacts } from "./structure";
 import { isSuppressed } from "./facts";
+import { sameName } from "./names";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 
 // Stage ④: putting what was read into the film.
@@ -107,9 +108,19 @@ export function mapFactsIntoBrief(
   if (facts.guests && facts.guests.length > 0) {
     // The one field the seeder refuses to fill, because a fabricated speaker
     // is a fabricated person. Read from a document it is a fact.
+    //
+    // The portrait is carried across by name. A photograph is an attribute of
+    // the speaker, not a version of the speaker list, so re-reading the flyer
+    // must not throw away the picture already placed against them — which is
+    // exactly what rebuilding the list with `photo: null` used to do, silently,
+    // every time the document was read again.
     const guests = facts.guests
       .filter((guest) => guest.name.trim())
-      .map((guest) => ({ name: guest.name.trim(), role: guest.role.trim(), photo: null }));
+      .map((guest) => {
+        const name = guest.name.trim();
+        const known = brief.guests.find((existing) => sameName(existing.name, name));
+        return { name, role: guest.role.trim(), photo: known?.photo ?? null };
+      });
     settle(
       "guests",
       brief.guests.map((guest) => guest.name).join("、"),

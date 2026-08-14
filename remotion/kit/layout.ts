@@ -11,6 +11,7 @@
 // component closes the layout up instead of leaving a hole.
 
 import type { SceneComponent } from "./components";
+import type { EventPhoto } from "@/remotion/event/types";
 
 export const SCENE_LAYOUTS = [
   /** Everything stacked and centred. The default; carries a title reveal. */
@@ -32,6 +33,79 @@ export const SCENE_LAYOUTS = [
 ] as const;
 
 export type SceneLayout = (typeof SCENE_LAYOUTS)[number];
+
+/**
+ * The stage itself.
+ *
+ * The margins are generous and the same for every arrangement: in this kind of
+ * film the breathing room IS the art direction. Here rather than in the renderer
+ * because the storyboard has to draw the same stage — a diagram with its own
+ * margins would describe a composition nobody is making.
+ */
+export const STAGE = { width: 1920, height: 1080, padX: 132, padY: 96 } as const;
+
+/**
+ * How a region sits on the stage, as plain values.
+ *
+ * Deliberately not `React.CSSProperties`: this module is the contract and stays
+ * free of React, so both the Remotion renderer and the plain-DOM storyboard can
+ * read it. The property names line up with CSS, so each consumer spreads them
+ * into whatever it draws with.
+ */
+export interface RegionGeometry {
+  alignItems: "center" | "flex-start" | "flex-end" | "stretch";
+  justifyContent: "center" | "flex-start" | "flex-end" | "stretch";
+  textAlign: "center" | "left" | "right";
+  /** Occupies one half of the stage; the other slot takes the rest. */
+  half: "left" | "right" | null;
+  /** Ignores the stage margins and reaches the edges. */
+  bleed: boolean;
+}
+
+export const REGION_GEOMETRY: Record<LayoutSlot["region"], RegionGeometry> = {
+  centre: {
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center",
+    half: null,
+    bleed: false,
+  },
+  left: {
+    alignItems: "flex-start",
+    justifyContent: "center",
+    textAlign: "left",
+    half: "left",
+    bleed: false,
+  },
+  right: {
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center",
+    half: "right",
+    bleed: false,
+  },
+  "bottom-left": {
+    alignItems: "flex-start",
+    justifyContent: "flex-end",
+    textAlign: "left",
+    half: null,
+    bleed: false,
+  },
+  "bottom-right": {
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+    textAlign: "right",
+    half: null,
+    bleed: false,
+  },
+  full: {
+    alignItems: "stretch",
+    justifyContent: "stretch",
+    textAlign: "center",
+    half: null,
+    bleed: true,
+  },
+};
 
 export interface LayoutSlot {
   /** Where this group sits. Resolved to flex by the renderer. */
@@ -105,12 +179,38 @@ export const LAYOUTS: Record<SceneLayout, LayoutSpec> = {
  * across the layout's slots and the fitter decides how loudly each is set, so
  * a scene never states a position or a size.
  */
+/**
+ * A photograph laid under the whole scene.
+ *
+ * The ground, not a component. A component is something the arrangement places
+ * — it lands in a slot, it can be dropped by the fitter, it has an entrance.
+ * A photograph filling the frame does none of that: it is what the scene is
+ * standing on, and `numbered-stack` and `corner-credit` have no full-bleed slot
+ * to put one in even though those are exactly the scenes that want a ground.
+ *
+ * `weight` says what the picture is FOR, and the theme decides how far it is
+ * dimmed. The hand-composed sake film used 0.5 behind the promise and 0.22
+ * behind the programme list — the same photograph treated differently because
+ * in one scene it is the subject and in the other it is the room the words are
+ * in. A scene naming an opacity would be a scene making the theme's decision.
+ *
+ * Absent is not a hole: the theme's ground shows through, which is the designed
+ * state and the reason a film with no photographs at all is still finished.
+ */
+export interface SceneBackdrop {
+  photo: EventPhoto;
+  weight: "hero" | "support";
+  /** Brief paths this ground came from, for the storyboard's correction panel. */
+  fields?: string[];
+}
+
 export interface Scene {
   layout: SceneLayout;
   components: SceneComponent[];
   /** Optional interstitial plate shown before this scene, when the theme's
    *  transition is `card`. The text is the scene's own idea in a few words. */
   card?: string;
+  backdrop?: SceneBackdrop;
 }
 
 /**

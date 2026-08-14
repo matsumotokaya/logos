@@ -83,7 +83,7 @@ export default function StageDrawer({
         className={cn(
           // Two thirds of the screen: enough room for a stage's own work,
           // little enough that the deliverable stays on screen.
-          "absolute inset-y-0 right-0 flex w-full max-w-3xl flex-col overflow-y-auto",
+          "absolute inset-y-0 right-0 flex w-full md:w-2/3 flex-col overflow-y-auto",
           "border-l border-hairline bg-paper shadow-xl focus:outline-none",
           exiting ? "drawer-slide-out" : "drawer-slide-in",
         )}

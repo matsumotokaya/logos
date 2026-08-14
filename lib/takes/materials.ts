@@ -117,13 +117,22 @@ export async function resolveBriefMaterialUrls<T>(
   brandId: string,
   takeId: string,
   brief: T,
-): Promise<{ brief: T; unresolved: string[] }> {
+): Promise<{ brief: T; unresolved: string[]; urls: Record<string, string> }> {
   const ids = collectMaterialIds(brief);
-  if (ids.size === 0) return { brief, unresolved: [] };
+  if (ids.size === 0) return { brief, unresolved: [], urls: {} };
 
   const inputs = await pinnedInputs(supabase, takeId, ids);
 
   const unresolved: string[] = [];
+  // What each pointer became.
+  //
+  // The client needs this to read its own brief back: a screen that lets you
+  // *choose* a material compares the brief's value against `material:<id>`, and
+  // after this function ran there is no such string left in it. The BGM picker
+  // highlighted nothing for exactly that reason — every option compared unequal
+  // to a signed URL. Handing back the mapping lets the caller invert it instead
+  // of pattern-matching a URL.
+  const urls: Record<string, string> = {};
   const resolved = replaceMaterialUris(brief, (id) => {
     const key = r2KeyOf(inputs.get(id));
     if (!key) {
@@ -134,11 +143,13 @@ export async function resolveBriefMaterialUrls<T>(
     // segment is the real filename, so the slot list stays readable and media
     // players get the extension they expect.
     const name = encodeURIComponent(path.posix.basename(key));
-    return signedLabsUrl(
+    const url = signedLabsUrl(
       `/api/brands/${brandId}/takes/${takeId}/materials/${id}/${name}?key=${encodeURIComponent(key)}`,
       takeMaterialSignatureToken(brandId, takeId, id, key),
     );
+    urls[materialUri(id)] = url;
+    return url;
   });
 
-  return { brief: resolved, unresolved };
+  return { brief: resolved, unresolved, urls };
 }

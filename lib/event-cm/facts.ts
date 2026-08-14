@@ -1,7 +1,10 @@
 import {
   EVENT_CM_GOAL,
 } from "@/lib/pipeline/event-cm";
-import type { EventCmBrief } from "@/remotion/event-cm/types";
+import {
+  EVENT_CM_SUPPRESSED_NOTE,
+  type EventCmBrief,
+} from "@/remotion/event-cm/types";
 
 // The facts a video is made of, as an editable list.
 //
@@ -55,6 +58,8 @@ const INPUT_BY_PATH: Record<string, FactInput> = {
   cta: "text",
   logos: "asset",
   "visuals.value": "asset",
+  "visuals.programs": "asset",
+  "visuals.closing": "asset",
   "visuals.inkArt": "asset",
   bgm: "asset",
   script: "generated",
@@ -82,6 +87,39 @@ export const FACT_FIELDS: FactField[] = EVENT_CM_GOAL.filter(
     : {}),
 }));
 
+/** The photograph slots the film draws. Chosen from material, never typed. */
+export const PHOTO_SLOTS = [
+  "visuals.value",
+  "visuals.programs",
+  "visuals.closing",
+] as const;
+
+const GUEST_PHOTO = /^guests\[(\d+)\]\.photo$/;
+
+export const isPhotoSlot = (path: string): boolean =>
+  (PHOTO_SLOTS as readonly string[]).includes(path) || GUEST_PHOTO.test(path);
+
+/**
+ * The list for one brief, portraits included.
+ *
+ * A speaker's photograph is a slot like any other, but how many there are
+ * depends on how many speakers were announced — so the list cannot be a
+ * constant. Portraits appear whether or not one has been placed: an empty row
+ * is where a person goes to choose the picture the automatic pass would not
+ * commit to.
+ */
+export function factFieldsFor(brief: EventCmBrief): FactField[] {
+  return [
+    ...FACT_FIELDS,
+    ...brief.guests.map((guest, index) => ({
+      path: `guests[${index}].photo`,
+      label: `${guest.name}の写真`,
+      required: false,
+      input: "asset" as const,
+    })),
+  ];
+}
+
 /** A value as it should read in the list. Never the raw JSON. */
 export function previewOf(brief: EventCmBrief, path: string): string {
   switch (path) {
@@ -95,6 +133,10 @@ export function previewOf(brief: EventCmBrief, path: string): string {
       return brief.logos.map((logo) => logo.name).join("、");
     case "visuals.value":
       return brief.visuals.value ? "写真あり" : "";
+    case "visuals.programs":
+      return brief.visuals.programs ? "写真あり" : "";
+    case "visuals.closing":
+      return brief.visuals.closing ? "写真あり" : "";
     case "visuals.inkArt":
       return brief.visuals.inkArt ? "あり" : "";
     case "bgm":
@@ -106,9 +148,27 @@ export function previewOf(brief: EventCmBrief, path: string): string {
     case "voice":
       return brief.voice ? `${Math.round(brief.voice.track.totalMs / 1000)}秒` : "";
     default: {
+      const guest = GUEST_PHOTO.exec(path);
+      if (guest) return brief.guests[Number(guest[1])]?.photo ? "写真あり" : "";
       const value = readScalar(brief, path);
       return value ?? "";
     }
+  }
+}
+
+/** The image a photo slot currently holds, for a thumbnail. Null when empty. */
+export function photoOf(brief: EventCmBrief, path: string): string | null {
+  const guest = GUEST_PHOTO.exec(path);
+  if (guest) return brief.guests[Number(guest[1])]?.photo?.src ?? null;
+  switch (path) {
+    case "visuals.value":
+      return brief.visuals.value?.src ?? null;
+    case "visuals.programs":
+      return brief.visuals.programs?.src ?? null;
+    case "visuals.closing":
+      return brief.visuals.closing?.src ?? null;
+    default:
+      return null;
   }
 }
 
@@ -219,15 +279,43 @@ export function applyAssetChoice(
   path: string,
   src: string | null,
 ): EventCmBrief | null {
-  switch (path) {
-    case "bgm":
-      return { ...brief, bgm: src };
-    default:
-      return null;
+  if (path === "bgm") return { ...brief, bgm: src };
+
+  // Replacing a photograph keeps the framing. The focus point says where the
+  // face or the subject sits in the frame, and a new picture arrives without
+  // one — but the slot's existing framing was chosen for this composition, so
+  // it stands until the new picture is read.
+  const guest = GUEST_PHOTO.exec(path);
+  if (guest) {
+    const index = Number(guest[1]);
+    if (!brief.guests[index]) return null;
+    return {
+      ...brief,
+      guests: brief.guests.map((person, i) =>
+        i === index ? { ...person, photo: photoValue(person.photo, src) } : person,
+      ),
+    };
   }
+
+  const key = (PHOTO_SLOTS as readonly string[]).includes(path)
+    ? (path.slice("visuals.".length) as "value" | "programs" | "closing")
+    : null;
+  if (key) {
+    return {
+      ...brief,
+      visuals: { ...brief.visuals, [key]: photoValue(brief.visuals[key], src) },
+    };
+  }
+  return null;
 }
 
-export const isAssetSlot = (path: string): boolean => path === "bgm";
+const photoValue = (
+  current: { src: string; focus?: { x: number; y: number }; zoom?: number } | null,
+  src: string | null,
+) => (src === null ? null : { ...(current ?? {}), src });
+
+export const isAssetSlot = (path: string): boolean =>
+  path === "bgm" || isPhotoSlot(path);
 
 /**
  * Record who decided this value. An edit is never overwritten by a re-run.
@@ -243,13 +331,27 @@ export function markUserEdited(
 ): EventCmBrief {
   return {
     ...brief,
-    factsUpdatedAt: now,
+    ...(isSpokenFact(path) ? { factsUpdatedAt: now } : {}),
     provenance: {
       ...(brief.provenance ?? {}),
       [path]: { origin: "user" },
     },
   };
 }
+
+/**
+ * Fields the narration could be reading.
+ *
+ * `factsUpdatedAt` exists for one job: telling the narration that it is
+ * describing an older event (`scriptIsStale`). So it must move when a spoken
+ * fact changes — and must not move for something the film only shows or plays.
+ * Picking a different music track used to stamp it, which put 「ナレーションが
+ * 書き直されていません」 on a film whose words were perfectly current. A warning
+ * that appears when nothing is wrong is a warning people learn to ignore.
+ */
+const UNSPOKEN = /^(bgm$|logos$|visuals\.|guests\[\d+\]\.photo$)/;
+
+export const isSpokenFact = (path: string): boolean => !UNSPOKEN.test(path);
 
 /**
  * Take a field off screen without losing it.
@@ -273,8 +375,10 @@ export function setSuppressed(
   return { ...brief, provenance: next };
 }
 
-/** Marker kept in the note so no schema change is needed for a boolean. */
-export const SUPPRESSED_NOTE = "__suppressed__";
+/** Marker kept in the note so no schema change is needed for a boolean.
+ *  Defined in the data contract, because the film's SHAPE depends on it —
+ *  `eventCmScenePlan` has to read it without importing this editing layer. */
+export const SUPPRESSED_NOTE = EVENT_CM_SUPPRESSED_NOTE;
 
 export const isSuppressed = (brief: EventCmBrief, path: string): boolean =>
   brief.provenance?.[path]?.note === SUPPRESSED_NOTE;
@@ -308,7 +412,14 @@ export function applySuppression(brief: EventCmBrief): EventCmBrief {
     valueLines: off("valueLines") ? [] : brief.valueLines,
     valueChip: off("valueChip") ? null : brief.valueChip,
     programs: off("programs") ? [] : brief.programs,
-    guests: off("guests") ? [] : brief.guests,
+    // A portrait can be taken off on its own: the speaker is still announced,
+    // the photograph is replaced by the monogram the component draws when it
+    // has none. Removing the person instead would be a different decision.
+    guests: off("guests")
+      ? []
+      : brief.guests.map((guest, index) =>
+          off(`guests[${index}].photo`) ? { ...guest, photo: null } : guest,
+        ),
     cta: off("cta") ? "" : brief.cta,
     logos: off("logos") ? [] : brief.logos,
     bgm: off("bgm") ? null : brief.bgm,
@@ -322,6 +433,8 @@ export function applySuppression(brief: EventCmBrief): EventCmBrief {
     visuals: {
       ...brief.visuals,
       value: off("visuals.value") ? null : brief.visuals.value,
+      programs: off("visuals.programs") ? null : brief.visuals.programs,
+      closing: off("visuals.closing") ? null : brief.visuals.closing,
       inkArt: off("visuals.inkArt") ? null : brief.visuals.inkArt,
     },
   };

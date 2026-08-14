@@ -1118,7 +1118,7 @@ export default function CampaignsTop() {
               ロゴを読み込んでいます…
             </p>
             <div className="relative mt-4 h-1 w-full overflow-hidden rounded-full bg-white/20">
-              <span className="progress-indeterminate absolute top-0 h-full rounded-full bg-white" />
+              <span className="progress-indeterminate absolute left-0 top-0 h-full w-2/5 rounded-full bg-white" />
             </div>
           </div>
         </div>

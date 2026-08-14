@@ -21,12 +21,13 @@ import { EventBackground } from "@/remotion/event/EventBackground";
 import { resolveMediaSrc } from "@/remotion/event/EventComposition";
 import { EVENT_FPS, EVENT_HEIGHT, EVENT_WIDTH } from "@/remotion/event/palette";
 import { Stage } from "@/remotion/kit/render/Stage";
-import { scenesForRole } from "@/remotion/kit/scenes/event-cm";
+import { sceneForRole } from "@/remotion/kit/scenes/event-cm";
 import { SUMI_THEME, themeForBrand, type Theme } from "@/remotion/kit/theme";
 import { CaptionBand } from "@/remotion/kit/render/CaptionBand";
 import { applySuppression } from "@/lib/event-cm/facts";
 import { captionsFor } from "./captions";
-import { eventCmTimeline, msToFrames } from "./timeline";
+import { eventCmTimeline, msToFrame, msToFrames } from "./timeline";
+import { eventCmSceneKey } from "./types";
 import type { EventCmBrief } from "./types";
 
 export { EVENT_FPS, EVENT_WIDTH, EVENT_HEIGHT };
@@ -60,8 +61,8 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
   const hasVoice = Boolean(brief.voice);
   const FULL = 0.62;
   const UNDER_VOICE = 0.16;
-  const startFrame = msToFrames(timeline.narrationStartMs, fps);
-  const endFrame = msToFrames(timeline.narrationEndMs, fps);
+  const startFrame = msToFrame(timeline.narrationStartMs, fps);
+  const endFrame = msToFrame(timeline.narrationEndMs, fps);
   const duckIn = Math.round(fps * 0.5);
   const duckOut = Math.round(fps * 0.8);
 
@@ -97,29 +98,31 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
       )}
       {brief.voice ? (
         // Held back by the lead-in so the opening belongs to the music.
-        <Sequence from={msToFrames(timeline.narrationStartMs, fps)}>
+        <Sequence from={msToFrame(timeline.narrationStartMs, fps)}>
           <Audio src={resolveMediaSrc(brief.voice.audio)} />
         </Sequence>
       ) : null}
       {timeline.scenes.map((beat) => {
-        const from = msToFrames(beat.fromMs, fps);
+        // One picture per scene. The film's shape is the timeline's shape.
+        //
+        // Keyed by scene identity rather than by role: three programme pictures
+        // share a role, and React would have treated them as one Sequence
+        // re-rendered three times.
+        const from = msToFrame(beat.fromMs, fps);
         const length = msToFrames(beat.durationMs, fps);
-        const scenes = scenesForRole(beat.role, brief);
-        // A beat that yields two scenes splits its own span; the narration
-        // still says one thing across both.
-        const each = Math.floor(length / scenes.length);
-        return scenes.map((scene, i) => {
-          const sceneLength = i === scenes.length - 1 ? length - each * i : each;
-          return (
-            <Sequence
-              key={`${beat.role}-${i}`}
-              from={from + each * i}
-              durationInFrames={sceneLength}
-            >
-              <Stage scene={scene} theme={theme} length={sceneLength} />
-            </Sequence>
-          );
-        });
+        return (
+          <Sequence
+            key={eventCmSceneKey(beat)}
+            from={from}
+            durationInFrames={length}
+          >
+            <Stage
+              scene={sceneForRole(beat.role, brief, beat.index)}
+              theme={theme}
+              length={length}
+            />
+          </Sequence>
+        );
       })}
       {/* Above every scene. Subtitles are not one scene's business. */}
       <CaptionBand captions={captionsFor(brief)} theme={theme} />

@@ -18,8 +18,17 @@ import { sanitizeFacts, type SanitizeReport } from "./sanitize";
 // PDFs and images arrive here whole, because the extraction stage has no
 // parser for them (extract.ts). They are attached as file/image parts, so the
 // model reads the flyer itself rather than a lossy transcription of it.
+//
+// Images are read in the SAME call as the facts, and that is a design decision
+// rather than a saving. What links a photograph to a speaker is the document
+// that names them — a caption under a portrait, a line in a programme. Sending
+// the pictures to one call and the text to another means throwing that link
+// away and then trying to rebuild it from names alone. Each image is announced
+// by a heading carrying its material ID, so the model has something to point
+// at when it answers; before that, images arrived anonymously and could not be
+// referred to at all.
 
-const MODEL = "gpt-5.6-terra";
+const MODEL = "gpt-5.6-luna";
 const LLM_TIMEOUT_MS = 180_000;
 
 const openai = (): OpenAI => new OpenAI({ timeout: LLM_TIMEOUT_MS, maxRetries: 2 });
@@ -58,7 +67,61 @@ const SYSTEM = `あなたはイベント告知資料の読み取り担当です�
 - venue: 会場
 - fee: 参加費
 - cta: 申し込み方法・行動喚起
-- footnote: 注記（年齢制限・定員など）`;
+- footnote: 注記（年齢制限・定員など）
+
+## 画像の読み取り
+
+画像には【画像 ラベル / ID: xxxx】という見出しが付いています。**渡されたすべての画像について1件ずつ** images に結果を返してください。判定できない画像も unreadable として残し、飛ばさないでください。ref にはその画像のIDをそのまま入れます。
+
+- role: speaker-portrait（人物の顔が主役）/ key-visual（イベント全体の雰囲気・主役の情景）/ scene-photo（実演・展示・会場内の活動）/ venue（会場・空間そのもの）/ logo（主催・協賛のマーク）/ document（文字が主役の資料ページ・チラシ）/ texture（質感・装飾・背景）/ unreadable
+- caption: 何が写っているかを一文で
+- visibleText: 画像内で読める文字（キャプション・氏名・社名）。無ければ空配列
+- personName: **画像のキャプション・資料本文・ファイル名から氏名が分かる場合だけ**その氏名。**顔から人物を推測することは絶対にしない。** 根拠が無ければ null
+- personEvidence: 氏名の根拠（image-caption / document-text / filename）。personName が null なら null
+
+**ファイル名は根拠です。** 画像の見出しにはファイル名が入っています。ファイル名（ローマ字・かな・漢字）が、資料に出てくる登壇者の姓または氏名と対応するなら、それを filename 根拠として personName に書いてください。例: 「miyao.jpg」と資料の「宮尾佳明」→ personName は「宮尾佳明」、personEvidence は filename。「yamada_taro.png」と「山田太郎」も同じです。「IMG_2831.jpg」「AdobeStock_1894358160.jpeg」のように人を指さないファイル名であれば null のままにしてください。
+
+**顔の一致で決めないこと**は変わりません。ファイル名という書かれた根拠があるから結びつけるのであって、写っている顔から誰かを当ててはいけません。
+- focusX / focusY: 主役（顔・被写体）が画面のどこにあるか
+- confidence: この判定の確からしさ
+- reason: そう判定した理由を短く`;
+
+/**
+ * What one image is, and what the material says about it.
+ *
+ * The classification is the model's job; where the picture ends up is not
+ * (lib/event-cm/place-images.ts). Two fields carry the whole safety rule:
+ * `personName` may only be filled from something written down, and
+ * `personEvidence` says which written thing it was. A face alone never
+ * identifies anybody.
+ *
+ * The focus point is an enum rather than coordinates because a model's numeric
+ * guess at "where is the face" is not measurement. Five bands is the precision
+ * the hand-composed brief actually used (remotion/event/briefs/sake-2026.ts).
+ */
+const ImageReadingSchema = z.object({
+  ref: z.string().describe("画像の見出しに書かれたID"),
+  role: z.enum([
+    "speaker-portrait",
+    "key-visual",
+    "scene-photo",
+    "venue",
+    "logo",
+    "document",
+    "texture",
+    "unreadable",
+  ]),
+  caption: z.string(),
+  visibleText: z.array(z.string()),
+  personName: z.string().nullable(),
+  personEvidence: z.enum(["image-caption", "document-text", "filename"]).nullable(),
+  focusX: z.enum(["left", "centre", "right"]),
+  focusY: z.enum(["top", "upper", "centre", "lower", "bottom"]),
+  confidence: z.enum(["high", "medium", "low"]),
+  reason: z.string(),
+});
+
+export type ImageReading = z.infer<typeof ImageReadingSchema>;
 
 const FactsSchema = z.object({
   title: z.string().nullable(),
@@ -76,6 +139,7 @@ const FactsSchema = z.object({
   fee: z.string().nullable(),
   cta: z.string().nullable(),
   footnote: z.string().nullable(),
+  images: z.array(ImageReadingSchema).describe("渡された画像すべて。1枚も飛ばさない"),
   note: z.string().nullable().describe("矛盾や判断に迷った点。無ければ null"),
 });
 
@@ -94,6 +158,10 @@ export interface StructuredResult {
   facts: EventFacts;
   /** Which materials were actually looked at. */
   readLabels: string[];
+  /** How many images went to the model, and how many came back judged. Kept
+   *  next to the result because "twelve sent, nine answered" is the difference
+   *  between a picture nobody used and a picture nobody looked at. */
+  imageCounts: { sent: number; judged: number };
   /** What the deterministic pass threw away, and why. */
   dropped: SanitizeReport["dropped"];
   usage: { inputTokens: number; outputTokens: number } | null;
@@ -110,6 +178,7 @@ export async function structureEventFacts(
   }
 
   const content: ContentPart[] = [];
+  let sentImages = 0;
   for (const source of usable) {
     if (source.mode === "text" && source.text) {
       content.push({ type: "text", text: `【${source.label}】\n${source.text}` });
@@ -117,6 +186,7 @@ export async function structureEventFacts(
     }
     if (!source.data) continue;
     if (source.mediaType === "application/pdf") {
+      content.push({ type: "text", text: `【資料 ${source.label}】` });
       content.push({
         type: "file",
         file: {
@@ -125,15 +195,25 @@ export async function structureEventFacts(
         },
       });
     } else {
+      // The heading is what makes the picture referable. Without it the model
+      // can describe an image but cannot say which one it described, and the
+      // answer cannot be joined back to a material.
+      content.push({
+        type: "text",
+        text: `【画像 ${source.label} / ID: ${source.materialId}】`,
+      });
       content.push({
         type: "image_url",
-        image_url: { url: `data:${source.mediaType};base64,${source.data}` },
+        image_url: {
+          url: `data:${source.image?.sentAs ?? source.mediaType};base64,${source.data}`,
+        },
       });
+      sentImages += 1;
     }
   }
   content.push({
     type: "text",
-    text: "この資料から読み取れるイベントの事実だけを抜き出してください。書かれていない項目は null にしてください。",
+    text: "この資料から読み取れるイベントの事実だけを抜き出してください。書かれていない項目は null にしてください。画像は1枚ずつ images に判定を返し、氏名は根拠がある場合だけ書いてください。",
   });
 
   const response = await openai().chat.completions.parse({
@@ -158,6 +238,7 @@ export async function structureEventFacts(
   return {
     facts,
     readLabels: usable.map((source) => source.label),
+    imageCounts: { sent: sentImages, judged: facts.images?.length ?? 0 },
     dropped: report.dropped,
     usage: response.usage
       ? {

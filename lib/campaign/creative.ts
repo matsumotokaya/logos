@@ -25,7 +25,7 @@ import { luminance } from "../color";
 // - judgeBrandMatch (Stage 4): compare the rendered LP against the original
 //   site screenshot and flag mismatches before shipping.
 
-const MODEL = "gpt-5.6-terra";
+const MODEL = "gpt-5.6-luna";
 export const LLM_MODEL = MODEL;
 export const LLM_PROVIDER = "OpenAI API";
 export const LLM_ENGINE = `OpenAI API（Chat Completions + structured outputs / ${MODEL}）`;

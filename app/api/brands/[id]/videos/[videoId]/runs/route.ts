@@ -14,6 +14,9 @@ export interface TakeRunRecord {
   startedAt: string;
   finishedAt: string | null;
   error: string | null;
+  /** What the run was given. Recorded because "what did it read" is half of
+   *  "why did it produce that". */
+  input: unknown;
   /** What the run produced, as the run itself recorded it. */
   steps: unknown;
   usage: unknown;
@@ -48,7 +51,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("take_runs")
-    .select("id, stage, status, started_at, finished_at, error_message, steps, usage")
+    .select("id, stage, status, started_at, finished_at, error_message, input, steps, usage")
     .eq("take_id", take.id)
     .order("started_at", { ascending: false })
     .limit(50);
@@ -63,6 +66,7 @@ export async function GET(
     startedAt: row.started_at as string,
     finishedAt: (row.finished_at as string | null) ?? null,
     error: (row.error_message as string | null) ?? null,
+    input: row.input,
     steps: row.steps,
     usage: row.usage,
   }));

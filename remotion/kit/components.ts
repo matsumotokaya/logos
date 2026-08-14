@@ -18,7 +18,7 @@
 // Rendering lives in remotion/kit/render/*; this file is the contract, so it
 // stays free of React and can be reasoned about (and tested) on its own.
 
-import type { EventPhoto } from "@/remotion/event/types";
+import type { EventPhoto, LogoTreatment } from "@/remotion/event/types";
 
 /**
  * How loud a component is on its stage. Not a font size — the theme decides
@@ -27,6 +27,25 @@ import type { EventPhoto } from "@/remotion/event/types";
  */
 export const EMPHASIS_LEVELS = ["hero", "primary", "secondary", "caption"] as const;
 export type Emphasis = (typeof EMPHASIS_LEVELS)[number];
+
+/**
+ * What every instance may carry, whatever its kind.
+ *
+ * `fields` is what makes a storyboard editable. A component is built from the
+ * brief — a heading from `title`, a datetime from `schedule.date` and
+ * `schedule.time` — and until now that link only existed inside the builder, so
+ * a screen showing the scene could say what appears but not where to change it.
+ * Recording it on the instance keeps one source for the mapping: the builder
+ * still decides, and the renderer ignores this entirely.
+ *
+ * Order matters — the first is the component's primary field. Decoration
+ * (`rule`, `mark`) carries none, which is the honest answer for something that
+ * came from no fact at all.
+ */
+export interface ComponentMeta {
+  emphasis?: Emphasis;
+  fields?: string[];
+}
 
 export const COMPONENT_KINDS = [
   "kicker",
@@ -56,37 +75,49 @@ export interface PersonParams {
 }
 
 /** One component instance in a scene. Discriminated by `kind`. */
-export type SceneComponent =
-  /** Small label riding above the main statement: a series name, a round. */
-  | { kind: "kicker"; text: string; emphasis?: Emphasis }
-  /** The statement the scene exists to make. */
-  | { kind: "heading"; text: string; emphasis?: Emphasis }
-  | { kind: "subheading"; text: string; emphasis?: Emphasis }
-  /** Two or three short lines stacked as verse — a claim broken for rhythm,
-   *  not a paragraph that happened to wrap. */
-  | { kind: "lines"; lines: string[]; emphasis?: Emphasis }
-  | { kind: "body"; text: string; emphasis?: Emphasis }
-  /** A short label in a ruled or rounded enclosure. */
-  | { kind: "chip"; text: string; emphasis?: Emphasis }
-  /** Ordered items. `numbered` puts a large numeral beside each. */
-  | { kind: "list"; items: string[]; numbered?: boolean; emphasis?: Emphasis }
-  | { kind: "person"; person: PersonParams; emphasis?: Emphasis }
-  | { kind: "people"; people: PersonParams[]; emphasis?: Emphasis }
-  | { kind: "logo"; src: string | null; name: string; scale?: number; emphasis?: Emphasis }
-  | {
-      kind: "logoRow";
-      logos: Array<{ src: string | null; name: string; scale?: number }>;
-      emphasis?: Emphasis;
-    }
-  | { kind: "stat"; value: string; unit?: string; label?: string; emphasis?: Emphasis }
-  /** Dates need their own setting: the numerals, the weekday and the time are
-   *  three different sizes in every well-set announcement. */
-  | { kind: "datetime"; date: string; weekday?: string; time?: string; emphasis?: Emphasis }
-  | { kind: "cta"; text: string; emphasis?: Emphasis }
-  | { kind: "image"; photo: EventPhoto | null; emphasis?: Emphasis }
-  /** Structure, not decoration: in this art direction a rule carries weight. */
-  | { kind: "rule"; length?: "short" | "full"; emphasis?: Emphasis }
-  | { kind: "mark"; glyph?: string; emphasis?: Emphasis };
+export type SceneComponent = ComponentMeta &
+  (
+    /** Small label riding above the main statement: a series name, a round. */
+    | { kind: "kicker"; text: string }
+    /** The statement the scene exists to make. */
+    | { kind: "heading"; text: string }
+    | { kind: "subheading"; text: string }
+    /** Two or three short lines stacked as verse — a claim broken for rhythm,
+     *  not a paragraph that happened to wrap. */
+    | { kind: "lines"; lines: string[] }
+    | { kind: "body"; text: string }
+    /** A short label in a ruled or rounded enclosure. */
+    | { kind: "chip"; text: string }
+    /** Ordered items. `numbered` puts a large numeral beside each. */
+    | { kind: "list"; items: string[]; numbered?: boolean }
+    | { kind: "person"; person: PersonParams }
+    | { kind: "people"; people: PersonParams[] }
+    | {
+        kind: "logo";
+        src: string | null;
+        name: string;
+        scale?: number;
+        treatment?: LogoTreatment;
+      }
+    | {
+        kind: "logoRow";
+        logos: Array<{
+          src: string | null;
+          name: string;
+          scale?: number;
+          treatment?: LogoTreatment;
+        }>;
+      }
+    | { kind: "stat"; value: string; unit?: string; label?: string }
+    /** Dates need their own setting: the numerals, the weekday and the time are
+     *  three different sizes in every well-set announcement. */
+    | { kind: "datetime"; date: string; weekday?: string; time?: string }
+    | { kind: "cta"; text: string }
+    | { kind: "image"; photo: EventPhoto | null }
+    /** Structure, not decoration: in this art direction a rule carries weight. */
+    | { kind: "rule"; length?: "short" | "full" }
+    | { kind: "mark"; glyph?: string }
+  );
 
 /**
  * What a component does with nothing in it.

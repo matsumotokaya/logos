@@ -7,23 +7,21 @@
 // the layout up.
 
 import React from "react";
-import { AbsoluteFill, useCurrentFrame } from "remotion";
-import { distribute, LAYOUTS, type Scene } from "../layout";
+import { AbsoluteFill, Img, interpolate, useCurrentFrame } from "remotion";
+import {
+  distribute,
+  LAYOUTS,
+  REGION_GEOMETRY,
+  STAGE,
+  type Scene,
+  type SceneBackdrop,
+} from "../layout";
 import { fitScene } from "../fit";
-import type { Theme } from "../theme";
+import { captionSafeBottom, type Theme } from "../theme";
 import { KitComponent } from "./KitComponent";
 import { enterDelay, sceneFade } from "./motion";
 import type { LayoutSlot } from "../layout";
 import type { Emphasis, SceneComponent } from "../components";
-
-const REGION_STYLE: Record<LayoutSlot["region"], React.CSSProperties> = {
-  centre: { alignItems: "center", justifyContent: "center", textAlign: "center" },
-  left: { alignItems: "flex-start", justifyContent: "center", textAlign: "left" },
-  right: { alignItems: "center", justifyContent: "center" },
-  "bottom-left": { alignItems: "flex-start", justifyContent: "flex-end", textAlign: "left" },
-  "bottom-right": { alignItems: "flex-end", justifyContent: "flex-end", textAlign: "right" },
-  full: { alignItems: "stretch", justifyContent: "stretch" },
-};
 
 const ALIGN: Record<LayoutSlot["align"], React.CSSProperties["alignItems"]> = {
   start: "flex-start",
@@ -31,10 +29,41 @@ const ALIGN: Record<LayoutSlot["align"], React.CSSProperties["alignItems"]> = {
   end: "flex-end",
 };
 
-/** Stage margins. Generous, and the same for every layout: the breathing room
- *  IS the art direction in this kind of film. */
-const PAD_X = 132;
-const PAD_Y = 96;
+/**
+ * The photograph a scene stands on.
+ *
+ * Cover, framed at the brief's focus point, dimmed by the theme, pushed slowly
+ * for the length of the scene and covered by a scrim. The push is what keeps a
+ * still photograph from reading as a paused video; the scrim is what lets any
+ * photograph — including a bright one nobody art-directed — carry type.
+ */
+const Backdrop: React.FC<{
+  backdrop: SceneBackdrop;
+  theme: Theme;
+  length: number;
+}> = ({ backdrop, theme, length }) => {
+  const frame = useCurrentFrame();
+  const [from, to] = theme.backdrop.push;
+  const focus = backdrop.photo.focus ?? { x: 0.5, y: 0.5 };
+  return (
+    <AbsoluteFill>
+      <Img
+        src={backdrop.photo.src}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: `${focus.x * 100}% ${focus.y * 100}%`,
+          opacity: theme.backdrop.opacity[backdrop.weight],
+          transform: `scale(${interpolate(frame, [0, Math.max(length, 1)], [from, to], {
+            extrapolateRight: "clamp",
+          })})`,
+        }}
+      />
+      <AbsoluteFill style={{ background: theme.backdrop.scrim }} />
+    </AbsoluteFill>
+  );
+};
 
 export const Stage: React.FC<{
   scene: Scene;
@@ -63,9 +92,13 @@ export const Stage: React.FC<{
 
   return (
     <AbsoluteFill style={{ opacity: sceneFade(theme, frame, length) }}>
+      {scene.backdrop ? (
+        <Backdrop backdrop={scene.backdrop} theme={theme} length={length} />
+      ) : null}
       {groups.map((components, slotIndex) => {
         const slot = spec.slots[slotIndex];
-        const isFull = slot.region === "full";
+        const geometry = REGION_GEOMETRY[slot.region];
+        const isFull = geometry.bleed;
         return (
           <AbsoluteFill
             key={`${slot.region}-${slotIndex}`}
@@ -73,12 +106,18 @@ export const Stage: React.FC<{
               display: "flex",
               flexDirection: "column",
               gap: slot.gap,
-              padding: isFull ? 0 : `${PAD_Y}px ${PAD_X}px`,
-              ...REGION_STYLE[slot.region],
+              padding: isFull ? 0 : `${STAGE.padY}px ${STAGE.padX}px`,
+              // The subtitle band owns the bottom of the frame; a region that
+              // stacks against the bottom edge stops above it (theme.ts).
+              ...(geometry.justifyContent === "flex-end" && !isFull
+                ? { paddingBottom: captionSafeBottom(theme) }
+                : {}),
+              justifyContent: geometry.justifyContent,
+              textAlign: geometry.textAlign,
               alignItems: isFull ? "stretch" : ALIGN[slot.align],
               // A split layout uses half the stage per side.
-              ...(slot.region === "left" ? { right: "50%" } : {}),
-              ...(slot.region === "right" && !fullBleed ? { left: "50%" } : {}),
+              ...(geometry.half === "left" ? { right: "50%" } : {}),
+              ...(geometry.half === "right" && !fullBleed ? { left: "50%" } : {}),
             }}
           >
             {components.map((component, i) => (

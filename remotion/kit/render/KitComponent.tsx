@@ -19,6 +19,7 @@ import {
   type PersonParams,
   type SceneComponent,
 } from "../components";
+import type { LogoTreatment } from "@/remotion/event/types";
 import type { Theme } from "../theme";
 import { enterStyle } from "./motion";
 
@@ -190,17 +191,37 @@ const PersonBlock: React.FC<{ theme: Theme; person: PersonParams; size: number }
 );
 
 /** A logo image, or its name set as a credit — the designed substitute. */
+/**
+ * How a mark is made legible on the stage it lands on.
+ *
+ * This was missing entirely: a brief could say `treatment: "invert"` and the kit
+ * drew the artwork raw, so a black SVG on the ink ground was a black rectangle
+ * nobody could see. `knockout` is the default here rather than `invert` because
+ * inverting a mark that was already light breaks it just as badly.
+ */
+const TREATMENT_FILTER: Record<LogoTreatment, string | undefined> = {
+  light: undefined,
+  invert: "invert(1)",
+  knockout: "brightness(0) invert(1)",
+};
+
 const LogoMark: React.FC<{
   theme: Theme;
   src: string | null;
   name: string;
   scale?: number;
   height: number;
-}> = ({ theme, src, name, scale = 1, height }) =>
+  treatment?: LogoTreatment;
+}> = ({ theme, src, name, scale = 1, height, treatment = "knockout" }) =>
   src ? (
     <Img
       src={resolveSrc(src)}
-      style={{ height: height * scale, width: "auto", objectFit: "contain" }}
+      style={{
+        height: height * scale,
+        width: "auto",
+        objectFit: "contain",
+        filter: TREATMENT_FILTER[treatment],
+      }}
     />
   ) : (
     <span
@@ -372,6 +393,7 @@ export const KitComponent: React.FC<{
             src={component.src}
             name={component.name}
             scale={component.scale}
+            treatment={component.treatment}
             height={step.size * 1.6}
           />
         </div>
@@ -396,6 +418,7 @@ export const KitComponent: React.FC<{
               src={logo.src}
               name={logo.name}
               scale={logo.scale}
+              treatment={logo.treatment}
               height={step.size * 1.5}
             />
           ))}

@@ -140,13 +140,29 @@ export function videoPipeline(input: VideoPipelineInput): VideoPipeline {
   // is about what came in from outside.
   const sourceCount = input.sourceCount ?? 0;
   const inputAt = input.sourcePinnedAt ?? null;
-  const inputStatus: PipelineStageStatus = sourceCount > 0 ? "ready" : "empty";
-
-  // extract: a run of the extraction stage. Stale once material was added
-  // after the last run, which is what makes "add a flyer" visibly change the
-  // state of the stages below it.
   const extractAt = input.runs?.extract ?? null;
-  const extractStatus = statusFor(extractAt, inputAt, Boolean(extractAt), false);
+
+  // input and extraction are one stage.
+  //
+  // They were two, and the split cost a user a whole round trip: a flyer was
+  // uploaded, "資料を読み取る" was pressed, it said 成功, and the video still
+  // described a different event — because reading is not applying, and the two
+  // steps that do apply were in drawers nobody had been told to open.
+  //
+  // Merging them is also honest about what reading currently is. slide-factory
+  // keeps ①入力・抽出 as one stage because its extractor really parses PDFs and
+  // spreadsheets; here extraction reads text files and *carries* everything
+  // else to the model, so a stage of its own was announcing work that mostly
+  // does not happen. When a real parser arrives it can split again.
+  //
+  // `stale` with material and no run is the state that matters: there is
+  // something to read and it has not been read.
+  const inputStatus: PipelineStageStatus =
+    sourceCount === 0
+      ? "empty"
+      : extractAt
+        ? statusFor(extractAt, inputAt, true, false)
+        : "stale";
 
   // structure: a run that worked out the event's facts from what was read.
   // Recorded, not applied — applying is the map stage's job, which is what
@@ -156,7 +172,7 @@ export function videoPipeline(input: VideoPipelineInput): VideoPipeline {
     structureAt,
     extractAt ?? inputAt,
     Boolean(structureAt),
-    extractStatus === "stale",
+    inputStatus === "stale",
   );
 
   // map: the brief as it now stands — what the template renders from. It has
@@ -196,18 +212,17 @@ export function videoPipeline(input: VideoPipelineInput): VideoPipeline {
   const stages: PipelineStage[] = [
     {
       id: "input",
-      label: STAGE_LABELS.input,
+      // Not STAGE_LABELS.input: the merge is this pipeline's decision, and the
+      // brand-asset pipeline still has the two stages separately.
+      label: "入力・抽出",
       status: inputStatus,
       summary:
-        sourceCount > 0 ? `資料${sourceCount}件` : "資料なし（すべてこちらの提案）",
-      producedAt: inputAt,
-    },
-    {
-      id: "extract",
-      label: STAGE_LABELS.extract,
-      status: extractStatus,
-      summary: extractAt ? "資料を読み取り済み" : "未実行",
-      producedAt: extractAt,
+        sourceCount === 0
+          ? "資料なし（すべてこちらの提案）"
+          : extractAt && inputStatus === "ready"
+            ? `資料${sourceCount}件・読み取り済み`
+            : `資料${sourceCount}件・未読み取り`,
+      producedAt: extractAt ?? inputAt,
     },
     {
       id: "structure",

@@ -27,6 +27,7 @@ const READ_FROM_SAKE_MATERIAL: EventFacts = {
   fee: "XXXX円",
   cta: "ホームページはこちら",
   footnote: "レオパレス21 オーナー約40名・社員約10名",
+  images: [],
   note: null,
 };
 

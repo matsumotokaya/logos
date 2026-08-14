@@ -12,8 +12,13 @@
 import { guardLabsRequest } from "@/lib/labs-access";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { draftEventCmScript, eventCmScriptAvailable } from "@/lib/event-cm/script";
+import { applySuppression } from "@/lib/event-cm/facts";
 import { validateBrief } from "@/lib/templates/brief-schemas";
-import { EVENT_CM_SCENE_ROLES, type EventCmBrief } from "@/remotion/event-cm/types";
+import {
+  eventCmNarratedSteps,
+  eventCmSceneKey,
+  type EventCmBrief,
+} from "@/remotion/event-cm/types";
 
 const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -89,7 +94,14 @@ export async function POST(
 
   let draft;
   try {
-    draft = await draftEventCmScript(brief, { now: new Date().toISOString() });
+    // Written against the brief AS THE FILM SEES IT. A field switched off is not
+    // on screen, so it must not be spoken either — and, more mechanically, the
+    // shape of the script has to match the shape of the film: with the speakers
+    // switched off there is no speaker picture, and a line written for one would
+    // have nowhere to go.
+    draft = await draftEventCmScript(applySuppression(brief), {
+      now: new Date().toISOString(),
+    });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "台本を生成できませんでした" },
@@ -140,22 +152,61 @@ export async function PATCH(
     return Response.json({ error: "台本のシーンが必要です" }, { status: 400 });
   }
 
+  // Keyed by scene identity: a caller editing the second programme's line sends
+  // `{ role: "program", index: 1 }`, and keying by role alone would have written
+  // that text over all three programme pictures.
   const texts = new Map<string, string>();
   for (const raw of body.scenes) {
     if (!raw || typeof raw !== "object") continue;
-    const scene = raw as { role?: unknown; text?: unknown };
+    const scene = raw as { role?: unknown; index?: unknown; text?: unknown };
     if (typeof scene.role === "string" && typeof scene.text === "string") {
-      texts.set(scene.role, scene.text.trim());
+      const key =
+        typeof scene.index === "number"
+          ? `${scene.role}#${scene.index}`
+          : scene.role;
+      texts.set(key, scene.text.trim());
     }
   }
   const brief = loaded.take.brief as EventCmBrief;
-  const scenes = EVENT_CM_SCENE_ROLES.map((role, i) => ({
-    role,
-    text: texts.get(role) ?? brief.script?.scenes[i]?.text ?? "",
-  }));
-  if (scenes.some((scene) => !scene.text)) {
+  // The script holds the narrated PICTURES of this brief — four with nobody
+  // announced, one per programme when several are listed — not all seven scenes.
+  // Walking every role and reading the previous text by array index did both
+  // wrong: it demanded words for the two silent mark scenes, and it lined line 1
+  // up against scene 0. So the shape comes from the brief and previous text is
+  // looked up by scene identity, which is also what lets a caller send one line
+  // and keep the rest.
+  // The film's shape, not the brief's raw contents: a suppressed field has no
+  // picture. The brief itself is saved unsuppressed — switching a field off is a
+  // decision to hide it, never to delete it.
+  const steps = eventCmNarratedSteps(applySuppression(brief));
+  const previous = new Map(
+    (brief.script?.scenes ?? []).map(
+      (scene) => [eventCmSceneKey(scene), scene.text] as const,
+    ),
+  );
+  // A partial script is a legal, ordinary state — not an error.
+  //
+  // This used to demand a line for every narrated picture, which made saving ONE
+  // line impossible the moment the film gained a picture nobody had written yet:
+  // splitting three programmes into three pictures left two of them blank, so
+  // every single-line save was refused with 「空のコマがあります」. Everything
+  // downstream already handles a missing line: the timeline falls back to that
+  // scene's budget, the captions skip it, and `scriptIsStale` reports that the
+  // narration is not finished. So lines with no words are simply not stored, and
+  // the order of the ones that are is the film's order.
+  const scenes = steps
+    .map((step) => {
+      const key = eventCmSceneKey(step);
+      return {
+        role: step.role,
+        ...(step.index === undefined ? {} : { index: step.index }),
+        text: texts.get(key) ?? previous.get(key) ?? "",
+      };
+    })
+    .filter((scene) => scene.text.length > 0);
+  if (scenes.length === 0) {
     return Response.json(
-      { error: "すべてのシーンに読み上げる言葉が必要です" },
+      { error: "読み上げる言葉がありません" },
       { status: 400 },
     );
   }

@@ -11,6 +11,9 @@ import { type VideoState } from "@/lib/video/asset";
 import { VIDEO_TEMPLATES } from "@/lib/video/templates";
 import { renderOutputSignatureToken } from "../../takes/[takeId]/renders/[renderId]/output/route";
 import { resolveBriefMaterialUrls } from "@/lib/takes/materials";
+import { deleteTake, parseMaterialDisposition } from "@/lib/takes/delete";
+import { titleOffer } from "@/lib/event-cm/title";
+import type { EventCmBrief } from "@/remotion/event-cm/types";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import {
   ensureCanonicalVideoPublication,
@@ -42,7 +45,10 @@ export async function GET(
 
   const { data: take, error: takeError } = await supabase
     .from("takes")
-    .select("id, brand_id, template_id, title, brief, created_at")
+    // The brand's name travels with the take because the page says where you
+    // are: a breadcrumb reading 「ブランド」 names no brand, and this screen is
+    // reached from a tree where the brand is the thing you picked.
+    .select("id, brand_id, template_id, title, brief, created_at, brand_entities(name)")
     .eq("id", videoId)
     .eq("brand_id", brandId)
     .eq("tool_kind", "video")
@@ -85,6 +91,7 @@ export async function GET(
     // server and the private R2 keys off the wire.
     let briefForClient = take.brief;
     let unresolvedMaterials: string[] = [];
+    let materialUrls: Record<string, string> = {};
     try {
       const resolvedBrief = await resolveBriefMaterialUrls(
         supabase,
@@ -94,6 +101,7 @@ export async function GET(
       );
       briefForClient = resolvedBrief.brief;
       unresolvedMaterials = resolvedBrief.unresolved;
+      materialUrls = resolvedBrief.urls;
     } catch {
       // A material read failure must not take the page down: the brief still
       // describes the video, and the slot list below the player is derived
@@ -132,34 +140,56 @@ export async function GET(
               }
             : null;
 
-    return Response.json({
-      kind: "asset" as const,
-      video: {
-        render: renderState,
-        mp4Url,
-        id: take.id,
-        brandId: take.brand_id,
-        title: take.title,
-        template: take.template_id,
-        templateName: VIDEO_TEMPLATES[take.template_id]?.name ?? take.template_id,
-        published: (publicationResult.data?.length ?? 0) > 0,
-        publicUrl: publicationResult.data?.[0]?.url_path ?? null,
-        briefSlug: null,
-        brief: take.template_id === "event-promo" ? eventBrief : briefForClient,
-        campaignJobId,
-        unresolvedMaterials,
-        state: artifact
-          ? "mp4_ready"
-          : take.template_id === "product-cm"
-            ? hasPinnedVoice
-              ? "preview_ready"
-              : campaignVideoState(campaignJobId)
-            : eventBrief
-              ? "preview_ready"
-              : "empty",
-        createdAt: take.created_at,
+    return Response.json(
+      {
+        kind: "asset" as const,
+        video: {
+          render: renderState,
+          mp4Url,
+          id: take.id,
+          brandId: take.brand_id,
+          brandName:
+            (Array.isArray(take.brand_entities)
+              ? take.brand_entities[0]?.name
+              : (take.brand_entities as { name?: string } | null)?.name) ?? null,
+          title: take.title,
+          template: take.template_id,
+          templateName: VIDEO_TEMPLATES[take.template_id]?.name ?? take.template_id,
+          published: (publicationResult.data?.length ?? 0) > 0,
+          publicUrl: publicationResult.data?.[0]?.url_path ?? null,
+          briefSlug: null,
+          brief: take.template_id === "event-promo" ? eventBrief : briefForClient,
+          campaignJobId,
+          unresolvedMaterials,
+          // material:<uuid> → the signed URL it became, so a picker can tell
+          // which of its options the brief currently holds.
+          materialUrls,
+          // What this take can actually do right now.
+          //
+          // `eventBrief` is only set for event-promo, so every event-cm take
+          // reported "empty" — 「未作成」 — while its film was playing in the
+          // player two inches below the label. The honest test is whether there
+          // is a brief to render, which for both event templates is true from
+          // the moment the take exists.
+          state: artifact
+            ? "mp4_ready"
+            : take.template_id === "product-cm"
+              ? hasPinnedVoice
+                ? "preview_ready"
+                : campaignVideoState(campaignJobId)
+              : briefForClient
+                ? "preview_ready"
+                : "empty",
+          createdAt: take.created_at,
+        },
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+          Vary: "Authorization",
+        },
+      },
+    );
   }
 
   return Response.json({ error: "動画が見つかりません" }, { status: 404 });
@@ -180,7 +210,15 @@ export async function PATCH(
   const { id: brandId, videoId } = await ctx.params;
   const supabase = createServerSupabaseForToken(user.token);
 
-  let body: { published?: unknown; brief?: unknown; title?: unknown };
+  let body: {
+    published?: unknown;
+    brief?: unknown;
+    title?: unknown;
+    /** Answer to "rename this video to the event's title?" — see
+     *  lib/event-cm/title.ts. Kept as one field so the rule for what each
+     *  answer writes lives on the server, not in the button. */
+    titleOffer?: unknown;
+  };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -189,7 +227,7 @@ export async function PATCH(
 
   const { data: take, error: takeReadError } = await supabase
     .from("takes")
-    .select("id, template_id, brief")
+    .select("id, template_id, title, brief")
     .eq("id", videoId)
     .eq("brand_id", brandId)
     .eq("tool_kind", "video")
@@ -258,6 +296,29 @@ export async function PATCH(
     if (typeof body.title === "string" && body.title.trim()) {
       update.title = body.title.trim();
     }
+    if (body.titleOffer === "accept" || body.titleOffer === "decline") {
+      const current = take.brief as EventCmBrief;
+      const proposed = titleOffer(take.title as string, current);
+      if (proposed) {
+        if (body.titleOffer === "accept") {
+          update.title = proposed;
+        } else {
+          // Remembering the exact string means a *different* title proposed
+          // later still gets asked about.
+          const declined = validateBrief("event-cm", {
+            ...current,
+            titleDeclined: proposed,
+          });
+          if (!declined.ok) {
+            return Response.json(
+              { error: declined.issues.join(", ") },
+              { status: 400 },
+            );
+          }
+          update.brief = declined.brief;
+        }
+      }
+    }
     if (Object.keys(update).length > 1) {
       const { error: updateError } = await supabase
         .from("takes")
@@ -271,4 +332,70 @@ export async function PATCH(
   }
 
   return Response.json({ error: "動画が見つかりません" }, { status: 404 });
+}
+
+// Removing a video for good.
+//
+// The whole decision lives in `delete_take` (0031) — permission, the live
+// publication refusal, and what happens to material this take is the only
+// holder of. This route's only judgement is that the take is a video of *this*
+// brand, so a video id from another brand cannot be deleted through this path.
+export async function DELETE(
+  req: Request,
+  ctx: { params: Promise<{ id: string; videoId: string }> },
+) {
+  const denied = await guardLabsRequest(req);
+  if (denied) return denied;
+  let user;
+  try {
+    user = await requireUser(req);
+  } catch {
+    return unauthorized();
+  }
+  const { id: brandId, videoId } = await ctx.params;
+  const supabase = createServerSupabaseForToken(user.token);
+
+  const url = new URL(req.url);
+  const disposition = parseMaterialDisposition(url.searchParams.get("materials"));
+  if (!disposition) {
+    return Response.json({ error: "素材の扱いが不正です" }, { status: 400 });
+  }
+
+  const { data: take, error: takeError } = await supabase
+    .from("takes")
+    .select("id")
+    .eq("id", videoId)
+    .eq("brand_id", brandId)
+    .eq("tool_kind", "video")
+    .maybeSingle();
+  if (takeError) {
+    return Response.json({ error: "動画を確認できませんでした" }, { status: 500 });
+  }
+  if (!take) {
+    return Response.json({ error: "動画が見つかりません" }, { status: 404 });
+  }
+
+  const outcome = await deleteTake(supabase, {
+    brandId,
+    takeId: take.id as string,
+    disposition,
+  });
+  if (!outcome.ok) {
+    return Response.json(
+      {
+        error: outcome.error,
+        needsMaterialDecision: outcome.needsMaterialDecision,
+      },
+      { status: outcome.status },
+    );
+  }
+
+  return Response.json(
+    {
+      ok: true,
+      cleanupPending: outcome.cleanupPending,
+      promotedMaterials: outcome.promotedMaterials,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

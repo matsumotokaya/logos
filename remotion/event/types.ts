@@ -31,7 +31,21 @@ export interface EventPhoto {
  * Opaque logos on a white plate are knocked out ahead of time by
  * labs/event/scripts/prepare-assets.mjs and arrive here as `light`.
  */
-export type LogoTreatment = "light" | "invert";
+export type LogoTreatment =
+  /** Already light: draw as supplied. */
+  | "light"
+  /** Dark artwork on transparency: invert it. Keeps a two-tone mark two-tone. */
+  | "invert"
+  /**
+   * Draw as a white silhouette whatever colour it is (`brightness(0) invert(1)`).
+   *
+   * The default on a dark stage, and the only treatment that cannot fail: a
+   * brand SVG may be black, coloured, or two-tone, and `invert` turns a light
+   * mark dark just as readily as it fixes a dark one. Losing the brand colour is
+   * the accepted cost — a knocked-out mark is the standard way to credit a
+   * presenter on black, and an unreadable one credits nobody.
+   */
+  | "knockout";
 
 export interface EventLogo {
   name: string;

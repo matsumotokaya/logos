@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { EventBriefSchema } from "@/remotion/event/brief-schema";
 import { CmVoiceTrackSchema } from "@/lib/templates/voice-schema";
-import { EVENT_CM_SCENE_ROLES } from "./types";
+import { EVENT_CM_NARRATED_ROLES } from "./types";
 
 // Runtime shape of an EventCmBrief. Like the event-promo schema this validates
 // STRUCTURE, not completeness.
@@ -12,15 +12,19 @@ import { EVENT_CM_SCENE_ROLES } from "./types";
 //   0 scenes — not written yet. A seeded take is created before the narration
 //              stage runs, and the goal reports the script as the one thing
 //              still missing (lib/pipeline/event-cm.ts).
-//   5 scenes — each role exactly once, in order. The composition picks a scene
-//              component per role, so a script missing `cta` is not an
-//              incomplete brief, it is a film with no ending.
+//   written  — one line per narrated scene, in film order, no repeats. Which
+//              scenes those are depends on the facts: with nobody announced
+//              there is no speaker picture, so a four-beat script is complete
+//              (types.ts `eventCmScenePlan`). What is never legal is a line for
+//              a scene the film does not have, or the same scene twice.
 //
-// Anything between the two is a half-written script, which nothing produces on
-// purpose and no renderer can use.
+// A half-written script is what nothing produces on purpose and no renderer can
+// use, so the schema refuses it rather than rendering a film with a silent gap.
 
 export const EventCmSceneSchema = z.object({
-  role: z.enum(EVENT_CM_SCENE_ROLES),
+  role: z.enum(EVENT_CM_NARRATED_ROLES as [string, ...string[]]),
+  /** Which item, when the role repeats (one picture per programme). */
+  index: z.number().int().min(0).optional(),
   text: z.string(),
 });
 
@@ -33,12 +37,35 @@ export const EventCmScriptSchema = z
     angle: z.string(),
   })
   .refine(
-    (script) =>
-      script.scenes.length === 0 ||
-      (script.scenes.length === EVENT_CM_SCENE_ROLES.length &&
-        script.scenes.every((scene, i) => scene.role === EVENT_CM_SCENE_ROLES[i])),
+    (script) => {
+      if (script.scenes.length === 0) return true;
+      // Roles keep the film's order, and a role may repeat ONLY as consecutive
+      // indexed pictures — which is what a programme per picture is. So the
+      // check is: role positions never go backwards, an index appears only where
+      // the role legitimately repeats, and no two pictures are the same picture.
+      const keys = script.scenes.map((scene) =>
+        scene.index === undefined ? scene.role : `${scene.role}#${scene.index}`,
+      );
+      if (new Set(keys).size !== keys.length) return false;
+      const positions = script.scenes.map((scene) =>
+        (EVENT_CM_NARRATED_ROLES as readonly string[]).indexOf(scene.role),
+      );
+      if (positions.some((position) => position < 0)) return false;
+      return positions.every((position, at) => {
+        if (at === 0) return true;
+        const previous = positions[at - 1];
+        if (position > previous) return true;
+        // Same role twice: allowed when both are indexed and the index advances.
+        return (
+          position === previous &&
+          script.scenes[at].index !== undefined &&
+          script.scenes[at - 1].index !== undefined &&
+          (script.scenes[at].index as number) > (script.scenes[at - 1].index as number)
+        );
+      });
+    },
     {
-      message: `scenes must be empty, or exactly ${EVENT_CM_SCENE_ROLES.join(" → ")}`,
+      message: `scenes must be empty, or follow ${EVENT_CM_NARRATED_ROLES.join(" → ")} in that order (a role may repeat only as consecutive indexed scenes)`,
     },
   );
 
@@ -69,6 +96,7 @@ export const EventCmBriefSchema = EventBriefSchema.extend({
   provenance: EventCmProvenanceSchema.optional(),
   theme: EventCmThemeSchema.optional(),
   factsUpdatedAt: z.string().optional(),
+  titleDeclined: z.string().nullable().optional(),
   script: EventCmScriptSchema,
   voice: z
     .object({
@@ -77,5 +105,13 @@ export const EventCmBriefSchema = EventBriefSchema.extend({
     })
     .optional(),
 });
+
+// Deliberately NOT validated here: whether the script covers exactly the scenes
+// this brief needs. Reading a flyer that names a speaker adds a scene, and the
+// stored script — written when there was no speaker — would instantly become
+// invalid. Refusing to save a fact somebody just supplied is the wrong answer to
+// it; `scriptIsStale` reports the mismatch and the map stage rewrites. The film
+// keeps playing in the meantime, with the budget standing in for the line that
+// has not been written yet (timeline.ts).
 
 export type EventCmBriefInput = z.infer<typeof EventCmBriefSchema>;

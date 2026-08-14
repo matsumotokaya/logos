@@ -7,8 +7,11 @@ import {
   type GoalFieldState,
   type GoalProgress,
 } from "./stages";
-import type { EventCmBrief } from "@/remotion/event-cm/types";
-import { scriptChars } from "@/remotion/event-cm/types";
+import {
+  EVENT_CM_SUPPRESSED_NOTE,
+  scriptChars,
+  type EventCmBrief,
+} from "@/remotion/event-cm/types";
 
 /**
  * What an event video needs to know before it is any good.
@@ -45,6 +48,11 @@ export const EVENT_CM_GOAL: readonly GoalField[] = [
   // How it looks
   { path: "logos", label: "ロゴ", required: true },
   { path: "visuals.value", label: "主役の写真", required: false },
+  // Grounds, not decoration: the film uses one if it has one and stands on its
+  // own ink if it does not. Optional for that reason — a fallback is not a
+  // defect (§6), so a video with no scene photography is finished, not short.
+  { path: "visuals.programs", label: "プログラムの背景", required: false },
+  { path: "visuals.closing", label: "締めの背景", required: false },
   { path: "visuals.inkArt", label: "背景のアート", required: false },
   { path: "bgm", label: "BGM", required: false },
   // What it says
@@ -78,6 +86,8 @@ function filledPaths(brief: EventCmBrief): string[] {
   text("cta", brief.cta);
   list("logos", brief.logos);
   if (brief.visuals?.value) paths.push("visuals.value");
+  if (brief.visuals?.programs) paths.push("visuals.programs");
+  if (brief.visuals?.closing) paths.push("visuals.closing");
   text("visuals.inkArt", brief.visuals?.inkArt);
   text("bgm", brief.bgm);
   if (brief.script && scriptChars(brief.script) > 0) paths.push("script");
@@ -95,10 +105,10 @@ export interface EventCmGoalState {
   suppressed: string[];
 }
 
-/** Marker the facts surface writes when a field is switched off. Duplicated
- *  from lib/event-cm/facts.ts as a constant rather than imported, to keep this
- *  module free of the editing layer. */
-const SUPPRESSED_NOTE = "__suppressed__";
+/** Marker the facts surface writes when a field is switched off. Read from the
+ *  data contract so there is one spelling of it (the shape of the film depends
+ *  on the same marker — see `eventCmScenePlan`). */
+const SUPPRESSED_NOTE = EVENT_CM_SUPPRESSED_NOTE;
 
 /**
  * Read a brief against the goal, carrying each value's origin.

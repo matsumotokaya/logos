@@ -16,10 +16,13 @@ import { ORIGIN_LABELS, type FieldOrigin } from "@/lib/pipeline/stages";
 import type { GoalFieldState } from "@/lib/pipeline/stages";
 import {
   editableValue,
-  FACT_FIELDS,
+  factFieldsFor,
+  isPhotoSlot,
   isSuppressed,
+  photoOf,
   previewOf,
 } from "@/lib/event-cm/facts";
+import type { BriefSource } from "./BriefSourceIntake";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 
 const ORIGIN_STYLE: Record<FieldOrigin, string> = {
@@ -50,16 +53,40 @@ export default function FactList({
   goalFields,
   busy,
   onEdit,
+  paths,
+  imageSources = [],
 }: {
   brief: EventCmBrief;
   goalFields: GoalFieldState[];
   busy?: boolean;
   onEdit: (edit: FactEdit) => void;
+  /**
+   * Show only these fields, in this order. Used by one storyboard panel, whose
+   * business is the values that picture shows and no others. Omitted = the whole
+   * list, which is what the pipeline's structure stage wants.
+   */
+  paths?: string[];
+  /**
+   * The images pinned to this video, as the candidate list for a photo slot.
+   *
+   * There is no separate table of "candidates": every picture that was uploaded
+   * is still here, whether the automatic pass used it or left it alone. So the
+   * material list IS the candidate list, and choosing is picking from it.
+   */
+  imageSources?: BriefSource[];
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<string>("");
+  const [choosing, setChoosing] = useState<string | null>(null);
 
   const originOf = new Map(goalFields.map((field) => [field.path, field.origin]));
+  const byPath = new Map(factFieldsFor(brief).map((field) => [field.path, field]));
+  const fields = paths
+    ? paths.flatMap((path) => {
+        const field = byPath.get(path);
+        return field ? [field] : [];
+      })
+    : factFieldsFor(brief);
 
   const startEdit = (path: string) => {
     setDraft(editableValue(brief, path).join("\n"));
@@ -73,12 +100,15 @@ export default function FactList({
 
   return (
     <ul className="mt-4 flex flex-col gap-2">
-      {FACT_FIELDS.map((field) => {
+      {fields.map((field) => {
         const suppressed = isSuppressed(brief, field.path);
         const origin = originOf.get(field.path) ?? null;
         const preview = previewOf(brief, field.path);
         const editable = field.input === "text" || field.input === "lines";
         const isEditingThis = editing === field.path;
+        const photoSlot = isPhotoSlot(field.path);
+        const currentPhoto = photoSlot ? photoOf(brief, field.path) : null;
+        const isChoosingThis = choosing === field.path;
 
         return (
           <li
@@ -120,12 +150,35 @@ export default function FactList({
               )}
 
               {!isEditingThis ? (
-                <span className="min-w-0 flex-1 truncate text-[13px] text-ink-muted">
-                  {preview || "—"}
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  {/* The picture itself, small. A row that says 「写真あり」 and
+                      nothing else cannot answer the only question worth asking
+                      here — which photograph. */}
+                  {currentPhoto ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={currentPhoto}
+                      alt=""
+                      className="h-9 w-14 shrink-0 rounded border border-hairline object-cover"
+                    />
+                  ) : null}
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-ink-muted">
+                    {preview || "—"}
+                  </span>
                 </span>
               ) : null}
 
               <span className="ml-auto flex shrink-0 items-center gap-2">
+                {photoSlot && !suppressed ? (
+                  <button
+                    type="button"
+                    onClick={() => setChoosing(isChoosingThis ? null : field.path)}
+                    disabled={busy}
+                    className="text-[11px] text-accent hover:underline disabled:opacity-50"
+                  >
+                    {isChoosingThis ? "やめる" : currentPhoto ? "差し替え" : "選ぶ"}
+                  </button>
+                ) : null}
                 {editable && !suppressed ? (
                   isEditingThis ? (
                     <>
@@ -186,6 +239,46 @@ export default function FactList({
                 {field.input === "lines" ? (
                   <p className="mt-1.5 text-[11px] text-ink-faint">1行に1項目</p>
                 ) : null}
+              </div>
+            ) : null}
+
+            {isChoosingThis ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {imageSources.length === 0 ? (
+                  <p className="text-[11px] text-ink-faint">
+                    入力ステージに画像を追加すると、ここで選べるようになります。
+                  </p>
+                ) : (
+                  <>
+                    {imageSources.map((source) => (
+                      <button
+                        key={source.id}
+                        type="button"
+                        onClick={() => {
+                          onEdit({ path: field.path, src: `material:${source.id}` });
+                          setChoosing(null);
+                        }}
+                        disabled={busy}
+                        className="max-w-56 truncate rounded-full border border-hairline px-3 py-1 text-[11px] hover:border-ink disabled:opacity-50"
+                      >
+                        {source.label}
+                      </button>
+                    ))}
+                    {currentPhoto ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onEdit({ path: field.path, src: null });
+                          setChoosing(null);
+                        }}
+                        disabled={busy}
+                        className="rounded-full border border-hairline px-3 py-1 text-[11px] text-ink-faint hover:text-ink disabled:opacity-50"
+                      >
+                        写真を使わない
+                      </button>
+                    ) : null}
+                  </>
+                )}
               </div>
             ) : null}
 

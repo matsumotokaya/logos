@@ -11,6 +11,7 @@ import { type VideoState, type VideoSummary } from "@/lib/video/asset";
 import { emptyEventBrief } from "@/remotion/event/briefs";
 import { createTake } from "@/lib/takes/create";
 import { seedEventCmFromBrand } from "@/lib/event-cm/seed-from-brand";
+import { UNTITLED_VIDEO } from "@/lib/event-cm/title";
 import { draftEventCmScript, eventCmScriptAvailable } from "@/lib/event-cm/script";
 
 type TakeVideoRow = {
@@ -190,14 +191,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
     brief = seededBrief;
     pinMaterial = seeded.seeded.logoMaterial;
-    if (!title) title = seededBrief.title;
+    // Not the seeded event name: that is a proposal for the *film*, and using
+    // it as the video's name made a guess look like something somebody typed
+    // (lib/event-cm/title.ts).
+    if (!title) title = UNTITLED_VIDEO;
   } else if (template === "event-promo") {
     // The template IS the starting point. Copying an existing take as a
     // "base" was a way of getting materials before the take had its own input
     // stage; now it has one, and offering a video to build from asked the
     // user to pick a template twice.
-    brief = emptyEventBrief(title || "新しいイベント動画");
-    if (!title) title = "新しいイベント動画";
+    brief = emptyEventBrief(title || UNTITLED_VIDEO);
+    if (!title) title = UNTITLED_VIDEO;
   } else {
     // product-cm is driven by the campaign pipeline; the row records which job
     // owns the Brand Kit and narration.

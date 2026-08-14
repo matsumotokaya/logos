@@ -74,7 +74,9 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("take_inputs")
-    .select("role, pinned_at, brand_materials(id, kind, label, media_type, bytes, created_at)")
+    .select(
+      "role, pinned_at, brand_materials(id, kind, label, media_type, bytes, created_at, provenance)",
+    )
     .eq("take_id", loaded.take.id)
     .eq("role", SOURCE_ROLE);
   if (error) {
@@ -84,8 +86,22 @@ export async function GET(
   type Row = {
     pinned_at: string;
     brand_materials:
-      | { id: string; kind: string; label: string; media_type: string | null; bytes: number | null }
-      | Array<{ id: string; kind: string; label: string; media_type: string | null; bytes: number | null }>
+      | {
+          id: string;
+          kind: string;
+          label: string;
+          media_type: string | null;
+          bytes: number | null;
+          provenance: { upload_fingerprint?: unknown } | null;
+        }
+      | Array<{
+          id: string;
+          kind: string;
+          label: string;
+          media_type: string | null;
+          bytes: number | null;
+          provenance: { upload_fingerprint?: unknown } | null;
+        }>
       | null;
   };
   const materials = ((data ?? []) as Row[])
@@ -93,7 +109,20 @@ export async function GET(
       const material = Array.isArray(row.brand_materials)
         ? row.brand_materials[0]
         : row.brand_materials;
-      return material ? { ...material, pinnedAt: row.pinned_at } : null;
+      return material
+        ? {
+            id: material.id,
+            kind: material.kind,
+            label: material.label,
+            media_type: material.media_type,
+            bytes: material.bytes,
+            pinnedAt: row.pinned_at,
+            upload_fingerprint:
+              typeof material.provenance?.upload_fingerprint === "string"
+                ? material.provenance.upload_fingerprint
+                : null,
+          }
+        : null;
     })
     .filter((material): material is NonNullable<typeof material> => material !== null);
 
@@ -122,35 +151,91 @@ export async function POST(
 
   try {
     if (!isR2Configured()) throw new Error("素材の保存先が設定されていません");
-    const body = (await req.json()) as {
-      label?: unknown;
-      mediaType?: unknown;
-      data?: unknown;
-      text?: unknown;
-    };
-
     let buffer: Buffer;
     let mediaType: string;
-    if (typeof body.text === "string" && body.text.trim()) {
-      buffer = Buffer.from(body.text, "utf8");
-      mediaType = "text/plain";
-    } else if (typeof body.data === "string" && typeof body.mediaType === "string") {
-      if (!ACCEPTED.test(body.mediaType)) throw new Error("この形式は取り込めません");
-      buffer = Buffer.from(body.data, "base64");
-      mediaType = body.mediaType;
+    let requestedLabel: unknown;
+    let lastModified: string | null = null;
+    if (req.headers.get("content-type")?.includes("multipart/form-data")) {
+      const form = await req.formData();
+      const file = form.get("file");
+      if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
+        throw new Error("素材が空です");
+      }
+      mediaType =
+        typeof form.get("mediaType") === "string" ? String(form.get("mediaType")) : file.type;
+      if (!ACCEPTED.test(mediaType)) throw new Error("この形式は取り込めません");
+      if (file.size > MAX_BYTES) throw new Error("素材が大きすぎます（12MBまで）");
+      buffer = Buffer.from(await file.arrayBuffer());
+      requestedLabel = form.get("label") ?? file.name;
+      const rawLastModified = form.get("lastModified");
+      lastModified = typeof rawLastModified === "string" ? rawLastModified : null;
     } else {
-      throw new Error("素材が空です");
+      const body = (await req.json()) as {
+        label?: unknown;
+        mediaType?: unknown;
+        data?: unknown;
+        text?: unknown;
+      };
+      requestedLabel = body.label;
+      if (typeof body.text === "string" && body.text.trim()) {
+        buffer = Buffer.from(body.text, "utf8");
+        mediaType = "text/plain";
+      } else if (typeof body.data === "string" && typeof body.mediaType === "string") {
+        if (!ACCEPTED.test(body.mediaType)) throw new Error("この形式は取り込めません");
+        buffer = Buffer.from(body.data, "base64");
+        mediaType = body.mediaType;
+      } else {
+        throw new Error("素材が空です");
+      }
     }
     if (buffer.length === 0) throw new Error("素材が空です");
     if (buffer.length > MAX_BYTES) throw new Error("素材が大きすぎます（12MBまで）");
 
     const label =
-      typeof body.label === "string" && body.label.trim()
-        ? body.label.trim().slice(0, 200)
+      typeof requestedLabel === "string" && requestedLabel.trim()
+        ? requestedLabel.trim().slice(0, 200)
         : mediaType === "text/plain"
           ? "貼り付けたテキスト"
           : "素材";
     const checksum = createHash("sha256").update(buffer).digest("hex");
+    const uploadFingerprint =
+      lastModified && /^\d+$/.test(lastModified)
+        ? `${label}:${buffer.length}:${lastModified}`
+        : null;
+
+    // A retry may arrive after the browser lost the connection. Reuse the
+    // material already registered for this take instead of writing another
+    // object and pin. The client also skips known fingerprints before sending.
+    const existing = await supabase
+      .from("brand_materials")
+      .select("id, kind, label, media_type, bytes, created_at")
+      .eq("take_id", loaded.take.id)
+      .eq("checksum", checksum)
+      .limit(1)
+      .maybeSingle();
+    if (existing.error) throw new Error("既存の素材を確認できませんでした");
+    if (existing.data) {
+      const pinned = await supabase
+        .from("take_inputs")
+        .select("material_id")
+        .eq("take_id", loaded.take.id)
+        .eq("material_id", existing.data.id)
+        .eq("role", SOURCE_ROLE)
+        .limit(1)
+        .maybeSingle();
+      if (pinned.error) throw new Error("素材の登録状態を確認できませんでした");
+      if (!pinned.data) {
+        const repinned = await supabase.from("take_inputs").insert({
+          take_id: loaded.take.id,
+          material_id: existing.data.id,
+          role: SOURCE_ROLE,
+          checksum,
+        });
+        if (repinned.error) throw new Error("素材を入力として固定できませんでした");
+      }
+      return Response.json({ material: existing.data, duplicate: true }, { status: 200 });
+    }
+
     // Content hash in the key, as everywhere else: the same bytes uploaded
     // twice cannot become two objects.
     const r2Key = `brands/${brandId}/takes/${loaded.take.id}/materials/${checksum}`;
@@ -171,7 +256,11 @@ export async function POST(
         bytes: buffer.length,
         checksum,
         source_kind: "upload",
-        provenance: { source: "video_brief_input", uploaded_by: user.id },
+        provenance: {
+          source: "video_brief_input",
+          uploaded_by: user.id,
+          ...(uploadFingerprint ? { upload_fingerprint: uploadFingerprint } : {}),
+        },
         created_by: user.id,
       })
       .select("id, kind, label, media_type, bytes, created_at")

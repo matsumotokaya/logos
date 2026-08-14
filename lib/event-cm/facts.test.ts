@@ -100,3 +100,21 @@ test("音楽を選ぶと「あなたの入力」になる", () => {
   );
   assert.equal(chosen.provenance?.bgm?.origin, "user");
 });
+
+test("音楽や写真を選び直しても、ナレーションは古くならない", () => {
+  // The warning exists to say "the film is narrating a different event". A
+  // music track is not something the narration says, so choosing one must not
+  // put that warning on screen.
+  const bgm = markUserEdited(SEEDED, "bgm", "2026-08-14T00:00:00.000Z");
+  assert.equal(bgm.factsUpdatedAt, SEEDED.factsUpdatedAt);
+  const photo = markUserEdited(SEEDED, "visuals.programs", "2026-08-14T00:00:00.000Z");
+  assert.equal(photo.factsUpdatedAt, SEEDED.factsUpdatedAt);
+  const portrait = markUserEdited(SEEDED, "guests[0].photo", "2026-08-14T00:00:00.000Z");
+  assert.equal(portrait.factsUpdatedAt, SEEDED.factsUpdatedAt);
+
+  // A spoken fact still stamps: that is the whole point of the field.
+  const date = markUserEdited(SEEDED, "schedule.date", "2026-08-14T00:00:00.000Z");
+  assert.equal(date.factsUpdatedAt, "2026-08-14T00:00:00.000Z");
+  // And the origin is recorded either way, so no re-run overwrites the choice.
+  assert.equal(bgm.provenance?.bgm?.origin, "user");
+});

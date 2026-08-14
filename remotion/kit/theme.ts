@@ -106,6 +106,24 @@ export interface ThemeCaption {
   backdrop: "none" | "scrim" | "shadow" | "plate";
 }
 
+/**
+ * How a photograph laid under a scene is treated.
+ *
+ * Lifted straight out of 世界が恋する日本酒, where `SceneBackdrop` dimmed the
+ * same photograph to 0.5 behind the promise and 0.22 behind the programme, put
+ * a radial scrim over it, and pushed it slowly for the length of the scene.
+ * Here rather than in the scene for the usual reason: motion and treatment
+ * belong to the theme, or swapping the theme means rewriting every scene.
+ */
+export interface ThemeBackdrop {
+  /** Photo opacity under the scrim, by what the picture is doing in the scene. */
+  opacity: Record<"hero" | "support", number>;
+  /** Drawn over the photograph so type stays legible on any photograph. */
+  scrim: string;
+  /** Ken Burns: scale at the start of the scene and at the end. */
+  push: [number, number];
+}
+
 export interface Theme {
   id: string;
   name: string;
@@ -117,6 +135,7 @@ export interface Theme {
   scale: Record<Emphasis, TypeStep>;
   motion: ThemeMotion;
   ornament: ThemeOrnament;
+  backdrop: ThemeBackdrop;
   caption: ThemeCaption;
 }
 
@@ -155,9 +174,40 @@ export const SUMI_THEME: Theme = {
     transition: "fade",
   },
   ornament: { rules: true, markGlyph: "—", corner: "none" },
+  backdrop: {
+    opacity: { hero: 0.5, support: 0.22 },
+    scrim:
+      "radial-gradient(85% 75% at 50% 50%, rgba(11,13,19,0.42) 0%, rgba(11,13,19,0.92) 100%)",
+    push: [1.04, 1.13],
+  },
   // Set in the text face rather than the display mincho: a subtitle is read,
   // not composed, and mincho at 34px over moving footage loses its hairlines.
   caption: { size: 34, bottom: 72, color: "#ffffff", backdrop: "plate" },
+};
+
+/**
+ * How much of the bottom of the frame belongs to the subtitle.
+ *
+ * Subtitles are mandatory in this template — the film is watched muted — so the
+ * band is not something a scene may compose over. Before this, `full-bleed-overlay`
+ * set its copy at the stage margin (96px) while the plate sat from 72px to about
+ * 150px, and the promise scene's own words ran through the subtitle. Both are
+ * legible alone and neither is legible together.
+ *
+ * Two lines' worth, because a subtitle that wraps must not start the collision
+ * again. Bottom-anchored regions keep clear of it; centred ones are the fitter's
+ * business (fit.ts), since a centred block only reaches down here when it is
+ * already too tall.
+ */
+export const captionSafeBottom = (theme: Theme): number => {
+  // The plate's own geometry, as CaptionBand draws it: 1.5 line-height and
+  // 0.42em of padding above and below. Guessing a multiple of the font size
+  // instead left a nine-pixel overlap — close enough to look like a mistake
+  // rather than a margin.
+  const line = theme.caption.size * 1.5;
+  const padding = theme.caption.size * 0.84;
+  const plate = line * 2 + padding;
+  return Math.round(theme.caption.bottom + plate + 24);
 };
 
 export interface BrandThemeInput {

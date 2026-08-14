@@ -23,7 +23,7 @@ export const EventPhotoSchema = z.object({
 export const EventLogoSchema = z.object({
   name: z.string(),
   src: z.string().nullable(),
-  treatment: z.enum(["light", "invert"]).optional(),
+  treatment: z.enum(["light", "invert", "knockout"]).optional(),
   scale: z.number().positive().optional(),
 });
 

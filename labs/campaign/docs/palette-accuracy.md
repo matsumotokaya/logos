@@ -95,7 +95,7 @@ LLMに**色の証拠が一切渡っていない**まま、プロンプトの補�
 
 - **`page.evaluate`に関数を渡さない**。tsx(esbuild)のkeepNamesが`__name`ヘルパーを注入し、ブラウザ側で`ReferenceError: __name is not defined`になる。ページ内コレクタは純粋JSの文字列（`COLLECT_PAGE_COLORS`）として保持している
 - Playwright/Chromiumはローカルに`npm i playwright && npx playwright install chromium`で導入済み。`playwright`はNext.jsの既定`serverExternalPackages`に含まれるためnext.config変更は不要。Vercel本番ではcaptureがnullになりgenerated経路に落ちる（設計どおり。マネージド差し替えは`docs/deep-research-prompts.md`§4）
-- 裁定・検証のモデルは`lib/campaign/creative.ts`の`MODEL`（Tier S実装・受け入れ実測は`claude-opus-4-8`で実施。2026-07-19にOpenAI `gpt-5.6-terra`へ切り替え——請求体系の都合。Tierを下げる際の第一候補は検証の省略と裁定モデルの軽量化=luna）
+- 裁定・検証のモデルは`lib/campaign/creative.ts`の`MODEL`（Tier S実装・受け入れ実測は`claude-opus-4-8`で実施。現在はOpenAI `gpt-5.6-luna`を使用。Tierを下げる際の第一候補として検証の省略と裁定モデルの軽量化を採用）
 
 ### 実測結果（受け入れ基準の検証・2026-07-19）
 

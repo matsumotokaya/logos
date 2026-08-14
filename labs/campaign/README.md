@@ -37,7 +37,7 @@ UIフロー（`/campaigns`、当面Labsロール必須）:
 2. **結果レイアウトは最初からプレースホルダーで表示**（何が生成されるかを実行前から予測できる）。「LPと動画素材を生成」ボタン → **サーバー側のジョブとして生成が走る**（`var/campaign-lab/jobs/` に永続化、UIは2.5秒ポーリングで追従）。**ページを閉じても・回線が切れても生成は継続**し、次に開いたとき最新ジョブ（ログ+結果）が復元される。**2〜4分かかる**が、下記のとおり成果物は届いた順に画面へ埋まっていく
    - **段階的完成（progressive fill、2026-07-20実装）**: 全部が終わってから一括表示ではなく、各ステージの中間成果物を届いた順にプレースホルダーへ差し替える。実測タイミング（bakuraku.jp）: **サービス概要+URL ≈0.3秒**（`取得情報（仮）`バッジ付き）→ **ロゴ+デザイントークン ≈18秒** → **パレット証拠色チップ（役割未確定）≈18秒** → **パレット5色確定+`サイトから抽出`≈20秒** → **creative完了で分析・コピー・テーマ・LP・ナレーションが一括 ≈38秒**（=最長のcreative待ちの間、画面は既に7割埋まっている）→ verify中はLP見出しに`元サイトと照合中…`。各ブロックは `fill-in` 演出（fade+rise+アクセント色フラッシュ、`globals.css`）で入る
    - **実装**: パイプラインの各ステージ境界が `onPartial(patch)`（`CampaignPartial`=source/logo/design_tokens/palette_candidates/palette を蓄積）と、creative直後の `onDraft(kit, html)`（verify前にkit+LPを先行公開）を呼ぶ。ジョブに `partial` として溜め、jobs APIが返し、`ResultDigest` は「kit優先・無ければpartialで描画」する。**LLM・処理そのものは一切変更していない**（既存の縦貫通に観測点を足しただけ）
-3. **処理ログ**: 実行中は**画面右下のポップアップ**としてパイプラインの実イベントが流れる（engine→ingest→capture→palette→adjudicate→creative→verify→cost）。完了するとポップアップは自動で消え、プレースホルダーが実データに置き換わり、**ログはマーケティングアセットの下に参考情報として移動**する。captureが実行されたかスキップされたか（⚠表示）が利用者にも開発者にも見える。**LLM呼び出しは使用エンジン（OpenAI API / gpt-5.6-terra・Chat Completions + structured outputs）・実トークン数・概算USDコストをログに明示**し、最後に合計を出す（単価は `creative.ts` の `PRICE_PER_MTOK`: terra 入力$2.50/出力$15 per 1Mトークン）
+3. **処理ログ**: 実行中は**画面右下のポップアップ**としてパイプラインの実イベントが流れる（engine→ingest→capture→palette→adjudicate→creative→verify→cost）。完了するとポップアップは自動で消え、プレースホルダーが実データに置き換わり、**ログはマーケティングアセットの下に参考情報として移動**する。captureが実行されたかスキップされたか（⚠表示）が利用者にも開発者にも見える。**LLM呼び出しは使用エンジン（OpenAI API / gpt-5.6-luna・Chat Completions + structured outputs）・実トークン数・概算USDコストをログに明示**し、最後に合計を出す（単価は `creative.ts` の `PRICE_PER_MTOK`: luna 入力$1/出力$6 per 1Mトークン）
 4. 結果画面は2層:
    - **サービスヘッダー（分析結果）**: サービス名・タグライン・業種・事業タイプ・提供価値・ターゲット・概要。全アセットの一段上に置く
    - **マーケティングアセット**:
@@ -53,7 +53,7 @@ npm run campaign -- --name "MyApp" --desc "説明" --shots ./materials  # PDFや
 # 出力: var/campaign/<slug>/{brandkit.json, index.html, narration.txt}
 ```
 
-必要な環境変数: `.env.local` の `OPENAI_API_KEY`（LLMはOpenAIをメイン利用。モデルは `lib/campaign/creative.ts` の `MODEL`、現在 `gpt-5.6-terra`）。秘密値はリポジトリへコミットしない。インフラは他ラボと共有する方針（Labs認証・署名URL・R2等。campaign専用インフラは作らない）。
+必要な環境変数: `.env.local` の `OPENAI_API_KEY`（LLMはOpenAIをメイン利用。モデルは `lib/campaign/creative.ts` の `MODEL`、現在 `gpt-5.6-luna`）。秘密値はリポジトリへコミットしない。インフラは他ラボと共有する方針（Labs認証・署名URL・R2等。campaign専用インフラは作らない）。
 
 パレット抽出（Tier S capture）はローカルにChromiumが必要: `npx playwright install chromium`（`playwright` はdependencies導入済み）。無いホストではcaptureが自動でスキップされ、`palette_source: "generated"` のAI提案パレットに落ちる。
 
@@ -65,7 +65,7 @@ npm run campaign -- --name "MyApp" --desc "説明" --shots ./materials  # PDFや
 ソース（URL / PDF / 画像 / テキスト）
    ▼ Stage 1: ingest（スクレイピング・og:image） + capture（Playwrightで実画面レンダリング・証拠収集・ロゴ画像・デザイントークン）
    ▼ Stage 2: palette（CIELABクラスタリング → 証拠付きパレット候補）
-   ▼ Stage 3: creative（VLM裁定=候補からの選択のみ + OpenAI gpt-5.6-terra structured outputs）
+   ▼ Stage 3: creative（VLM裁定=候補からの選択のみ + OpenAI gpt-5.6-luna structured outputs）
 Service Brand Kit
   = service（名前/タグライン/概要 + 分析: 業種/事業タイプ/提供価値/ターゲット）
   + brand（palette + palette_source / font_style）

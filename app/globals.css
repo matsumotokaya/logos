@@ -27,6 +27,16 @@
   --color-plate: var(--plate);
   --color-plate-foreground: var(--plate-foreground);
 
+  /* Wide-desktop step, for surfaces that lay work out side by side (the video
+     storyboard puts three 16:9 pictures abreast here).
+
+     A named breakpoint rather than `min-[1800px]:`, because Tailwind emits
+     arbitrary media variants *before* the named ones — so `lg:grid-cols-2` won
+     on source order and the third column never appeared. In rem for the same
+     reason: the built-in breakpoints are rem, and a px value sorts outside that
+     sequence, which puts this block before `lg` again. 112.5rem = 1800px. */
+  --breakpoint-3xl: 112.5rem;
+
   --font-display: var(--font-display), var(--font-sans-stack);
   --font-sans: var(--font-inter), var(--font-sans-stack);
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
@@ -81,17 +91,23 @@ body {
 }
 
 /* Indeterminate progress bar: a segment sweeps across the track while an async
-   step (logo parse → save → navigation) is in flight. */
+   step (logo parse → save → navigation) is in flight.
+
+   Transform only. This used to animate `left` and `width`, which lays out and
+   paints on every frame — on the video page it shares the screen with a
+   Remotion player, and a bar that stutters the film it sits above is worse than
+   no bar. The element supplies its own width (w-2/5); the keyframe only moves
+   it, so 250% of its own width is exactly the far edge of the track. */
 @keyframes progress-indeterminate {
-  0%   { left: -45%; width: 45%; }
-  50%  { left: 30%;  width: 55%; }
-  100% { left: 100%; width: 45%; }
+  0%   { transform: translate3d(-100%, 0, 0); }
+  100% { transform: translate3d(250%, 0, 0); }
 }
 .progress-indeterminate {
   animation: progress-indeterminate 1.15s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .progress-indeterminate { animation: none; left: 0; width: 100%; opacity: 0.6; }
+  /* Still a bar, still says "busy" — it just stops moving. */
+  .progress-indeterminate { animation: none; transform: none; width: 100%; opacity: 0.6; }
 }
 
 /* Stage drawer: slides in from the right over the deliverable, which stays
