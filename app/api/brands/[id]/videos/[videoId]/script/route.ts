@@ -195,14 +195,11 @@ export async function PATCH(
   // narration is not finished. So lines with no words are simply not stored, and
   // the order of the ones that are is the film's order.
   const scenes = steps
-    .map((step) => {
-      const key = eventCmSceneKey(step);
-      return {
-        role: step.role,
-        ...(step.index === undefined ? {} : { index: step.index }),
-        text: texts.get(key) ?? previous.get(key) ?? "",
-      };
-    })
+    .map((step) => ({
+      role: step.role,
+      ...(step.index === undefined ? {} : { index: step.index }),
+      text: texts.get(step.key) ?? previous.get(step.key) ?? "",
+    }))
     .filter((scene) => scene.text.length > 0);
   if (scenes.length === 0) {
     return Response.json(

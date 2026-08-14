@@ -14,7 +14,7 @@
 // and scene length from the timeline, which sharpens from budget to script to
 // measured voice (timeline.ts).
 
-import React from "react";
+import React, { useMemo } from "react";
 import { AbsoluteFill, Sequence, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { Audio } from "@remotion/media";
 import { EventBackground } from "@/remotion/event/EventBackground";
@@ -37,7 +37,9 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
   const { durationInFrames, fps } = useVideoConfig();
   // The whole film, derived once (film.ts). This component only sequences it —
   // suppression, timing, scene building and captions are not its business.
-  const film = eventCmFilm(raw);
+  // Memoised on the brief because this component re-renders every frame
+  // (useCurrentFrame), and the film includes fitting every scene's type.
+  const film = useMemo(() => eventCmFilm(raw), [raw]);
   const brief = film.drawn;
   const theme = film.theme;
 

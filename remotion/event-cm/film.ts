@@ -8,8 +8,9 @@
 // and its description disagreed (docs/event-cm-refactor-plan.md §1–2).
 //
 // This module is the answer said once. The composition sequences
-// `film.scenes`; the storyboard re-says them in human words; the APIs count
-// `film.missingLines`. None of them derive anything about the film themselves.
+// `film.scenes`; the storyboard re-says them in human words; the script and
+// voice APIs read `film.scenes.filter((scene) => scene.narrated)`. None of
+// them derive anything about the film themselves.
 //
 // Deliberately not a React module: the same function runs in the Player, the
 // CLI renderer, API routes and tests.
@@ -40,6 +41,7 @@ import {
   type EventCmBrief,
   type EventCmScene,
   type EventCmSceneRole,
+  type EventCmScript,
   type ScriptStaleness,
 } from "./types";
 
@@ -180,10 +182,24 @@ function applySuppression(brief: EventCmBrief): EventCmBrief {
  * Pure and deterministic: the same brief always returns the same film, so
  * running it in the Player, the renderer and an API route cannot disagree.
  */
+const EMPTY_SCRIPT: EventCmScript = {
+  version: 1,
+  scenes: [],
+  source: "llm",
+  updatedAt: "",
+  angle: "",
+};
+
 export function eventCmFilm(raw: EventCmBrief): EventCmFilm {
+  // Total over degenerate input. The type requires `script`, but a brief that
+  // reached the database without one must derive the same film as "not written
+  // yet" (an empty scene list — the schema's own legal state) rather than
+  // throwing halfway into whichever API handler asked. The one derivation is
+  // only the one derivation if it always answers.
+  const stored = raw.script ? raw : { ...raw, script: EMPTY_SCRIPT };
   // A field the user switched off is emptied before anything is built, so the
   // components' existing empty behaviour carries the decision.
-  const drawn = applySuppression(raw);
+  const drawn = applySuppression(stored);
   const theme = themeOf(drawn);
   const timeline = eventCmTimeline(drawn);
   const captions = captionsFor(drawn);
