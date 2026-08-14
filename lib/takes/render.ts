@@ -47,6 +47,8 @@ interface RenderRow {
     template_id: string;
     template_version: number;
     brief: unknown;
+    /** The brief a run fixed, for templates that have one (migration 0050). */
+    baked_brief: unknown;
   } | null;
 }
 
@@ -57,7 +59,7 @@ export async function renderTake(
   const { data, error } = await supabase
     .from("take_renders")
     .select(
-      "id, take_id, format, locale, aspect_ratio, theme, takes(brand_id, template_id, template_version, brief)",
+      "id, take_id, format, locale, aspect_ratio, theme, takes(brand_id, template_id, template_version, brief, baked_brief)",
     )
     .eq("id", renderId)
     .maybeSingle();
@@ -84,7 +86,15 @@ export async function renderTake(
     };
   }
 
-  const validated = validateBrief(template.id, take.brief);
+  // The export is a file of the film the player showed, not of the workbench.
+  //
+  // Reading the working brief here would hand somebody an MP4 of edits they
+  // were still making — including a scenario with no recording, which would
+  // export at the estimated length rather than the measured one. Templates with
+  // no fixing step (product-cm, event-promo) have no `baked_brief`, and for
+  // them this is the brief it always was (migration 0050, §9.4).
+  const source = take.baked_brief ?? take.brief;
+  const validated = validateBrief(template.id, source);
   if (!validated.ok) {
     return { ok: false, error: `briefが壊れています: ${validated.issues.join(", ")}` };
   }

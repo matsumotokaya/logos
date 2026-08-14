@@ -8,9 +8,16 @@
 // all this come from?" — by showing each field's origin (§17.5). A proposal
 // the tool made is labelled as one, so nobody publishes a guessed date
 // believing somebody typed it.
+//
+// TWO BRIEFS, on purpose. `brief` is the workbench — the storyboard, the fact
+// list and every edit act on it. `playing` is the film a run fixed, and it is
+// the only thing the player runs. They disagree while somebody is working, and
+// the notice between them says by how much rather than hiding it
+// (docs/event-cm-refactor-plan.md §9.5).
 
 import dynamic from "next/dynamic";
 import { eventCmGoalState } from "@/lib/pipeline/event-cm";
+import { BAKE_CHANGE_LABEL, type BakeState } from "@/lib/event-cm/bake";
 import type { BriefSource } from "./BriefSourceIntake";
 import FactList, { type FactEdit } from "./FactList";
 import Storyboard from "./Storyboard";
@@ -34,6 +41,8 @@ const EventCmPlayer = dynamic(() => import("./EventCmPlayerClient"), {
 
 export default function EventCmWorkspace({
   brief,
+  playing,
+  bake,
   onEditFact,
   onEditNarration,
   onDeletePanel,
@@ -42,6 +51,10 @@ export default function EventCmWorkspace({
   writing,
 }: {
   brief: EventCmBrief;
+  /** The film the player runs: what the last run fixed. */
+  playing: EventCmBrief;
+  /** How far `playing` is behind `brief`, and whether it exists at all. */
+  bake: BakeState;
   /** Correct a value, or switch a field off. Absent = read only. */
   onEditFact?: (edit: FactEdit) => void;
   /** Save one picture's narration line, from the storyboard panel. */
@@ -81,11 +94,29 @@ export default function EventCmWorkspace({
           across a 2000px column is 1100px tall and pushes the storyboard
           entirely off screen. Centred, because a column with one wide object in
           it that hugs the left edge looks like a layout that failed. */}
-      <div className="mx-auto w-full max-w-5xl">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
         {/* Dark surround because the film itself is ink-black. */}
         <div className="overflow-hidden rounded-2xl bg-[#0b0d13] p-2 shadow-sm">
-          <EventCmPlayer brief={brief} />
+          <EventCmPlayer brief={playing} />
         </div>
+
+        {/* Why this is not what the storyboard says.
+
+            Under the picture rather than over it: the film is the thing being
+            looked at, and a banner above it reads as part of the frame. Two
+            different sentences, because the two states are not degrees of the
+            same problem — one is an invitation, the other is a report. */}
+        {!bake.baked ? (
+          <p className="rounded-xl border border-hairline bg-ink/[0.03] px-4 py-2.5 text-[12px] text-ink-muted">
+            これは下書きのままの再生です。「動画を作り直す」を押すと、読み上げが付いて尺が確定します。
+          </p>
+        ) : bake.changes.length > 0 ? (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] text-amber-900">
+            絵コンテに、まだこの動画へ反映していない変更が{bake.changes.length}件あります（
+            {bake.changes.map((change) => BAKE_CHANGE_LABEL[change]).join("、")}）。
+            「動画を作り直す」を押すと反映されます。
+          </p>
+        ) : null}
       </div>
 
       {/* Directly under the goal: what the film is made of, picture by picture.

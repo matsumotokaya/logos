@@ -43,7 +43,9 @@ export async function duplicateTake(
 ): Promise<DuplicateTakeOutcome> {
   const { data: source, error: sourceError } = await supabase
     .from("takes")
-    .select("id, brand_id, tool_kind, template_id, title, brief, work_id, variant_id")
+    .select(
+      "id, brand_id, tool_kind, template_id, title, brief, baked_brief, baked_at, work_id, variant_id",
+    )
     .eq("id", input.takeId)
     .eq("brand_id", input.brandId)
     .eq("tool_kind", input.toolKind)
@@ -82,6 +84,28 @@ export async function duplicateTake(
   });
   if (!created.ok) {
     return { ok: false, status: 500, error: created.error, issues: created.issues };
+  }
+
+  // The copy is the same film, not a fresh draft of it.
+  //
+  // Written after creation because `create_v2_take` fixes the take's columns and
+  // knows nothing about a baked copy. Leaving it null would be a lie the screen
+  // then tells: 「これは下書きのままの再生です。押すと読み上げが付いて尺が確定
+  // します」 over a copy that already has its recording, followed by a TTS call
+  // it did not need. What the copy genuinely lacks is an MP4, and that is
+  // handled by not copying renders (above).
+  if (source.baked_brief) {
+    const { error: bakedError } = await supabase
+      .from("takes")
+      .update({ baked_brief: source.baked_brief, baked_at: source.baked_at })
+      .eq("id", created.takeId);
+    if (bakedError) {
+      return {
+        ok: false,
+        status: 500,
+        error: `複製は作成しましたが、動画の内容を引き継げませんでした: ${bakedError.message}`,
+      };
+    }
   }
 
   const { data: pins, error: pinsError } = await supabase

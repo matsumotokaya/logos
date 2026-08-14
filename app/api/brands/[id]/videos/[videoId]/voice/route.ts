@@ -13,6 +13,7 @@ import {
   narrationVoiceByName,
 } from "@/lib/narration/voices";
 import { EVENT_CM_PERSONA } from "@/lib/event-cm/delivery";
+import { isSuppressed, setSuppressed } from "@/lib/event-cm/facts";
 import { attachTakeNarration } from "@/lib/takes/narration";
 import { eventCmFilm } from "@/remotion/event-cm/film";
 import { validateBrief } from "@/lib/templates/brief-schemas";
@@ -98,6 +99,21 @@ export async function POST(
     narrationVoiceByName(brief.voice?.track.voice) ??
     DEFAULT_NARRATION_VOICE;
 
+  // Asking for it read aloud is the decision to have a narration, so a previous
+  // "off" is withdrawn here — before the call rather than after it, because the
+  // decision is the user's and does not depend on whether the provider answers.
+  // Cleared through the ordinary suppression path so there is one spelling of
+  // it (lib/event-cm/facts.ts).
+  if (isSuppressed(brief, "voice")) {
+    const restored = validateBrief("event-cm", setSuppressed(brief, "voice", false));
+    if (restored.ok) {
+      await supabase
+        .from("takes")
+        .update({ brief: restored.brief, updated_at: new Date().toISOString() })
+        .eq("id", take.id);
+    }
+  }
+
   try {
     const { wav, track } = await generateNarration(scenes, {
       persona: EVENT_CM_PERSONA,
@@ -178,8 +194,18 @@ export async function DELETE(
     return Response.json({ error: "このテンプレートには対応していません" }, { status: 400 });
   }
 
-  const brief = { ...(take.brief as EventCmBrief) };
-  if (!brief.voice) return Response.json({ ok: true, alreadyOff: true });
+  const stored = take.brief as EventCmBrief;
+  if (!stored.voice && isSuppressed(stored, "voice")) {
+    return Response.json({ ok: true, alreadyOff: true });
+  }
+  // Off is RECORDED, not merely enacted.
+  //
+  // Clearing the pointer alone made "off" indistinguishable from "never spoken",
+  // and the one button always reaches a recording (§9.9) — so the next run would
+  // hand back a narration the user had just removed. Written as a suppression
+  // because that is what the brief already calls a decision to leave something
+  // out, and it is reversible in the same way (§9.3).
+  const brief = setSuppressed({ ...stored }, "voice", true);
   delete brief.voice;
 
   const validated = validateBrief("event-cm", brief);

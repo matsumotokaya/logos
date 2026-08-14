@@ -48,7 +48,9 @@ export async function GET(
     // The brand's name travels with the take because the page says where you
     // are: a breadcrumb reading 「ブランド」 names no brand, and this screen is
     // reached from a tree where the brand is the thing you picked.
-    .select("id, brand_id, template_id, title, brief, created_at, brand_entities(name)")
+    .select(
+      "id, brand_id, template_id, title, brief, baked_brief, baked_at, created_at, brand_entities(name)",
+    )
     .eq("id", videoId)
     .eq("brand_id", brandId)
     .eq("tool_kind", "video")
@@ -108,6 +110,29 @@ export async function GET(
       // from the same fields. The player shows what it can fetch.
     }
 
+    // The film the player will actually run.
+    //
+    // Two briefs travel to the client on purpose (migration 0050): the
+    // storyboard edits the working one, the player shows the one a run fixed.
+    // Resolved through the same path because the player has to fetch the same
+    // photographs and the same recording — a baked brief full of `material:`
+    // pointers would play as a film with every slot empty.
+    let bakedForClient: unknown = null;
+    if (take.baked_brief) {
+      try {
+        bakedForClient = (
+          await resolveBriefMaterialUrls(
+            supabase,
+            brandId,
+            take.id as string,
+            take.baked_brief,
+          )
+        ).brief;
+      } catch {
+        // Same reasoning as above; the working brief still describes the video.
+      }
+    }
+
     const artifact = artifactResult.data;
     const mp4Url = artifact
       ? signedLabsUrl(
@@ -159,6 +184,10 @@ export async function GET(
           publicUrl: publicationResult.data?.[0]?.url_path ?? null,
           briefSlug: null,
           brief: take.template_id === "event-promo" ? eventBrief : briefForClient,
+          // What a run fixed. Null = never run, which the screen answers with
+          // guidance rather than a warning (§9.9).
+          bakedBrief: bakedForClient,
+          bakedAt: take.baked_at ?? null,
           campaignJobId,
           unresolvedMaterials,
           // material:<uuid> → the signed URL it became, so a picker can tell

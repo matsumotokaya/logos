@@ -90,6 +90,8 @@ export default function VideoPipelinePanel({
   extracted,
   structured,
   facts,
+  output,
+  description,
   action,
   runs,
 }: {
@@ -103,6 +105,16 @@ export default function VideoPipelinePanel({
   structured?: ReactNode;
   /** Map stage: the editable fact list. */
   facts?: ReactNode;
+  /**
+   * Last stage: what this template's chain ends with.
+   *
+   * Supplied by templates whose last step is the film rather than the file
+   * (event-cm). Absent, the drawer keeps talking about the MP4, which is still
+   * the truth for the templates that have no fixing step.
+   */
+  output?: ReactNode;
+  /** Overrides the built-in description for this stage, for the same reason. */
+  description?: string;
   /**
    * The one thing this stage does — always the step that carries the work
    * forward into the next stage. One button per drawer, because a stage is a
@@ -126,7 +138,9 @@ export default function VideoPipelinePanel({
             <StatusBadge status={stage.status} />
           </div>
           <p className="text-sm text-ink-muted">{stage.summary}</p>
-          <p className="text-xs text-ink-faint">{STAGE_DESCRIPTION[stage.id]}</p>
+          <p className="text-xs text-ink-faint">
+            {description ?? STAGE_DESCRIPTION[stage.id]}
+          </p>
           {stage.producedAt ? (
             <p className="font-mono text-[11px] text-ink-faint">
               最終更新: {new Date(stage.producedAt).toLocaleString("ja-JP")}
@@ -193,7 +207,9 @@ export default function VideoPipelinePanel({
         </section>
       ) : null}
 
-      {stageId === "output" ? (
+      {stageId === "output" && output ? (
+        <section className="border-t border-hairline pt-5">{output}</section>
+      ) : stageId === "output" ? (
         <section className="flex flex-col gap-2 border-t border-hairline pt-5">
           <h3 className="text-sm font-medium text-ink">MP4を作る</h3>
           <p className="text-sm text-ink-muted">

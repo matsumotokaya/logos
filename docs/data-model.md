@@ -89,6 +89,19 @@ Takeは以下を必須とする。
 
 作成は原子的RPCを使い、Take・既定Render・必要なRun/Slotを途中状態なしで作る。再試行可能な処理は`idempotency_key`と`request_hash`で同一要求を判定する。
 
+### 4.1 作業中のbriefと、固定したbrief(`baked_brief`)
+
+`takes`は**2つのブリーフを持てる**(migration 0050)。
+
+| 列 | 意味 | 読む側 |
+| --- | --- | --- |
+| `brief` | 編集がそのまま溜まる**作業中**の値。すべての書き込み経路はここだけを書く | 絵コンテ、FactList、パイプラインの各段 |
+| `baked_brief` / `baked_at` | **実行が固定した成果**。null = 一度も実行していない | プレイヤー、MP4レンダー([../lib/takes/render.ts](../lib/takes/render.ts))、公開URL |
+
+**焼き付けを持つのは現時点で`event-cm`だけ**。他のテンプレートは`baked_brief`がnullのままで、レンダーは従来どおり`brief`を読む(`baked_brief ?? brief`)。書き込むのは`POST /api/brands/[id]/videos/[videoId]/bake`だけで、一括実行の最終段だけが呼ぶ。
+
+分けた理由は、**編集が即座に成果物へ届いてしまう**状態を無くすため——シナリオを1行保存すると、その場でプレイヤーの尺と字幕が変わっていた。「作業場と成果は違っていてよい。違いは画面が言う」が現在の契約で、差分判定の正本は [../lib/event-cm/bake.ts](../lib/event-cm/bake.ts)(設計の経緯は [event-cm-refactor-plan.md §9.5 / §11.1](event-cm-refactor-plan.md))。
+
 ## 5. Templateと成果物
 
 テンプレート定義のコード正本は [../lib/templates/catalog.ts](../lib/templates/catalog.ts)、production台帳は`template_versions`。production版のdefinition hashがコードと異なる状態では新規Takeを作らない。
@@ -151,7 +164,7 @@ POST `/api/brands/{id}/videos` の `templateTakeId` パラメータがこの経�
 - **Takeの削除は`delete_take(p_take_id, p_material_disposition)`が唯一の経路**(`takes`にDELETEポリシーは無い)。`require_decision`(既定)は、そのTakeだけが持つ`upload` / `url_fetch` / `ai_generated`素材があると`TAKE_DELETE_NEEDS_MATERIAL_DECISION`で止まり、DETAILに対象一覧を入れる。`promote`はscopeをbrand/workへ上げて残し、`discard`はR2ごと消す。参照数が0になったキーだけが`private.r2_deletion_queue`へ入る
 - HTTP面は `DELETE /api/brands/[id]/videos/[videoId]`、`DELETE /api/brands/[id]/lps/[takeId]`(`?materials=promote|discard`)、`DELETE /api/brands/businesses/[id]`、`DELETE /api/brands/[id]`。実装は [../lib/takes/delete.ts](../lib/takes/delete.ts) がRPCの例外をHTTPステータスへ写す
 - **ロゴの削除は`delete_logo_with_presentation`**。Logo・candidate・プレゼンTake・canonical slotを1トランザクションで消す。呼び出しはブラウザrepo(`repo.deleteLogo`)で、mockupのR2削除を先に済ませる
-- **複製はTake(動画・LP)だけ**。[../lib/takes/duplicate.ts](../lib/takes/duplicate.ts) が`brief`と`take_inputs`(material_id + checksum)を写し、`createTake`で**現行のproduction版**に固定する。R2オブジェクトは共有され、`take_renders`は空から始まる。複製が元Takeのtake scope素材を指すため、元を`discard`で消すと複製が素材を失う——`promote`がその場合の正解であり、`delete_take`が選択を要求する理由でもある
+- **複製はTake(動画・LP)だけ**。[../lib/takes/duplicate.ts](../lib/takes/duplicate.ts) が`brief`・`baked_brief`・`take_inputs`(material_id + checksum)を写し、`createTake`で**現行のproduction版**に固定する。R2オブジェクトは共有され、`take_renders`は空から始まる。**複製に無いのはMP4であって映像ではない**ので、固定済みブリーフは引き継ぐ(引き継がないと、音声まで揃ったTakeの複製が「未実行」と名乗って不要なTTS課金が走る)。複製が元Takeのtake scope素材を指すため、元を`discard`で消すと複製が素材を失う——`promote`がその場合の正解であり、`delete_take`が選択を要求する理由でもある
 - Organization / Brand / Logoに複製は無い。器のコピーは中身を持たず、ロゴの複製は別途master SVGの複写を要する
 
 ## 9. RLSと所有権

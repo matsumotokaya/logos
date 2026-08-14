@@ -220,9 +220,11 @@ export async function POST(
         now: new Date().toISOString(),
       });
       briefToSave = { ...briefToSave, script: draft.script };
-      // A rewritten script makes the old recording describe words nobody says
-      // any more, so the voice goes with it.
-      delete briefToSave.voice;
+      // The recording stays, and the next step of the same run replaces it.
+      // Deleting it here would leave the workbench silent in the window between
+      // this stage and the voice stage — and if the run stopped in between, the
+      // film the user is watching would still be the baked one, which has its
+      // own matching voice (§9.2).
       rewrote = true;
     }
 

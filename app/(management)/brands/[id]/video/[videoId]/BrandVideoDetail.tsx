@@ -27,6 +27,12 @@ import BgmDialog from "@/components/video/BgmDialog";
 import { DEFAULT_ASSETS } from "@/lib/assets/defaults";
 import { narrationVoiceByName } from "@/lib/narration/voices";
 import { panelDeletion } from "@/lib/event-cm/panel-actions";
+import {
+  bakeState,
+  pendingFilmSteps,
+  renderIsBehind,
+  type FilmStep,
+} from "@/lib/event-cm/bake";
 import { eventCmFilm } from "@/remotion/event-cm/film";
 import { EVENT_WIDTH, EVENT_HEIGHT } from "@/remotion/event/palette";
 import type { FactEdit } from "@/components/video/FactList";
@@ -71,6 +77,9 @@ type VideoAsset = {
   publicUrl: string | null;
   briefSlug: string | null;
   brief: EventBrief | Record<string, unknown> | null;
+  /** The brief a run fixed — what the player runs. Null = never run. */
+  bakedBrief: Record<string, unknown> | null;
+  bakedAt: string | null;
   campaignJobId: string | null;
   /** Materials the brief points at that are not pinned to this take. The
    *  preview cannot fetch them, so say so rather than let the player fail
@@ -221,17 +230,42 @@ export default function BrandVideoDetail({
   const [runs, setRuns] = useState<TakeRunRecord[]>([]);
   const [runCards, setRunCards] = useState<RunCard[]>([]);
 
-  const load = useCallback(async () => {
+  // The workbench and the film, as a pair.
+  //
+  // Derived here, above everything that reads either of them, because the whole
+  // screen turns on the difference: the storyboard edits the first, the player
+  // runs the second, and three separate surfaces (the badge, the notice under
+  // the player, the tooltip) have to agree about the gap between them (§9.7).
+  const eventCm =
+    resolved?.video.template === "event-cm" && resolved.video.brief
+      ? {
+          working: resolved.video.brief as EventCmBrief,
+          baked: (resolved.video.bakedBrief ?? null) as EventCmBrief | null,
+        }
+      : null;
+  /** What the one button still owes the film. Never includes MP4 (§9.4). */
+  const filmSteps: FilmStep[] = eventCm
+    ? pendingFilmSteps(eventCm.working, eventCm.baked)
+    : [];
+  const bake = eventCm ? bakeState(eventCm.working, eventCm.baked) : null;
+
+  // Returns what it read as well as storing it: a multi-step run has to decide
+  // its next step from the brief the previous step just wrote, and React state
+  // set inside the same callback is not visible to the rest of that callback.
+  const load = useCallback(async (): Promise<Resolved | null> => {
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}`);
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(json?.error ?? "動画を取得できませんでした");
       }
-      setResolved((await res.json()) as Resolved);
+      const next = (await res.json()) as Resolved;
+      setResolved(next);
       setError(null);
+      return next;
     } catch (e) {
       setError(e instanceof Error ? e.message : "動画を取得できませんでした");
+      return null;
     }
   }, [brandId, videoId]);
 
@@ -311,7 +345,7 @@ export default function BrandVideoDetail({
    * film whose shape changed under a human-edited script would otherwise have no
    * way back to a complete narration. The caller is the one that warns.
    */
-  async function writeScript(force = false) {
+  async function writeScript(force = false): Promise<boolean> {
     busy("ナレーションを書いています…");
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/script`, {
@@ -324,8 +358,38 @@ export default function BrandVideoDetail({
         throw new Error(json?.error ?? "台本を作成できませんでした");
       }
       await load();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "台本を作成できませんでした");
+      return false;
+    } finally {
+      idle();
+    }
+  }
+
+  /**
+   * Fix the workbench as the film.
+   *
+   * The one step of the whole page that changes what somebody watching sees.
+   * Everything else — reading a flyer, correcting a date, rewriting a line,
+   * recording a voice — writes the working brief and leaves the player alone
+   * (§9.5).
+   */
+  async function bakeFilm(): Promise<boolean> {
+    busy("動画に反映しています…");
+    try {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/bake`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "動画に反映できませんでした");
+      }
+      await load();
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "動画に反映できませんでした");
+      return false;
     } finally {
       idle();
     }
@@ -637,7 +701,13 @@ export default function BrandVideoDetail({
   }
 
   /**
-   * Run the pipeline, in order.
+   * Run everything, in order, and finish by making it the film.
+   *
+   *   資料 → 読み取り → 事実 → シナリオ → 読み上げ → 反映
+   *
+   * One button, one chain (§9.6). MP4 is deliberately not on it: exporting is
+   * outside the chain (§9.4), and including it would spend several minutes of
+   * rendering every time somebody tried a different voice.
    *
    * Unfinished steps first. With nothing unfinished it runs the whole thing
    * again from the top, because "everything has been done" is not the same as
@@ -648,14 +718,40 @@ export default function BrandVideoDetail({
    *
    * Stops at the first failure rather than carrying on: a structuring step
    * that could not read the flyer has nothing for the mapping step to apply,
-   * and running it anyway would report a second, confusing error.
+   * and running it anyway would report a second, confusing error. The film the
+   * user is watching is untouched by a run that stopped halfway, because
+   * nothing is watched until the last step.
    */
   async function runAll() {
-    const pending = pendingRunStages(pipeline?.stages ?? [], sources.length);
+    const stagesPending = pendingRunStages(pipeline?.stages ?? [], sources.length);
+    // Asked with nothing outstanding: do it all again, words and voice included.
+    const redo = stagesPending.length === 0 && filmSteps.length === 0;
     const stages: RunnableStage[] =
-      pending.length > 0 ? pending : ["extract", "structure", "map"];
+      stagesPending.length > 0 ? stagesPending : ["extract", "structure", "map"];
     for (const stage of stages) {
       const ok = await runStage(stage);
+      if (!ok) return;
+    }
+
+    // Decided from the brief the reading stages just wrote, not from the one
+    // the page held when the button was pressed: the mapping stage may have
+    // rewritten the narration, which changes what is left to do.
+    const fresh = await load();
+    const working = fresh?.video.brief as EventCmBrief | undefined;
+    if (!working || fresh?.video.template !== "event-cm") return;
+    const steps = pendingFilmSteps(
+      working,
+      (fresh.video.bakedBrief ?? null) as EventCmBrief | null,
+      { redo },
+    );
+
+    for (const step of steps) {
+      const ok =
+        step === "script"
+          ? await writeScript()
+          : step === "voice"
+            ? await speakScript()
+            : await bakeFilm();
       if (!ok) return;
     }
   }
@@ -813,16 +909,25 @@ export default function BrandVideoDetail({
   const video = resolved.video;
   const openStageDef = pipeline?.stages.find((stage) => stage.id === openStage);
   const pendingStages = pendingRunStages(pipeline?.stages ?? [], sources.length);
-  const pendingCount = pendingStages.length;
+  // One number for the whole chain. It used to count the three reading stages
+  // only, so writing a scenario — the change that matters most — left the badge
+  // reading 0 while the film was a version behind (§9.7).
+  const pendingCount = pendingStages.length + filmSteps.length;
+  // The exported file predates the film it claims to be of.
+  const mp4Behind = renderIsBehind(video.render?.renderedAt ?? null, video.bakedAt);
 
   // Aspect, pixels, length. Computed here because the timeline is the film's
   // own (a script shortens or lengthens it), and shown with the other metadata
   // rather than over the picture. Read through eventCmFilm so the number here
   // is the number the player runs to — a raw-brief timeline once disagreed
   // with the film the moment a field was switched off.
+  //
+  // Of the PLAYED brief, not the workbench: the length beside the title is a
+  // property of the film somebody can watch. Quoting the working brief's length
+  // would move the number while the player kept running the old one.
   const eventCmMeta = (() => {
-    if (video.template !== "event-cm" || !video.brief) return null;
-    const film = eventCmFilm(video.brief as EventCmBrief);
+    if (video.template !== "event-cm" || !eventCm) return null;
+    const film = eventCmFilm(eventCm.baked ?? eventCm.working);
     const seconds = (film.totalMs / 1000).toFixed(1);
     const measured = film.timingSource === "voice";
     return `16:9 / ${EVENT_WIDTH}×${EVENT_HEIGHT} / ${measured ? "" : "約"}${seconds}秒`;
@@ -873,17 +978,20 @@ export default function BrandVideoDetail({
               // says whether there is new work, and the button stays available
               // for the re-run that a model result often deserves.
               disabled={saving || sources.length === 0}
+              // Named for what it produces, not for how it runs. 「まとめて実行」
+              // said nothing about where it stops, and this one stops before the
+              // MP4 on purpose (§9.6).
               aria-label={
                 pendingCount > 0
-                  ? `まとめて実行（未処理${pendingCount}件）`
-                  : "まとめて実行（すべて実行し直す）"
+                  ? `動画を作り直す（未処理${pendingCount}件）`
+                  : "動画を作り直す（すべて実行し直す）"
               }
               title={
                 sources.length === 0
                   ? "先に資料を追加してください"
                   : pendingCount > 0
-                    ? `未処理の${pendingCount}件を順番に実行`
-                    : "未処理はありません。もう一度すべて実行し直します"
+                    ? `未処理の${pendingCount}件を順番に実行し、動画に反映します（MP4は書き出しません）`
+                    : "未処理はありません。資料の読み取りからシナリオ・読み上げまで、もう一度すべて実行し直します"
               }
               className={cn(
                 "mr-6 inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60 md:mr-10",
@@ -892,7 +1000,7 @@ export default function BrandVideoDetail({
                   : "border-hairline bg-paper text-ink-muted hover:border-ink hover:text-ink",
               )}
             >
-              <span>{saving ? "実行中…" : "まとめて実行"}</span>
+              <span>{saving ? "実行中…" : "動画を作り直す"}</span>
               {pendingCount > 0 ? (
                 <span
                   aria-hidden="true"
@@ -957,6 +1065,28 @@ export default function BrandVideoDetail({
                   busy={saving}
                   onEdit={(edit) => void editFact(edit)}
                 />
+              ) : undefined
+            }
+            description={
+              video?.template === "event-cm"
+                ? "絵コンテで直した内容が、再生される動画になった時点。実行するまで絵コンテと動画は違っていて、それが正常な状態です。MP4の書き出しはこの先の別の操作です。"
+                : undefined
+            }
+            output={
+              video?.template === "event-cm" && bake ? (
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-sm font-medium text-ink">動画に反映する</h3>
+                  <p className="text-sm text-ink-muted">
+                    {!bake.baked
+                      ? "まだ一度も実行していません。「動画を作り直す」を押すと、資料の読み取りからシナリオ・読み上げまで通り、その結果が再生される動画になります。"
+                      : bake.changes.length > 0
+                        ? `絵コンテに、まだ反映していない変更が${bake.changes.length}件あります。「動画を作り直す」を押すと反映されます。`
+                        : "いまの絵コンテの内容が、そのまま再生されています。"}
+                  </p>
+                  <p className="text-xs text-ink-faint">
+                    MP4の書き出しと公開はこの段には含まれません（ページ上部のボタンから、必要なときだけ）。
+                  </p>
+                </div>
               ) : undefined
             }
           />
@@ -1153,12 +1283,27 @@ export default function BrandVideoDetail({
               書き出し: {new Date(video.render.renderedAt).toLocaleString("ja-JP")}
             </p>
           ) : null}
+          {/* Export sits outside the chain, so it goes out of date on its own
+              and nothing pulls it back. Said here, next to the file it is about,
+              rather than counted into the button — a re-export is minutes of
+              rendering and is the user's call (§9.4). */}
+          {mp4Behind ? (
+            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+              このMP4は、いま再生されている動画より古いバージョンです。
+              「MP4を作り直す」で書き出し直せます。
+            </p>
+          ) : null}
         </section>
       ) : null}
 
-      {video.template === "event-cm" && video.brief ? (
+      {video.template === "event-cm" && eventCm && bake ? (
         <EventCmWorkspace
-          brief={video.brief as EventCmBrief}
+          brief={eventCm.working}
+          // Never run = play the workbench. The take's opening move is a
+          // finished film with no model call behind it, and refusing to show it
+          // until somebody presses a button would throw that away (§9.9).
+          playing={eventCm.baked ?? eventCm.working}
+          bake={bake}
           onEditFact={(edit) => void editFact(edit)}
           onEditNarration={(scene, text) => editNarration(scene, text)}
           onDeletePanel={(scene) => deletePanel(scene)}

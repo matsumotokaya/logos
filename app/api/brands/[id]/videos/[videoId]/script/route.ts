@@ -109,11 +109,16 @@ export async function POST(
     );
   }
 
-  // Writing the script makes any existing voice describe words nobody says any
-  // more. Dropping it is what keeps the film honest: the timeline falls back
-  // to the script's own length until the voice is made again.
+  // The recording stays.
+  //
+  // It used to be deleted here, on the reasoning that a voice reading replaced
+  // words is a lie. The reasoning was right and the remedy was wrong: editing
+  // is supposed to accumulate until the user decides to run (§9.2), and a film
+  // that fell silent halfway through a rewrite was the editor reaching into the
+  // result. Now the result does not move at all until it is baked, and the
+  // disagreement is SAID instead — `voiceReadsScenario` (lib/event-cm/bake.ts)
+  // is what the screen reads to say it.
   const next: EventCmBrief = { ...brief, script: draft.script };
-  delete next.voice;
 
   const saved = await saveBrief(supabase, loaded.take.id as string, next);
   if ("error" in saved) {
@@ -221,7 +226,8 @@ export async function PATCH(
         typeof body.angle === "string" ? body.angle.trim() : (brief.script?.angle ?? ""),
     },
   };
-  delete next.voice;
+  // The recording stays — see the POST handler. Saving one line is the smallest
+  // edit there is, and it was the one that used to silence the film.
 
   const saved = await saveBrief(supabase, loaded.take.id as string, next);
   if ("error" in saved) {

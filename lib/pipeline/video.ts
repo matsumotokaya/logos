@@ -72,6 +72,15 @@ export interface VideoPipelineInput {
   renderUpdatedAt: string | null;
   /** When the most recent MP4 artifact was uploaded. */
   artifactCreatedAt: string | null;
+  /**
+   * The fixing step, for templates that have one (event-cm).
+   *
+   * Present means the chain ends at the film rather than at a file: `at` is
+   * when the workbench was last made the film, `changes` how many edits have
+   * happened since (lib/event-cm/bake.ts). Absent means this template has no
+   * such step and its last stage is the render, as it always was.
+   */
+  bake?: { at: string | null; changes: number } | null;
 }
 
 export interface VideoPipeline {
@@ -189,18 +198,31 @@ export function videoPipeline(input: VideoPipelineInput): VideoPipeline {
     structureStatus === "stale",
   );
 
-  // output: a Render exists for the take. The MP4 is the timestamp we surface.
+  // The last stage: the film, or — for templates with no fixing step — the file.
+  //
+  // MP4 used to be the fourth link of the chain for everything, which read as
+  // "this is not finished until you export". Exporting is outside the chain
+  // (§9.4): most people never ask for it, and putting it here made a video that
+  // plays perfectly look three quarters done. What actually completes the chain
+  // for event-cm is the bake — the moment the workbench becomes the film — so
+  // that is what the fourth dot reports when the template has one.
+  //
   // A failed render still counts as "the stage produced something" — the user
   // can see it failed from the bar dot, but the row exists and the latest
   // attempt is what would be re-rendered.
-  const outputAt = input.artifactCreatedAt ?? input.renderUpdatedAt;
-  const outputHasOutput = input.renderStatus !== "empty";
-  const outputStatus = statusFor(
-    outputAt,
-    mapAt,
-    outputHasOutput,
-    mapStatus === "stale",
-  );
+  const outputAt = input.bake
+    ? input.bake.at
+    : (input.artifactCreatedAt ?? input.renderUpdatedAt);
+  const outputHasOutput = input.bake
+    ? input.bake.at !== null
+    : input.renderStatus !== "empty";
+  const outputStatus: PipelineStageStatus = input.bake
+    ? !input.bake.at
+      ? "empty"
+      : mapStatus === "stale" || input.bake.changes > 0
+        ? "stale"
+        : "ready"
+    : statusFor(outputAt, mapAt, outputHasOutput, mapStatus === "stale");
 
   const templateLabel =
     input.template === "event-promo"
@@ -243,10 +265,15 @@ export function videoPipeline(input: VideoPipelineInput): VideoPipeline {
     },
     {
       id: "output",
-      label: STAGE_LABELS.output,
+      label: input.bake ? "動画" : STAGE_LABELS.output,
       status: outputStatus,
-      summary:
-        input.renderStatus === "ready"
+      summary: input.bake
+        ? !input.bake.at
+          ? "未実行（下書きのまま再生中）"
+          : input.bake.changes > 0
+            ? `未反映の変更が${input.bake.changes}件`
+            : "絵コンテの内容を反映済み"
+        : input.renderStatus === "ready"
           ? "MP4を作成済み"
           : input.renderStatus === "running"
             ? "MP4を作成中"

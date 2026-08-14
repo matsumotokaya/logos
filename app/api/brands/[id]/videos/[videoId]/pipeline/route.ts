@@ -4,6 +4,8 @@ import {
   requireUser,
 } from "@/lib/supabase/server";
 import { videoPipeline } from "@/lib/pipeline/video";
+import { bakeState } from "@/lib/event-cm/bake";
+import type { EventCmBrief } from "@/remotion/event-cm/types";
 
 /**
  * The video pipeline for one V2 Take. Mirrors the brand-asset pipeline: the
@@ -30,7 +32,7 @@ export async function GET(
 
   const takeResult = await supabase
     .from("takes")
-    .select("id, brand_id, template_id, title, brief, updated_at")
+    .select("id, brand_id, template_id, title, brief, baked_brief, baked_at, updated_at")
     .eq("id", videoId)
     .eq("brand_id", brandId)
     .eq("tool_kind", "video")
@@ -124,6 +126,19 @@ export async function GET(
     renderUpdatedAt: (render?.updated_at as string | null) ?? null,
     artifactCreatedAt:
       (artifactResult.data?.created_at as string | null) ?? null,
+    // Only event-cm has a fixing step, so only it ends the chain at the film
+    // instead of at the MP4. Counted through the same function the badge and the
+    // player's notice read, so the three cannot disagree (§9.7).
+    bake:
+      take.template_id === "event-cm"
+        ? {
+            at: (take.baked_at as string | null) ?? null,
+            changes: bakeState(
+              take.brief as EventCmBrief,
+              (take.baked_brief as EventCmBrief | null) ?? null,
+            ).changes.length,
+          }
+        : null,
   });
 
   return Response.json(
