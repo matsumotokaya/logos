@@ -389,53 +389,9 @@ export const suppressedPaths = (brief: EventCmBrief): string[] =>
     .filter(([, entry]) => entry.note === SUPPRESSED_NOTE)
     .map(([path]) => path);
 
-/**
- * The brief as it should be drawn: suppressed fields emptied out.
- *
- * Emptying rather than flagging, because every component already knows what to
- * do with nothing — omit, or draw its designed substitute (components.ts
- * EMPTY_BEHAVIOUR). Teaching the renderer a second kind of absence would mean
- * touching seventeen components to express a decision the brief can express
- * on its own.
- */
-export function applySuppression(brief: EventCmBrief): EventCmBrief {
-  const paths = new Set(suppressedPaths(brief));
-  if (paths.size === 0) return brief;
-
-  const off = (path: string) => paths.has(path);
-  return {
-    ...brief,
-    title: off("title") ? "" : brief.title,
-    subtitle: off("subtitle") ? "" : brief.subtitle,
-    seriesLabel: off("seriesLabel") ? "" : brief.seriesLabel,
-    presenter: off("presenter") ? "" : brief.presenter,
-    valueLines: off("valueLines") ? [] : brief.valueLines,
-    valueChip: off("valueChip") ? null : brief.valueChip,
-    programs: off("programs") ? [] : brief.programs,
-    // A portrait can be taken off on its own: the speaker is still announced,
-    // the photograph is replaced by the monogram the component draws when it
-    // has none. Removing the person instead would be a different decision.
-    guests: off("guests")
-      ? []
-      : brief.guests.map((guest, index) =>
-          off(`guests[${index}].photo`) ? { ...guest, photo: null } : guest,
-        ),
-    cta: off("cta") ? "" : brief.cta,
-    logos: off("logos") ? [] : brief.logos,
-    bgm: off("bgm") ? null : brief.bgm,
-    schedule: {
-      ...brief.schedule,
-      date: off("schedule.date") ? "" : brief.schedule.date,
-      time: off("schedule.time") ? "" : brief.schedule.time,
-      venue: off("schedule.venue") ? null : brief.schedule.venue,
-      fee: off("schedule.fee") ? null : brief.schedule.fee,
-    },
-    visuals: {
-      ...brief.visuals,
-      value: off("visuals.value") ? null : brief.visuals.value,
-      programs: off("visuals.programs") ? null : brief.visuals.programs,
-      closing: off("visuals.closing") ? null : brief.visuals.closing,
-      inkArt: off("visuals.inkArt") ? null : brief.visuals.inkArt,
-    },
-  };
-}
+// NOTE: `applySuppression` — the brief with suppressed fields emptied — lives
+// in remotion/event-cm/film.ts as a PRIVATE step of `eventCmFilm()`. It is not
+// exported from anywhere on purpose: half of the 2026-08-14 bugs were callers
+// deriving something from the raw brief because remembering to empty it first
+// was their responsibility. A function nobody can call is a step nobody can
+// skip. Anything that needs the drawn values reads `eventCmFilm(brief).drawn`.

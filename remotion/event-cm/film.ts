@@ -29,7 +29,7 @@ import {
 } from "@/remotion/kit/layout";
 import { sceneForRole } from "@/remotion/kit/scenes/event-cm";
 import { SUMI_THEME, themeForBrand, type Theme } from "@/remotion/kit/theme";
-import { applySuppression } from "@/lib/event-cm/facts";
+import { suppressedPaths } from "@/lib/event-cm/facts";
 import { captionsFor, type Caption } from "./captions";
 import { eventCmTimeline, type TimingSource } from "./timeline";
 import {
@@ -117,6 +117,62 @@ export interface EventCmFilm {
  *  whatever the brand actually has. */
 const themeOf = (brief: EventCmBrief): Theme =>
   brief.theme ? themeForBrand(SUMI_THEME, brief.theme) : SUMI_THEME;
+
+/**
+ * The brief as it should be drawn: suppressed fields emptied out.
+ *
+ * Emptying rather than flagging, because every component already knows what to
+ * do with nothing — omit, or draw its designed substitute (components.ts
+ * EMPTY_BEHAVIOUR). Teaching the renderer a second kind of absence would mean
+ * touching seventeen components to express a decision the brief can express
+ * on its own.
+ *
+ * Private on purpose. When this was public, calling it before deriving
+ * anything was the caller's responsibility, and every consumer that forgot
+ * described a film nobody was making. Now the only door to a drawn brief is
+ * `eventCmFilm(brief).drawn`.
+ */
+function applySuppression(brief: EventCmBrief): EventCmBrief {
+  const paths = new Set(suppressedPaths(brief));
+  if (paths.size === 0) return brief;
+
+  const off = (path: string) => paths.has(path);
+  return {
+    ...brief,
+    title: off("title") ? "" : brief.title,
+    subtitle: off("subtitle") ? "" : brief.subtitle,
+    seriesLabel: off("seriesLabel") ? "" : brief.seriesLabel,
+    presenter: off("presenter") ? "" : brief.presenter,
+    valueLines: off("valueLines") ? [] : brief.valueLines,
+    valueChip: off("valueChip") ? null : brief.valueChip,
+    programs: off("programs") ? [] : brief.programs,
+    // A portrait can be taken off on its own: the speaker is still announced,
+    // the photograph is replaced by the monogram the component draws when it
+    // has none. Removing the person instead would be a different decision.
+    guests: off("guests")
+      ? []
+      : brief.guests.map((guest, index) =>
+          off(`guests[${index}].photo`) ? { ...guest, photo: null } : guest,
+        ),
+    cta: off("cta") ? "" : brief.cta,
+    logos: off("logos") ? [] : brief.logos,
+    bgm: off("bgm") ? null : brief.bgm,
+    schedule: {
+      ...brief.schedule,
+      date: off("schedule.date") ? "" : brief.schedule.date,
+      time: off("schedule.time") ? "" : brief.schedule.time,
+      venue: off("schedule.venue") ? null : brief.schedule.venue,
+      fee: off("schedule.fee") ? null : brief.schedule.fee,
+    },
+    visuals: {
+      ...brief.visuals,
+      value: off("visuals.value") ? null : brief.visuals.value,
+      programs: off("visuals.programs") ? null : brief.visuals.programs,
+      closing: off("visuals.closing") ? null : brief.visuals.closing,
+      inkArt: off("visuals.inkArt") ? null : brief.visuals.inkArt,
+    },
+  };
+}
 
 /**
  * Derive the film — the ONLY place the six steps run in order.

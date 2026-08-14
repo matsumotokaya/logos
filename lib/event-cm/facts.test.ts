@@ -4,12 +4,14 @@ import {
   applyAssetChoice,
   applyFactEdit,
   isAssetSlot,
-  applySuppression,
   isSuppressed,
   markUserEdited,
   previewOf,
   setSuppressed,
 } from "./facts";
+// Suppression's effect on values is only observable through the film — the
+// emptying step is private to eventCmFilm on purpose.
+import { eventCmFilm } from "@/remotion/event-cm/film";
 import { seedEventCmBrief } from "./seed";
 import { eventCmGoalState } from "@/lib/pipeline/event-cm";
 
@@ -45,7 +47,7 @@ test("消した項目は「不足」ではなく「決めたこと」として�
 test("消した項目は描画前に空にされる", () => {
   const off = setSuppressed(SEEDED, "seriesLabel", true);
   assert.equal(SEEDED.seriesLabel.length > 0, true);
-  assert.equal(applySuppression(off).seriesLabel, "");
+  assert.equal(eventCmFilm(off).drawn.seriesLabel, "");
 });
 
 test("消してから戻すと元の値が返ってくる", () => {
@@ -53,8 +55,8 @@ test("消してから戻すと元の値が返ってくる", () => {
   const off = setSuppressed(SEEDED, "valueChip", true);
   const on = setSuppressed(off, "valueChip", false);
 
-  assert.equal(applySuppression(off).valueChip, null);
-  assert.equal(applySuppression(on).valueChip, SEEDED.valueChip);
+  assert.equal(eventCmFilm(off).drawn.valueChip, null);
+  assert.equal(eventCmFilm(on).drawn.valueChip, SEEDED.valueChip);
 });
 
 test("複数行の項目は1行1件として書き戻される", () => {

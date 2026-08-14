@@ -27,7 +27,7 @@ import BgmDialog from "@/components/video/BgmDialog";
 import { DEFAULT_ASSETS } from "@/lib/assets/defaults";
 import { narrationVoiceByName } from "@/lib/narration/voices";
 import { panelDeletion } from "@/lib/event-cm/panel-actions";
-import { eventCmTimeline } from "@/remotion/event-cm/timeline";
+import { eventCmFilm } from "@/remotion/event-cm/film";
 import { EVENT_WIDTH, EVENT_HEIGHT } from "@/remotion/event/palette";
 import type { FactEdit } from "@/components/video/FactList";
 import BriefSourceIntake, { type BriefSource } from "@/components/video/BriefSourceIntake";
@@ -817,12 +817,14 @@ export default function BrandVideoDetail({
 
   // Aspect, pixels, length. Computed here because the timeline is the film's
   // own (a script shortens or lengthens it), and shown with the other metadata
-  // rather than over the picture.
+  // rather than over the picture. Read through eventCmFilm so the number here
+  // is the number the player runs to — a raw-brief timeline once disagreed
+  // with the film the moment a field was switched off.
   const eventCmMeta = (() => {
     if (video.template !== "event-cm" || !video.brief) return null;
-    const timeline = eventCmTimeline(video.brief as EventCmBrief);
-    const seconds = (timeline.totalMs / 1000).toFixed(1);
-    const measured = timeline.source === "voice";
+    const film = eventCmFilm(video.brief as EventCmBrief);
+    const seconds = (film.totalMs / 1000).toFixed(1);
+    const measured = film.timingSource === "voice";
     return `16:9 / ${EVENT_WIDTH}×${EVENT_HEIGHT} / ${measured ? "" : "約"}${seconds}秒`;
   })();
 

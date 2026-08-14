@@ -4,7 +4,7 @@ import { eventCmStoryboard } from "./event-cm";
 import { eventCmFilm } from "@/remotion/event-cm/film";
 import { fitScene } from "@/remotion/kit/fit";
 import { sceneForRole } from "@/remotion/kit/scenes/event-cm";
-import { applySuppression, setSuppressed } from "@/lib/event-cm/facts";
+import { setSuppressed } from "@/lib/event-cm/facts";
 import { seedEventCmBrief } from "@/lib/event-cm/seed";
 import {
   eventCmTimeline,
@@ -367,12 +367,12 @@ test("絵コンテは、映像が実際に描くものと同じ部品・同じ�
 
   const storyboard = eventCmStoryboard(long);
   // Independent re-derivation through the kit's own functions — NOT through
-  // film.ts — so this still catches film.ts itself mis-fitting a scene.
-  const theme = eventCmFilm(long).theme;
+  // film.scenes — so this still catches film.ts itself mis-fitting a scene.
+  const film = eventCmFilm(long);
   for (const panel of storyboard.panels) {
     const fit = fitScene(
-      sceneForRole(panel.role, applySuppression(long), panel.index).components,
-      theme,
+      sceneForRole(panel.role, film.drawn, panel.index).components,
+      film.theme,
     );
     const drawn = panel.regions
       .flatMap((region) => region.blocks)
@@ -398,7 +398,7 @@ test("画面から消した項目は、絵コンテからも消える", () => {
     storyboard.panels.some((panel) => panel.role === "guests"),
     false,
   );
-  assert.equal(storyboard.totalMs, eventCmTimeline(applySuppression(off)).totalMs);
+  assert.equal(storyboard.totalMs, eventCmTimeline(eventCmFilm(off).drawn).totalMs);
 });
 
 test("マークは絵コンテでも画像として描ける（枠と社名の代用にしない）", () => {

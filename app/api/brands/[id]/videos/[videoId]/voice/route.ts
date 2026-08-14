@@ -14,13 +14,10 @@ import {
 } from "@/lib/narration/voices";
 import { EVENT_CM_PERSONA } from "@/lib/event-cm/delivery";
 import { attachTakeNarration } from "@/lib/takes/narration";
-import { applySuppression } from "@/lib/event-cm/facts";
+import { eventCmFilm } from "@/remotion/event-cm/film";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import { EVENT_CM_SCENE_GAP_MS } from "@/remotion/event-cm/timeline";
-import {
-  eventCmNarratedSteps,
-  type EventCmBrief,
-} from "@/remotion/event-cm/types";
+import { type EventCmBrief } from "@/remotion/event-cm/types";
 
 const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -78,9 +75,9 @@ export async function POST(
   const scenes = brief.script?.scenes ?? [];
   // The film's own shape decides how many lines are expected: four when nobody
   // is announced, one per programme when several are listed, and none for a
-  // field the user switched off (which is why the suppressed brief is what gets
-  // counted — the film draws that one).
-  const expected = eventCmNarratedSteps(applySuppression(brief)).length;
+  // field the user switched off. The film object is the one place that shape
+  // is derived, so the count comes from it.
+  const expected = eventCmFilm(brief).scenes.filter((scene) => scene.narrated).length;
   if (scenes.length !== expected) {
     // Says which state it is in. A partial script is the ordinary state while
     // somebody is writing, and 「先に台本を作成してください」 reads as though

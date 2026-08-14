@@ -12,10 +12,9 @@
 import { guardLabsRequest } from "@/lib/labs-access";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { draftEventCmScript, eventCmScriptAvailable } from "@/lib/event-cm/script";
-import { applySuppression } from "@/lib/event-cm/facts";
+import { eventCmFilm } from "@/remotion/event-cm/film";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import {
-  eventCmNarratedSteps,
   eventCmSceneKey,
   type EventCmBrief,
   type EventCmSceneRole,
@@ -100,7 +99,7 @@ export async function POST(
     // shape of the script has to match the shape of the film: with the speakers
     // switched off there is no speaker picture, and a line written for one would
     // have nowhere to go.
-    draft = await draftEventCmScript(applySuppression(brief), {
+    draft = await draftEventCmScript(eventCmFilm(brief).drawn, {
       now: new Date().toISOString(),
     });
   } catch (error) {
@@ -179,7 +178,7 @@ export async function PATCH(
   // The film's shape, not the brief's raw contents: a suppressed field has no
   // picture. The brief itself is saved unsuppressed — switching a field off is a
   // decision to hide it, never to delete it.
-  const steps = eventCmNarratedSteps(applySuppression(brief));
+  const steps = eventCmFilm(brief).scenes.filter((scene) => scene.narrated);
   const previous = new Map(
     (brief.script?.scenes ?? []).map(
       (scene) => [eventCmSceneKey(scene), scene.text] as const,
