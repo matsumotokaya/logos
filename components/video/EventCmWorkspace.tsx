@@ -23,6 +23,7 @@ import {
   filmStatus,
   FILM_STEP_LABEL,
   type BakeState,
+  type FilmStatus,
   type FilmStep,
 } from "@/lib/event-cm/bake";
 import type { BriefSource } from "./BriefSourceIntake";
@@ -36,6 +37,18 @@ import {
   type EventCmBrief,
   type EventCmSceneRole,
 } from "@/remotion/event-cm/types";
+
+/** The three colours the whole screen uses (docs/video-state-model.md §3.1):
+ *  amber = a change not yet in the film, green = nothing outstanding, and a
+ *  quiet grey for the states that are neither. Never red — an unreflected edit
+ *  is the ordinary condition of a workbench, and a red dot living there through
+ *  every session teaches people to ignore the colour that means something broke. */
+const STATUS_DOT: Record<FilmStatus, string> = {
+  unrun: "bg-ink/25",
+  behind: "bg-amber-500",
+  matched: "bg-ink/25",
+  settled: "bg-emerald-500",
+};
 
 const EventCmPlayer = dynamic(() => import("./EventCmPlayerClient"), {
   ssr: false,
@@ -121,14 +134,14 @@ export default function EventCmWorkspace({
           across a 2000px column is 1100px tall and pushes the storyboard
           entirely off screen. Centred, because a column with one wide object in
           it that hugs the left edge looks like a layout that failed. */}
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
+      <div className="mx-auto flex w-full max-w-5xl flex-col">
         {/* Dark surround because the film itself is ink-black.
 
             Ringed in amber while the workbench is ahead of it: the picture is
             what the user is looking at, and the whole misunderstanding this
             model exists to fix ("I changed the music and nothing happened") is
             a misunderstanding about THIS rectangle. A ring is enough — it
-            frames without covering, and the sentence underneath says why. */}
+            frames without covering, and the line underneath says why. */}
         <div
           className={cn(
             "overflow-hidden rounded-2xl bg-[#0b0d13] p-2 shadow-sm",
@@ -138,43 +151,53 @@ export default function EventCmWorkspace({
           <EventCmPlayer brief={playing} />
         </div>
 
-        {/* Which version this is, and how far behind it is.
+        {/* Which version this is, as a STATUS LINE rather than a message.
 
-            Under the picture rather than over it: the film is the thing being
-            looked at, and a banner above it reads as part of the frame. Three
-            states, not degrees of one problem — an invitation, a report, and a
-            plain statement that there is nothing to do. */}
-        {status === "unrun" ? (
-          <p className="rounded-xl border border-hairline bg-ink/[0.03] px-4 py-2.5 text-[12px] text-ink-muted">
-            これは下書きのままの再生です。「動画を作り直す」を押すと、読み上げが付いて尺が確定します。
-          </p>
-        ) : status === "behind" ? (
-          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] text-amber-900">
-            <span className="font-semibold">
-              再生中は{playedAt}の動画です。
+            It used to be a bordered, tinted paragraph in a sentence — which is
+            the shape of an error, so a video in a perfectly ordinary state (two
+            edits not yet reflected: the everyday condition of a workbench) read
+            as a video with something wrong with it. The same facts as a line of
+            metadata — when it was made, how many changes since, which ones —
+            read as what they are. Only the change count carries colour.
+
+            And it stands off the picture. Tucked right under the frame it read
+            as part of the player rather than as a line about it. */}
+        <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-muted">
+          <span
+            aria-hidden="true"
+            className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[status])}
+          />
+          {status === "unrun" ? (
+            <span>
+              下書きのまま再生中
+              <span className="text-ink-faint">
+                　「動画を作り直す」で読み上げが付き、尺が確定します
+              </span>
             </span>
-            {" "}
-            そのあとの変更が{bake.changes.length}件あります（{describeChanges(bake.changes)}
-            ）。「動画を作り直す」を押すと反映されます。
-          </p>
-        ) : status === "matched" ? (
-          // Matching the storyboard is not the same as being finished. This take
-          // plays exactly what the storyboard says AND still has work in it —
-          // words that no longer cover the pictures, or a film nobody has read
-          // aloud. Green here would sit above a button reading 未処理3件, which
-          // is the two-surfaces-disagreeing bug this whole model exists to stop.
-          <p className="rounded-xl border border-hairline bg-ink/[0.03] px-4 py-2.5 text-[12px] text-ink-muted">
-            再生中は{playedAt}の動画で、絵コンテと一致しています。「動画を作り直す」を押すと
-            {steps.map((step) => FILM_STEP_LABEL[step]).join("・")}を行います。
-          </p>
-        ) : (
-          // Said out loud rather than left as the absence of a warning: "no
-          // warning" and "I know this is current" are not the same feeling, and
-          // the second one is the one somebody needs before they publish.
-          <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-[12px] text-emerald-900">
-            最新の状態です（{playedAt}に反映）。絵コンテの内容がそのまま再生されています。
-          </p>
-        )}
+          ) : (
+            <>
+              <span>更新 {playedAt}</span>
+              {status === "behind" ? (
+                <span className="font-medium text-amber-700">
+                  変更 {bake.changes.length}件（{describeChanges(bake.changes)}）
+                </span>
+              ) : status === "matched" ? (
+                // Matching the storyboard is not the same as being finished:
+                // this take plays exactly what the storyboard says AND still
+                // has work in it. 最新 here would sit over a button reading
+                // 未処理3件 — the two-surfaces-disagreeing bug in miniature.
+                <span>
+                  残りの工程 {steps.map((step) => FILM_STEP_LABEL[step]).join("・")}
+                </span>
+              ) : (
+                // Said rather than left as the absence of a warning: "nothing
+                // is complaining" and "I know this is current" are different
+                // feelings, and the second is the one needed before publishing.
+                <span className="font-medium text-emerald-700">最新</span>
+              )}
+            </>
+          )}
+        </p>
       </div>
 
       {/* Directly under the goal: what the film is made of, picture by picture.

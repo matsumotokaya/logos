@@ -2,7 +2,7 @@ import "server-only";
 
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { parseOrExplain } from "./llm-length";
+import { LLM_BUDGET, parseOrExplain } from "@/lib/llm";
 import { z } from "zod";
 import type { ExtractedSource } from "./extract";
 import { sanitizeFacts, type SanitizeReport } from "./sanitize";
@@ -220,10 +220,7 @@ export async function structureEventFacts(
   const response = await parseOrExplain(() =>
     openai().chat.completions.parse({
     model: MODEL,
-    // Reasoning counts against this too, and this call looks at up to twelve
-    // images at once. The answer itself measures ~2000 tokens on a real flyer,
-    // so the rest of the budget is thinking room.
-    max_completion_tokens: 16000,
+    max_completion_tokens: LLM_BUDGET.long,
     reasoning_effort: "medium",
     messages: [
       { role: "system", content: SYSTEM },

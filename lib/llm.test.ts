@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { LengthFinishReasonError } from "openai/error";
-import { parseOrExplain } from "./llm-length";
+import { LLM_BUDGET, parseOrExplain } from "./llm";
 
 // The failure a user actually met: the map stage stopped after 28 seconds with
 // 「Could not parse response content as the length limit was reached」, which
@@ -31,4 +31,13 @@ test("それ以外の失敗はそのまま通す（言い換えて隠さない�
       }, "長さの上限"),
     /529 overloaded/,
   );
+});
+
+test("予算は答えより大きく、しかし青天井ではない", () => {
+  // A ceiling is not a reservation — unused room is not billed — so the number
+  // is chosen to survive a heavy run, not to be tight. It stays finite because
+  // the one thing it has to stop is a confused call that never stops writing.
+  assert.ok(LLM_BUDGET.long >= 30_000, "重い呼び出しの余裕が足りない");
+  assert.ok(LLM_BUDGET.short >= 8_000, "軽い呼び出しでも推論の余裕は要る");
+  assert.ok(LLM_BUDGET.long < 200_000, "上限が実質無いのは別の危険");
 });

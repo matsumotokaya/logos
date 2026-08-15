@@ -2,7 +2,7 @@ import "server-only";
 
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { parseOrExplain } from "./llm-length";
+import { LLM_BUDGET, parseOrExplain } from "@/lib/llm";
 import { z } from "zod";
 import {
   EVENT_CM_MAX_CHARS,
@@ -258,12 +258,7 @@ export async function draftEventCmScenario(
   const response = await parseOrExplain(() =>
     openai().chat.completions.parse({
     model: MODEL,
-    // Reasoning counts against this budget, and this is a writing task with a
-    // page of constraints — so most of it is spent before the first word of
-    // output. At 4000 a film with several programme panels ran out mid-JSON and
-    // the stage failed with the provider's English sentence about a length
-    // limit, which named neither the cause nor anything to do about it.
-    max_completion_tokens: 16000,
+    max_completion_tokens: LLM_BUDGET.long,
     reasoning_effort: "medium",
     messages: [
       {

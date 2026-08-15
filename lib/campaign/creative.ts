@@ -9,6 +9,7 @@ import type { RawServiceInfo } from "./ingest";
 import type { SiteCapture } from "./capture";
 import { describeCandidates, type PaletteCandidate } from "./palette";
 import { luminance } from "../color";
+import { LLM_BUDGET, parseOrExplain } from "@/lib/llm";
 
 // Campaign creative — turn any mix of sources (scraped URL, pasted text,
 // uploaded PDFs / images) into a validated Service Brand Kit via OpenAI
@@ -161,16 +162,19 @@ export async function generateBrandKit(
   }
   content.push({ type: "text", text: buildUserPrompt(input) });
 
-  const response = await client.chat.completions.parse({
+  const response = await parseOrExplain(() =>
+    client.chat.completions.parse({
     model: MODEL,
-    max_completion_tokens: 16000,
+    max_completion_tokens: LLM_BUDGET.long,
     reasoning_effort: "medium",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content },
     ],
     response_format: zodResponseFormat(BrandKitSchema, "brand_kit"),
-  });
+    }),
+    "ソースが長さの上限に達しました。読み込むページを減らすか、短いソースでお試しください",
+  );
 
   const kit = response.choices[0]?.message.parsed;
   if (!kit) {
@@ -345,7 +349,7 @@ export async function adjudicatePalette(input: {
 
   const response = await client.chat.completions.parse({
     model: MODEL,
-    max_completion_tokens: 4000,
+    max_completion_tokens: LLM_BUDGET.short,
     reasoning_effort: "low",
     messages: [
       { role: "system", content: ADJUDICATOR_SYSTEM },
@@ -406,7 +410,7 @@ export async function judgeBrandMatch(input: {
   const client = openai();
   const response = await client.chat.completions.parse({
     model: MODEL,
-    max_completion_tokens: 2000,
+    max_completion_tokens: LLM_BUDGET.short,
     reasoning_effort: "low",
     messages: [
       { role: "system", content: VERIFIER_SYSTEM },
