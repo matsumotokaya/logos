@@ -370,6 +370,31 @@ export interface FilmPending {
   redoSteps: FilmStep[];
 }
 
+/**
+ * Which of the four things the player is, in one word.
+ *
+ * Data rather than a chain of ternaries in the component, because getting it
+ * wrong is invisible in a screenshot: the first attempt called a take "settled"
+ * whenever it matched the storyboard, and one of the three real takes then
+ * showed a green 「最新の状態です」 directly above a button reading 未処理3件.
+ * Matching the workbench and being finished are different questions.
+ *
+ *   unrun     never run — plays the draft. Guidance, not a warning (§9.9)
+ *   behind    the workbench has changes the film does not (amber)
+ *   matched   plays exactly the storyboard, and there is still work in it
+ *   settled   nothing outstanding anywhere (green)
+ */
+export type FilmStatus = "unrun" | "behind" | "matched" | "settled";
+
+export function filmStatus(
+  state: Pick<BakeState, "baked" | "changes">,
+  steps: FilmStep[],
+): FilmStatus {
+  if (!state.baked) return "unrun";
+  if (state.changes.length > 0) return "behind";
+  return steps.length > 0 ? "matched" : "settled";
+}
+
 export function filmPending(
   working: EventCmBrief,
   baked: EventCmBrief | null,

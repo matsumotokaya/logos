@@ -7,13 +7,19 @@
 // a whim. Two controls that answer the same kind of question should not be one
 // row of pills under the storyboard and one button in the header.
 //
-// The difference is that nothing is generated here. A track is chosen, the brief
-// records it, and the player is already playing it on the next load — so the
-// confirmation says 変更しました rather than 完成しました.
+// The difference is that nothing is generated here: a track is chosen and the
+// brief records it, so the confirmation says 変更しました rather than 完成しました.
+//
+// What it does NOT say is that the film now plays it. Choosing a track changes
+// the workbench, and the player keeps the version a run fixed until somebody
+// presses 動画を作り直す (docs/video-state-model.md §2). That fact belongs to
+// the dot on the trigger and to the notice under the player — not to a sentence
+// inside this dialog, which is read before the change and forgotten after it.
 
 import { Dialog } from "@base-ui/react/dialog";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
+import StatusDot from "./StatusDot";
 import type { DefaultAsset } from "@/lib/assets/defaults";
 import type { BriefSource } from "./BriefSourceIntake";
 
@@ -25,6 +31,8 @@ export default function BgmDialog({
   /** Whether a narration exists — it decides how the music behaves, not
    *  whether it plays. */
   ducks,
+  /** The chosen track is not the one the played film has (§5). */
+  unreflected,
   busy,
   onChoose,
   onTurnOff,
@@ -33,6 +41,7 @@ export default function BgmDialog({
   pool: readonly DefaultAsset[];
   uploads: readonly BriefSource[];
   ducks: boolean;
+  unreflected: boolean;
   busy: boolean;
   onChoose: (src: string) => Promise<boolean>;
   onTurnOff: () => Promise<boolean>;
@@ -45,8 +54,17 @@ export default function BgmDialog({
     ...pool.map((asset) => ({
       src: asset.src,
       label: asset.label,
-      note: asset.credit,
-      warn: asset.licensed ? null : "書き出しには乗りません（仮素材）",
+      // Said in a sentence, not only in a chip: a hover title is invisible on a
+      // touch screen, and the consequence (a silent MP4) is not guessable.
+      note: asset.licensed
+        ? asset.credit
+        : `${asset.credit}・書き出したMP4では無音になります`,
+      // Not about the bake — about the licence. These two tracks were cleared
+      // for one production and cannot be redistributed, so the export leaves
+      // them out (lib/assets/defaults.ts). 「書き出しには乗りません」 said that
+      // in our words and was read as "your change has not been applied yet",
+      // which is a different sentence the screen says elsewhere.
+      warn: asset.licensed ? null : "試聴用",
     })),
     ...uploads.map((source) => ({
       src: `material:${source.id}`,
@@ -86,14 +104,7 @@ export default function BgmDialog({
       >
         <span className="inline-flex items-center gap-2">
           BGM
-          <span
-            aria-hidden="true"
-            className={cn(
-              "inline-block size-1.5 rounded-full",
-              current ? "bg-emerald-500" : "bg-ink/25",
-            )}
-          />
-          <span className="sr-only">{current ? "現在オン" : "現在オフ"}</span>
+          <StatusDot on={Boolean(current)} unreflected={unreflected} />
         </span>
       </Dialog.Trigger>
 
@@ -113,6 +124,15 @@ export default function BgmDialog({
                       }`
                     : "オフ（無音の映像になります）"}
                 </Dialog.Description>
+                {/* Said here only when it is true, and phrased as the state of
+                    this video rather than as a rule about the product. A
+                    standing sentence explaining the bake would be read before
+                    the change and forgotten after it. */}
+                {unreflected ? (
+                  <p className="mt-1.5 text-[12px] text-amber-700">
+                    この選択は、まだ再生中の動画に反映していません。「動画を作り直す」を押すと入ります。
+                  </p>
+                ) : null}
               </div>
               <Dialog.Close
                 aria-label="閉じる"
@@ -150,7 +170,10 @@ export default function BgmDialog({
                       <span className="block text-[11px] text-ink-faint">{option.note}</span>
                     </span>
                     {option.warn ? (
-                      <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                      <span
+                        title="この曲は試聴だけに使えます。MP4を書き出すと無音になるので、公開する動画には別の曲を選んでください"
+                        className="shrink-0 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold text-ink-muted"
+                      >
                         {option.warn}
                       </span>
                     ) : null}

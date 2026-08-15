@@ -19,6 +19,7 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
+import StatusDot from "./StatusDot";
 import { NARRATION_VOICES } from "@/lib/narration/voices";
 
 export default function NarrationDialog({
@@ -27,6 +28,7 @@ export default function NarrationDialog({
   totalMs,
   mock,
   canSpeak,
+  unreflected,
   busy,
   onSpeak,
   onTurnOff,
@@ -38,6 +40,8 @@ export default function NarrationDialog({
   mock: boolean;
   /** False while there is no scenario to read. */
   canSpeak: boolean;
+  /** The recording is not the one the played film has (§5). */
+  unreflected: boolean;
   busy: boolean;
   /** Resolves true when the take actually changed. */
   onSpeak: (voiceId: string) => Promise<boolean>;
@@ -83,16 +87,10 @@ export default function NarrationDialog({
       >
         <span className="inline-flex items-center gap-2">
           読み上げ
-          {/* The dot says whether the film currently speaks. The label does not
-              change, because the action available is the same either way. */}
-          <span
-            aria-hidden="true"
-            className={cn(
-              "inline-block size-1.5 rounded-full",
-              hasVoice ? "bg-emerald-500" : "bg-ink/25",
-            )}
-          />
-          <span className="sr-only">{hasVoice ? "現在オン" : "現在オフ"}</span>
+          {/* Whether the film speaks, AND whether the film being played is the
+              one that says it. The label never changes, because the action
+              available is the same either way (components/video/StatusDot.tsx). */}
+          <StatusDot on={hasVoice} unreflected={unreflected} />
         </span>
       </Dialog.Trigger>
 

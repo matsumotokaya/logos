@@ -4,6 +4,7 @@ import {
   bakeChanges,
   bakeState,
   describeChanges,
+  filmStatus,
   narrationIsOff,
   pendingFilmSteps,
   renderIsBehind,
@@ -185,6 +186,22 @@ test("未反映は名前で言い、多すぎるときだけ畳む", () => {
     ]),
     "BGM、主役の写真、シナリオ、他2件",
   );
+});
+
+test("絵コンテと一致していることと、やることが無いことは別", () => {
+  // Found on real data: a take whose scenario no longer covers its pictures had
+  // zero differences from the played film — it had been fixed in that state —
+  // while the button still owed three steps. Calling that 「最新の状態です」 put
+  // a green banner directly above a badge reading 未処理3件.
+  const settled = { baked: true, changes: [] };
+  assert.equal(filmStatus(settled, []), "settled");
+  assert.equal(filmStatus(settled, ["scenario", "voice", "bake"]), "matched");
+
+  const change = { path: "bgm", label: "BGM", needs: ["bake" as const] };
+  assert.equal(filmStatus({ baked: true, changes: [change] }, ["bake"]), "behind");
+
+  // Never run outranks everything: it is an invitation, not a warning.
+  assert.equal(filmStatus({ baked: false, changes: [] }, ["bake"]), "unrun");
 });
 
 test("読み上げは、いま書かれている言葉と一致するときだけ「合っている」", () => {

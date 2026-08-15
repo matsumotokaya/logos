@@ -16,8 +16,15 @@
 // (docs/old/event-cm-refactor-plan.md §9.5).
 
 import dynamic from "next/dynamic";
+import { cn } from "@/lib/cn";
 import { eventCmGoalState } from "@/lib/pipeline/event-cm";
-import { describeChanges, type BakeState } from "@/lib/event-cm/bake";
+import {
+  describeChanges,
+  filmStatus,
+  FILM_STEP_LABEL,
+  type BakeState,
+  type FilmStep,
+} from "@/lib/event-cm/bake";
 import type { BriefSource } from "./BriefSourceIntake";
 import FactList, { type FactEdit } from "./FactList";
 import Storyboard from "./Storyboard";
@@ -43,6 +50,8 @@ export default function EventCmWorkspace({
   brief,
   playing,
   bake,
+  bakedAt,
+  steps,
   onEditFact,
   onEditScenario,
   onDeletePanel,
@@ -55,6 +64,11 @@ export default function EventCmWorkspace({
   playing: EventCmBrief;
   /** How far `playing` is behind `brief`, and whether it exists at all. */
   bake: BakeState;
+  /** When the played film was fixed. Null = never run. */
+  bakedAt: string | null;
+  /** What the one button would run now. Matching the storyboard and being
+   *  finished are different things, and only the second one is green. */
+  steps: FilmStep[];
   /** Correct a value, or switch a field off. Absent = read only. */
   onEditFact?: (edit: FactEdit) => void;
   /** Save one picture's scenario line, from the storyboard panel. */
@@ -77,6 +91,19 @@ export default function EventCmWorkspace({
   const chars = scenarioChars(brief.scenario);
   const stale = scenarioStaleness(brief);
   const storyboard = eventCmStoryboard(brief);
+  const status = filmStatus(bake, steps);
+  const unreflected = status === "behind";
+  // When the film being played was fixed. Date and time, because two runs in
+  // one afternoon is the ordinary case and a date alone would not tell them
+  // apart. Absent for a take that has never been run — that branch says so.
+  const playedAt = bakedAt
+    ? new Date(bakedAt).toLocaleString("ja-JP", {
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
   return (
     <div className="flex flex-col gap-6">
@@ -95,27 +122,59 @@ export default function EventCmWorkspace({
           entirely off screen. Centred, because a column with one wide object in
           it that hugs the left edge looks like a layout that failed. */}
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
-        {/* Dark surround because the film itself is ink-black. */}
-        <div className="overflow-hidden rounded-2xl bg-[#0b0d13] p-2 shadow-sm">
+        {/* Dark surround because the film itself is ink-black.
+
+            Ringed in amber while the workbench is ahead of it: the picture is
+            what the user is looking at, and the whole misunderstanding this
+            model exists to fix ("I changed the music and nothing happened") is
+            a misunderstanding about THIS rectangle. A ring is enough — it
+            frames without covering, and the sentence underneath says why. */}
+        <div
+          className={cn(
+            "overflow-hidden rounded-2xl bg-[#0b0d13] p-2 shadow-sm",
+            unreflected && "ring-2 ring-amber-400",
+          )}
+        >
           <EventCmPlayer brief={playing} />
         </div>
 
-        {/* Why this is not what the storyboard says.
+        {/* Which version this is, and how far behind it is.
 
             Under the picture rather than over it: the film is the thing being
-            looked at, and a banner above it reads as part of the frame. Two
-            different sentences, because the two states are not degrees of the
-            same problem — one is an invitation, the other is a report. */}
-        {!bake.baked ? (
+            looked at, and a banner above it reads as part of the frame. Three
+            states, not degrees of one problem — an invitation, a report, and a
+            plain statement that there is nothing to do. */}
+        {status === "unrun" ? (
           <p className="rounded-xl border border-hairline bg-ink/[0.03] px-4 py-2.5 text-[12px] text-ink-muted">
             これは下書きのままの再生です。「動画を作り直す」を押すと、読み上げが付いて尺が確定します。
           </p>
-        ) : bake.changes.length > 0 ? (
+        ) : status === "behind" ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] text-amber-900">
-            まだこの動画へ反映していない変更が{bake.changes.length}件あります（
-            {describeChanges(bake.changes)}）。「動画を作り直す」を押すと反映されます。
+            <span className="font-semibold">
+              再生中は{playedAt}の動画です。
+            </span>
+            {" "}
+            そのあとの変更が{bake.changes.length}件あります（{describeChanges(bake.changes)}
+            ）。「動画を作り直す」を押すと反映されます。
           </p>
-        ) : null}
+        ) : status === "matched" ? (
+          // Matching the storyboard is not the same as being finished. This take
+          // plays exactly what the storyboard says AND still has work in it —
+          // words that no longer cover the pictures, or a film nobody has read
+          // aloud. Green here would sit above a button reading 未処理3件, which
+          // is the two-surfaces-disagreeing bug this whole model exists to stop.
+          <p className="rounded-xl border border-hairline bg-ink/[0.03] px-4 py-2.5 text-[12px] text-ink-muted">
+            再生中は{playedAt}の動画で、絵コンテと一致しています。「動画を作り直す」を押すと
+            {steps.map((step) => FILM_STEP_LABEL[step]).join("・")}を行います。
+          </p>
+        ) : (
+          // Said out loud rather than left as the absence of a warning: "no
+          // warning" and "I know this is current" are not the same feeling, and
+          // the second one is the one somebody needs before they publish.
+          <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-[12px] text-emerald-900">
+            最新の状態です（{playedAt}に反映）。絵コンテの内容がそのまま再生されています。
+          </p>
+        )}
       </div>
 
       {/* Directly under the goal: what the film is made of, picture by picture.

@@ -27,6 +27,7 @@ import BgmDialog from "@/components/video/BgmDialog";
 import { DEFAULT_ASSETS } from "@/lib/assets/defaults";
 import { narrationVoiceByName } from "@/lib/narration/voices";
 import {
+  describeChanges,
   renderIsBehind,
   type BakeState,
   type FilmPending,
@@ -257,6 +258,16 @@ export default function BrandVideoDetail({
   // the drawable ones here would report the music and every photograph as
   // changed on a page refresh, because their URLs are signed afresh (§3.3).
   const pending = resolved?.video.pending ?? null;
+  /**
+   * Whether one field differs from the film being played.
+   *
+   * The header's dots and (later) the fact list's chips ask this. They ask the
+   * manifest rather than comparing anything themselves, which is the whole
+   * point of computing it once: the dot beside 「BGM」 and the notice under the
+   * player cannot say different things about the same track.
+   */
+  const isUnreflected = (path: string): boolean =>
+    (pending?.changes ?? []).some((change) => change.path === path);
   /** What the one button still owes the film. Never includes MP4 (§9.4). */
   const filmSteps: FilmStep[] = pending?.steps ?? [];
   const bake: BakeState | null = pending
@@ -1112,7 +1123,10 @@ export default function BrandVideoDetail({
                     {!bake.baked
                       ? "まだ一度も実行していません。「動画を作り直す」を押すと、資料の読み取りからシナリオ・読み上げまで通り、その結果が再生される動画になります。"
                       : bake.changes.length > 0
-                        ? `絵コンテに、まだ反映していない変更が${bake.changes.length}件あります。「動画を作り直す」を押すと反映されます。`
+                        ? // Named here too, and from the same list: the drawer
+                          // and the notice under the player are two views of
+                          // one answer, so they cannot report different counts.
+                          `まだ反映していない変更が${bake.changes.length}件あります（${describeChanges(bake.changes)}）。「動画を作り直す」を押すと反映されます。`
                         : "いまの絵コンテの内容が、そのまま再生されています。"}
                   </p>
                   <p className="text-xs text-ink-faint">
@@ -1199,6 +1213,7 @@ export default function BrandVideoDetail({
                     pool={DEFAULT_ASSETS.filter((asset) => asset.kind === "bgm")}
                     uploads={sources.filter((source) => source.kind === "audio")}
                     ducks={Boolean(brief?.voice)}
+                    unreflected={isUnreflected("bgm")}
                     busy={saving}
                     onChoose={(src) => editFact({ path: "bgm", src })}
                     onTurnOff={() => editFact({ path: "bgm", src: null })}
@@ -1222,6 +1237,10 @@ export default function BrandVideoDetail({
                     totalMs={track?.totalMs ?? null}
                     mock={Boolean(track?.mock)}
                     canSpeak={Boolean(brief?.scenario.scenes.length)}
+                    // The scenario counts too: a recording that is current in
+                    // the workbench still is not what the player speaks if the
+                    // words it reads were written after the last run.
+                    unreflected={isUnreflected("voice") || isUnreflected("scenario")}
                     busy={saving}
                     onSpeak={(voiceId) => speakScenario(voiceId)}
                     onTurnOff={() => turnNarrationOff()}
@@ -1336,6 +1355,8 @@ export default function BrandVideoDetail({
           // until somebody presses a button would throw that away (§9.9).
           playing={eventCm.baked ?? eventCm.working}
           bake={bake}
+          bakedAt={pending?.bakedAt ?? null}
+          steps={filmSteps}
           onEditFact={(edit) => void editFact(edit)}
           onEditScenario={(scene, text) => editScenario(scene, text)}
           onDeletePanel={(scene) => deletePanel(scene)}
