@@ -5,32 +5,59 @@
 // docs/old/event-cm-refactor-plan.md §9.5). So the two disagree by design, and the
 // screen's job is to say by how much rather than to hide it.
 //
-// This module is the only place that answers "how much". Three surfaces read
-// the same answer — the pipeline's badge, the one button's count, and the
-// notice over the player (§9.7) — because a badge saying 2 over a notice saying
-// nothing is how the last round of bugs started.
+// This module is the only place that answers "how much", and it answers it
+// FIELD BY FIELD (docs/video-state-model.md §3.2). Every surface reads the same
+// list — the pipeline's badge, the one button's count, the notice under the
+// player, the chips in the fact list — because a badge saying 2 over a notice
+// saying nothing is how the last round of bugs started.
 //
-// Deliberately NOT a deep equality of the two briefs. A brief carries signed
-// material URLs that are re-minted on every load, so `brief !== baked_brief` is
-// true even when nothing happened. The comparison is on the three things a run
-// actually advances: the facts, the scenario, and the recording.
+// Compared on the STORED form of the two briefs, which is what makes a field
+// comparison possible at all: stored, a photograph is `material:<uuid>` and
+// stays that string forever. The client's copy has those pointers replaced by
+// signed URLs that are re-minted on every load, so comparing THAT would report
+// a change on a page refresh. Hence the rule this module depends on: it is
+// called by API routes, never by the browser (§3.3).
+//
+// It used to compare three timestamps instead. That could not name what had
+// changed, and worse, one of the three (`factsUpdatedAt`) deliberately ignores
+// music, photographs and logos — so replacing the BGM moved nothing, the badge
+// read 0, and the player went on playing the old track with no way to tell.
 
-import { isSuppressed } from "./facts";
+import { isSuppressed, isSpokenFact } from "./facts";
+import { EVENT_CM_GOAL } from "@/lib/pipeline/event-cm";
 import {
   eventCmSceneKey,
   scenarioStaleness,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 
-/** One thing the workbench holds that the played film does not. */
-export type BakeChange = "facts" | "scenario" | "voice";
+/**
+ * One field the workbench holds differently from the played film.
+ *
+ * Named with the same path and the same label the fact list uses, so "what is
+ * unreflected" and "where do I correct it" are the same word on screen.
+ */
+export interface BakeChange {
+  /** A goal path: "bgm" / "visuals.value" / "guests[0].photo" / "scenario". */
+  path: string;
+  /** The user's word for it: 「BGM」「主役の写真」. */
+  label: string;
+  /** What reflecting this change costs. Music needs no re-reading (§3.5). */
+  needs: FilmStep[];
+}
 
-/** Said in the user's words, in the order a change travels the pipeline. */
-export const BAKE_CHANGE_LABEL: Record<BakeChange, string> = {
-  facts: "項目の変更",
-  scenario: "シナリオの変更",
-  voice: "読み上げの変更",
-};
+/**
+ * The changed fields, in the user's words, short enough to sit under a player.
+ *
+ * Folded at three because a structuring run can rewrite a dozen fields at once,
+ * and a notice that grows into a wall stops being read — but a bare number
+ * ("12件") does not answer the only question worth asking, which is *what*.
+ */
+export function describeChanges(changes: BakeChange[], limit = 3): string {
+  const named = changes.slice(0, limit).map((change) => change.label);
+  const rest = changes.length - named.length;
+  return rest > 0 ? `${named.join("、")}、他${rest}件` : named.join("、");
+}
 
 export interface BakeState {
   /**
@@ -58,6 +85,152 @@ export const FILM_STEP_LABEL: Record<FilmStep, string> = {
   voice: "読み上げる",
   bake: "動画に反映する",
 };
+
+/** The order the one button runs them in. Fixing is always last. */
+const FILM_STEP_ORDER: readonly FilmStep[] = ["scenario", "voice", "bake"];
+
+/**
+ * The value of one field, in a form two briefs can be compared by.
+ *
+ * Reads the STORED brief, so `material:<uuid>` pointers compare as themselves.
+ * A field the film does not draw has no entry and is therefore never a change —
+ * which is the same rule as "a brief may only hold fields some scene draws".
+ */
+function factValueOf(brief: EventCmBrief, path: string): string {
+  const guestPhoto = /^guests\[(\d+)\]\.photo$/.exec(path);
+  if (guestPhoto) {
+    return JSON.stringify(brief.guests[Number(guestPhoto[1])]?.photo ?? null);
+  }
+  switch (path) {
+    // The words, not their clock: a scenario rewritten to the same sentences is
+    // the same scenario, and re-running the writer must not invent a change.
+    case "scenario":
+      return JSON.stringify(
+        brief.scenario.scenes.map((scene) => [eventCmSceneKey(scene), scene.text]),
+      );
+    // The recording's own stamp, never `voice.audio`: that pointer is rewritten
+    // as a freshly signed URL for the client, and a re-record of the same words
+    // is still a different recording.
+    case "voice":
+      return brief.voice?.track.generatedAt ?? "";
+    // People are compared by who they are; their portraits have their own paths
+    // above, so replacing a photograph says 「◯◯の写真」 rather than 「登壇者」.
+    case "guests":
+      return JSON.stringify(brief.guests.map((guest) => [guest.name, guest.role]));
+    case "programs":
+      return JSON.stringify(brief.programs.map((program) => program.title));
+    case "valueLines":
+      return JSON.stringify(brief.valueLines);
+    case "logos":
+      return JSON.stringify(brief.logos);
+    case "visuals.value":
+      return JSON.stringify(brief.visuals.value);
+    case "visuals.programs":
+      return JSON.stringify(brief.visuals.programs);
+    case "visuals.closing":
+      return JSON.stringify(brief.visuals.closing);
+    case "bgm":
+      return brief.bgm ?? "";
+    case "title":
+      return brief.title;
+    case "subtitle":
+      return brief.subtitle;
+    case "seriesLabel":
+      return brief.seriesLabel;
+    case "presenter":
+      return brief.presenter;
+    case "valueChip":
+      return brief.valueChip ?? "";
+    case "cta":
+      return brief.cta;
+    case "schedule.date":
+      return brief.schedule.date;
+    case "schedule.time":
+      return brief.schedule.time;
+    case "schedule.venue":
+      return brief.schedule.venue ?? "";
+    case "schedule.fee":
+      return brief.schedule.fee ?? "";
+    default:
+      return "";
+  }
+}
+
+/**
+ * Every field worth comparing, with the word the screen calls it.
+ *
+ * The goal's list plus one row per speaker's portrait, taken from whichever
+ * brief has more people: a speaker who was added still has a portrait slot to
+ * differ in, and one who was removed is already reported through `guests`.
+ */
+function comparableFields(
+  working: EventCmBrief,
+  baked: EventCmBrief,
+): Array<{ path: string; label: string }> {
+  const fields = EVENT_CM_GOAL.map((field) => ({
+    path: field.path,
+    label: field.label,
+  }));
+  const people = Math.max(working.guests.length, baked.guests.length);
+  for (let index = 0; index < people; index += 1) {
+    const name = working.guests[index]?.name ?? baked.guests[index]?.name ?? "";
+    fields.push({ path: `guests[${index}].photo`, label: `${name}の写真` });
+  }
+  return fields;
+}
+
+/**
+ * What reflecting one field costs.
+ *
+ * The knowledge is already written down: `isSpokenFact` knows which fields the
+ * narration could be reading. Changing one of those means the words describe an
+ * older event, so they get rewritten and read again; changing the music or a
+ * photograph means neither. That is why replacing the BGM reflects in seconds
+ * and costs nothing, while correcting the date does not.
+ *
+ * The two standing refusals apply here as they do everywhere: hand-written
+ * words are never rewritten, and a narration switched off is not turned back on.
+ */
+function needsFor(path: string, working: EventCmBrief): FilmStep[] {
+  const steps: FilmStep[] = [];
+  const spoken = path === "scenario" || isSpokenFact(path);
+  if (spoken && path !== "scenario" && working.scenario.source !== "human") {
+    steps.push("scenario");
+  }
+  if (spoken && !narrationIsOff(working) && working.scenario.scenes.length > 0) {
+    steps.push("voice");
+  }
+  steps.push("bake");
+  return steps;
+}
+
+/**
+ * Field by field, what the workbench holds that the played film does not.
+ *
+ * Includes being switched off: a suppressed field is emptied before the film is
+ * drawn and before the scenario is written, so deciding to hide the venue is a
+ * change to the venue.
+ */
+export function bakeChanges(
+  working: EventCmBrief,
+  baked: EventCmBrief | null,
+): BakeChange[] {
+  // Never run: there is no played film to be ahead of. The screen answers this
+  // state with guidance rather than a count (§9.9).
+  if (!baked) return [];
+
+  return comparableFields(working, baked)
+    .filter(
+      (field) =>
+        factValueOf(working, field.path) !== factValueOf(baked, field.path) ||
+        isSuppressed(working, field.path) !== isSuppressed(baked, field.path),
+    )
+    .map((field) => ({
+      path: field.path,
+      label: field.label,
+      needs: needsFor(field.path, working),
+    }));
+}
 
 /**
  * Whether the recording says what the scenario now says.
@@ -95,32 +268,13 @@ export const narrationIsOff = (brief: EventCmBrief): boolean =>
 /**
  * How far the played film is behind the workbench.
  *
- * `baked` null = never run. Everything else is a three-way comparison of the
- * nodes the pipeline advances (§9.7).
+ * `baked` null = never run, which is guidance rather than a difference.
  */
 export function bakeState(
   working: EventCmBrief,
   baked: EventCmBrief | null,
 ): BakeState {
-  if (!baked) return { baked: false, changes: [] };
-
-  const changes: BakeChange[] = [];
-  if ((working.factsUpdatedAt ?? "") !== (baked.factsUpdatedAt ?? "")) {
-    changes.push("facts");
-  }
-  if (working.scenario.updatedAt !== baked.scenario.updatedAt) {
-    changes.push("scenario");
-  }
-  // The recording's own stamp, never `voice.audio`: the pointer is rewritten as
-  // a freshly signed URL on every load, so comparing it would report a change
-  // on a page refresh.
-  if (
-    (working.voice?.track.generatedAt ?? "") !==
-    (baked.voice?.track.generatedAt ?? "")
-  ) {
-    changes.push("voice");
-  }
-  return { baked: true, changes };
+  return { baked: Boolean(baked), changes: bakeChanges(working, baked) };
 }
 
 /**
@@ -155,13 +309,16 @@ export function pendingFilmSteps(
     redo?: boolean;
   } = {},
 ): FilmStep[] {
-  const steps: FilmStep[] = [];
+  const steps = new Set<FilmStep>();
 
+  // What the WORKING brief owes on its own, whatever the player is showing: a
+  // scenario nobody has written yet, or one describing an older event, and a
+  // recording that does not say what the scenario now says.
   const handWritten = working.scenario.source === "human";
   const unwritten = working.scenario.scenes.length === 0;
   const scenarioPending =
     !handWritten && (options.redo || unwritten || scenarioStaleness(working) !== null);
-  if (scenarioPending) steps.push("scenario");
+  if (scenarioPending) steps.add("scenario");
 
   // Always reached unless it was switched off or there is nothing to read: the
   // length of the film is not known until something has been spoken, so "no
@@ -176,19 +333,54 @@ export function pendingFilmSteps(
     (scenarioPending ||
       (!unwritten &&
         (options.redo || !working.voice || !voiceReadsScenario(working))));
-  if (voicePending) steps.push("voice");
+  if (voicePending) steps.add("voice");
 
-  const state = bakeState(working, baked);
-  if (
-    options.redo ||
-    !state.baked ||
-    state.changes.length > 0 ||
-    scenarioPending ||
-    voicePending
-  ) {
-    steps.push("bake");
+  // And what the DIFFERENCES cost. Each field says for itself, so a video whose
+  // only change is its music asks for the fixing step alone — one that runs in
+  // seconds and spends nothing (§3.5).
+  for (const change of bakeChanges(working, baked)) {
+    for (const step of change.needs) steps.add(step);
   }
-  return steps;
+
+  if (options.redo || !baked || steps.size > 0) steps.add("bake");
+  return FILM_STEP_ORDER.filter((step) => steps.has(step));
+}
+
+/**
+ * Everything a screen needs to say how far the player is behind — computed once,
+ * on the server, and handed over (docs/video-state-model.md §4).
+ *
+ * The surfaces that read it (the notice under the player, the badge on the one
+ * button, the chips in the fact list, the marks on the storyboard, the bar's
+ * last stage) do not recompute any part of it. They rephrase it.
+ */
+export interface FilmPending {
+  /** When the played film was fixed. Null = never run: guidance, not a warning. */
+  bakedAt: string | null;
+  changes: BakeChange[];
+  /** What the one button will run now. */
+  steps: FilmStep[];
+  /**
+   * What it would run if asked with nothing outstanding.
+   *
+   * Sent alongside because the button stays pressable at zero — a draft that
+   * came out slightly wrong is an ordinary reason to ask again — and its label
+   * has to name what that press would do without the browser working it out.
+   */
+  redoSteps: FilmStep[];
+}
+
+export function filmPending(
+  working: EventCmBrief,
+  baked: EventCmBrief | null,
+  bakedAt: string | null,
+): FilmPending {
+  return {
+    bakedAt,
+    changes: bakeChanges(working, baked),
+    steps: pendingFilmSteps(working, baked),
+    redoSteps: pendingFilmSteps(working, baked, { redo: true }),
+  };
 }
 
 /**

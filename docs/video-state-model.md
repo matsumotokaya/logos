@@ -1,7 +1,7 @@
 # 動画編集の状態モデル(編集・映像・出力の3層と未反映差分)
 
 最終更新: 2026-08-15
-ステータス: **仕様確定・実装前**。この文書が「編集中・未反映・オールグリーン」の体験の正本
+ステータス: **§6 の1段目・2段目を実装済み**(差分のフィールド化とサーバー1箇所への集約)。残りは3段目(表示面)・4段目(オールグリーン)。この文書が「編集中・未反映・オールグリーン」の体験の正本
 
 ## 1. この文書の範囲
 
@@ -82,25 +82,30 @@
 
 take GET(`/api/brands/[id]/videos/[videoId]`)と pipeline GET が同じ形で返す。**クライアントはこれを計算しない**。
 
+**実装済み**([lib/event-cm/bake.ts](../lib/event-cm/bake.ts) の `FilmPending` / `filmPending()`):
+
 ```ts
 pending: {
   /** プレイヤーが再生している版の時刻。null = 一度も実行していない(案内表示・琥珀ではない) */
   bakedAt: string | null;
   /** 境界1の差分。保存形ブリーフのフィールド単位比較。空 = 編集と動画が一致 */
   changes: Array<{
-    path: string;          // EVENT_CM_GOAL の path("bgm" / "visuals.value" / "scenario" …)
+    path: string;          // EVENT_CM_GOAL の path("bgm" / "visuals.value" / "guests[0].photo" …)
     label: string;         // 同 goal のラベル(「BGM」「主役の写真」…)。画面はこれをそのまま言う
     needs: FilmStep[];     // この差分の反映に必要な工程(§3.5)
   }>;
-  /** 未読の資料の件数(読み取り3段の未処理。既存バッジと同源) */
-  unread: number;
-  /** 「動画を作り直す」が実際に通す工程(changes.needs の合成 + unread があれば読み取り3段) */
+  /** 「動画を作り直す」が実際に通す工程(changes.needs + 作業中ブリーフ自身の未了分の合成) */
   steps: FilmStep[];
+  /** 未処理ゼロで押されたときに通す工程。ボタンはゼロでも押せるので、その press が
+   *  何をするかをブラウザに計算させないために一緒に配る */
+  redoSteps: FilmStep[];
 }
 ```
 
+- **`unread`(資料の未読件数)はマニフェストに入れない**。`FilmStep` は `scenario / voice / bake` の3つで、読み取り3段は別の語彙だから。ボタンのバッジは従来どおり `pendingStages.length + steps.length` で合成する——読み取り段の判定([lib/pipeline/stage-actions.ts](../lib/pipeline/stage-actions.ts))は署名URLの影響を受けないので、クライアントで導出しても壊れない
+- どのテンプレートがこのマニフェストを持つかは**台帳が宣言する**([lib/templates/catalog.ts](../lib/templates/catalog.ts) の `bakesBrief`)。APIルートに `template_id === "event-cm"` を書かない
 - 境界2(MP4の古さ)は従来どおり `renderIsBehind` で別に運ぶ。MP4は鎖の外(§9.4の決定は不変)なのでマニフェストに混ぜない。オールグリーン判定(§5)だけが両方を見る
-- 件数の畳み方: 表示は**頭3件+「他N件」**。構造化が一度に12項目書き換えても帯が画面を覆わない
+- 件数の畳み方: `describeChanges()` が**頭3件+「他N件」**で畳む。構造化が一度に12項目書き換えても帯が画面を覆わない
 
 ## 5. 表示面の仕様(6つの面、1つの答え)
 
@@ -123,8 +128,8 @@ pending: {
 
 ## 6. 実装計画(4段・各段でテストgreenを保つ)
 
-1. **マニフェスト**: `bake.ts` の `bakeState` をフィールド単位比較に書き換え(`BakeChange` を `{path, label, needs}[]` へ)、`pendingFilmSteps` を `needs` の合成に変える。`factsUpdatedAt` を差分判定から外す。テストは既存の bake.test.ts を移行+「BGMだけ変えると bake のみ」「写真の差分は voice を要求しない」等を追加
-2. **API**: take GET / pipeline GET が `pending` を返す。クライアント側の `bakeState` / `pendingFilmSteps` 呼び出しを撤去し、受け取ったマニフェストを描くだけにする(この時点で計算は1箇所になる)
+1. ✅ **マニフェスト**(2026-08-15): `bakeChanges()` がフィールド単位で比較し、`BakeChange` は `{path, label, needs}`。`pendingFilmSteps` は差分の `needs` と作業中ブリーフ自身の未了分の合成。`factsUpdatedAt` は差分判定から外れ、シナリオの陳腐化だけを答える
+2. ✅ **API**(2026-08-15): take GET が `pending` を返し、pipeline GET は同じ `bakeChanges()` を読む。**クライアントの `bakeState` / `pendingFilmSteps` 呼び出しは撤去**——ブラウザは差分を計算しない。1段目と2段目は分けられない(フィールド比較にした瞬間、署名URLを持つクライアント側計算は必ず誤差分を出すため)
 3. **表示面**: プレイヤーの版名乗り+琥珀枠、FactListの「未反映」チップ、絵コンテの点、バーの給源差し替え
 4. **オールグリーン**: 一致状態の緑表示
 

@@ -36,6 +36,8 @@ export interface VideoTemplate {
   narration: boolean;
   /** Whether the brief alone is enough to play the film (catalog.ts). */
   playableFromBrief: boolean;
+  /** Whether edits collect in a workbench brief and reach the film on request. */
+  bakesBrief: boolean;
   /** Every brand gets exactly one of these by default, unpublished. */
   isBrandDefault: boolean;
 }
@@ -48,6 +50,7 @@ const toVideoTemplate = (template: TemplateEntry): VideoTemplate => ({
   duration: template.duration ?? "",
   narration: template.narration ?? false,
   playableFromBrief: template.playableFromBrief ?? true,
+  bakesBrief: template.bakesBrief ?? false,
   isBrandDefault: template.isBrandDefault,
 });
 

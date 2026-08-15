@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  bakeChanges,
   bakeState,
+  describeChanges,
   narrationIsOff,
   pendingFilmSteps,
   renderIsBehind,
@@ -68,32 +70,121 @@ test("焼き付けた版と同じなら差分は無い", () => {
   assert.deepEqual(bakeState(brief, brief).changes, []);
 });
 
-test("事実・シナリオ・読み上げは、それぞれ別の差分として言う", () => {
+test("差分は変わった項目の名前で言う（何件、ではなく何が）", () => {
   const baked = spoken(written(SEEDED, "2026-08-14T10:00:00Z"), "2026-08-14T10:05:00Z");
+
+  const date: EventCmBrief = {
+    ...baked,
+    schedule: { ...baked.schedule, date: "2026.11.14" },
+  };
   assert.deepEqual(
-    bakeState({ ...baked, factsUpdatedAt: "2026-08-14T11:00:00Z" }, baked).changes,
-    ["facts"],
+    bakeChanges(date, baked).map((change) => [change.path, change.label]),
+    [["schedule.date", "開催日"]],
   );
+
+  const rewritten: EventCmBrief = {
+    ...baked,
+    scenario: {
+      ...baked.scenario,
+      scenes: baked.scenario.scenes.map((scene, index) =>
+        index === 0 ? { ...scene, text: "別の言葉" } : scene,
+      ),
+    },
+  };
   assert.deepEqual(
-    bakeState(written(baked, "2026-08-14T12:00:00Z"), baked).changes,
+    bakeChanges(rewritten, baked).map((change) => change.path),
     ["scenario"],
   );
+
   assert.deepEqual(
-    bakeState(spoken(baked, "2026-08-14T13:00:00Z"), baked).changes,
+    bakeChanges(spoken(baked, "2026-08-14T13:00:00Z"), baked).map((c) => c.path),
     ["voice"],
   );
 });
 
-test("素材URLが署名し直されただけでは差分にならない", () => {
+test("BGMを差し替えたら「BGM」1件の差分になる", () => {
+  // The event this whole model was rebuilt for. Choosing a track moved none of
+  // the three stamps the old comparison read — `factsUpdatedAt` deliberately
+  // ignores music — so the badge said 0 while the player kept the old song.
   const baked = spoken(written(SEEDED, "2026-08-14T10:00:00Z"), "2026-08-14T10:05:00Z");
-  // What the client actually receives: the same take, its pointers resolved to
-  // freshly signed URLs. A deep equality would call this a change on every load.
-  const reloaded: EventCmBrief = {
+  const swapped: EventCmBrief = {
     ...baked,
-    bgm: "/api/brands/b/takes/t/materials/m/bgm.mp3?key=k&sig=NEW",
-    voice: { ...baked.voice!, audio: "/api/…/voice.wav?sig=NEW" },
+    bgm: "material:00000000-0000-0000-0000-0000000000bb",
   };
-  assert.deepEqual(bakeState(reloaded, baked).changes, []);
+
+  const changes = bakeChanges(swapped, baked);
+  assert.deepEqual(
+    changes.map((change) => [change.path, change.label]),
+    [["bgm", "BGM"]],
+  );
+  // And it costs nothing to reflect: music is not read aloud, so no rewriting
+  // and no second TTS bill — just the fixing step.
+  assert.deepEqual(changes[0].needs, ["bake"]);
+  assert.deepEqual(pendingFilmSteps(swapped, baked), ["bake"]);
+});
+
+test("写真の差し替えも、言う言葉は変えないので読み直さない", () => {
+  const baked = spoken(written(SEEDED, "2026-08-14T10:00:00Z"), "2026-08-14T10:05:00Z");
+  const photo: EventCmBrief = {
+    ...baked,
+    visuals: { ...baked.visuals, value: { src: "material:abc" } },
+  };
+  assert.deepEqual(
+    bakeChanges(photo, baked).map((change) => [change.label, change.needs]),
+    [["主役の写真", ["bake"]]],
+  );
+});
+
+test("比較は保存形。署名URLに置き換わった版を比べてはいけない", () => {
+  // Why this module is called by API routes and never by the browser (§3.3).
+  // Stored, a track is `material:<uuid>` for ever; the copy the client receives
+  // has a URL signed afresh on every load. Comparing THOSE would report the
+  // music and every photograph as changed on a page refresh.
+  const stored: EventCmBrief = {
+    ...spoken(written(SEEDED, "2026-08-14T10:00:00Z"), "2026-08-14T10:05:00Z"),
+    bgm: "material:00000000-0000-0000-0000-0000000000bb",
+  };
+  assert.deepEqual(bakeChanges(stored, stored), []);
+
+  const resolved: EventCmBrief = {
+    ...stored,
+    bgm: "/api/brands/b/takes/t/materials/m/bgm.mp3?key=k&sig=NEW",
+  };
+  assert.deepEqual(
+    bakeChanges(resolved, stored).map((change) => change.path),
+    ["bgm"],
+    "署名URL版を比べると偽の差分が出る——だからサーバーで保存形を比べる",
+  );
+
+  // The recording is the exception that proves the rule: its pointer is signed
+  // too, so it is compared by the stamp on the recording instead.
+  const reSigned: EventCmBrief = {
+    ...stored,
+    voice: { ...stored.voice!, audio: "/api/…/voice.wav?sig=NEW" },
+  };
+  assert.deepEqual(bakeChanges(reSigned, stored), []);
+});
+
+test("未反映は名前で言い、多すぎるときだけ畳む", () => {
+  // A number alone ("12件") does not answer the only question worth asking.
+  // But a structuring run can rewrite a dozen fields, and a notice that grows
+  // into a wall stops being read.
+  const change = (label: string) => ({ path: label, label, needs: ["bake" as const] });
+  assert.equal(describeChanges([change("BGM")]), "BGM");
+  assert.equal(
+    describeChanges([change("BGM"), change("主役の写真"), change("シナリオ")]),
+    "BGM、主役の写真、シナリオ",
+  );
+  assert.equal(
+    describeChanges([
+      change("BGM"),
+      change("主役の写真"),
+      change("シナリオ"),
+      change("開催日"),
+      change("会場"),
+    ]),
+    "BGM、主役の写真、シナリオ、他2件",
+  );
 });
 
 test("読み上げは、いま書かれている言葉と一致するときだけ「合っている」", () => {
@@ -184,7 +275,13 @@ test("コマを削除した直後も、シナリオから追いつかせる", ()
   assert.deepEqual(pendingFilmSteps(brief, brief), []);
 
   const deleted = setSuppressed(brief, "guests", true, "2026-08-14T11:00:00Z");
-  assert.deepEqual(bakeState(deleted, brief).changes, ["facts"]);
+  // Switching a field off is a change TO THAT FIELD: it is emptied before the
+  // film is drawn and before the words are written, so it is named as 登壇者
+  // rather than lumped into a generic "facts".
+  assert.deepEqual(
+    bakeChanges(deleted, brief).map((change) => [change.path, change.label]),
+    [["guests", "登壇者"]],
+  );
   assert.deepEqual(pendingFilmSteps(deleted, brief), ["scenario", "voice", "bake"]);
 });
 

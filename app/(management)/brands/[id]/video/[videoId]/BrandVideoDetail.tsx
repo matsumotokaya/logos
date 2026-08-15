@@ -27,9 +27,9 @@ import BgmDialog from "@/components/video/BgmDialog";
 import { DEFAULT_ASSETS } from "@/lib/assets/defaults";
 import { narrationVoiceByName } from "@/lib/narration/voices";
 import {
-  bakeState,
-  pendingFilmSteps,
   renderIsBehind,
+  type BakeState,
+  type FilmPending,
   type FilmStep,
 } from "@/lib/event-cm/bake";
 import { eventCmFilm } from "@/remotion/event-cm/film";
@@ -89,6 +89,10 @@ type VideoAsset = {
   unresolvedMaterials?: string[];
   /** material:<uuid> → the signed URL the server resolved it to. */
   materialUrls?: Record<string, string>;
+  /** How far the player is behind the workbench, and what closing the gap
+   *  costs. Computed by the server on the stored briefs; null for templates
+   *  where a saved edit is already the film (§4). */
+  pending?: FilmPending | null;
   state: VideoState;
   createdAt: string;
   render: { status: "running" | "done" | "error"; error: string | null; renderedAt: string | null } | null;
@@ -232,12 +236,9 @@ export default function BrandVideoDetail({
   const [runs, setRuns] = useState<TakeRunRecord[]>([]);
   const [runCards, setRunCards] = useState<RunCard[]>([]);
 
-  // The workbench and the film, as a pair.
-  //
-  // Derived here, above everything that reads either of them, because the whole
-  // screen turns on the difference: the storyboard edits the first, the player
-  // runs the second, and three separate surfaces (the badge, the notice under
-  // the player, the tooltip) have to agree about the gap between them (§9.7).
+  // The two briefs, for DRAWING: the storyboard renders one and the player the
+  // other. These are the resolved copies, which is what drawing needs — an
+  // <img> cannot fetch `material:<uuid>`.
   const eventCm =
     resolved?.video.template === "event-cm" && resolved.video.brief
       ? {
@@ -245,11 +246,22 @@ export default function BrandVideoDetail({
           baked: (resolved.video.bakedBrief ?? null) as EventCmBrief | null,
         }
       : null;
+
+  // How far the film is behind the workbench — read, not derived.
+  //
+  // The whole screen turns on this difference: the storyboard edits one brief,
+  // the player runs the other, and four surfaces (the badge, the notice under
+  // the player, the bar's last stage, the tooltip) have to agree about the gap.
+  // So the answer arrives with the take, computed once by the server on the two
+  // STORED briefs — precisely the copies above, before resolution. Comparing
+  // the drawable ones here would report the music and every photograph as
+  // changed on a page refresh, because their URLs are signed afresh (§3.3).
+  const pending = resolved?.video.pending ?? null;
   /** What the one button still owes the film. Never includes MP4 (§9.4). */
-  const filmSteps: FilmStep[] = eventCm
-    ? pendingFilmSteps(eventCm.working, eventCm.baked)
-    : [];
-  const bake = eventCm ? bakeState(eventCm.working, eventCm.baked) : null;
+  const filmSteps: FilmStep[] = pending?.steps ?? [];
+  const bake: BakeState | null = pending
+    ? { baked: pending.bakedAt !== null, changes: pending.changes }
+    : null;
 
   // Returns what it read as well as storing it: a multi-step run has to decide
   // its next step from the brief the previous step just wrote, and React state
@@ -753,13 +765,9 @@ export default function BrandVideoDetail({
    */
   async function runFilmSteps(options: { redo?: boolean } = {}): Promise<boolean> {
     const fresh = await load();
-    const working = fresh?.video.brief as EventCmBrief | undefined;
-    if (!working || fresh?.video.template !== "event-cm") return false;
-    const steps = pendingFilmSteps(
-      working,
-      (fresh.video.bakedBrief ?? null) as EventCmBrief | null,
-      options,
-    );
+    const pendingNow = fresh?.video.pending;
+    if (!pendingNow) return false;
+    const steps = options.redo ? pendingNow.redoSteps : pendingNow.steps;
 
     for (const step of steps) {
       const ok =

@@ -92,6 +92,16 @@ export interface TemplateEntry {
    * with nothing in it. Defaults to true, which is the product's stance.
    */
   playableFromBrief?: boolean;
+  /**
+   * Video-specific: whether editing accumulates instead of reaching the film.
+   *
+   * True means the take carries two briefs — the one being edited and the one a
+   * run fixed — and the player, the export and the public URL all read the
+   * fixed one (`takes.baked_brief`, migration 0050). The screen then owes the
+   * user an account of the difference, which is what `lib/event-cm/bake.ts`
+   * computes. False (the default) means a saved edit is the film.
+   */
+  bakesBrief?: boolean;
   stages: PipelineStage[];
   publishSurfaces: PublishSurface[];
   costProfile: CostProfile;
@@ -164,6 +174,9 @@ export const TEMPLATES: TemplateEntry[] = [
     requires: "イベントの事実（EventBrief）と、そこから書いたシナリオ",
     duration: "30秒前後（シナリオと読み上げの長さで決まる）",
     narration: true,
+    // The storyboard is a workbench: edits collect there and reach the film
+    // only when the user asks. The only template that works this way today.
+    bakesBrief: true,
     // The script is written by an LLM from the brief, then spoken. Both are
     // charged, and both re-run only when asked.
     stages: ["collect", "structure", "render", "publish"],

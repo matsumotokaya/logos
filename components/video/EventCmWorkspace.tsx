@@ -17,7 +17,7 @@
 
 import dynamic from "next/dynamic";
 import { eventCmGoalState } from "@/lib/pipeline/event-cm";
-import { BAKE_CHANGE_LABEL, type BakeState } from "@/lib/event-cm/bake";
+import { describeChanges, type BakeState } from "@/lib/event-cm/bake";
 import type { BriefSource } from "./BriefSourceIntake";
 import FactList, { type FactEdit } from "./FactList";
 import Storyboard from "./Storyboard";
@@ -112,9 +112,8 @@ export default function EventCmWorkspace({
           </p>
         ) : bake.changes.length > 0 ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] text-amber-900">
-            絵コンテに、まだこの動画へ反映していない変更が{bake.changes.length}件あります（
-            {bake.changes.map((change) => BAKE_CHANGE_LABEL[change]).join("、")}）。
-            「動画を作り直す」を押すと反映されます。
+            まだこの動画へ反映していない変更が{bake.changes.length}件あります（
+            {describeChanges(bake.changes)}）。「動画を作り直す」を押すと反映されます。
           </p>
         ) : null}
       </div>

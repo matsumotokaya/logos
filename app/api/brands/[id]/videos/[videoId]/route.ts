@@ -13,6 +13,7 @@ import { renderOutputSignatureToken } from "../../takes/[takeId]/renders/[render
 import { resolveBriefMaterialUrls } from "@/lib/takes/materials";
 import { deleteTake, parseMaterialDisposition } from "@/lib/takes/delete";
 import { titleOffer } from "@/lib/event-cm/title";
+import { filmPending } from "@/lib/event-cm/bake";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import {
@@ -188,6 +189,21 @@ export async function GET(
           // guidance rather than a warning (§9.9).
           bakedBrief: bakedForClient,
           bakedAt: take.baked_at ?? null,
+          // How far the player is behind the workbench, field by field.
+          //
+          // Computed HERE, on the stored briefs, and never in the browser: the
+          // copies above have had their `material:<uuid>` pointers replaced by
+          // signed URLs that are re-minted on every load, so a field comparison
+          // run on them would report the BGM and every photograph as changed on
+          // a page refresh (docs/video-state-model.md §3.3).
+          pending:
+            VIDEO_TEMPLATES[take.template_id]?.bakesBrief && take.brief
+              ? filmPending(
+                  take.brief as EventCmBrief,
+                  (take.baked_brief as EventCmBrief | null) ?? null,
+                  take.baked_at ?? null,
+                )
+              : null,
           campaignJobId,
           unresolvedMaterials,
           // material:<uuid> → the signed URL it became, so a picker can tell
