@@ -170,10 +170,28 @@ test("コマが増えた直後は、シナリオから追いつかせる", () =>
   assert.deepEqual(pendingFilmSteps(withGuest, brief), ["scenario", "voice", "bake"]);
 });
 
+test("コマを削除した直後も、シナリオから追いつかせる", () => {
+  // The mirror of the test above, and the one that was broken: deleting the
+  // speakers is a suppression, and suppressions used not to stamp the facts —
+  // so the film lost a picture while every stamp stayed put. The badge said 0,
+  // the notice said nothing was pending, and the player went on showing the
+  // deleted picture until somebody pressed the button a second time.
+  const guests = [{ name: "宮尾 佳明", role: "宮尾酒造 十一代目当主", photo: null }];
+  const brief = spoken(
+    written({ ...SEEDED, guests }, "2026-08-14T10:00:00Z"),
+    "2026-08-14T10:05:00Z",
+  );
+  assert.deepEqual(pendingFilmSteps(brief, brief), []);
+
+  const deleted = setSuppressed(brief, "guests", true, "2026-08-14T11:00:00Z");
+  assert.deepEqual(bakeState(deleted, brief).changes, ["facts"]);
+  assert.deepEqual(pendingFilmSteps(deleted, brief), ["scenario", "voice", "bake"]);
+});
+
 test("読む言葉が無いのに読み上げを予告しない", () => {
   // Hand-authored and still empty: the scenario step will not run (it never
   // overwrites human words) and there is nothing to speak, so listing 読み上げ
-  // would promise a step that can only answer 「先に台本を作成してください」.
+  // would promise a step that can only answer 「先にシナリオを書いてください」.
   const empty: EventCmBrief = {
     ...SEEDED,
     scenario: { version: 1, scenes: [], source: "human", updatedAt: "", angle: "" },

@@ -298,7 +298,7 @@ test("プログラムが1つなら、コマも1つ（既存のTakeは変わら�
   assert.ok(scene.components.some((component) => component.kind === "list"));
 });
 
-test("プログラムのコマは、その分だけ台本の行を要求する", () => {
+test("プログラムのコマは、その分だけシナリオの行を要求する", () => {
   const steps = eventCmNarratedSteps(SAKE);
   assert.deepEqual(steps.map(eventCmSceneKey), [
     "title",

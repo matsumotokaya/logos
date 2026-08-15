@@ -7,7 +7,7 @@ import { guardLabsRequest } from "@/lib/labs-access";
 import { campaignCmMp4Exists, getCampaignJob } from "@/lib/campaign/jobs";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { isVideoTemplateId, VIDEO_TEMPLATES } from "@/lib/video/templates";
-import { type VideoState, type VideoSummary } from "@/lib/video/asset";
+import { videoState, type VideoState, type VideoSummary } from "@/lib/video/asset";
 import { emptyEventBrief } from "@/remotion/event/briefs";
 import { createTake } from "@/lib/takes/create";
 import { seedEventCmFromBrand } from "@/lib/event-cm/seed-from-brand";
@@ -30,7 +30,7 @@ type TakeVideoRow = {
 
 const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
 
-/** MP4 on disk beats a voice track; neither means the slot is still empty. */
+/** What the local generation job says. Everything else is `videoState`. */
 function campaignVideoState(jobId: string | null): VideoState {
   if (!jobId) return "empty";
   if (campaignCmMp4Exists(jobId)) return "mp4_ready";
@@ -95,20 +95,23 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     );
     const takeJobId =
       typeof brief?.campaignJobId === "string" ? brief.campaignJobId : null;
+    const jobId = takeJobId ?? campaignJobId;
     videos.push({
       id: take.id,
       brandId: take.brand_id,
       template: take.template_id,
       title: take.title,
       published,
-      state:
-        take.template_id === "product-cm"
-          ? campaignVideoState(takeJobId ?? campaignJobId)
-          : renderReady
-            ? "mp4_ready"
-            : take.brief
-              ? "preview_ready"
-              : "empty",
+      // The same derivation the detail screen uses (lib/video/asset.ts). The
+      // job store is only consulted for a take whose template says its brief
+      // is not enough to play on its own.
+      state: videoState({
+        template: take.template_id,
+        hasRender: renderReady,
+        hasBrief: Boolean(take.brief),
+        hasVoice: brief?.voice != null && typeof brief.voice === "object",
+        ...(jobId ? { campaign: () => campaignVideoState(jobId) } : {}),
+      }),
       createdAt: take.created_at,
       isPlaceholder: false,
     });

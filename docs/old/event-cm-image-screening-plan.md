@@ -37,16 +37,16 @@
 
 | 事実 | 場所 |
 | --- | --- |
-| 画像は passthrough として運ばれ、構造化で `image_url` パーツとしてモデルへ渡っている | [lib/event-cm/extract.ts](../lib/event-cm/extract.ts), [lib/event-cm/structure.ts](../lib/event-cm/structure.ts) |
-| ただし**画像に識別ラベルが付いていない**。`【label】` はテキスト素材だけ | [lib/event-cm/structure.ts](../lib/event-cm/structure.ts) |
-| **モデルへ送る画像に上限が無い**。原寸base64をそのまま渡す(1素材12MBまで受理) | [structure.ts](../lib/event-cm/structure.ts) / [materials/route.ts](../app/api/brands/[id]/videos/[videoId]/materials/route.ts) |
-| checksum・同一画像の統合は**素材登録時に実装済み** | [materials/route.ts](../app/api/brands/[id]/videos/[videoId]/materials/route.ts) |
-| `event-cm` が実際に描く画像は **`logos[0]` / `visuals.value` / `guests[n].photo` の3つだけ** | [remotion/kit/scenes/event-cm.ts](../remotion/kit/scenes/event-cm.ts) |
-| `visuals.programs` / `visuals.closing` は型にあるが `event-cm` は読まない(event-promo由来) | [remotion/event/types.ts](../remotion/event/types.ts) |
-| マッピングは登壇者配列を丸ごと置き換え、**毎回 `photo: null` を書く** | [lib/event-cm/map.ts](../lib/event-cm/map.ts) |
-| `material:<uuid>` の解決(preview署名URL / render時のステージング)は完成している | [lib/takes/materials.ts](../lib/takes/materials.ts) |
+| 画像は passthrough として運ばれ、構造化で `image_url` パーツとしてモデルへ渡っている | [lib/event-cm/extract.ts](../../lib/event-cm/extract.ts), [lib/event-cm/structure.ts](../../lib/event-cm/structure.ts) |
+| ただし**画像に識別ラベルが付いていない**。`【label】` はテキスト素材だけ | [lib/event-cm/structure.ts](../../lib/event-cm/structure.ts) |
+| **モデルへ送る画像に上限が無い**。原寸base64をそのまま渡す(1素材12MBまで受理) | [structure.ts](../../lib/event-cm/structure.ts) / [materials/route.ts](../../app/api/brands/[id]/videos/[videoId]/materials/route.ts) |
+| checksum・同一画像の統合は**素材登録時に実装済み** | [materials/route.ts](../../app/api/brands/[id]/videos/[videoId]/materials/route.ts) |
+| `event-cm` が実際に描く画像は **`logos[0]` / `visuals.value` / `guests[n].photo` の3つだけ** | [remotion/kit/scenes/event-cm.ts](../../remotion/kit/scenes/event-cm.ts) |
+| `visuals.programs` / `visuals.closing` は型にあるが `event-cm` は読まない(event-promo由来) | [remotion/event/types.ts](../../remotion/event/types.ts) |
+| マッピングは登壇者配列を丸ごと置き換え、**毎回 `photo: null` を書く** | [lib/event-cm/map.ts](../../lib/event-cm/map.ts) |
+| `material:<uuid>` の解決(preview署名URL / render時のステージング)は完成している | [lib/takes/materials.ts](../../lib/takes/materials.ts) |
 | 画像縮小に使える `sharp` は依存に入っている | package.json |
-| OCRエンジン・PDFテキストパーサは**無い** | [lib/event-cm/extract.ts](../lib/event-cm/extract.ts) |
+| OCRエンジン・PDFテキストパーサは**無い** | [lib/event-cm/extract.ts](../../lib/event-cm/extract.ts) |
 
 構造化→マッピングの連続実行(入力画面の「構造化して反映する」)は完了済み。したがって
 残っている行き止まりは「画像だけが `brief` に届かない」ことに絞られている。
@@ -54,7 +54,7 @@
 ## 4. 先に直す2つの欠陥(この計画の前提条件)
 
 **1. 再マッピングが登壇者の写真を消す。**
-[lib/event-cm/map.ts](../lib/event-cm/map.ts) は `facts.guests` を採るとき配列を作り直し、
+[lib/event-cm/map.ts](../../lib/event-cm/map.ts) は `facts.guests` を採るとき配列を作り直し、
 `photo: null` を入れる。写真を自動配置しても、資料を読み直した瞬間に消える。氏名で正規化
 照合してマージする(空白・全角半角・姓名の区切りを無視して比較し、残った人の `photo` を
 引き継ぐ)。**写真は登壇者の属性であって、登壇者リストの版ではない。**
@@ -68,7 +68,7 @@
 
 ## 5. 日本酒の映画から持ってくる技術
 
-手で組んだ「世界が恋する日本酒」([remotion/event/EventComposition.tsx](../remotion/event/EventComposition.tsx))は、
+手で組んだ「世界が恋する日本酒」([remotion/event/EventComposition.tsx](../../remotion/event/EventComposition.tsx))は、
 背景写真の扱いをすでに解いている。新しく発明せず、これを部品語彙(`remotion/kit/`)へ移す。
 
 | 技術 | 実装 | どう移すか |
@@ -77,10 +77,10 @@
 | **シーンごとの減光**(value 0.5 / programs 0.22 / closing 0.24) | 同 | 文字量で決まる値なのでテーマが持つ。シーンは `hero` / `support` の意図だけを言う |
 | `focus: {x, y}` → `object-position` | `focusPosition()` | すでに `KitComponent` にある。判定を自動化するだけ |
 | 円形に切り出すポートレート + `zoom` | `EventComposition.tsx` の portrait | `people` コンポーネントが継承済み |
-| ロゴの `knockout` / `invert` 正規化 | [labs/event/scripts/prepare-assets.mjs](../labs/event/scripts/prepare-assets.mjs) | 輝度判定をサーバー側の決定論へ(§8の規則5) |
-| 実ブリーフの focus 値(0.45 / 0.68 / 0.5) | [remotion/event/briefs/sake-2026.ts](../remotion/event/briefs/sake-2026.ts) | 粗い列挙で足りることの根拠(§7) |
+| ロゴの `knockout` / `invert` 正規化 | [labs/event/scripts/prepare-assets.mjs](../../labs/event/scripts/prepare-assets.mjs) | 輝度判定をサーバー側の決定論へ(§8の規則5) |
+| 実ブリーフの focus 値(0.45 / 0.68 / 0.5) | [remotion/event/briefs/sake-2026.ts](../../remotion/event/briefs/sake-2026.ts) | 粗い列挙で足りることの根拠(§7) |
 
-**この映画が受入基準**である点は変えない。[lib/kit/event-cm-scenes.test.ts](../lib/kit/event-cm-scenes.test.ts) が
+**この映画が受入基準**である点は変えない。[lib/kit/event-cm-scenes.test.ts](../../lib/kit/event-cm-scenes.test.ts) が
 実ブリーフで検証しているので、背景写真を追加したらここに `visuals.programs` / `closing` を
 持つブリーフを通す。
 
@@ -175,7 +175,7 @@ const ImageReadingSchema = z.object({
    `inferred`。理由文(`reason`)を `provenance[path].note` に残す
 
 `brief` へ書くのは `material:<uuid>`。preview と render の解決は
-[lib/takes/materials.ts](../lib/takes/materials.ts) が既に持っているので、新しい配信経路は要らない。
+[lib/takes/materials.ts](../../lib/takes/materials.ts) が既に持っているので、新しい配信経路は要らない。
 
 ## 9. テンプレート: 背景写真を持たせる
 
@@ -226,11 +226,11 @@ export interface Scene {
 
 | 順 | やること | 実装 |
 | --- | --- | --- |
-| A | 前提の2欠陥を直す(氏名マージ・送信上限と縮小) | [names.ts](../lib/event-cm/names.ts) / [map.ts](../lib/event-cm/map.ts) / [extract.ts](../lib/event-cm/extract.ts) |
-| B | 画像に `【画像 ラベル / ID: …】` を付け、`ImageReadingSchema` を構造化に足す | [structure.ts](../lib/event-cm/structure.ts) |
-| C | 配置規則(§8)をマッピングに実装。由来と理由を記録 | [place-images.ts](../lib/event-cm/place-images.ts) / [run/[stage]/route.ts](../app/api/brands/[id]/videos/[videoId]/run/[stage]/route.ts) |
-| D | `Scene.backdrop` とテーマの減光・スクリム・寄り。`value` / `program` / `cta` へ配線 | [layout.ts](../remotion/kit/layout.ts) / [theme.ts](../remotion/kit/theme.ts) / [Stage.tsx](../remotion/kit/render/Stage.tsx) / [scenes/event-cm.ts](../remotion/kit/scenes/event-cm.ts) |
-| E | 絵コンテの背景描画、FactListの写真行(差し替え・外す)、実行ログの件数と理由 | [storyboard/event-cm.ts](../lib/storyboard/event-cm.ts) / [Storyboard.tsx](../components/video/Storyboard.tsx) / [FactList.tsx](../components/video/FactList.tsx) / [facts.ts](../lib/event-cm/facts.ts) |
+| A | 前提の2欠陥を直す(氏名マージ・送信上限と縮小) | [names.ts](../../lib/event-cm/names.ts) / [map.ts](../../lib/event-cm/map.ts) / [extract.ts](../../lib/event-cm/extract.ts) |
+| B | 画像に `【画像 ラベル / ID: …】` を付け、`ImageReadingSchema` を構造化に足す | [structure.ts](../../lib/event-cm/structure.ts) |
+| C | 配置規則(§8)をマッピングに実装。由来と理由を記録 | [place-images.ts](../../lib/event-cm/place-images.ts) / [run/[stage]/route.ts](../../app/api/brands/[id]/videos/[videoId]/run/[stage]/route.ts) |
+| D | `Scene.backdrop` とテーマの減光・スクリム・寄り。`value` / `program` / `cta` へ配線 | [layout.ts](../../remotion/kit/layout.ts) / [theme.ts](../../remotion/kit/theme.ts) / [Stage.tsx](../../remotion/kit/render/Stage.tsx) / [scenes/event-cm.ts](../../remotion/kit/scenes/event-cm.ts) |
+| E | 絵コンテの背景描画、FactListの写真行(差し替え・外す)、実行ログの件数と理由 | [storyboard/event-cm.ts](../../lib/storyboard/event-cm.ts) / [Storyboard.tsx](../../components/video/Storyboard.tsx) / [FactList.tsx](../../components/video/FactList.tsx) / [facts.ts](../../lib/event-cm/facts.ts) |
 
 実装で確定した設計判断:
 
@@ -253,7 +253,7 @@ export interface Scene {
 - 画像12枚を入れても構造化が落ちず、送らなかった画像が理由付きで残る
 - 画像の判定が失敗しても、素材と既存の動画成果物を失わない
 - 実行ログに 総画像数 / 送信数 / 判定数 / 採用数 / 未使用数 と理由が残る
-- [lib/kit/event-cm-scenes.test.ts](../lib/kit/event-cm-scenes.test.ts) が背景写真を持つ実ブリーフで通る
+- [lib/kit/event-cm-scenes.test.ts](../../lib/kit/event-cm-scenes.test.ts) が背景写真を持つ実ブリーフで通る
 
 ## 13. 今回やらないこと(と、その理由)
 

@@ -26,7 +26,6 @@ import NarrationDialog from "@/components/video/NarrationDialog";
 import BgmDialog from "@/components/video/BgmDialog";
 import { DEFAULT_ASSETS } from "@/lib/assets/defaults";
 import { narrationVoiceByName } from "@/lib/narration/voices";
-import { panelDeletion } from "@/lib/event-cm/panel-actions";
 import {
   bakeState,
   pendingFilmSteps,
@@ -433,47 +432,49 @@ export default function BrandVideoDetail({
   /**
    * Remove one picture from the film.
    *
-   * The rule is the template's (lib/event-cm/panel-actions.ts) and it is applied
-   * through the ordinary fact edits, so nothing here is a second way to write a
-   * brief: switching the speakers off is the same suppression the list does, and
-   * removing a programme is the same edit as retyping the list without it.
+   * The rule is the template's (lib/event-cm/panel-actions.ts) and the SERVER
+   * applies it — this only asks. The menu consults the same function to decide
+   * what to offer, but the brief it is looking at can be minutes old, so the
+   * decision that matters is taken next to the write.
+   *
+   * What removing means is the template's answer too: switching the speakers off
+   * is a suppression, taking out a programme is an edit to the list. Composing
+   * those here is what made the button a second way to author a brief.
    */
   async function deletePanel(scene: {
     role: EventCmSceneRole;
     index?: number;
   }): Promise<boolean> {
-    const brief = resolved?.video.brief as EventCmBrief | undefined;
-    if (!brief) return false;
-    const decision = panelDeletion(brief, scene);
-    // Not reported through `setError`: that replaces the whole page, and a
-    // refused delete is not a page that failed to load.
-    if (!decision.can) return false;
-
-    if (decision.kind === "suppress") {
-      const ok = await editFact({ path: decision.path, suppressed: true });
-      if (ok) {
-        setNotice(
-          "登壇者のコマを削除しました。登壇者の情報は残っているので、下の一覧から戻せます",
-        );
-      }
-      return ok;
-    }
-    // A programme picture exists because the programme does, so the picture goes
-    // when the item does. The narration then describes an evening with one fewer
-    // item, which `scenarioIsStale` reports and the mapping stage rewrites.
-    const removed = brief.programs[decision.index]?.title ?? "";
-    const ok = await editFact({
-      path: "programs",
-      lines: brief.programs
-        .filter((_, index) => index !== decision.index)
-        .map((program) => program.title),
-    });
-    if (ok) {
-      setNotice(
-        `プログラム「${removed}」のコマを削除しました。言う内容が変わったので、シナリオは書き直しが必要です`,
+    const query = new URLSearchParams({ role: scene.role });
+    if (scene.index !== undefined) query.set("index", String(scene.index));
+    busy("コマを削除しています…");
+    try {
+      const res = await videoFetch(
+        `/api/brands/${brandId}/videos/${videoId}/panels?${query}`,
+        { method: "DELETE" },
       );
+      const json = (await res.json().catch(() => null)) as {
+        error?: string;
+        kind?: "suppress" | "remove-program";
+        removed?: string | null;
+      } | null;
+      if (!res.ok) throw new Error(json?.error ?? "コマを削除できませんでした");
+      await load();
+      setNotice(
+        json?.kind === "remove-program"
+          ? `プログラム「${json.removed ?? ""}」のコマを削除しました。言う内容が変わったので、シナリオは書き直しが必要です`
+          : "登壇者のコマを削除しました。登壇者の情報は残っているので、下の一覧から戻せます",
+      );
+      return true;
+    } catch (e) {
+      // The band above the storyboard, which is where the refusal belongs: it
+      // carries the template's own sentence ("告知は自分の名前を先に言います")
+      // and leaves the page — and anything being typed in it — standing.
+      setError(e instanceof Error ? e.message : "コマを削除できませんでした");
+      return false;
+    } finally {
+      idle();
     }
-    return ok;
   }
 
   useEffect(() => {

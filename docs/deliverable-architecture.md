@@ -2,7 +2,7 @@
 
 **このドキュメントは要件と概念設計であり、テーブル定義・画面実装はここでは決めない。** 2026-08-04のピボット合意と、同日の外部エンジニアレビュー(§13)を反映した第2版。設計(スキーマ・画面)に進む前にこの内容へ合意を取る。
 
-**スキーマ設計の正本は [schema-v2.md](schema-v2.md)**(§10-2の成果物)。§11-1(Brand種別・audience)・§11-2(Work境界)・§11-3(briefSchema共通部分)はそこで決定済み。
+**スキーマ設計の正本は [schema-v2.md](old/schema-v2.md)**(§10-2の成果物)。§11-1(Brand種別・audience)・§11-2(Work境界)・§11-3(briefSchema共通部分)はそこで決定済み。
 
 最終更新: 2026-08-04(レビュー反映・第2版)
 
@@ -473,7 +473,7 @@ v2は本節の大半を**すでに構造として持っている**。足りな�
 2. `template_versions.spec` にDAGを載せられるか。載せた場合に既存Takeの版固定と衝突しないか
 3. 素材の差し替え・追加で、どの工程が古くなるかを機械的に判定できるか
 4. `/brands/[id]` を全成果物のダッシュボードにしたとき、ブランドアセット(ロゴ)が同じ枠に並ぶか
-5. LPが素材ゼロで出るか(現在は Service Brand Kit が無いとRenderが `pending`。§17.2 [schema-v2.md](schema-v2.md))
+5. LPが素材ゼロで出るか(現在は Service Brand Kit が無いとRenderが `pending`。§17.2 [schema-v2.md](old/schema-v2.md))
 6. 画面から再レンダーできるか(現在イベントPVは公開切り替えのみ)
 7. `XXX` 方針への切り替えで、`remotion/event/slots.ts` の「充足率スコアではない」という判断をどう扱うか
 
@@ -491,7 +491,7 @@ migration 0023〜0046 で**移行期の二重経路を残さず契約まで閉�
 
 **§15の前提「全成果物が同じパイプラインを通る」は、データ構造としては既に成立している。** 4テンプレート(`event-promo` / `campaign-lp` / `logo-presentation` / `product-cm`)が同じ `takes` に同居し、公開判定は `publications.status='live'` の1箇所、公開URLは `/c/<takeId>` と `/v/<takeId>` で対称。
 
-**ドキュメントの役割も切り替わった**: 現在形の正本は [data-model.md](data-model.md)。[schema-v2.md](schema-v2.md) は移行の履歴・判断記録へ降格し、「なぜこの形か」を遡るときだけ読む。
+**ドキュメントの役割も切り替わった**: 現在形の正本は [data-model.md](data-model.md)。[schema-v2.md](old/schema-v2.md) は移行の履歴・判断記録へ降格し、「なぜこの形か」を遡るときだけ読む。
 
 ### 16.2 クローズ時点で残っている穴(次フェーズの入口)
 

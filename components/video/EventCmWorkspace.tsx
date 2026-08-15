@@ -13,7 +13,7 @@
 // list and every edit act on it. `playing` is the film a run fixed, and it is
 // the only thing the player runs. They disagree while somebody is working, and
 // the notice between them says by how much rather than hiding it
-// (docs/event-cm-refactor-plan.md §9.5).
+// (docs/old/event-cm-refactor-plan.md §9.5).
 
 import dynamic from "next/dynamic";
 import { eventCmGoalState } from "@/lib/pipeline/event-cm";

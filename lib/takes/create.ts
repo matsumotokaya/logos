@@ -11,7 +11,7 @@ import { validateBrief } from "@/lib/templates/brief-schemas";
 // single insert: the template id, its version, the brief schema version and the
 // tool kind. The database refuses to let any of them change later (0026), so a
 // take made today still describes what it was made with after the catalog moves
-// on (docs/schema-v2.md §9).
+// on (docs/old/schema-v2.md §9).
 //
 // The default renders are created at the same time, empty. A take with no
 // render row would leave the detail screen with nothing to show as the goal,

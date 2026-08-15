@@ -23,7 +23,7 @@ import { stageBriefMaterials } from "./materials";
 //
 // An artifact is deliberately NOT a material. It becomes one only if somebody
 // promotes it, and then both rows point at the same R2 object (there is never a
-// second copy of the bytes — docs/schema-v2.md §11).
+// second copy of the bytes — docs/old/schema-v2.md §11).
 
 export type RenderTakeResult =
   | {

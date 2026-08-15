@@ -120,3 +120,27 @@ test("音楽や写真を選び直しても、ナレーションは古くなら�
   // And the origin is recorded either way, so no re-run overwrites the choice.
   assert.equal(bgm.provenance?.bgm?.origin, "user");
 });
+
+test("項目を消すのも事実の変更（シナリオが古くなる）", () => {
+  // Switching a field off changes what the film says as well as what it draws:
+  // a suppressed field is emptied before the scenario is written. Without the
+  // stamp the deletion was invisible downstream — the scenario stayed "current"
+  // while describing speakers that were no longer in the film, and bakeState
+  // reported nothing to reflect, so the player kept the deleted picture.
+  const off = setSuppressed(SEEDED, "guests", true, "2026-08-15T00:00:00.000Z");
+  assert.equal(off.factsUpdatedAt, "2026-08-15T00:00:00.000Z");
+
+  const back = setSuppressed(off, "guests", false, "2026-08-15T01:00:00.000Z");
+  assert.equal(back.factsUpdatedAt, "2026-08-15T01:00:00.000Z");
+});
+
+test("見せるだけの項目と、読み上げそのものは消しても古くならない", () => {
+  // Same rule as choosing a track: a warning that appears when nothing is wrong
+  // teaches people to ignore warnings. `voice` is here because it IS the
+  // narration — switching the reading off must not ask for a rewrite of words
+  // nobody is going to speak.
+  for (const path of ["bgm", "visuals.closing", "guests[0].photo", "voice", "scenario"]) {
+    const off = setSuppressed(SEEDED, path, true, "2026-08-15T00:00:00.000Z");
+    assert.equal(off.factsUpdatedAt, SEEDED.factsUpdatedAt, path);
+  }
+});

@@ -7,7 +7,7 @@ import { guardLabsRequest } from "@/lib/labs-access";
 import { campaignCmMp4Exists, getCampaignJob } from "@/lib/campaign/jobs";
 import { signedLabsUrl } from "@/lib/labs-output-sign";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
-import { type VideoState } from "@/lib/video/asset";
+import { videoState, type VideoState } from "@/lib/video/asset";
 import { VIDEO_TEMPLATES } from "@/lib/video/templates";
 import { renderOutputSignatureToken } from "../../takes/[takeId]/renders/[renderId]/output/route";
 import { resolveBriefMaterialUrls } from "@/lib/takes/materials";
@@ -193,22 +193,16 @@ export async function GET(
           // material:<uuid> → the signed URL it became, so a picker can tell
           // which of its options the brief currently holds.
           materialUrls,
-          // What this take can actually do right now.
-          //
-          // `eventBrief` is only set for event-promo, so every event-cm take
-          // reported "empty" — 「未作成」 — while its film was playing in the
-          // player two inches below the label. The honest test is whether there
-          // is a brief to render, which for both event templates is true from
-          // the moment the take exists.
-          state: artifact
-            ? "mp4_ready"
-            : take.template_id === "product-cm"
-              ? hasPinnedVoice
-                ? "preview_ready"
-                : campaignVideoState(campaignJobId)
-              : briefForClient
-                ? "preview_ready"
-                : "empty",
+          // What this take can actually do right now — derived in
+          // lib/video/asset.ts, which the portal's list reads too. The two used
+          // to answer separately and disagreed about product-cm.
+          state: videoState({
+            template: take.template_id,
+            hasRender: Boolean(artifact),
+            hasBrief: Boolean(briefForClient),
+            hasVoice: hasPinnedVoice,
+            campaign: () => campaignVideoState(campaignJobId),
+          }),
           createdAt: take.created_at,
         },
       },

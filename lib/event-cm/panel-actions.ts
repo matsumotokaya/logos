@@ -5,7 +5,10 @@ import type { EventCmBrief, EventCmSceneRole } from "@/remotion/event-cm/types";
 // Same shape as lib/brand-tree-actions.ts, and for the same reason: the answer
 // is a rule about the template, so it lives next to the template rather than
 // inside a button. A menu is not the authority — the server applies the same
-// function before writing anything.
+// function before writing anything, and it decides what removing a picture
+// MEANS as well as whether it is allowed (app/api/brands/[id]/videos/[videoId]/
+// panels/route.ts). The client used to compose that write itself, which made
+// the button a second author of briefs.
 //
 // Deleting a picture is not a generic operation here. This template's structure
 // is fixed and says so (remotion/event-cm/types.ts EVENT_CM_SCENES): the film

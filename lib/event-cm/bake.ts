@@ -2,7 +2,7 @@
 //
 // The storyboard edits `brief`. The player, the MP4 renderer and the public URL
 // read `baked_brief` — the copy a run fixed (migration 0050,
-// docs/event-cm-refactor-plan.md §9.5). So the two disagree by design, and the
+// docs/old/event-cm-refactor-plan.md §9.5). So the two disagree by design, and the
 // screen's job is to say by how much rather than to hide it.
 //
 // This module is the only place that answers "how much". Three surfaces read

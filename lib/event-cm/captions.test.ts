@@ -46,7 +46,7 @@ test("文で割る（句点を残す）", () => {
   assert.deepEqual(splitSentences("  "), []);
 });
 
-test("台本があれば、音声を待たずに字幕が出る", () => {
+test("シナリオがあれば、音声を待たずに字幕が出る", () => {
   // The whole reason subtitles are derived from the scenario: a film watched
   // muted must be readable before anyone has paid for TTS.
   const captions = captionsFor(written);
@@ -58,7 +58,7 @@ test("台本があれば、音声を待たずに字幕が出る", () => {
   assert.equal(captions[0].text, "ウェルスパークラボがおくる、パッションアセットの世界。");
 });
 
-test("台本が無ければ字幕も無い", () => {
+test("シナリオが無ければ字幕も無い", () => {
   assert.deepEqual(captionsFor(SEEDED), []);
 });
 

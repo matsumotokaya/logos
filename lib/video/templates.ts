@@ -3,7 +3,7 @@
 // This file used to BE the catalog. It is now a view over lib/templates, which
 // covers every tool kind (LP, video, banner, guideline…) with the same shape,
 // because the pivot made the template — not the video — the unit the product
-// grows by (docs/schema-v2.md §8).
+// grows by (docs/old/schema-v2.md §8).
 //
 // The exports below are unchanged so the portal and the video detail screen
 // keep working; what changed is that there is no second place to edit.
@@ -34,6 +34,8 @@ export interface VideoTemplate {
   duration: string;
   /** Whether narration is part of the template. */
   narration: boolean;
+  /** Whether the brief alone is enough to play the film (catalog.ts). */
+  playableFromBrief: boolean;
   /** Every brand gets exactly one of these by default, unpublished. */
   isBrandDefault: boolean;
 }
@@ -45,6 +47,7 @@ const toVideoTemplate = (template: TemplateEntry): VideoTemplate => ({
   requires: template.requires,
   duration: template.duration ?? "",
   narration: template.narration ?? false,
+  playableFromBrief: template.playableFromBrief ?? true,
   isBrandDefault: template.isBrandDefault,
 });
 

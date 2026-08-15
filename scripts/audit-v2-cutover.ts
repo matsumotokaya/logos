@@ -1,4 +1,4 @@
-// Read-only cutover audit for docs/schema-v2.md §19.
+// Read-only cutover audit for docs/old/schema-v2.md §19.
 //
 // The contract migration removes all legacy tables, so this audits only the
 // final model plus the one explicitly preserved event closure.

@@ -1,6 +1,6 @@
 // The template catalog — what kinds of marketing tool this product can make.
 //
-// This is the authority (docs/schema-v2.md §8). public.template_versions is a
+// This is the authority (docs/old/schema-v2.md §8). public.template_versions is a
 // ledger of what has existed, written from here by lib/templates/ledger.ts; it
 // is never edited by hand and never treated as the definition.
 //
@@ -35,7 +35,7 @@ export const PIPELINE_STAGES = [
 export type PipelineStage = (typeof PIPELINE_STAGES)[number];
 
 /** Surfaces a template is able to publish to. Publishing to a surface the
- *  template does not declare is refused (docs/schema-v2.md §12). */
+ *  template does not declare is refused (docs/old/schema-v2.md §12). */
 export const PUBLISH_SURFACES = [
   "canonical_url",
   "vanity_url",
@@ -82,6 +82,16 @@ export interface TemplateEntry {
   duration?: string;
   /** Video-specific: whether narration is part of the template. */
   narration?: boolean;
+  /**
+   * Video-specific: whether the brief alone is enough to play the film.
+   *
+   * True for the templates that hand back a finished film the moment the take
+   * exists — the fallbacks are designed, so nothing is missing. False for one
+   * that assembles around a recorded narration: without it there is no timeline
+   * to draw, and calling that state "playable" would put a player on screen
+   * with nothing in it. Defaults to true, which is the product's stance.
+   */
+  playableFromBrief?: boolean;
   stages: PipelineStage[];
   publishSurfaces: PublishSurface[];
   costProfile: CostProfile;
@@ -179,6 +189,9 @@ export const TEMPLATES: TemplateEntry[] = [
     requires: "ソース（URL・PDF・テキスト）から生成したService Brand Kit",
     duration: "30秒",
     narration: true,
+    // The brief is a Brand Kit plus narration timing: until the voice has been
+    // recorded and pinned, there is no length and nothing to play.
+    playableFromBrief: false,
     stages: ["collect", "extract", "structure", "render", "publish"],
     publishSurfaces: ["canonical_url", "embed"],
     costProfile: { llm: true, tts: true, render: "local" },

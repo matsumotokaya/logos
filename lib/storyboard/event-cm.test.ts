@@ -140,6 +140,21 @@ test("登壇者が居なければそのコマは無い", () => {
   );
 });
 
+test("通し番号はラベルであって、コマの identity ではない", () => {
+  // The speakers' picture sits before the closing one, so removing it moves the
+  // number under the picture that follows. Anything that had remembered「コマ6」
+  // would now be pointing at a different picture — which is why the number is a
+  // string: it cannot be passed where `index` (which programme) is wanted, and
+  // it cannot quietly become a React key or an API argument.
+  const withGuests = eventCmStoryboard(briefWith({ guests: GUESTS }));
+  const withoutGuests = eventCmStoryboard(briefWith({ guests: [] }));
+
+  const numberOfCta = (storyboard: { panels: Array<{ role: string; no: string }> }) =>
+    storyboard.panels.find((panel) => panel.role === "cta")?.no;
+  assert.notEqual(numberOfCta(withGuests), numberOfCta(withoutGuests));
+  assert.equal(typeof numberOfCta(withGuests), "string");
+});
+
 test("コマの境目は隙間なく続き、最後は尺で終わる", () => {
   const storyboard = eventCmStoryboard(briefWith({ guests: GUESTS }));
   storyboard.panels.forEach((panel, index) => {
@@ -183,7 +198,7 @@ test("ロゴのコマは主催のマークを見せ、画像が無くても欠�
   assert.equal(logo.figures[0].label, "WealthPark Lab");
 });
 
-test("台本があれば尺の根拠は台本、無ければ想定尺", () => {
+test("シナリオがあれば尺の根拠はシナリオ、無ければ想定尺", () => {
   assert.equal(eventCmStoryboard(briefWith()).timingSource, "scenario");
   const noScenario = {
     ...base(),
@@ -444,7 +459,7 @@ test("登壇者の写真も、絵コンテがその画像を持つ", () => {
   assert.equal(figures[1].hasAsset, false);
 });
 
-test("コマが喋るかどうかは映像の形で決まる（台本の有無ではない）", () => {
+test("コマが喋るかどうかは映像の形で決まる（シナリオの有無ではない）", () => {
   // The bug this exists to catch: three programme pictures appeared silent —
   // no line, no subtitle, no editor to write one in — because the stored scenario
   // still held a single unindexed `program` line. A picture that speaks speaks

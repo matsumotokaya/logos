@@ -1,6 +1,6 @@
 // Fix the working brief as the film.
 //
-// The last step of the one button (docs/event-cm-refactor-plan.md §9.6). Until
+// The last step of the one button (docs/old/event-cm-refactor-plan.md §9.6). Until
 // this runs, editing the storyboard changes nothing anybody watches: the
 // player, the MP4 renderer and the public URL all read `baked_brief`, and this
 // route is the only thing that writes it.

@@ -106,7 +106,15 @@ function systemFor(
     .join("\n");
   const roles = keys;
 
-  return `あなたは日本のイベント告知CMのコピーライター兼構成作家です。30秒のCMナレーション（読み上げ原稿）を書きます。
+  // Vocabulary note: this prompt says ナレーション／読み上げ原稿 while the code
+  // and the UI say シナリオ (§11.2). Deliberate, and not a leftover. The three
+  // words split OUR confusion — which of the subtitle, the words and the
+  // recording is derived from which — and the model has no such confusion: it
+  // is asked once, for the words that will be spoken, and 「読み上げ原稿」 is
+  // the instruction that keeps them speakable. Asking for a 「シナリオ」 invites
+  // the screenplay furniture that rule 2 below then has to forbid. 「台本」 was
+  // removed because it is ambiguous in the same direction, not to rename it.
+  return `あなたは日本のイベント告知CMのコピーライター兼構成作家です。${EVENT_CM_TARGET_SECONDS}秒のCMナレーション（読み上げ原稿）を書きます。
 
 ## 絶対の制約
 
@@ -139,7 +147,7 @@ ${specs}
 
 ## angle
 
-台本を書く前に決めた訴求軸を1文で書く。「何を約束する${EVENT_CM_TARGET_SECONDS}秒か」を、書き手の判断として述べる。`;
+この原稿を書く前に決めた訴求軸を1文で書く。「何を約束する${EVENT_CM_TARGET_SECONDS}秒か」を、書き手の判断として述べる。`;
 }
 
 const draftSchemaFor = (roles: readonly string[]) =>
@@ -147,7 +155,7 @@ const draftSchemaFor = (roles: readonly string[]) =>
     angle: z
       .string()
       .describe(
-        "この台本が約束していることを1文の日本語で。書き手の判断であって、事実の要約ではない",
+        "この原稿が約束していることを1文の日本語で。書き手の判断であって、事実の要約ではない",
       ),
     scenes: z
       .array(
@@ -264,7 +272,7 @@ export async function draftEventCmScenario(
 
 ${facts}${notes ? `\n\n主催者からの補足（事実として扱ってよい）:\n${notes}` : ""}
 
-30秒のCMナレーションを書いてください。`,
+${EVENT_CM_TARGET_SECONDS}秒のCMナレーションを書いてください。`,
       },
     ],
     response_format: zodResponseFormat(draftSchemaFor(keys), "event_cm_scenario"),

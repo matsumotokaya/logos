@@ -41,7 +41,7 @@ const withScenario = (brief: EventCmBrief, texts: string[]): EventCmBrief => ({
   },
 });
 
-test("台本が無くても全シーンの尺が決まる", () => {
+test("シナリオが無くても全シーンの尺が決まる", () => {
   // This is what makes "add a video" produce something that plays: no LLM
   // call, no render, and still a complete film.
   const timeline = eventCmTimeline(SEEDED);
@@ -130,7 +130,7 @@ test("30秒を超えてよい——正しい尺が要件", () => {
   assert.ok(timeline.totalMs < 50_000, `${timeline.totalMs}ms — 長すぎる`);
 });
 
-test("台本を書くと尺がその文字数に従う", () => {
+test("シナリオを書くと尺がその文字数に従う", () => {
   const short = withScenario(SEEDED, [
     "あ".repeat(28),
     "い".repeat(45),
@@ -150,11 +150,11 @@ test("台本を書くと尺がその文字数に従う", () => {
   assert.equal(shortTimeline.source, "scenario");
   const shortProgram = shortTimeline.scenes.find((s) => s.role === "program")!;
   const longProgram = longTimeline.scenes.find((s) => s.role === "program")!;
-  assert.ok(longProgram.durationMs > shortProgram.durationMs * 2, "長い台本は長いシーンになる");
+  assert.ok(longProgram.durationMs > shortProgram.durationMs * 2, "長いシナリオは長いシーンになる");
   assert.ok(longTimeline.totalMs > shortTimeline.totalMs);
 });
 
-test("無音のシーンは台本の長さに影響されない", () => {
+test("無音のシーンはシナリオの長さに影響されない", () => {
   // Their job is fixed: establish the mark, and let it go. A long scenario must
   // not stretch the opening logo.
   const timeline = eventCmTimeline(
@@ -179,7 +179,7 @@ test("短すぎる一行でも読める最小の尺を確保する", () => {
   );
 });
 
-test("音声があれば実測が台本の推定を上書きする", () => {
+test("音声があれば実測がシナリオの推定を上書きする", () => {
   const roles = eventCmNarratedSteps(SEEDED).map((step) => step.role);
   const written = withScenario(SEEDED, roles.map((_, i) => "あ".repeat(30 + i)));
   const spoken: EventCmBrief = {

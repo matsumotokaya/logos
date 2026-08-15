@@ -125,7 +125,7 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   );
 });
 
-test("シーンが増えたら、保存を拒まず「台本が古い」と言う", () => {
+test("シーンが増えたら、保存を拒まず「シナリオが古い」と言う", () => {
   // The flow this protects: drop in a flyer that names a speaker. The film gains
   // a scene the scenario has no line for, and refusing to save the speaker would
   // be the wrong answer to a fact somebody just supplied.
@@ -149,7 +149,7 @@ test("シーンが増えたら、保存を拒まず「台本が古い」と言�
     guests: [{ name: "宮尾 佳明", role: "宮尾酒造 十一代目当主", photo: null }],
   };
   assert.equal(validateBrief("event-cm", withGuest).ok, true, "保存は通る");
-  assert.equal(scenarioIsStale(withGuest), true, "台本は古いと分かる");
+  assert.equal(scenarioIsStale(withGuest), true, "シナリオは古いと分かる");
 });
 
 test("提案する日付は4週間以上先の最初の金曜日", () => {
@@ -168,12 +168,12 @@ test("業種が読めなければ一般セミナーに落ちる", () => {
   assert.equal(archetypeFor({ industry: "", description: "" }).id, "general-seminar");
 });
 
-test("シードだけで台本以外の必須項目が埋まる", () => {
+test("シードだけでシナリオ以外の必須項目が埋まる", () => {
   const state = eventCmGoalState(seedFor(WEALTHPARK_LAB));
   assert.deepEqual(
     state.progress.missingRequired.map((field) => field.path),
     ["scenario"],
-    "残る必須項目はナレーション台本だけ",
+    "残る必須項目はシナリオだけ",
   );
 });
 
@@ -232,7 +232,7 @@ test("既定のBGMはブランドが違っても同じ", () => {
 
 test("event-promo のフィールドは持たない", () => {
   // `EventCmBrief extends EventBrief` をやめた本体の確認
-  // (remotion/event-cm/types.ts、docs/event-cm-refactor-plan.md §11.3)。
+  // (remotion/event-cm/types.ts、docs/old/event-cm-refactor-plan.md §11.3)。
   //
   // Three fields no event-cm scene draws used to arrive here for free, and the
   // goal and the fact list offered all three to the user. Filling one changed

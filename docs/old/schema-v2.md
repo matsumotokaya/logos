@@ -1,11 +1,11 @@
 # v2スキーマ概念設計(マーケティングツール生成)
 
 最終更新: 2026-08-10
-ステータス: **V2完了。migration 0047まで適用済み。旧テーブル・互換読み・移行期カラム・旧helperを廃止し、現在形は [data-model.md](data-model.md) へ統合済み。本書の件数と段階記録は移行当時の履歴として残す。**
+ステータス: **V2完了。migration 0047まで適用済み。旧テーブル・互換読み・移行期カラム・旧helperを廃止し、現在形は [data-model.md](../data-model.md) へ統合済み。本書の件数と段階記録は移行当時の履歴として残す。**
 
-要件の正本は [deliverable-architecture.md](deliverable-architecture.md)。本書はその §10-2「新スキーマ概念設計」と実施記録であり、**現在のテーブル契約は [data-model.md](data-model.md) と適用済みmigrationが正本**である。アカウント・URL・RLSの原則は [account-design.md](account-design.md) を参照する。
+要件の正本は [deliverable-architecture.md](../deliverable-architecture.md)。本書はその §10-2「新スキーマ概念設計」と実施記録であり、**現在のテーブル契約は [data-model.md](../data-model.md) と適用済みmigrationが正本**である。アカウント・URL・RLSの原則は [account-design.md](../account-design.md) を参照する。
 
-適用済みSQLの正本は常に [../supabase/migrations/](../supabase/migrations/) であり、本書のDDLは**設計の記述**である(コピー元ではなく、書くべきものの定義)。
+適用済みSQLの正本は常に [../supabase/migrations/](../../supabase/migrations/) であり、本書のDDLは**設計の記述**である(コピー元ではなく、書くべきものの定義)。
 
 ---
 
@@ -169,7 +169,7 @@ create table public.brand_knowledge_claims (
 );
 ```
 
-- **`claims_no_fiction_as_fact` が要件 §4.1「架空の内容を事実として保存しない」のDB上の実体。** 現行LPパイプラインは架空の証言・架空の取引先名・架空の実績数値を意図的に生成する([../lib/campaign/schema.ts](../lib/campaign/schema.ts))。それらは `layer='expression'`(テイク内の表現)としてしか入らず、事実フィールドへの経路が構造的に無い。アプリのうっかりミスがデータ汚染にならない
+- **`claims_no_fiction_as_fact` が要件 §4.1「架空の内容を事実として保存しない」のDB上の実体。** 現行LPパイプラインは架空の証言・架空の取引先名・架空の実績数値を意図的に生成する([../lib/campaign/schema.ts](../../lib/campaign/schema.ts))。それらは `layer='expression'`(テイク内の表現)としてしか入らず、事実フィールドへの経路が構造的に無い。アプリのうっかりミスがデータ汚染にならない
 - **UPDATE / DELETE ポリシーを作らない。** `logo_activities` と同じ append-only。矛盾は「同じ field_path に異なる value の主張が複数ある」状態として**残す**(消して整合させない)
 - `variant_id is null` = ブランド共通の主張
 - index: `(brand_id, field_path, observed_at desc)` / `(run_id)`
@@ -220,7 +220,7 @@ create unique index brand_knowledge_values_variant_field_uq
 | `proof.*`(実績・証言・価格)                                                                                                          | fact       | **現行は架空生成。claimsには入れない**(テイク内の表現に留める) |
 
 - `offering.*` を `service.*` と呼ばないのは、Brand種別が service に限らないため(product / media / event も同じ語彙を使う)
-- 継承解決(親Brandの確定値 → 子が上書き)は**アプリ側1モジュール**に置く。現在 [../app/api/brands/route.ts](../app/api/brands/route.ts) の `mergeProfile` / `resolvedProfile` に実装があり、レンダラー(TS)も同じ解決を必要とするため、DB関数に移すと二重実装になる。`lib/brand/knowledge.ts` へ集約し、APIルートはそれを呼ぶだけにする
+- 継承解決(親Brandの確定値 → 子が上書き)は**アプリ側1モジュール**に置く。現在 [../app/api/brands/route.ts](../../app/api/brands/route.ts) の `mergeProfile` / `resolvedProfile` に実装があり、レンダラー(TS)も同じ解決を必要とするため、DB関数に移すと二重実装になる。`lib/brand/knowledge.ts` へ集約し、APIルートはそれを呼ぶだけにする
 - プロジェクション(読み取り用の最新ビュー)は**導出物**であり保存しない。必要になったらキャッシュ表を足すが、その時も正本は values + claims
 
 ## 8. Template: 定義はコード、版はDBの台帳
@@ -241,7 +241,7 @@ create table public.template_versions (
 );
 ```
 
-- **定義を書く場所はコード**([../lib/video/templates.ts](../lib/video/templates.ts) を全ツール種別へ一般化した `lib/templates/`)。DBは**版の台帳**であり、権威ある定義の複製ではない
+- **定義を書く場所はコード**([../lib/video/templates.ts](../../lib/video/templates.ts) を全ツール種別へ一般化した `lib/templates/`)。DBは**版の台帳**であり、権威ある定義の複製ではない
 - 台帳が必要な理由: Takeが `(template_id, version)` を参照する以上、その版が実在したことをDBで保証できないと、リファクタ後に**どこも指していないバージョンを指したTake**が生まれる。再レンダー保証の宣言(`spec.rerenderable`)も検証できない
 - 同期は起動時/デプロイ時の冪等 upsert。`stage='production'` への昇格だけは運営操作(`presentation_asset_definitions.release_stage` と同じ思想)
 - `spec` に入れるもの: `stages`(collect/extract/structure/render/publish の部分集合)、`publishSurfaces`、`costProfile`、`isBrandDefault`、`rerenderable`
@@ -418,7 +418,7 @@ create table public.render_artifacts (
 - 各段は独立して再実行でき、再実行は前の成果を壊さない。`take_renders.status='stale'` は「新しい版が出たが黙って再レンダーしていない」状態を表す(要件 §4.3の「明示同意」)
 - **Artifact は自動的に素材一覧へ入らない。** テイク内では `render_artifacts` を直接参照でき、素材として一覧に載るのは `brand_materials`(`origin_artifact_id` を持つ行)を明示昇格で作ったときだけ
 - **同じバイト列を二重に持たない。** 昇格した素材は Artifact と同じ `r2_key` を指す。したがって**R2オブジェクトの削除は参照が0になったときだけ**行う(`render_artifacts` と `brand_materials` の両方を数える)。この参照カウントは `private.r2_deletion_queue` へ入れる前の判定として実装する
-- R2キー規約: `brands/<brandId>/takes/<takeId>/renders/<renderId>/<name>`。既存の `brands/<brandId>/takes/<takeId>/output/<name>`([../lib/video/storage.ts](../lib/video/storage.ts))はそのまま有効(キーはDBに保存された値が正本であり、移行でオブジェクトを動かさない)
+- R2キー規約: `brands/<brandId>/takes/<takeId>/renders/<renderId>/<name>`。既存の `brands/<brandId>/takes/<takeId>/output/<name>`([../lib/video/storage.ts](../../lib/video/storage.ts))はそのまま有効(キーはDBに保存された値が正本であり、移行でオブジェクトを動かさない)
 
 ```sql
 create table public.publications (
@@ -548,13 +548,13 @@ create table public.brand_access_grants (
 ### 14.4 公開面はRLSで開けない
 
 - **v2の新テーブルは anon に一切開かない。** 公開判定の正本は `publications.status='live'` だけで、RLSに二重化しない(公開を止めたときに直す場所が2つになるのを避ける)
-- 公開ページはサーバー側で解決して描画する。LP・動画・モックアップはすでにこの形([../lib/labs-output-sign.ts](../lib/labs-output-sign.ts) / [../lib/mockup-sign.ts](../lib/mockup-sign.ts))
+- 公開ページはサーバー側で解決して描画する。LP・動画・モックアップはすでにこの形([../lib/labs-output-sign.ts](../../lib/labs-output-sign.ts) / [../lib/mockup-sign.ts](../../lib/mockup-sign.ts))
 - 現行の `/p/[id]` はクライアントが匿名セッションで `logos` を直読みしている(RLSの `unlisted`/`public` 経路)。**これは壊さず維持**し、ロゴプレゼンのTake化(着手順の最後)でサーバー解決へ移す
 - `take_runs` は出典URL・コスト・エラーを含むため、閲覧ロールにも見せない(0022の判断を踏襲)
 
 ### 14.5 生成の実行者は当面Labsゲートのまま
 
-コストの発生する操作(`take_runs` の起動)は、現行どおり `platform_admin` / `labs_member` だけが実行できる([../lib/labs-access.ts](../lib/labs-access.ts) の `guardLabsRequest`)。SVGロゴ→プレゼンは全登録ユーザーのまま。
+コストの発生する操作(`take_runs` の起動)は、現行どおり `platform_admin` / `labs_member` だけが実行できる([../lib/labs-access.ts](../../lib/labs-access.ts) の `guardLabsRequest`)。SVGロゴ→プレゼンは全登録ユーザーのまま。
 
 - **課金は当面設計しない(フリー)。** ただし `take_runs.usage` へのコスト記録は最初から行う。将来クレジット制にする場合、残高チェックを差し込む場所は生成起動の1箇所だけで済む
 - DBのRLS上は `can_edit_brand_output` があれば書けるので、ゲートはアプリ層の1関数に集約する(RLSに運営ロールを持ち込まない §14.1 の帰結)
@@ -614,7 +614,7 @@ create table public.brand_access_grants (
 
 ### 17.1 event-promo 1本通しの実測(2026-08-05)
 
-`npm run templates:sync` → `npm run takes:event`([../scripts/run-event-take.ts](../scripts/run-event-take.ts))。ハーネスは**既存v1アセットの実briefを読む**ので、合成データでは分からない「スキーマが手持ちのデータと合っているか」も同時に確かめている。
+`npm run templates:sync` → `npm run takes:event`([../scripts/run-event-take.ts](../../scripts/run-event-take.ts))。ハーネスは**既存v1アセットの実briefを読む**ので、合成データでは分からない「スキーマが手持ちのデータと合っているか」も同時に確かめている。
 
 | 段       | 結果                                                                                                                                                |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -739,7 +739,7 @@ URL投入前の企業/サービス選択ダイアログは廃止した。既存�
 - `/c/[id]` と `/p/[id]` の既存URLを壊さず、v2 Publication / canonical slotで解決する
 - リポジトリの実行コードから旧 `brand_profiles` / `brand_generation_runs` / `brand_assets`（マーケティング成果物用途）/ `campaigns` 参照が0になる
 - contract migration後にテスト、型検査、lint、build、主要E2E、Supabase security/performance advisorが成功する
-- 完了後、この文書の確定内容を [data-model.md](data-model.md) へ統合し、本書を廃止する
+- 完了後、この文書の確定内容を [data-model.md](../data-model.md) へ統合し、本書を廃止する
 
 ### 19.4 実行順
 
@@ -809,7 +809,7 @@ URL投入前の企業/サービス選択ダイアログは廃止した。既存�
 - 0042で旧Profile、generation run、asset、campaign、logo presentationテーブルと移行期のBrand列・トリガー・policy分岐を削除。`brand_kind`と`brand_organization_id`をnot null化した
 - 適用後の実測はOrganization 1、Brand 1、Work 1、Take 1、Input/Material 13、Render/Artifact 1、Logo 0。旧テーブル非存在、旧列非存在、未分類Brand 0
 - ロゴ作成 → presentation Take/Render/slot → 編集 → 削除をリモートDBのrollback契約テストで再確認。テスト行漏れ0
-- `npm run v2:audit`の全blockerはfalse、`npm run v2:prune-r2`は`preserve=14 / delete=0`。現在形は [data-model.md](data-model.md) へ統合済み
+- `npm run v2:audit`の全blockerはfalse、`npm run v2:prune-r2`は`preserve=14 / delete=0`。現在形は [data-model.md](../data-model.md) へ統合済み
 - 0043で、SQL body参照のため旧テーブルdropに追随しなかった`can_view_campaign` / `can_manage_campaign` helperも削除した
 - 0044でロゴプレゼンの内部ensure RPCをservice role限定にし、read RPCをRLSに従うsecurity invokerへ変更した
 - 0045で保全Organizationのprimary corporate Brandを復元し、WealthPark Labをその子Brandへ接続した。Organization詳細が企業プロフィール・企業ロゴの基点を必ず持つ不変条件を回復した

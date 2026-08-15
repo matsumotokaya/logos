@@ -9,7 +9,7 @@ import "server-only";
 //
 // R2 is the only source of truth. No local fallback, deliberately: two code
 // paths would mean "which copy is canonical" depends on which machine served
-// the request (docs/schema-v2.md §11).
+// the request (docs/old/schema-v2.md §11).
 
 import { isR2Configured, putR2Object } from "@/lib/r2";
 import type { RenderFormat } from "@/lib/templates/catalog";

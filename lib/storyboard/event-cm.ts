@@ -146,9 +146,18 @@ export interface StoryboardBackdrop {
 }
 
 export interface StoryboardPanel {
-  /** 1-based, in film order. A LABEL — never an identity (React keys and API
-   *  calls use the scene key; a deleted panel renumbers everything after it). */
-  no: number;
+  /**
+   * Where this picture falls in the film, 1-based, as it is written on screen.
+   *
+   * A STRING, and that is the point. It is a caption, not a coordinate: the
+   * sixth picture becomes the fifth the moment somebody deletes a programme, so
+   * nothing may key off it or send it to an API. `index` — which programme this
+   * picture is about — sits one line below and is a number, and passing this
+   * one where that one was wanted is exactly the bug that made an open modal
+   * show a different picture than the one it was opened on. Identity is
+   * `eventCmSceneKey(panel)`, and the type now refuses the confusion.
+   */
+  no: string;
   role: EventCmSceneRole;
   /** Which item this picture is about, when the role repeats (programmes). */
   index?: number;
@@ -371,7 +380,7 @@ export function eventCmStoryboard(raw: EventCmBrief): Storyboard {
     const blocks = regions.flatMap((region) => region.blocks);
 
     return {
-      no: at + 1,
+      no: String(at + 1),
       role: scene.role,
       ...(scene.index === undefined ? {} : { index: scene.index }),
       narrated: scene.narrated,

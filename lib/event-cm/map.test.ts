@@ -176,7 +176,7 @@ test("項目を手で直してもナレーションが古くなる", () => {
   assert.equal(scenarioIsStale(edited), true);
 });
 
-test("台本が無いうちは「古い」にならない", () => {
+test("シナリオが無いうちは「古い」にならない", () => {
   const result = mapFactsIntoBrief(
     SEEDED,
     { ...EMPTY_FACTS, title: "世界が恋する日本酒" },
@@ -187,7 +187,7 @@ test("台本が無いうちは「古い」にならない", () => {
   assert.equal(scenarioIsStale(result.brief), false);
 });
 
-test("台本の1行だけを直せる（役割で対応し、位置で対応しない）", () => {
+test("シナリオの1行だけを直せる（役割で対応し、位置で対応しない）", () => {
   // What the PATCH endpoint does, as data: the scenario holds the narrated roles
   // for this brief, so an edit is looked up by role and the rest is carried
   // over. Indexing by array position used to line line 1 up against scene 0 and
@@ -224,7 +224,7 @@ test("台本の1行だけを直せる（役割で対応し、位置で対応し�
   assert.deepEqual(
     scenes.map(eventCmSceneKey),
     steps.map(eventCmSceneKey),
-    "台本の並びは映像の並びと同じ",
+    "シナリオの並びは映像の並びと同じ",
   );
   const value = scenes.find((scene) => scene.role === "value")!;
   assert.equal(value.text, "書き直した価値の行");
@@ -232,7 +232,7 @@ test("台本の1行だけを直せる（役割で対応し、位置で対応し�
   assert.ok(scenes.every((scene) => scene.text), "空の行が残っている");
 });
 
-test("台本は1行だけでも保存できる（書きかけは正常な状態）", () => {
+test("シナリオは1行だけでも保存できる（書きかけは正常な状態）", () => {
   // What the PATCH endpoint does now, as data. It used to demand a line for
   // every narrated picture, so the moment the film gained a picture nobody had
   // written yet — three programmes replacing one — every single-line save was
@@ -280,7 +280,10 @@ test("消した項目は、映像の形の判定にも反映される", () => {
     "登壇者が居ればそのコマがある",
   );
 
-  const off = setSuppressed(withGuests, "guests", true);
+  // Deleted first, written afterwards — which is the real order, and the order
+  // the stamps have to be in for the scenario to count as current. Switching a
+  // field off IS a change to the facts (facts.ts `setSuppressed`).
+  const off = setSuppressed(withGuests, "guests", true, "2026-08-11T00:00:00.000Z");
   assert.equal(
     eventCmNarratedSteps(off).some((step) => step.role === "guests"),
     false,
@@ -302,7 +305,7 @@ test("消した項目は、映像の形の判定にも反映される", () => {
       })),
     },
   };
-  assert.equal(scenarioStaleness(written), null, "正しい台本が古い扱いになっている");
+  assert.equal(scenarioStaleness(written), null, "正しいシナリオが古い扱いになっている");
 });
 
 test("食い違いの種類を言い分ける（形が違う／事実が新しい）", () => {

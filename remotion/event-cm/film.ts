@@ -5,7 +5,7 @@
 // each walking its own subset of the same six steps (suppression → plan →
 // timeline → scenes → fit → captions). Every bug in the 2026-08-14 session had
 // the same shape: one consumer skipped a step the others took, and the film
-// and its description disagreed (docs/event-cm-refactor-plan.md §1–2).
+// and its description disagreed (docs/old/event-cm-refactor-plan.md §1–2).
 //
 // This module is the answer said once. The composition sequences
 // `film.scenes`; the storyboard re-says them in human words; the scenario and

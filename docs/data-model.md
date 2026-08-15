@@ -3,7 +3,7 @@
 更新日: 2026-08-13
 ステータス: **V2稼働構造の正本**
 
-V2の設計・移行判断の履歴は [schema-v2.md](schema-v2.md)、アカウントとRLSの原則は [account-design.md](account-design.md)、成果物アーキテクチャの背景は [deliverable-architecture.md](deliverable-architecture.md) を参照する。本書はmigration 0046適用後の現在形だけを記す。
+V2の設計・移行判断の履歴は [schema-v2.md](old/schema-v2.md)、アカウントとRLSの原則は [account-design.md](account-design.md)、成果物アーキテクチャの背景は [deliverable-architecture.md](deliverable-architecture.md) を参照する。本書はmigration 0046適用後の現在形だけを記す。
 
 既存Brandへロゴを追加するときは`create_brand_logo_with_presentation`を使い、Logo・primary Candidate・`logo-presentation@1` Take・HTML Render・`logo_presentation` canonical slotを同一transactionで作る。単独ロゴ取り込み用の`create_logo_with_presentation`だけが未所属用Brandを補完する。
 
@@ -100,13 +100,13 @@ Takeは以下を必須とする。
 
 **焼き付けを持つのは現時点で`event-cm`だけ**。他のテンプレートは`baked_brief`がnullのままで、レンダーは従来どおり`brief`を読む(`baked_brief ?? brief`)。書き込むのは`POST /api/brands/[id]/videos/[videoId]/bake`だけで、一括実行の最終段だけが呼ぶ。
 
-分けた理由は、**編集が即座に成果物へ届いてしまう**状態を無くすため——シナリオを1行保存すると、その場でプレイヤーの尺と字幕が変わっていた。「作業場と成果は違っていてよい。違いは画面が言う」が現在の契約で、差分判定の正本は [../lib/event-cm/bake.ts](../lib/event-cm/bake.ts)(設計の経緯は [event-cm-refactor-plan.md §9.5 / §11.1](event-cm-refactor-plan.md))。
+分けた理由は、**編集が即座に成果物へ届いてしまう**状態を無くすため——シナリオを1行保存すると、その場でプレイヤーの尺と字幕が変わっていた。「作業場と成果は違っていてよい。違いは画面が言う」が現在の契約で、差分判定の正本は [../lib/event-cm/bake.ts](../lib/event-cm/bake.ts)(設計の経緯は [event-cm-refactor-plan.md §9.5 / §11.1](old/event-cm-refactor-plan.md)・アーカイブ)。**差分の見せ方(フィールド単位のマニフェスト・琥珀/緑/赤の3色)は [video-state-model.md](video-state-model.md) が仕様**(2026-08-15確定・実装前)。
 
 **2つある列は、briefのキーを改名するときも2つある**。migration 0051(`script` → `scenario`)は同じ式を`brief`と`baked_brief`の両方に当てている。片方だけ改名すると既存の動画が「シナリオ空」として想定尺へ落ちるので、以後 brief のキーを変える migration はこの2列を必ずセットで扱う。
 
 ### 4.2 event-cm briefの語彙(`scenario` / 字幕 / `voice`)
 
-`event-cm`の`brief`が持つ主要フィールドは3語に割れている(migration 0051 で改名。経緯は [event-cm-refactor-plan.md §9.1](event-cm-refactor-plan.md))。
+`event-cm`の`brief`が持つ主要フィールドは3語に割れている(migration 0051 で改名。経緯は [event-cm-refactor-plan.md §9.1](old/event-cm-refactor-plan.md))。
 
 | フィールド | 実体 | 型 |
 | --- | --- | --- |
@@ -120,7 +120,7 @@ Takeは以下を必須とする。
 
 **briefのキーを消すときは migration が要らないことが多い**。zod 4 の `z.object()` は未知キーを strip し、書き込み経路はすべて `validateBrief` の**出力**を保存するので、次に保存された時点で消える。**キーを増やす/改名するときは焼き替えが必要**(strip では足せない)——その場合は上記のとおり`brief`と`baked_brief`の両方に当てる。
 
-**`product-cm`はまだ`cm_script`のまま**。同じ「各シーンの主文」構造だが、共通語彙にするかは未決定([event-cm-refactor-plan.md §9.10](event-cm-refactor-plan.md))。共有コードの [../lib/narration/voice.ts](../lib/narration/voice.ts) はどちらの綴りも知らない。
+**`product-cm`はまだ`cm_script`のまま**。同じ「各シーンの主文」構造だが、共通語彙にするかは未決定([event-cm-refactor-plan.md §9.10](old/event-cm-refactor-plan.md))。共有コードの [../lib/narration/voice.ts](../lib/narration/voice.ts) はどちらの綴りも知らない。
 
 ## 5. Templateと成果物
 

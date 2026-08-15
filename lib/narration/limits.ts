@@ -4,5 +4,11 @@
 // (it reaches the TTS provider), and the editor needs the same number to tell
 // somebody their line is too long BEFORE they ask for it to be read.
 
-/** The provider's per-request ceiling (labs/campaign/audio/tts-lib/tts.mjs). */
+/**
+ * The provider's per-request ceiling.
+ *
+ * The same number is written in labs/campaign/audio/tts-lib/tts.mjs, which runs
+ * as a standalone ESM script and cannot import this file. Both sides say so;
+ * changing one alone means the editor accepts a line the synthesiser refuses.
+ */
 export const TTS_MAX_SECTION_CHARS = 2000;

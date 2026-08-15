@@ -345,8 +345,13 @@ export function markUserEdited(
  * Picking a different music track used to stamp it, which put 「ナレーションが
  * 書き直されていません」 on a film whose words were perfectly current. A warning
  * that appears when nothing is wrong is a warning people learn to ignore.
+ *
+ * `scenario` and `voice` are here because they are the narration, not facts it
+ * reads. Stamping when the words are written would make them stale the instant
+ * they were saved, and switching the reading off would ask for a rewrite of a
+ * scenario nobody is going to speak.
  */
-const UNSPOKEN = /^(bgm$|logos$|visuals\.|guests\[\d+\]\.photo$)/;
+const UNSPOKEN = /^(bgm$|logos$|visuals\.|guests\[\d+\]\.photo$|scenario$|voice$)/;
 
 export const isSpokenFact = (path: string): boolean => !UNSPOKEN.test(path);
 
@@ -356,11 +361,21 @@ export const isSpokenFact = (path: string): boolean => !UNSPOKEN.test(path);
  * Distinct from empty on purpose. An empty venue is something nobody has
  * confirmed and belongs on the collection list; a suppressed venue is a
  * decision not to show one, and must stop being asked about.
+ *
+ * Stamps the facts for the same reason an edit does. Switching a field off
+ * changes what the film draws AND what it says — a suppressed field is not
+ * spoken either (`applySuppression` empties it before the scenario is written).
+ * Without the stamp the change was invisible to everything downstream: the
+ * scenario stayed "current" while describing speakers that had been removed,
+ * and `bakeState` — which compares these three stamps and nothing else —
+ * reported no pending changes, so the one button had no step to run and the
+ * player kept the deleted picture until somebody pressed it a second time.
  */
 export function setSuppressed(
   brief: EventCmBrief,
   path: string,
   suppressed: boolean,
+  now: string = new Date().toISOString(),
 ): EventCmBrief {
   const current = brief.provenance?.[path];
   const next = { ...(brief.provenance ?? {}) };
@@ -369,7 +384,11 @@ export function setSuppressed(
   } else if (current) {
     next[path] = { origin: current.origin };
   }
-  return { ...brief, provenance: next };
+  return {
+    ...brief,
+    ...(isSpokenFact(path) ? { factsUpdatedAt: now } : {}),
+    provenance: next,
+  };
 }
 
 /** Marker kept in the note so no schema change is needed for a boolean.
