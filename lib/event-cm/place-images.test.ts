@@ -191,9 +191,11 @@ test("ロゴの描き方は、透過と輝度の両方で決まる", () => {
   // Transparent artwork: brightness decides.
   assert.equal(treatmentFor(0.1, false), "knockout");
   assert.equal(treatmentFor(0.9, false), "light");
-  // A plate is always knocked out, however bright it measures. This is the
-  // case that shipped wrong: a JPEG logo would have drawn a white box on ink.
-  assert.equal(treatmentFor(0.95, true), "knockout");
+  // Opaque artwork is drawn as supplied, whatever it measures. Knocking it out
+  // is what shipped wrong: the filter has no alpha to cut, so it painted the
+  // plate AND the mark white and a corporate logo rendered as a blank box.
+  assert.equal(treatmentFor(0.95, true), "light");
+  assert.equal(treatmentFor(0.1, true), "light");
   // Unmeasurable falls to the treatment that cannot fail on an ink ground.
   assert.equal(treatmentFor(null, false), "knockout");
 
@@ -209,13 +211,16 @@ test("ロゴの描き方は、透過と輝度の両方で決まる", () => {
   assert.equal(added?.name, "宮尾酒造");
   assert.equal(added?.treatment, "knockout");
 
+  // The real case: a corporate mark supplied as a JPEG, dark artwork on a white
+  // plate. It is drawn as it came — plate and all — because the alternative on
+  // the screen was a blank white box with the mark destroyed.
   const opaque = placeImagesIntoBrief(
     SEEDED,
     [reading({ ref: "img-2", role: "logo", visibleText: ["レオパレス21"] })],
     [material("img-2", { luminance: 0.93, opaque: true })],
     "フライヤー.pdf",
   );
-  assert.equal(opaque.brief.logos.at(-1)?.treatment, "knockout");
+  assert.equal(opaque.brief.logos.at(-1)?.treatment, "light");
 });
 
 test("判定が返らなかった画像も、消えずに理由が残る", () => {
@@ -248,14 +253,15 @@ test("写真が入ってもナレーションは古くならない", () => {
 });
 
 test("すでに入っているロゴでも、描き方が違えば直す", () => {
-  // The self-healing case: a mark that once landed as "draw as supplied" on a
-  // plate must not stay a white box on the ink because a re-run refuses to
-  // look at it again.
+  // The self-healing case, and the one that repairs what shipped: a plated
+  // mark stored as `knockout` renders as a blank white box, and a re-run has
+  // to be able to take that back rather than refusing to look at a mark it has
+  // seen before.
   const withWrongLogo: EventCmBrief = {
     ...SEEDED,
     logos: [
       ...SEEDED.logos,
-      { name: "レオパレス21", src: "material:img-1", treatment: "light" },
+      { name: "レオパレス21", src: "material:img-1", treatment: "knockout" },
     ],
   };
   const result = placeImagesIntoBrief(
@@ -265,8 +271,8 @@ test("すでに入っているロゴでも、描き方が違えば直す", () =>
     "フライヤー.pdf",
   );
 
-  assert.equal(result.brief.logos.at(-1)?.treatment, "knockout");
-  assert.match(result.placed[0]?.reason ?? "", /白抜きに直しました/);
+  assert.equal(result.brief.logos.at(-1)?.treatment, "light");
+  assert.match(result.placed[0]?.reason ?? "", /そのまま描くように直しました/);
   // Idempotent: run it again and there is nothing left to fix.
   const again = placeImagesIntoBrief(
     result.brief,

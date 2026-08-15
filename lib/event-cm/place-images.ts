@@ -102,18 +102,23 @@ const photoOf = (reading: ImageReading): EventPhoto => ({
  * Not asked of the model — the answer follows from two measurements
  * (deliverable-architecture §17.2), and it takes both:
  *
- *   - **Opaque artwork is always knocked out.** A logo delivered as a JPEG is a
- *     mark on a plate, and drawing it as supplied puts a white rectangle on the
- *     ink ground. This is the case that shipped wrong: leopalace21.jpg measured
- *     bright, was called "already light", and would have rendered as a box.
- *     `prepare-assets.mjs` knocks these out by hand for the same reason.
+ *   - **Opaque artwork is drawn as supplied.** A CSS filter cannot remove a
+ *     white plate: it has no alpha to cut. `knockout` is
+ *     `brightness(0) invert(1)`, which on an opaque raster paints EVERY pixel
+ *     white — the plate and the mark together. That is what shipped: a
+ *     corporate logo delivered as a JPEG rendered as a blank white box with no
+ *     mark in it, which is worse than the white rectangle the rule was written
+ *     to avoid. Cutting a plate away is an image operation at ingest
+ *     (labs/event/scripts/prepare-assets.mjs does it with sharp), never a
+ *     filter at draw time. So the plate shows, and the mark is legible.
  *   - **On transparency, brightness decides.** A dark mark drawn as supplied is
  *     invisible on black; a mark that is already light must be left alone.
  *
- * Unmeasurable falls to `knockout`: it is the treatment that cannot fail.
+ * Unmeasurable transparency falls to `knockout`: with an alpha channel to work
+ * on, it is the treatment that cannot fail.
  */
 export function treatmentFor(luminance: number | null, opaque = true) {
-  if (opaque) return "knockout" as const;
+  if (opaque) return "light" as const;
   if (luminance === null) return "knockout" as const;
   return luminance < 0.45 ? ("knockout" as const) : ("light" as const);
 }
@@ -268,8 +273,8 @@ export function placeImagesIntoBrief(
           SLOT_LABELS.logos,
           "inferred",
           treatment === "knockout"
-            ? "地の付いた画像だったので、白抜きに直しました"
-            : "透過の明るいマークだったので、そのまま描くように直しました",
+            ? "透過した暗いマークだったので、白抜きに直しました"
+            : "地の付いた画像だったので、そのまま描くように直しました",
         );
       } else {
         drop(reading, "すでにロゴとして使われています");
