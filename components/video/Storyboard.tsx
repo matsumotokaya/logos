@@ -40,7 +40,13 @@ import {
 } from "@/remotion/event-cm/types";
 import { TTS_MAX_SECTION_CHARS } from "@/lib/narration/limits";
 import type { GoalFieldState } from "@/lib/pipeline/stages";
-import { factFieldsFor, isSuppressed, previewOf } from "@/lib/event-cm/facts";
+import {
+  factFieldsFor,
+  isPhotoSlot,
+  isSuppressed,
+  photoOf,
+  previewOf,
+} from "@/lib/event-cm/facts";
 import type { BriefSource } from "./BriefSourceIntake";
 import { panelDeletion, type PanelDeletion } from "@/lib/event-cm/panel-actions";
 import FactList, { type FactEdit } from "./FactList";
@@ -672,6 +678,35 @@ function PanelContents({ panel }: { panel: StoryboardPanel }) {
 }
 
 /**
+ * The name of the material sitting in a slot.
+ *
+ * 「写真あり」 answered the wrong question. A storyboard is read to find out
+ * WHICH picture is behind a scene, and a row saying that one exists is worth
+ * about as much as a row saying the title is a title. The label already names
+ * the slot (「大西 美香の写真」), so the value's job is to name the file in it.
+ *
+ * The client's brief has its pointers replaced by signed URLs, so the mapping
+ * the server handed over is inverted rather than the URL pattern-matched — the
+ * same inversion the music picker does, and for the same reason: a URL shape is
+ * not a contract.
+ */
+function materialNameOf(
+  src: string | null,
+  uriByUrl: Map<string, string>,
+  sources: readonly BriefSource[],
+): string | null {
+  if (!src) return null;
+  const uri = uriByUrl.get(src) ?? src;
+  const id = uri.startsWith("material:") ? uri.slice("material:".length) : null;
+  const known = id ? sources.find((source) => source.id === id) : null;
+  if (known) return known.label;
+  // A pool asset, or a pointer this take cannot resolve. The last path segment
+  // is the file, which still says more than 「あり」.
+  const name = decodeURIComponent(src.split("?")[0].split("/").pop() ?? "");
+  return name || null;
+}
+
+/**
  * The video's facts, as carried by ONE picture.
  *
  * The workspace used to print every field of the brief in a single list under
@@ -690,10 +725,14 @@ function PanelFacts({
   brief,
   goalFields,
   paths,
+  uriByUrl,
+  imageSources,
 }: {
   brief: EventCmBrief;
   goalFields: GoalFieldState[];
   paths: string[];
+  uriByUrl: Map<string, string>;
+  imageSources: readonly BriefSource[];
 }) {
   const originOf = new Map(goalFields.map((field) => [field.path, field.origin]));
   const byPath = new Map(factFieldsFor(brief).map((field) => [field.path, field]));
@@ -707,7 +746,9 @@ function PanelFacts({
     <dl className="mt-2 flex flex-col gap-1 border-t border-hairline pt-2">
       {rows.map(({ field, origin }) => {
         const off = isSuppressed(brief, field.path);
-        const value = previewOf(brief, field.path);
+        const value = isPhotoSlot(field.path)
+          ? materialNameOf(photoOf(brief, field.path), uriByUrl, imageSources)
+          : previewOf(brief, field.path);
         return (
           <div key={field.path} className="flex items-baseline gap-2 text-[11px]">
             <dt className="min-w-20 shrink-0 text-ink-faint">{field.label}</dt>
@@ -743,6 +784,7 @@ function PanelCard({
   brief,
   goalFields,
   busy,
+  uriByUrl,
   onEditFact,
   onEditScenario,
   onDeletePanel,
@@ -753,6 +795,8 @@ function PanelCard({
   brief: EventCmBrief;
   goalFields: GoalFieldState[];
   busy?: boolean;
+  /** Signed URL → `material:<uuid>`, so a slot can name the file in it. */
+  uriByUrl: Map<string, string>;
   onEditFact?: (edit: FactEdit) => void;
   /** Save one panel's scenario line. Absent = read only. */
   onEditScenario?: (
@@ -853,7 +897,13 @@ function PanelCard({
               BOTH mark cards, because it really is on screen twice.
               Read-only here, editable in the panel: 「コマを開くとその中身を
               直せる」 stays the one place values are typed. */}
-          <PanelFacts brief={brief} goalFields={goalFields} paths={paths} />
+          <PanelFacts
+            brief={brief}
+            goalFields={goalFields}
+            paths={paths}
+            uriByUrl={uriByUrl}
+            imageSources={imageSources ?? []}
+          />
         </div>
       </figure>
 
@@ -947,6 +997,7 @@ export default function Storyboard({
   brief,
   goalFields,
   busy,
+  uriByUrl,
   onEditFact,
   onEditScenario,
   onDeletePanel,
@@ -955,6 +1006,8 @@ export default function Storyboard({
   brief: EventCmBrief;
   goalFields: GoalFieldState[];
   busy?: boolean;
+  /** Signed URL → `material:<uuid>`, so a slot can name the file in it. */
+  uriByUrl: Map<string, string>;
   onEditFact?: (edit: FactEdit) => void;
   onEditScenario?: (
     scene: { role: EventCmSceneRole; index?: number },
@@ -1016,6 +1069,7 @@ export default function Storyboard({
             brief={brief}
             goalFields={goalFields}
             busy={busy}
+            uriByUrl={uriByUrl}
             onEditFact={onEditFact}
             onEditScenario={onEditScenario}
             onDeletePanel={onDeletePanel}

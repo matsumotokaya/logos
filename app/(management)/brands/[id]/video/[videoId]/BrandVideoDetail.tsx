@@ -1409,6 +1409,7 @@ export default function BrandVideoDetail({
           bake={bake}
           bakedAt={pending?.bakedAt ?? null}
           steps={filmSteps}
+          materialUrls={video.materialUrls}
           onEditFact={(edit) => void editFact(edit)}
           onEditScenario={(scene, text) => editScenario(scene, text)}
           onDeletePanel={(scene) => deletePanel(scene)}

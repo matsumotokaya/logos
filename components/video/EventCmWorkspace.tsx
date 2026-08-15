@@ -70,6 +70,7 @@ export default function EventCmWorkspace({
   onDeletePanel,
   onRewriteScenario,
   imageSources = [],
+  materialUrls,
   writing,
 }: {
   brief: EventCmBrief;
@@ -98,12 +99,20 @@ export default function EventCmWorkspace({
   onRewriteScenario?: (force: boolean) => void;
   /** Images pinned to this video: the candidate list for every photo slot. */
   imageSources?: BriefSource[];
+  /** `material:<uuid>` → the signed URL it became, as the server resolved it.
+   *  Inverted by the board so a slot can name the file it holds. */
+  materialUrls?: Record<string, string>;
   writing?: boolean;
 }) {
   const goal = eventCmGoalState(brief);
   const chars = scenarioChars(brief.scenario);
   const stale = scenarioStaleness(brief);
   const storyboard = eventCmStoryboard(brief);
+  // The brief arrives with its pointers already signed, so going the other way
+  // is how a slot names its file rather than pattern-matching a URL.
+  const uriByUrl = new Map(
+    Object.entries(materialUrls ?? {}).map(([uri, url]) => [url, uri]),
+  );
   const status = filmStatus(bake, steps);
   const unreflected = status === "behind";
   // When the film being played was fixed. Date and time, because two runs in
@@ -260,6 +269,7 @@ export default function EventCmWorkspace({
         brief={brief}
         goalFields={goal.fields}
         busy={writing}
+        uriByUrl={uriByUrl}
         onEditFact={onEditFact}
         onEditScenario={onEditScenario}
         onDeletePanel={onDeletePanel}
