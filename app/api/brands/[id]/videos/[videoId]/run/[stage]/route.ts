@@ -209,6 +209,8 @@ export async function POST(
     // unattended path safe: a person who wrote their own words keeps them.
     let rewrote = false;
     let briefToSave = images.brief;
+    /** What the rewrite spent, so the log can show it. */
+    let scenarioUsage: { inputTokens: number; outputTokens: number } | null = null;
     const previous = (take.brief as EventCmBrief).scenario;
     if (
       mapped.applied.length > 0 &&
@@ -220,6 +222,7 @@ export async function POST(
         now: new Date().toISOString(),
       });
       briefToSave = { ...briefToSave, scenario: draft.scenario };
+      scenarioUsage = draft.usage;
       // The recording stays, and the next step of the same run replaces it.
       // Deleting it here would leave the workbench silent in the window between
       // this stage and the voice stage — and if the run stopped in between, the
@@ -240,6 +243,10 @@ export async function POST(
 
     await record("succeeded", {
       input: { structuredAt: lastStructure?.finished_at ?? null },
+      // The rewrite is the only charged call this stage makes, and its cost was
+      // going unrecorded — so when it failed on a length limit the log could
+      // not say how close to the budget the successful runs had been.
+      ...(scenarioUsage ? { usage: scenarioUsage } : {}),
       steps: {
         applied: mapped.applied,
         keptUserValues: mapped.keptUserValues,

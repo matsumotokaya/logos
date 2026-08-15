@@ -2,6 +2,7 @@ import "server-only";
 
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
+import { parseOrExplain } from "./llm-length";
 import { z } from "zod";
 import {
   EVENT_CM_MAX_CHARS,
@@ -254,9 +255,15 @@ export async function draftEventCmScenario(
   const steps = eventCmNarratedSteps(brief);
   const keys = steps.map(eventCmSceneKey);
 
-  const response = await openai().chat.completions.parse({
+  const response = await parseOrExplain(() =>
+    openai().chat.completions.parse({
     model: MODEL,
-    max_completion_tokens: 4000,
+    // Reasoning counts against this budget, and this is a writing task with a
+    // page of constraints — so most of it is spent before the first word of
+    // output. At 4000 a film with several programme panels ran out mid-JSON and
+    // the stage failed with the provider's English sentence about a length
+    // limit, which named neither the cause nor anything to do about it.
+    max_completion_tokens: 16000,
     reasoning_effort: "medium",
     messages: [
       {
@@ -276,7 +283,9 @@ ${EVENT_CM_TARGET_SECONDS}秒のCMナレーションを書いてください。`
       },
     ],
     response_format: zodResponseFormat(draftSchemaFor(keys), "event_cm_scenario"),
-  });
+    }),
+    "シナリオが長さの上限に達しました。コマ数が多いか、事実の量が多すぎます。プログラムを減らすか、資料を整理してからもう一度お試しください",
+  );
 
   const parsed = response.choices[0]?.message.parsed;
   if (!parsed) throw new Error("シナリオを生成できませんでした");

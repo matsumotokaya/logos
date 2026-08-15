@@ -2,6 +2,7 @@ import "server-only";
 
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
+import { parseOrExplain } from "./llm-length";
 import { z } from "zod";
 import type { ExtractedSource } from "./extract";
 import { sanitizeFacts, type SanitizeReport } from "./sanitize";
@@ -216,16 +217,22 @@ export async function structureEventFacts(
     text: "この資料から読み取れるイベントの事実だけを抜き出してください。書かれていない項目は null にしてください。画像は1枚ずつ images に判定を返し、氏名は根拠がある場合だけ書いてください。",
   });
 
-  const response = await openai().chat.completions.parse({
+  const response = await parseOrExplain(() =>
+    openai().chat.completions.parse({
     model: MODEL,
-    max_completion_tokens: 6000,
+    // Reasoning counts against this too, and this call looks at up to twelve
+    // images at once. The answer itself measures ~2000 tokens on a real flyer,
+    // so the rest of the budget is thinking room.
+    max_completion_tokens: 16000,
     reasoning_effort: "medium",
     messages: [
       { role: "system", content: SYSTEM },
       { role: "user", content: content as never },
     ],
     response_format: zodResponseFormat(FactsSchema, "event_facts"),
-  });
+    }),
+    "資料が長さの上限に達しました。1回に読む資料を減らすか、長いPDFを分けてからお試しください",
+  );
 
   const parsed = response.choices[0]?.message.parsed;
   if (!parsed) throw new Error("資料から事実を読み取れませんでした");
