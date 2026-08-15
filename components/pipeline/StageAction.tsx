@@ -25,6 +25,7 @@ export default function StageAction({
   stages,
   busy,
   disabled,
+  part = "both",
   onRun,
   onRunFilm,
   filmSteps,
@@ -32,6 +33,16 @@ export default function StageAction({
   onRewriteScenario,
 }: {
   stageId: PipelineStageId;
+  /**
+   * Which of the two buttons to draw here.
+   *
+   * A button belongs directly under the thing it acts on. 「入力・抽出を実行」
+   * reads the list of documents, so it sits under that list; 「構造化して反映
+   * する」 consumes what the reading produced, so it sits under those results.
+   * Both at the bottom of the drawer made the reading button look like a second
+   * opinion about the extract results above it.
+   */
+  part?: "own" | "advance" | "both";
   /** Every stage's freshness — what decides whether either button has work. */
   stages: PipelineStage[];
   busy: boolean;
@@ -67,12 +78,14 @@ export default function StageAction({
    */
   onRewriteScenario?: () => void;
 }) {
-  const { own, advance } = stageActions({
+  const decided = stageActions({
     stageId,
     stages,
     hasMaterial: !disabled,
     filmSteps: onRunFilm ? (filmSteps ?? []) : null,
   });
+  const own = part === "advance" ? null : decided.own;
+  const advance = part === "own" ? null : decided.advance;
   if (!own && !advance) return null;
 
   const run = (step: StageRun) => {
@@ -82,7 +95,7 @@ export default function StageAction({
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
-      {stageId === "structure" && onRewriteScenario ? (
+      {stageId === "structure" && onRewriteScenario && part !== "own" ? (
         <button
           type="button"
           onClick={onRewriteScenario}

@@ -74,13 +74,21 @@ export interface VideoPipelinePayload {
   goal: GoalProgress;
 }
 
+// What to do here, in the second person, and nothing else.
+//
+// These lines used to describe the machinery — which part parses text, what
+// gets carried to the model, where meaning is decided. True, and no help at
+// all: somebody opening a drawer wants to know what to give it and what will
+// happen to the video, not how the stage is implemented.
 const STAGE_DESCRIPTION: Record<PipelineStageId, string> = {
   input:
-    "この動画のもとになる資料を登録し、次の段が読める形へ機械的に展開します。テキストはそのまま読み、PDFや画像は「次の段で直接見る」と印をつけて運びます。内容の意味はここでは判断しません。",
-  extract: "資料を機械的に読み取ります。テキストはそのまま読み、PDFや画像は次の段でモデルが直接見ます。",
-  structure: "読み取った資料からイベントの事実を取り出し、動画に反映します。資料に書かれていないことは埋めません。",
-  map: "いま動画が何でできているか。各項目の由来と、まだ埋まっていないものの一覧です。",
-  output: "Remotion でMP4が書き出されたか。失敗・実行中・成功をここで区別します。",
+    "イベントの告知文やチラシをアップロードすると、動画の内容がその情報に合わせて書き換わります。ロゴや写真などの画像を入れると、動画の中に表示されます。",
+  extract: "アップロードした資料を読み取ります。",
+  structure:
+    "読み取った資料から、イベント名・日時・会場・登壇者などを取り出して動画に反映します。資料に書かれていないことは埋めません。",
+  map: "いま動画が何でできているか。各項目の由来と、まだ埋まっていないものの一覧です。値はここで直せます。",
+  output:
+    "絵コンテで直した内容が、再生される動画に反映された時点です。MP4の書き出しはこのあとの別の操作です。",
 };
 
 export default function VideoPipelinePanel({
@@ -92,6 +100,7 @@ export default function VideoPipelinePanel({
   facts,
   output,
   description,
+  ownAction,
   action,
   runs,
 }: {
@@ -116,9 +125,15 @@ export default function VideoPipelinePanel({
   /** Overrides the built-in description for this stage, for the same reason. */
   description?: string;
   /**
-   * The one thing this stage does — always the step that carries the work
-   * forward into the next stage. One button per drawer, because a stage is a
-   * state and its action is the transition out of it.
+   * The work this stage does in place, drawn directly under what it acts on.
+   *
+   * 「入力・抽出を実行」 reads the documents listed above it. It used to sit at
+   * the very bottom of the drawer, under the extract results, where it read as
+   * an action on those results rather than the thing that produced them.
+   */
+  ownAction?: ReactNode;
+  /**
+   * The step OUT of this stage, always last: it consumes everything above it.
    */
   action?: ReactNode;
   /** Shown at the bottom of every stage, as in slide-factory. */
@@ -153,11 +168,17 @@ export default function VideoPipelinePanel({
 
       {/* The input UI belongs to the input stage and nowhere else. Putting a
           file picker inside 構造化 asked the user to supply material at a step
-          that consumes it. */}
-      {/* Input and extraction are one stage: what was supplied, and what
-          reading it produced, read as one thing. */}
+          that consumes it.
+
+          Input and extraction are one stage, and the drawer reads top to bottom
+          in the order the work happens: what was supplied → read it → what the
+          reading produced → carry it into the video. Each button sits under the
+          thing it acts on rather than both being collected at the foot. */}
       {stageId === "input" && intake ? (
-        <section className="border-t border-hairline pt-5">{intake}</section>
+        <section className="flex flex-col gap-4 border-t border-hairline pt-5">
+          {intake}
+          {ownAction ? <div className="flex justify-end">{ownAction}</div> : null}
+        </section>
       ) : null}
 
       {stageId === "input" && extracted ? (

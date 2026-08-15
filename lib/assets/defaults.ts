@@ -30,10 +30,13 @@ export interface DefaultAsset {
   /** Shown when a user asks where a default came from. */
   credit: string;
   /**
-   * Whether this may be published. Anything without a licence that permits
-   * commercial redistribution is usable as a placeholder and blocked at
-   * publish, so an unlicensed track can never leave the building inside an
-   * exported MP4.
+   * Whether this may be published.
+   *
+   * False marks a track that is fine for previewing and must not leave the
+   * building inside an exported MP4. **The export does not enforce this yet** —
+   * `unlicensedDefaults()` has no caller — so today it only drives what the
+   * picker says. Every track in the pool is currently cleared, so nothing is at
+   * risk; adding one that is not means writing the render-side exclusion first.
    */
   licensed: boolean;
 }
@@ -42,13 +45,19 @@ export interface DefaultAsset {
  * Music is the first thing the pool carries, because it is the first thing a
  * user will not supply. Nobody uploads a soundtrack; they expect one.
  *
- * Both tracks below are client-supplied placeholders — they were licensed for
- * one production, not for redistribution — so `licensed: false` keeps them out
- * of an exported MP4 while they still dress every preview. The bytes are
- * gitignored for the same reason the event photography is; the catalog entry
- * naming them is committed, so a fresh checkout knows what is missing.
+ * Both tracks were generated with Suno AI on a paid plan that grants commercial
+ * use, so they are ours to publish: they play in previews AND are burned into
+ * exported MP4s (confirmed by the owner, 2026-08-15). They were previously
+ * recorded here as client-supplied placeholders from the productions they were
+ * first used in, which was wrong about where they came from and kept them out
+ * of every export.
  *
- * Replacing these with cleared tracks is a content task, not a code change.
+ * The bytes are gitignored for the same reason the event photography is; the
+ * catalog entry naming them is committed, so a fresh checkout knows what is
+ * missing.
+ *
+ * `licensed: false` remains meaningful for the next track that arrives without
+ * clearance — the export refuses it and the picker says so.
  */
 export const DEFAULT_ASSETS: DefaultAsset[] = [
   {
@@ -57,8 +66,8 @@ export const DEFAULT_ASSETS: DefaultAsset[] = [
     src: "defaults/bgm/bright-corporate.mp3",
     tone: "ink",
     label: "明るい（コーポレート）",
-    credit: "仮素材（製品紹介動画で使っていたBGM）",
-    licensed: false,
+    credit: "Suno AI（商用利用可プランで生成）",
+    licensed: true,
   },
   {
     id: "bgm-ink-cinematic",
@@ -66,8 +75,8 @@ export const DEFAULT_ASSETS: DefaultAsset[] = [
     src: "defaults/bgm/ink-cinematic.mp3",
     tone: "ink",
     label: "和モダン（重厚）",
-    credit: "仮素材（レオパレス21×WealthPark Lab 案件の支給BGM）",
-    licensed: false,
+    credit: "Suno AI（商用利用可プランで生成）",
+    licensed: true,
   },
 ];
 

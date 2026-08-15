@@ -304,9 +304,12 @@ export default function BriefSourceIntake({
         </div>
       </div>
 
+      {/* 「この動画のもとになっている資料」 was a claim about the film — and
+          reading is not applying, so a freshly dropped flyer is not yet what
+          the video is made of. This list is simply what has been handed over. */}
       <div className="flex items-baseline gap-3">
         <h2 className="font-display text-base font-semibold tracking-tight">
-          この動画のもとになっている資料
+          追加した資料
         </h2>
         <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
       </div>

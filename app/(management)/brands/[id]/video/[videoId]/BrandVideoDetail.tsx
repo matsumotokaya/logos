@@ -1052,7 +1052,9 @@ export default function BrandVideoDetail({
       {pipeline && openStageDef ? (
         <StageDrawer
           title={`${openStageDef.label} ステージ`}
-          description={openStageDef.summary}
+          // The summary is printed inside the panel, next to this stage's
+          // status badge, where it belongs. Printing it in the drawer header
+          // too meant 「資料3件・読み取り済み」 appeared twice, two lines apart.
           onClose={() => setOpenStage(null)}
         >
           <VideoPipelinePanel
@@ -1078,9 +1080,26 @@ export default function BrandVideoDetail({
             structured={
               video?.template === "event-cm" ? <StructureResults runs={runs} /> : undefined
             }
+            // The reading button, drawn under the list of documents it reads.
+            ownAction={
+              video?.template === "event-cm" ? (
+                <StageAction
+                  part="own"
+                  stageId={openStageDef.id}
+                  stages={pipeline.stages}
+                  busy={saving}
+                  disabled={sources.length === 0}
+                  onRun={(stage) =>
+                    void (stage === "structure" ? runStructureAndMap() : runStage(stage))
+                  }
+                  onOpenStage={(stage) => setOpenStage(stage)}
+                />
+              ) : undefined
+            }
             action={
               video?.template === "event-cm" ? (
                 <StageAction
+                  part="advance"
                   stageId={openStageDef.id}
                   stages={pipeline.stages}
                   busy={saving}
@@ -1110,11 +1129,10 @@ export default function BrandVideoDetail({
                 />
               ) : undefined
             }
-            description={
-              video?.template === "event-cm"
-                ? "絵コンテで直した内容が、再生される動画になった時点。実行するまで絵コンテと動画は違っていて、それが正常な状態です。MP4の書き出しはこの先の別の操作です。"
-                : undefined
-            }
+            // No override: the stage's own line already says what this step is
+            // (VideoPipelinePanel STAGE_DESCRIPTION). Two descriptions of the
+            // same stage, one of them longer, is how the drawer ended up
+            // explaining the bake to somebody who had opened 入力・抽出.
             output={
               video?.template === "event-cm" && bake ? (
                 <div className="flex flex-col gap-2">
