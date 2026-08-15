@@ -40,6 +40,7 @@ import {
 } from "@/remotion/event-cm/types";
 import { TTS_MAX_SECTION_CHARS } from "@/lib/narration/limits";
 import type { GoalFieldState } from "@/lib/pipeline/stages";
+import { factFieldsFor, isSuppressed, previewOf } from "@/lib/event-cm/facts";
 import type { BriefSource } from "./BriefSourceIntake";
 import { panelDeletion, type PanelDeletion } from "@/lib/event-cm/panel-actions";
 import FactList, { type FactEdit } from "./FactList";
@@ -670,6 +671,72 @@ function PanelContents({ panel }: { panel: StoryboardPanel }) {
   );
 }
 
+/**
+ * The video's facts, as carried by ONE picture.
+ *
+ * The workspace used to print every field of the brief in a single list under
+ * the whole board, headed 「この動画は何でできているか」. It answered the
+ * question in the abstract and left the useful half out: *where* each value
+ * ends up. A date is not a property of the video, it is what the closing card
+ * says; a portrait is what the speakers' card shows; a mark is on screen twice
+ * and so appears under both mark cards. Distributing them makes the storyboard
+ * the mapping it is read as. The flat list still exists, in the pipeline's
+ * マッピング drawer, which is where a whole-brief view belongs.
+ *
+ * Read-only: values are typed in the panel (「コマを開くとその中身を直せる」),
+ * and two editable copies of one row is how they end up disagreeing.
+ */
+function PanelFacts({
+  brief,
+  goalFields,
+  paths,
+}: {
+  brief: EventCmBrief;
+  goalFields: GoalFieldState[];
+  paths: string[];
+}) {
+  const originOf = new Map(goalFields.map((field) => [field.path, field.origin]));
+  const byPath = new Map(factFieldsFor(brief).map((field) => [field.path, field]));
+  const rows = paths.flatMap((path) => {
+    const field = byPath.get(path);
+    return field ? [{ field, origin: originOf.get(path) ?? null }] : [];
+  });
+  if (rows.length === 0) return null;
+
+  return (
+    <dl className="mt-2 flex flex-col gap-1 border-t border-hairline pt-2">
+      {rows.map(({ field, origin }) => {
+        const off = isSuppressed(brief, field.path);
+        const value = previewOf(brief, field.path);
+        return (
+          <div key={field.path} className="flex items-baseline gap-2 text-[11px]">
+            <dt className="min-w-20 shrink-0 text-ink-faint">{field.label}</dt>
+            <dd
+              className={cn(
+                "min-w-0 flex-1 truncate",
+                off ? "text-ink-faint line-through" : "text-ink-muted",
+              )}
+            >
+              {/* A field with nothing in it is not a hole: the film draws a
+                  designed stand-in. Saying 「設計代替」 rather than showing an
+                  empty cell is the same stance the rest of the screen takes. */}
+              {off ? "表示しない" : value || "設計代替で描画"}
+            </dd>
+            {/* Only the guess is worth a badge here. Printing 「あなたの入力」
+                on every corrected row would fill the board with labels that
+                say nothing is wrong. */}
+            {!off && origin === "inferred" ? (
+              <span className="shrink-0 rounded-full border border-amber-300/60 bg-amber-50 px-1.5 text-[10px] font-semibold text-amber-800">
+                仮
+              </span>
+            ) : null}
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
 function PanelCard({
   panel,
   theme,
@@ -776,6 +843,17 @@ function PanelCard({
               入りきらないため落ちます: {panel.dropped.join("、")}
             </p>
           ) : null}
+
+          {/* Which of the video's facts this picture is carrying.
+              The storyboard IS the mapping — that is what it is read for — so
+              the values live under the picture that shows them rather than in
+              one flat list of everything under the whole board. The dates go
+              under the closing card because that is where they appear; a
+              speaker's portrait goes under the speakers; a logo appears under
+              BOTH mark cards, because it really is on screen twice.
+              Read-only here, editable in the panel: 「コマを開くとその中身を
+              直せる」 stays the one place values are typed. */}
+          <PanelFacts brief={brief} goalFields={goalFields} paths={paths} />
         </div>
       </figure>
 

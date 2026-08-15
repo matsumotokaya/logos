@@ -27,7 +27,7 @@ import {
   type FilmStep,
 } from "@/lib/event-cm/bake";
 import type { BriefSource } from "./BriefSourceIntake";
-import FactList, { type FactEdit } from "./FactList";
+import { type FactEdit } from "./FactList";
 import Storyboard from "./Storyboard";
 import { eventCmStoryboard } from "@/lib/storyboard/event-cm";
 import {
@@ -279,35 +279,31 @@ export default function EventCmWorkspace({
         </p>
       ) : null}
 
-      <section className="w-full max-w-5xl">
-        <div className="flex items-baseline gap-3">
-          <h2 className="font-display text-base font-semibold tracking-tight">
-            この動画は何でできているか
-          </h2>
-          <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
-        </div>
-        <p className="mt-2 max-w-3xl text-[11px] leading-relaxed text-ink-muted">
-          「仮に入れた値」は、何も聞かずにこちらで決めたものです。違えばその場で直せますし、
-          出したくない項目は消せます。空の枠は欠陥ではなく、設計済みの代替で描かれています。
+      {/* No flat list of the whole brief here any more.
+    
+          It used to sit under the board as 「この動画は何でできているか」, and
+          it answered that in the abstract while leaving out the half a reader
+          of a storyboard wants: WHERE each value ends up. Every field is now
+          printed under the picture that carries it (Storyboard `PanelFacts`) —
+          the dates under the closing card, a portrait under the speakers, a
+          mark under both mark cards because it really is on screen twice. That
+          makes the board the mapping it is read as.
+    
+          The whole-brief view still exists, in the pipeline's マッピング
+          drawer, which is where a list of everything belongs. And the things no
+          picture carries — the music, the reading, the video's own name — are
+          already controls in the header, so a 「基本情報」 section here would
+          have been a third place to read the same two facts.
+    
+          What survives is the count of guesses, because that is a fact about
+          the video that no single panel can state. */}
+      {goal.provisional.length > 0 ? (
+        <p className="w-full max-w-5xl text-[12px] text-amber-800">
+          {goal.provisional.length}件はこちらで仮に決めた値です（
+          {goal.provisional.map((field) => field.label).join("、")}）。各コマの
+          「仮」の項目を開くと直せます。
         </p>
-
-        {goal.provisional.length > 0 ? (
-          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] text-amber-800">
-            {goal.provisional.length}件はこちらで仮に決めた値です（
-            {goal.provisional.map((field) => field.label).join("、")}）。
-          </p>
-        ) : null}
-
-        {onEditFact ? (
-          <FactList
-            brief={brief}
-            goalFields={goal.fields}
-            busy={writing}
-            onEdit={onEditFact}
-            imageSources={imageSources}
-          />
-        ) : null}
-      </section>
+      ) : null}
     </div>
   );
 }
