@@ -364,10 +364,24 @@ export interface EventCmBrief {
    */
   titleDeclined?: string | null;
   scenario: EventCmScenario;
+  /**
+   * Who reads it, as a preset id (lib/narration/voices.ts).
+   *
+   * A SETTING, like the choice of music — not the recording. Picking a voice
+   * writes this and nothing else; the reading itself happens when the one
+   * button runs, alongside everything else that is waiting. It used to start a
+   * text-to-speech call the instant somebody pressed 「この声で読み上げる」,
+   * which meant a minute of waiting, a dialog that finally closed, and a player
+   * that had not changed — because a recording is not a film until the film is
+   * fixed. Absent = the template's standard narrator.
+   */
+  narrator?: string;
   /** Present once the scenario has been spoken. Nothing waits for a human to
    *  approve the text: the golden path runs scenario → voice → film unattended,
    *  and editing is what you reach for after seeing the result, not before.
-   *  `scenario.source` is what keeps a re-run from overwriting an edit. */
+   *  `scenario.source` is what keeps a re-run from overwriting an edit.
+   *  `track.voice` is the voice that ACTUALLY read it — compared against
+   *  `narrator` to know whether the recording is the one that was asked for. */
   voice?: {
     track: CmVoiceTrackOf<EventCmScene>;
     /** material:<uuid> of the mixed WAV, pinned through take_inputs. */

@@ -94,8 +94,14 @@ export async function POST(
     );
   }
 
+  // Which voice reads it, most specific first: what this call asked for, then
+  // what the take was set to, then what it happens to have been read in before,
+  // then the template's standard narrator. The setting comes before the old
+  // recording so the one button honours a choice made in the dialog — which is
+  // the whole point of choosing being separate from recording.
   const chosen =
     narrationVoiceById(requestedVoiceId) ??
+    narrationVoiceById(brief.narrator) ??
     narrationVoiceByName(brief.voice?.track.voice) ??
     DEFAULT_NARRATION_VOICE;
 
@@ -150,6 +156,81 @@ export async function POST(
       { status: 502 },
     );
   }
+}
+
+/**
+ * Choose who reads it. Records the setting; records nothing aloud.
+ *
+ * Separate from POST because choosing and recording are different acts, and
+ * conflating them produced the worst wait on the screen: pressing 「この声で
+ * 読み上げる」 spent a minute in text-to-speech, closed the dialog, and left a
+ * player that had not changed — the recording was made but the film had not
+ * been fixed, so nothing the user could see was different. Now the choice saves
+ * instantly, shows up as an unreflected change like any other, and the reading
+ * happens when the one button runs (docs/video-state-model.md §3.5).
+ *
+ * Choosing a voice is also the decision to have a narration, so it withdraws a
+ * previous "off" — the same rule POST follows, for the same reason.
+ */
+export async function PATCH(
+  req: Request,
+  ctx: { params: Promise<{ id: string; videoId: string }> },
+) {
+  const denied = await guardLabsRequest(req);
+  if (denied) return denied;
+  let user;
+  try {
+    user = await requireUser(req);
+  } catch {
+    return unauthorized();
+  }
+  const { id: brandId, videoId } = await ctx.params;
+  const supabase = createServerSupabaseForToken(user.token);
+
+  let voiceId: string | null = null;
+  try {
+    const body = (await req.json()) as { voiceId?: unknown } | null;
+    if (typeof body?.voiceId === "string") voiceId = body.voiceId;
+  } catch {
+    // Falls through to the 400 below: this call is only ever about a choice.
+  }
+  const chosen = narrationVoiceById(voiceId);
+  if (!chosen) {
+    return Response.json({ error: "その声は選べません" }, { status: 400 });
+  }
+
+  const { data: take, error } = await supabase
+    .from("takes")
+    .select("id, template_id, brief")
+    .eq("id", videoId)
+    .eq("brand_id", brandId)
+    .eq("tool_kind", "video")
+    .maybeSingle();
+  if (error) {
+    return Response.json({ error: "動画を確認できませんでした" }, { status: 500 });
+  }
+  if (!take) return Response.json({ error: "動画が見つかりません" }, { status: 404 });
+  if (take.template_id !== "event-cm") {
+    return Response.json({ error: "このテンプレートには対応していません" }, { status: 400 });
+  }
+
+  const stored = take.brief as EventCmBrief;
+  const next = setSuppressed({ ...stored, narrator: chosen.id }, "voice", false);
+  const validated = validateBrief("event-cm", next);
+  if (!validated.ok) {
+    return Response.json(
+      { error: `声を変更できません: ${validated.issues.join(", ")}` },
+      { status: 400 },
+    );
+  }
+  const saved = await supabase
+    .from("takes")
+    .update({ brief: validated.brief, updated_at: new Date().toISOString() })
+    .eq("id", take.id);
+  if (saved.error) {
+    return Response.json({ error: saved.error.message }, { status: 500 });
+  }
+  return Response.json({ ok: true, voiceId: chosen.id, voiceLabel: chosen.label });
 }
 
 /**

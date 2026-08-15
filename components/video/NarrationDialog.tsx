@@ -15,6 +15,13 @@
 // Off is a first-class choice, not a failure to record: an event film with
 // music and subtitles and no voice is a finished thing. Turning it off keeps
 // the recording (the API only clears the brief's pointer), so it can come back.
+//
+// CHOOSING IS NOT RECORDING. Picking a voice saves a setting and returns at
+// once; the reading happens when 「動画を作り直す」 runs, with everything else
+// that is waiting. It used to start text-to-speech on the spot — a minute of
+// waiting, a dialog that closed itself, and a player that had not changed,
+// because a recording is not a film until the film is fixed. The gap between
+// what that button seemed to promise and what it did was the whole problem.
 
 import { Dialog } from "@base-ui/react/dialog";
 import { useState } from "react";
@@ -25,29 +32,30 @@ import { NARRATION_VOICES } from "@/lib/narration/voices";
 export default function NarrationDialog({
   hasVoice,
   currentVoiceId,
+  narrator,
   totalMs,
   mock,
-  canSpeak,
   unreflected,
   busy,
-  onSpeak,
+  onChoose,
   onTurnOff,
 }: {
   hasVoice: boolean;
-  /** Preset the existing recording used, when it maps to one. */
+  /** Preset the existing recording actually used, when it maps to one. */
   currentVoiceId: string | null;
+  /** Preset the take is SET to. What the next reading will use. */
+  narrator: string | null;
   totalMs: number | null;
   mock: boolean;
-  /** False while there is no scenario to read. */
-  canSpeak: boolean;
   /** The recording is not the one the played film has (§5). */
   unreflected: boolean;
   busy: boolean;
-  /** Resolves true when the take actually changed. */
-  onSpeak: (voiceId: string) => Promise<boolean>;
+  /** Save the choice. Records nothing aloud. Resolves true when it saved. */
+  onChoose: (voiceId: string) => Promise<boolean>;
   onTurnOff: () => Promise<boolean>;
 }) {
-  const [chosen, setChosen] = useState<string>(currentVoiceId ?? NARRATION_VOICES[0].id);
+  const set = narrator ?? currentVoiceId ?? NARRATION_VOICES[0].id;
+  const [chosen, setChosen] = useState<string>(set);
   const [open, setOpen] = useState(false);
   // What just happened, said in the dialog that asked for it.
   //
@@ -150,9 +158,17 @@ export default function NarrationDialog({
                     <span className="shrink-0 font-mono text-[10px] text-ink-faint">
                       {voice.voice} / {voice.character}
                     </span>
+                    {/* Two different facts, and telling them apart is the point
+                        of splitting the choice from the recording: what the
+                        film currently speaks, and what the next reading will
+                        use. They are the same until somebody picks another. */}
                     {currentVoiceId === voice.id && hasVoice ? (
                       <span className="shrink-0 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold text-ink-muted">
-                        使用中
+                        再生中の声
+                      </span>
+                    ) : set === voice.id ? (
+                      <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                        次に使う
                       </span>
                     ) : null}
                   </label>
@@ -184,21 +200,18 @@ export default function NarrationDialog({
                 ) : null}
                 <button
                   type="button"
-                  onClick={() =>
-                    void run(
-                      () => onSpeak(chosen),
-                      hasVoice ? "読み上げを作り直しました" : "読み上げが完成しました",
-                    )
-                  }
-                  disabled={busy || !canSpeak || Boolean(done)}
-                  title={canSpeak ? undefined : "先にシナリオを書いてください"}
+                  onClick={() => void run(() => onChoose(chosen), "この声にしました")}
+                  disabled={busy || chosen === set || Boolean(done)}
+                  title={chosen === set ? "この声が選ばれています" : undefined}
                   className="ml-auto rounded-full bg-ink px-4 py-2 text-xs font-semibold text-paper transition hover:bg-accent disabled:opacity-50"
                 >
-                  {busy ? "作成中…" : hasVoice ? "この声で作り直す" : "この声で読み上げる"}
+                  {busy ? "保存中…" : "この声にする"}
                 </button>
               </div>
+              {/* Says what will happen and when, because the button no longer
+                  does the slow thing itself. */}
               <p className="mt-3 text-[11px] text-ink-faint">
-                作り直すと今の音声を置き換えます。オフにしても録音は残るので、いつでも戻せます。
+                選んだ声で読み上げるのは「動画を作り直す」を押したときです。オフにしても録音は残るので、いつでも戻せます。
               </p>
             </div>
           </Dialog.Popup>

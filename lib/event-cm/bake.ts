@@ -24,6 +24,7 @@
 // read 0, and the player went on playing the old track with no way to tell.
 
 import { isSuppressed, isSpokenFact } from "./facts";
+import { narrationVoiceByName } from "@/lib/narration/voices";
 import { EVENT_CM_GOAL } from "@/lib/pipeline/event-cm";
 import {
   eventCmSceneKey,
@@ -113,6 +114,10 @@ function factValueOf(brief: EventCmBrief, path: string): string {
     // is still a different recording.
     case "voice":
       return brief.voice?.track.generatedAt ?? "";
+    // Who was asked to read it. Absent means the standard narrator, and an
+    // absent setting must compare equal to an absent setting.
+    case "narrator":
+      return brief.narrator ?? "";
     // People are compared by who they are; their portraits have their own paths
     // above, so replacing a photograph says 「◯◯の写真」 rather than 「登壇者」.
     case "guests":
@@ -171,6 +176,10 @@ function comparableFields(
     path: field.path,
     label: field.label,
   }));
+  // Not in the goal, because it is never missing — there is always a narrator,
+  // and a fact list row saying so would be a row nobody can act on. It is still
+  // a setting somebody changes and therefore something the film can be behind.
+  fields.push({ path: "narrator", label: "読み上げの声" });
   const people = Math.max(working.guests.length, baked.guests.length);
   for (let index = 0; index < people; index += 1) {
     const name = working.guests[index]?.name ?? baked.guests[index]?.name ?? "";
@@ -193,11 +202,15 @@ function comparableFields(
  */
 function needsFor(path: string, working: EventCmBrief): FilmStep[] {
   const steps: FilmStep[] = [];
-  const spoken = path === "scenario" || isSpokenFact(path);
+  // Changing the reader changes the recording and not one word of it, so the
+  // writer stays out of it — the same reason swapping the music costs nothing.
+  const spoken = path === "scenario" || (path !== "narrator" && isSpokenFact(path));
+  const rerecord = spoken || path === "narrator";
+
   if (spoken && path !== "scenario" && working.scenario.source !== "human") {
     steps.push("scenario");
   }
-  if (spoken && !narrationIsOff(working) && working.scenario.scenes.length > 0) {
+  if (rerecord && !narrationIsOff(working) && working.scenario.scenes.length > 0) {
     steps.push("voice");
   }
   steps.push("bake");
@@ -266,6 +279,26 @@ export const narrationIsOff = (brief: EventCmBrief): boolean =>
   isSuppressed(brief, "voice");
 
 /**
+ * Whether the recording is in the voice that was asked for.
+ *
+ * Separate from `voiceReadsScenario`, which asks whether it says the right
+ * words. Choosing a different narrator leaves the words untouched and the
+ * recording wrong, and without this the setting could be saved, fixed into the
+ * film, and never acted on — the film keeping a voice nobody chose.
+ */
+export function voiceUsesNarrator(brief: EventCmBrief): boolean {
+  const recorded = brief.voice?.track.voice;
+  if (!recorded) return true;
+  // Nobody has asked for a particular voice, so whatever was recorded is the
+  // one that was wanted. Takes recorded before the presets existed carry voice
+  // names that map to no preset, and treating those as a mismatch would put a
+  // permanent 読み上げ on the button and spend a TTS call to replace a
+  // narration nobody had complained about.
+  if (!brief.narrator) return true;
+  return narrationVoiceByName(recorded)?.id === brief.narrator;
+}
+
+/**
  * How far the played film is behind the workbench.
  *
  * `baked` null = never run, which is guidance rather than a difference.
@@ -332,7 +365,10 @@ export function pendingFilmSteps(
     !narrationIsOff(working) &&
     (scenarioPending ||
       (!unwritten &&
-        (options.redo || !working.voice || !voiceReadsScenario(working))));
+        (options.redo ||
+          !working.voice ||
+          !voiceReadsScenario(working) ||
+          !voiceUsesNarrator(working))));
   if (voicePending) steps.add("voice");
 
   // And what the DIFFERENCES cost. Each field says for itself, so a video whose

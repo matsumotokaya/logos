@@ -9,6 +9,7 @@ import {
   pendingFilmSteps,
   renderIsBehind,
   voiceReadsScenario,
+  voiceUsesNarrator,
 } from "./bake";
 import { setSuppressed } from "./facts";
 import { seedEventCmBrief } from "./seed";
@@ -164,6 +165,34 @@ test("比較は保存形。署名URLに置き換わった版を比べてはい�
     voice: { ...stored.voice!, audio: "/api/…/voice.wav?sig=NEW" },
   };
   assert.deepEqual(bakeChanges(reSigned, stored), []);
+});
+
+test("声を選ぶのは設定。読み上げ直しは要るが、書き直しは要らない", () => {
+  // Choosing a voice used to start text-to-speech on the spot: a minute of
+  // waiting, then a player that had not changed. It is now a setting like the
+  // music — saved instantly, listed as unreflected, and read aloud when the one
+  // button runs. The words are untouched, so the writer stays out of it.
+  const baked = spoken(written(SEEDED, "2026-08-14T10:00:00Z"), "2026-08-14T10:05:00Z");
+  const picked: EventCmBrief = { ...baked, narrator: "male-1" };
+
+  assert.deepEqual(
+    bakeChanges(picked, baked).map((change) => [change.label, change.needs]),
+    [["読み上げの声", ["voice", "bake"]]],
+  );
+  assert.deepEqual(pendingFilmSteps(picked, baked), ["voice", "bake"]);
+});
+
+test("選んだ声で読まれていなければ、焼き付け済みでも読み上げが残る", () => {
+  // The setting and the recording are two facts, and only comparing them keeps
+  // a film from carrying a voice nobody chose: fixing the take with the two
+  // disagreeing would otherwise settle it for ever.
+  const brief: EventCmBrief = {
+    ...spoken(written(SEEDED, "2026-08-14T10:00:00Z"), "2026-08-14T10:05:00Z"),
+    narrator: "male-1",
+  };
+  assert.equal(voiceUsesNarrator(brief), false, "録音はZephyr、設定はmale-1");
+  assert.deepEqual(bakeChanges(brief, brief), [], "焼き付けとは一致している");
+  assert.deepEqual(pendingFilmSteps(brief, brief), ["voice", "bake"]);
 });
 
 test("未反映は名前で言い、多すぎるときだけ畳む", () => {

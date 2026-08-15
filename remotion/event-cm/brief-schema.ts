@@ -144,6 +144,8 @@ export const EventCmBriefSchema = z.object({
   factsUpdatedAt: z.string().optional(),
   titleDeclined: z.string().nullable().optional(),
   scenario: EventCmScenarioSchema,
+  /** Preset id of the chosen reader. A setting; the recording is derived. */
+  narrator: z.string().optional(),
   voice: z
     .object({
       track: CmVoiceTrackSchema,

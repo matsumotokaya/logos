@@ -351,7 +351,8 @@ export function markUserEdited(
  * they were saved, and switching the reading off would ask for a rewrite of a
  * scenario nobody is going to speak.
  */
-const UNSPOKEN = /^(bgm$|logos$|visuals\.|guests\[\d+\]\.photo$|scenario$|voice$)/;
+const UNSPOKEN =
+  /^(bgm$|logos$|visuals\.|guests\[\d+\]\.photo$|scenario$|voice$|narrator$)/;
 
 export const isSpokenFact = (path: string): boolean => !UNSPOKEN.test(path);
 

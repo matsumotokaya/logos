@@ -873,6 +873,36 @@ export default function BrandVideoDetail({
     }
   }
 
+  /**
+   * Choose who reads it. Saves a setting; records nothing.
+   *
+   * The slow part belongs to the one button, with everything else that is
+   * waiting. A dialog that spent a minute in text-to-speech and then closed
+   * onto an unchanged player was promising something it could not deliver on
+   * its own — the recording is not the film until the film is fixed.
+   */
+  async function chooseNarrator(voiceId: string): Promise<boolean> {
+    busy("声を保存しています…");
+    try {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/voice`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voiceId }),
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "声を変更できませんでした");
+      }
+      await load();
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "声を変更できませんでした");
+      return false;
+    } finally {
+      idle();
+    }
+  }
+
   /** Off: the film stops speaking and goes back to music and subtitles. The
    *  recording stays pinned to the take, so this is reversible. */
   async function turnNarrationOff(): Promise<boolean> {
@@ -1252,15 +1282,19 @@ export default function BrandVideoDetail({
                   <NarrationDialog
                     hasVoice={Boolean(brief?.voice)}
                     currentVoiceId={narrationVoiceByName(track?.voice)?.id ?? null}
+                    narrator={brief?.narrator ?? null}
                     totalMs={track?.totalMs ?? null}
                     mock={Boolean(track?.mock)}
-                    canSpeak={Boolean(brief?.scenario.scenes.length)}
-                    // The scenario counts too: a recording that is current in
-                    // the workbench still is not what the player speaks if the
-                    // words it reads were written after the last run.
-                    unreflected={isUnreflected("voice") || isUnreflected("scenario")}
+                    // Three ways the played film can be behind on the narration:
+                    // a newer recording, newer words to read, or a voice that
+                    // was chosen and has not been read in yet.
+                    unreflected={
+                      isUnreflected("voice") ||
+                      isUnreflected("scenario") ||
+                      isUnreflected("narrator")
+                    }
                     busy={saving}
-                    onSpeak={(voiceId) => speakScenario(voiceId)}
+                    onChoose={(voiceId) => chooseNarrator(voiceId)}
                     onTurnOff={() => turnNarrationOff()}
                   />
                 );
