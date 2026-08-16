@@ -31,6 +31,7 @@ import {
   materialCategoryLabel,
   type MaterialCategory,
 } from "@/lib/materials/category";
+import { materialPath, uniqueMaterialPaths } from "@/lib/materials/naming";
 import type {
   InventoryMaterial,
   InventoryPayload,
@@ -66,22 +67,23 @@ const readableSize = (bytes: number | null): string => {
 };
 
 /**
- * The folder a file would land in when exported.
+ * Group into the folders an export would write.
  *
- * Category first, medium as the fallback: the export path is
- * `assets/<category>/…`, and a file nobody has classified still has to sit
- * somewhere, so it goes to the medium's folder and shows as 未分類.
+ * Names and folders come from lib/materials/naming.ts, the same function the
+ * ZIP uses, so 「書き出したものと画面が同じ整理」 is true by construction rather
+ * than by two implementations agreeing. Uniqueness is resolved per tier for the
+ * same reason: what the screen shows is what unpacks.
  */
-const folderOf = (material: InventoryMaterial): string =>
-  material.category ?? (material.kind === "photo" ? "unsorted" : material.kind);
-
 function groupByFolder(materials: InventoryMaterial[]) {
-  const folders = new Map<string, InventoryMaterial[]>();
+  const paths = uniqueMaterialPaths(materials);
+  const folders = new Map<string, Array<{ material: InventoryMaterial; path: string }>>();
   for (const material of materials) {
-    const folder = folderOf(material);
+    const path = paths.get(material.id) ?? materialPath(material);
+    const folder = path.slice("assets/".length, path.lastIndexOf("/"));
     const bucket = folders.get(folder);
-    if (bucket) bucket.push(material);
-    else folders.set(folder, [material]);
+    const row = { material, path };
+    if (bucket) bucket.push(row);
+    else folders.set(folder, [row]);
   }
   return [...folders.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
@@ -135,12 +137,15 @@ function CategoryPicker({
 
 function MaterialRow({
   material,
+  fileName,
   uses,
   overriddenBy,
   disabled,
   onClassify,
 }: {
   material: InventoryMaterial;
+  /** The normalised name — what the export writes and the download hands over. */
+  fileName: string;
   uses: InventoryPayload["usage"][string] | undefined;
   /** Set when a material in the upper tier fills the same place as this one. */
   overriddenBy?: string;
@@ -149,12 +154,15 @@ function MaterialRow({
 }) {
   const measured =
     material.width && material.height ? `${material.width}×${material.height}` : null;
+  // Worth showing only when it differs: repeating 「miyao.jpg（元: miyao.jpg）」
+  // on every row buries the cases where the name really did change.
+  const renamed = fileName !== material.label;
 
   return (
     <li className="flex flex-col gap-1 rounded-lg border border-hairline px-3 py-2">
       <div className="flex items-center gap-2.5">
         <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink">
-          {material.label}
+          {fileName}
         </span>
         <CategoryPicker
           material={material}
@@ -162,6 +170,9 @@ function MaterialRow({
           onChange={(category) => onClassify(material.id, category)}
         />
       </div>
+      {renamed ? (
+        <p className="truncate text-[11px] text-ink-faint">元: {material.label}</p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-ink-faint">
         <span>{KIND_LABEL[material.kind] ?? material.kind}</span>
         <span>{SOURCE_LABEL[material.source_kind] ?? material.source_kind}</span>
@@ -235,10 +246,11 @@ function Tier({
               </span>
             </p>
             <ul className="flex flex-col gap-1 pl-3">
-              {rows.map((material) => (
+              {rows.map(({ material, path }) => (
                 <MaterialRow
                   key={material.id}
                   material={material}
+                  fileName={path.slice(path.lastIndexOf("/") + 1)}
                   uses={usage[material.id]}
                   overriddenBy={overrides?.get(material.id)}
                   disabled={disabled}

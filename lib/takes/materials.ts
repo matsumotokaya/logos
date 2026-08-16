@@ -5,6 +5,7 @@ import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getR2Object } from "@/lib/r2";
 import { signedLabsUrl } from "@/lib/labs-output-sign";
+import { uniqueMaterialPaths, type NameableMaterial } from "@/lib/materials/naming";
 import {
   collectMaterialIds,
   materialUri,
@@ -26,18 +27,24 @@ import {
 
 export { materialUri };
 
+/** Everything staging needs: the bytes' address, and how to name them. */
+type MaterialRow = NameableMaterial & { r2_key: string | null };
+
 type InputRow = {
   material_id: string;
   // Supabase's relationship inference represents this join as an array even
   // though the foreign key is one material per input; direct clients can
   // return the object form. Support both at this boundary.
-  brand_materials: { r2_key: string | null } | Array<{ r2_key: string | null }> | null;
+  brand_materials: MaterialRow | MaterialRow[] | null;
 };
 
-function r2KeyOf(input: InputRow | undefined): string | null {
+const materialOf = (input: InputRow | undefined): MaterialRow | null => {
   const material = input?.brand_materials;
-  return (Array.isArray(material) ? material[0] : material)?.r2_key ?? null;
-}
+  return (Array.isArray(material) ? material[0] : material) ?? null;
+};
+
+const r2KeyOf = (input: InputRow | undefined): string | null =>
+  materialOf(input)?.r2_key ?? null;
 
 async function pinnedInputs(
   supabase: SupabaseClient,
@@ -46,7 +53,9 @@ async function pinnedInputs(
 ): Promise<Map<string, InputRow>> {
   const { data, error } = await supabase
     .from("take_inputs")
-    .select("material_id, brand_materials(r2_key)")
+    .select(
+      "material_id, brand_materials(r2_key, label, kind, category, media_type, width, opaque, luminance, source_kind)",
+    )
     .eq("take_id", takeId)
     .in("material_id", [...ids]);
   if (error) throw new Error(`入力素材を読めませんでした: ${error.message}`);
@@ -73,22 +82,29 @@ export async function stageBriefMaterials<T>(
 
   const inputs = await pinnedInputs(supabase, takeId, ids);
 
+  // Named the way the inventory names them, so the project that unpacks on
+  // somebody else's machine has the same organisation the screen showed
+  // (docs/asset-normalization.md §10). It used to stage
+  // `materials/<uuid>/<checksum>` — a directory named after a database id
+  // holding a file with no extension — which is unreadable to the one person
+  // the export exists for.
+  const rows = [...ids].map((id) => {
+    const material = materialOf(inputs.get(id));
+    if (!material?.r2_key) throw new Error(`テイクに固定されていない素材です: ${id}`);
+    return { id, ...material };
+  });
+  const paths = uniqueMaterialPaths(rows);
+
   const resolved = new Map<string, string>();
-  for (const id of ids) {
-    const key = r2KeyOf(inputs.get(id));
-    if (!key) throw new Error(`テイクに固定されていない素材です: ${id}`);
+  for (const row of rows) {
+    const bytes = await getR2Object(row.r2_key as string);
+    if (!bytes) throw new Error(`R2に素材がありません: ${row.id}`);
 
-    const bytes = await getR2Object(key);
-    if (!bytes) throw new Error(`R2に素材がありません: ${id}`);
-
-    // Both the identifier and basename are controlled by our DB/key format;
-    // basename also preserves the extension that Remotion uses to decode it.
-    const name = path.basename(key);
-    const relative = path.posix.join("materials", id, name);
+    const relative = paths.get(row.id) as string;
     const destination = path.join(publicDir, relative);
     await mkdir(path.dirname(destination), { recursive: true });
     await writeFile(destination, bytes);
-    resolved.set(id, relative);
+    resolved.set(row.id, relative);
   }
 
   return replaceMaterialUris(brief, (id) => {

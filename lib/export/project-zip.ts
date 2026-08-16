@@ -217,8 +217,11 @@ export async function buildProjectZip(
     // project at a file that is not there.
     const files: Zippable = {};
     const excluded: string[] = [];
+    // Staged materials now land under `assets/` (lib/materials/naming.ts); a
+    // path outside it is one of our own bundled defaults, which staging never
+    // touches.
     const bgm = typeof staged.bgm === "string" ? staged.bgm : null;
-    if (bgm && !bgm.startsWith("materials/")) {
+    if (bgm && !bgm.startsWith("assets/")) {
       const unlicensed = unlicensedDefaults([bgm]);
       if (unlicensed.length > 0) {
         excluded.push(...unlicensed.map((asset) => asset.label));
