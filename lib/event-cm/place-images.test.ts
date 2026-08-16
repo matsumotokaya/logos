@@ -283,3 +283,28 @@ test("すでに入っているロゴでも、描き方が違えば直す", () =>
   assert.equal(again.placed.length, 0);
   assert.match(again.unused[0]?.reason ?? "", /すでにロゴ/);
 });
+
+test("初めて置くマークも、なぜその描き方なのかを事実どおりに記録する", () => {
+  // The run log is where someone reads the rule back. It once said "透過の明るい
+  // マーク" about a JPEG — artwork that cannot carry transparency at all — and
+  // carried a second branch describing the plated-mark knockout that had just
+  // been removed. Wording that contradicts the rule is how the rule gets
+  // reintroduced.
+  const plated = placeImagesIntoBrief(
+    SEEDED,
+    [reading({ ref: "img-1", role: "logo" })],
+    [material("img-1", { luminance: 0.93, opaque: true })],
+    "フライヤー.pdf",
+  );
+  assert.equal(plated.brief.logos.at(-1)?.treatment, "light");
+  assert.match(plated.placed[0]?.reason ?? "", /地の付いた画像/);
+
+  const darkOnAlpha = placeImagesIntoBrief(
+    SEEDED,
+    [reading({ ref: "img-1", role: "logo" })],
+    [material("img-1", { luminance: 0.1, opaque: false })],
+    "フライヤー.pdf",
+  );
+  assert.equal(darkOnAlpha.brief.logos.at(-1)?.treatment, "knockout");
+  assert.match(darkOnAlpha.placed[0]?.reason ?? "", /透過した暗いマーク/);
+});

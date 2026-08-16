@@ -298,11 +298,16 @@ export function placeImagesIntoBrief(
       "logos",
       SLOT_LABELS.logos,
       "inferred",
+      // Mirrors the wording of the self-healing branch above, and for the same
+      // reason: this line is where someone reads *why* a mark is drawn as it
+      // is. `treatmentFor` returns "light" for every opaque image, so knockout
+      // here means transparency — the old "地の付いた画像なので白抜き" branch
+      // was both unreachable and a description of the rule that was removed.
       treatment === "knockout"
-        ? material?.opaque
-          ? "地の付いた画像なので白抜きで置きました"
-          : "暗いマークなので白抜きで置きました"
-        : "透過の明るいマークなのでそのまま置きました",
+        ? "透過した暗いマークなので白抜きで置きました"
+        : material?.opaque
+          ? "地の付いた画像なので、そのまま描くように置きました"
+          : "透過の明るいマークなのでそのまま置きました",
     );
   }
 

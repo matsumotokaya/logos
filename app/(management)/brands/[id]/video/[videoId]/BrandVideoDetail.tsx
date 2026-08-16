@@ -1068,9 +1068,12 @@ export default function BrandVideoDetail({
             >
               <span>{saving ? "実行中…" : "動画を作り直す"}</span>
               {pendingCount > 0 ? (
+                // Amber, not red: work that has not run yet is a normal state,
+                // and red is reserved for failure (§3.1). Every other red on
+                // this screen is an error banner or a delete.
                 <span
                   aria-hidden="true"
-                  className="inline-flex size-5 items-center justify-center rounded-full bg-red-500 font-mono text-[10px] font-bold leading-none text-white tabular-nums"
+                  className="inline-flex size-5 items-center justify-center rounded-full bg-amber-400 font-mono text-[10px] font-bold leading-none text-ink tabular-nums"
                 >
                   {pendingCount}
                 </span>
