@@ -320,7 +320,10 @@ public/assets/person/miyao-yoshiaki_portrait_1600w.jpg
 2. ~~**軸1を列にする**~~ **✅ 2026-08-16 実装**(migration 0053 適用済み)。語彙は §5.1、コードの正本は [lib/materials/category.ts](../lib/materials/category.ts)。構造化LLMが2軸を別々に答え、マッピング段が `category` / `category_source` を素材の行へ書く([lib/materials/classify.ts](../lib/materials/classify.ts))。**`user` が付いた行は実行が二度と触らない**
    - **残り: プルダウンで直すUI**。書く側と守る規則(`inferred` は上書き可・`user` は不可)は出来ているが、`user` を立てる操作面がまだ無い。**インベントリUI(段階4)と同時に作る**のが自然——直す場所は一覧の中だから
 3. **名前を正規化する**。`label` を正規化名にし、元名を `provenance.originalFilename` へ。書き出しがそれを使う
-4. **インベントリUIを立てる**(§9)。絵コンテ下の2段セクションとマッピング段ドロワーを1実装で。まず読み(2段が見える・使用先が見える)、次に書き(分類・名前の修正、昇格)
+4. ~~**インベントリUIを立てる**~~ **✅ 2026-08-16 実装**([components/materials/MaterialInventory.tsx](../components/materials/MaterialInventory.tsx))。絵コンテ下とマッピング段ドロワーが**同じ要素**を描く。2段が見え、`assets/<category>/` のディレクトリ表示、各行に種別・由来・寸法・**使用先**が出て、**分類はプルダウンで直せる**(`PATCH /api/brands/[id]/materials/[materialId]` が `category_source='user'` を立て、以後の実行が上書きしない)
+   - **使用先の導出は [lib/event-cm/material-usage.ts](../lib/event-cm/material-usage.ts)**。`take_inputs.role` では答えられない——47件中27件が `brief_source` で、それは「読ませるために上げた」であって「映像のここに出る」ではない。**ポインタを持っていることが使われていること**なので、ブリーフのどのパスに `material:` があるかが答え([collectMaterialPaths](../lib/takes/material-uri.ts))。シーン名は `EVENT_CM_SCENE_LABELS` から採るので、絵コンテと同じ言葉になる
+   - **名前は未対応**(段階3)。表示名はまだ `label` そのままで、`sake/AdobeStock_1894358160.jpeg` のような名前が並ぶ。ディレクトリの枠は先にできたので、段階3は名前だけを差し替える
+   - **昇格(「ブランドの基盤へ」)は未実装**。段階5
 5. **基盤を実在させる**(§7.3)。昇格UI・取り込み時の「基盤に登録しますか」・canonical スロットの指名
 6. **注入とオフ**(§7.1)。Take 作成時の基盤インストール、役割単位の上書き表示、基盤まるごとオフ
 7. **派生とトリミング**。`derived_from_material_id` に最初の使い手を作る

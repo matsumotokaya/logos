@@ -35,6 +35,42 @@ export function collectMaterialIds(value: unknown, ids = new Set<string>()): Set
 }
 
 /**
+ * The same walk, keeping WHERE each pointer was found.
+ *
+ * The inventory has to answer 「この素材はどこで使われているか」, and
+ * `take_inputs.role` cannot answer it: 27 of the 47 pins say `brief_source`,
+ * which means "somebody uploaded this to be read", not "the film shows it
+ * here". The brief is the only thing that knows, because holding the pointer
+ * IS being used.
+ *
+ * Paths come back in dotted form with array indices (`guests.0.photo`), which
+ * is what a template's own vocabulary translates into a scene name. One
+ * material can appear more than once — a mark really is in three scenes — so
+ * the value is a list and duplicates are kept.
+ */
+export function collectMaterialPaths(
+  value: unknown,
+  paths = new Map<string, string[]>(),
+  at = "",
+): Map<string, string[]> {
+  if (typeof value === "string" && value.startsWith(MATERIAL_URI_PREFIX)) {
+    const id = value.slice(MATERIAL_URI_PREFIX.length);
+    const found = paths.get(id);
+    if (found) found.push(at);
+    else paths.set(id, [at]);
+  } else if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      collectMaterialPaths(item, paths, at ? `${at}.${index}` : String(index)),
+    );
+  } else if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) {
+      collectMaterialPaths(item, paths, at ? `${at}.${key}` : key);
+    }
+  }
+  return paths;
+}
+
+/**
  * Rewrite every `material:<uuid>` leaf through `resolve`.
  *
  * Returning null from `resolve` leaves the pointer untouched, so an unresolved

@@ -57,6 +57,8 @@ import { eventCmGoalState } from "@/lib/pipeline/event-cm";
 import type { TakeRunRecord } from "@/app/api/brands/[id]/videos/[videoId]/runs/route";
 import PipelineBar from "@/components/pipeline/PipelineBar";
 import StageDrawer from "@/components/pipeline/StageDrawer";
+import MaterialInventory from "@/components/materials/MaterialInventory";
+import type { InventoryPayload } from "@/app/api/brands/[id]/videos/[videoId]/inventory/route";
 import VideoPipelinePanel, {
   type VideoPipelinePayload,
 } from "@/components/pipeline/VideoPipelinePanel";
@@ -235,6 +237,7 @@ export default function BrandVideoDetail({
   >(null);
   const [openStage, setOpenStage] = useState<string | null>(null);
   const [sources, setSources] = useState<BriefSource[]>([]);
+  const [inventory, setInventory] = useState<InventoryPayload | null>(null);
   const [runs, setRuns] = useState<TakeRunRecord[]>([]);
   const [runCards, setRunCards] = useState<RunCard[]>([]);
 
@@ -564,6 +567,37 @@ export default function BrandVideoDetail({
     setRuns(body.runs ?? []);
   }, [brandId, videoId]);
 
+  const loadInventory = useCallback(async () => {
+    const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/inventory`);
+    if (!res.ok) return;
+    setInventory((await res.json()) as InventoryPayload);
+  }, [brandId, videoId]);
+
+  // Correcting a classification is a whole-library edit, not a video edit: the
+  // material belongs to the brand, so the answer follows it into every other
+  // deliverable that pins it. Failing quietly is not an option — the row would
+  // snap back on the next load with no explanation — so the error goes to the
+  // page's inline band rather than replacing the screen (§9.1).
+  const classifyMaterial = useCallback(
+    async (materialId: string, category: string | null) => {
+      try {
+        const res = await videoFetch(`/api/brands/${brandId}/materials/${materialId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category }),
+        });
+        if (!res.ok) {
+          const json = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(json?.error ?? "分類を保存できませんでした");
+        }
+        await loadInventory();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "分類を保存できませんでした");
+      }
+    },
+    [brandId, loadInventory],
+  );
+
   // Kept off the synchronous effect path, same as the take load: setting state
   // during the effect body triggers cascading renders.
   useEffect(() => {
@@ -574,11 +608,12 @@ export default function BrandVideoDetail({
       if (cancelled) return;
       await loadSources();
       if (!cancelled) await loadRuns();
+      if (!cancelled) await loadInventory();
     })();
     return () => {
       cancelled = true;
     };
-  }, [resolved, loadSources, loadRuns]);
+  }, [resolved, loadSources, loadRuns, loadInventory]);
 
   async function submitSource(
     init: RequestInit,
@@ -1197,12 +1232,29 @@ export default function BrandVideoDetail({
             }
             facts={
               video?.template === "event-cm" && video.brief ? (
-                <FactList
-                  brief={video.brief as EventCmBrief}
-                  goalFields={eventCmGoalState(video.brief as EventCmBrief).fields}
-                  busy={saving}
-                  onEdit={(edit) => void editFact(edit)}
-                />
+                <div className="flex flex-col gap-6">
+                  <FactList
+                    brief={video.brief as EventCmBrief}
+                    goalFields={eventCmGoalState(video.brief as EventCmBrief).fields}
+                    busy={saving}
+                    onEdit={(edit) => void editFact(edit)}
+                  />
+                  {/* The whole-brief view belongs here, and so does the whole
+                      material list: this stage is where mapping is inspected.
+                      Identical element to the one under the storyboard (§9.2) —
+                      a second implementation is how the two would drift. */}
+                  <div className="border-t border-hairline pt-5">
+                    <h3 className="text-sm font-medium text-ink">素材</h3>
+                    <p className="mb-3 text-[11px] text-ink-faint">
+                      この動画に入っている素材と、ブランドが持っている素材。
+                    </p>
+                    <MaterialInventory
+                      payload={inventory}
+                      busy={saving}
+                      onClassify={(id, category) => void classifyMaterial(id, category)}
+                    />
+                  </div>
+                </div>
               ) : undefined
             }
             // No override: the stage's own line already says what this step is
@@ -1484,6 +1536,15 @@ export default function BrandVideoDetail({
           imageSources={sources.filter(
             (source) => source.kind === "photo" || source.kind === "logo",
           )}
+          // The same element the mapping drawer renders, so the board and the
+          // drawer cannot come to disagree about what this video is made of.
+          inventory={
+            <MaterialInventory
+              payload={inventory}
+              busy={saving}
+              onClassify={(id, category) => void classifyMaterial(id, category)}
+            />
+          }
           writing={saving}
         />
       ) : video.template === "event-promo" && video.brief ? (

@@ -71,6 +71,7 @@ export default function EventCmWorkspace({
   onRewriteScenario,
   imageSources = [],
   materialUrls,
+  inventory,
   writing,
 }: {
   brief: EventCmBrief;
@@ -102,6 +103,15 @@ export default function EventCmWorkspace({
   /** `material:<uuid>` → the signed URL it became, as the server resolved it.
    *  Inverted by the board so a slot can name the file it holds. */
   materialUrls?: Record<string, string>;
+  /**
+   * The material inventory, drawn under the board.
+   *
+   * Passed in rather than fetched here, for the same reason the pipeline drawer
+   * takes its sections as nodes: this component knows about the film, not about
+   * endpoints. It is the same element the mapping drawer renders (§9.2), so the
+   * two surfaces cannot drift.
+   */
+  inventory?: React.ReactNode;
   writing?: boolean;
 }) {
   const goal = eventCmGoalState(brief);
@@ -313,6 +323,26 @@ export default function EventCmWorkspace({
           {goal.provisional.map((field) => field.label).join("、")}）。各シーンの
           「仮」の項目を開くと直せます。
         </p>
+      ) : null}
+
+      {/* The inventory sits under the board because the board answers 「どこに
+          載るか」 and this answers 「何を持っているか」 — adjacent questions, and
+          a reader who has just seen a scene wants to know what else is on hand.
+
+          Two tiers, because the injection has two layers: this deliverable's
+          material, and the brand's base that every deliverable starts from
+          (docs/asset-normalization.md §7, §9.1). */}
+      {inventory ? (
+        <section className="flex w-full max-w-5xl flex-col gap-3 border-t border-hairline pt-6">
+          <div>
+            <h3 className="text-sm font-medium text-ink">素材</h3>
+            <p className="text-[11px] text-ink-faint">
+              この動画が使っているものと、ブランドが持っているもの。分類はここで直せます。
+              どのシーンに置くかは、上の絵コンテでシーンを開いて選びます。
+            </p>
+          </div>
+          {inventory}
+        </section>
       ) : null}
     </div>
   );
