@@ -51,8 +51,20 @@ test("読めなかった画像は other ではなく null", () => {
 
 test("未分類は「未分類」と言う（勝手に その他 にしない）", () => {
   assert.equal(materialCategoryLabel(null), "未分類");
-  assert.equal(materialCategoryLabel("person"), "人物");
+  assert.equal(materialCategoryLabel("person"), "人物の写真");
   assert.equal(materialCategoryLabel("存在しない値"), "未分類");
   assert.equal(isMaterialCategory("other"), true);
   assert.equal(isMaterialCategory("price"), false);
+});
+
+test("呼び名がファイルであることを名乗る（情報と読み違えられない）", () => {
+  // 「場所」は会場フィールドのことに読めるが、「場所の写真」は読めない。
+  // §5 の区別を、仕様書を読んでいない人にも呼び名だけで伝えるため。
+  for (const category of ["person", "product", "screen", "place", "scenery"] as const) {
+    const label = MATERIAL_CATEGORY_LABELS[category];
+    assert.ok(
+      label.endsWith("の写真") || label.endsWith("の画像"),
+      `${category} の呼び名「${label}」がファイルであることを名乗っていない`,
+    );
+  }
 });

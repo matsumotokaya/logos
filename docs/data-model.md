@@ -79,6 +79,14 @@ Organization詳細ページにはロゴ・パレット・タイポ等のBrand Pr
 
 MaterialのscopeはBrand、Work、Takeのいずれか。R2オブジェクトのchecksumとサイズを保存し、`take_inputs`がroleとchecksumを固定する。レンダー時に「現在のBrand素材」を再解決せず、Takeが固定した入力だけを使う。
 
+**ファイルと情報は別の軸で分類する**(正本は [asset-normalization.md §5](asset-normalization.md))。
+
+- **ファイル**(`brand_materials`)は**サービス全体で共通の1つの絶対軸**で分類する。`category` は「何が写っているか」で、テンプレートと無関係に真(`kind` は媒体、`category` は内容、`opaque`/`luminance`/`width` は測定値。migration 0052・0053)
+- **情報**は**テンプレートごとのオントロジー**が持つ。イベントは会場・参加費・プログラム、LPは料金プラン・お客様の声・FAQ——共通の一覧は作らない。実体はTakeの`brief`で、成果物を越えるものだけBrandKnowledgeへ上がる
+- **どのスロットにどのファイルを置くか**も情報の側(`brief`のスロット、`take_inputs.role`)。だから「キービジュアル」は`category`の値になり得ない
+
+判定は**開けるものか、読むものか**。`brand_materials`はバイト列の無い行を作れない(0028 `materials_has_body`)ので、価格や会場名に行を与えようとすると、その値を入れるためのファイルを作ることになる。
+
 Takeは以下を必須とする。
 
 - `tool_kind`
