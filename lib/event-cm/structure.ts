@@ -3,6 +3,7 @@ import "server-only";
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { LLM_BUDGET, parseOrExplain } from "@/lib/llm";
+import { MATERIAL_CATEGORIES } from "@/lib/materials/category";
 import { z } from "zod";
 import type { ExtractedSource } from "./extract";
 import { sanitizeFacts, type SanitizeReport } from "./sanitize";
@@ -74,7 +75,10 @@ const SYSTEM = `あなたはイベント告知資料の読み取り担当です�
 
 画像には【画像 ラベル / ID: xxxx】という見出しが付いています。**渡されたすべての画像について1件ずつ** images に結果を返してください。判定できない画像も unreadable として残し、飛ばさないでください。ref にはその画像のIDをそのまま入れます。
 
-- role: speaker-portrait（人物の顔が主役）/ key-visual（イベント全体の雰囲気・主役の情景）/ scene-photo（実演・展示・会場内の活動）/ venue（会場・空間そのもの）/ logo（主催・協賛のマーク）/ document（文字が主役の資料ページ・チラシ）/ texture（質感・装飾・背景）/ unreadable
+- role: **この動画での使い道**。speaker-portrait（人物の顔が主役）/ key-visual（イベント全体の雰囲気・主役の情景）/ scene-photo（実演・展示・会場内の活動）/ venue（会場・空間そのもの）/ logo（主催・協賛のマーク）/ document（文字が主役の資料ページ・チラシ）/ texture（質感・装飾・背景）/ unreadable
+- category: **この画像に何が写っているか**。使い道とは別に答えてください。person（人物）/ product（製品・サービスそのもの）/ screen（画面・UI・スクリーンショット）/ place（会場・店舗・外観など場所そのもの）/ scenery（情景・雰囲気）/ mark（ロゴ・シンボル）/ graphic（図版・イラスト・図解）/ document（文字が主役の資料）/ texture（質感・装飾）/ other。判定できなければ null
+
+  role と category は別の問いです。同じ写真が、この動画では「key-visual（主役の情景として使う）」で、写っているものは「product（製品そのもの）」ということがあります。category はこの動画と関係なく真であることだけを答えてください。
 - caption: 何が写っているかを一文で
 - visibleText: 画像内で読める文字（キャプション・氏名・社名）。無ければ空配列
 - personName: **画像のキャプション・資料本文・ファイル名から氏名が分かる場合だけ**その氏名。**顔から人物を推測することは絶対にしない。** 根拠が無ければ null
@@ -112,6 +116,17 @@ const ImageReadingSchema = z.object({
     "texture",
     "unreadable",
   ]),
+  /**
+   * The other axis: what the picture contains, regardless of this film.
+   *
+   * Asked separately from `role` because they are different questions that were
+   * being answered by one word. `role` decides placement and stays event-cm's
+   * vocabulary; `category` is stored on the material and has to mean the same
+   * thing to a landing page and a banner (lib/materials/category.ts).
+   *
+   * Nullable so "I could not tell" stays distinguishable from "other".
+   */
+  category: z.enum(MATERIAL_CATEGORIES).nullable(),
   caption: z.string(),
   visibleText: z.array(z.string()),
   personName: z.string().nullable(),

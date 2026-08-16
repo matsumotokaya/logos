@@ -27,6 +27,7 @@ import {
   placeImagesIntoBrief,
   type ImageMaterial,
 } from "@/lib/event-cm/place-images";
+import { storeImageClassifications } from "@/lib/materials/classify";
 import { draftEventCmScenario, eventCmScenarioAvailable } from "@/lib/event-cm/scenario";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
@@ -200,6 +201,19 @@ export async function POST(
       readLabel,
     );
 
+    // What each picture IS goes back to the material, not just into this film.
+    // The model already decided it; leaving the answer in this run's record is
+    // what made the next run pay to decide it again (docs §14-2). Placement
+    // above is the other axis and stays with the take.
+    const classified = await storeImageClassifications(
+      supabase,
+      (steps.facts.images ?? []).map((reading) => ({
+        materialId: reading.ref,
+        category: reading.category ?? null,
+        role: reading.role,
+      })),
+    );
+
     // The scenario is the film's spine: it decides the scene order and the
     // scene lengths, so facts that changed without it are a film narrating a
     // different event. Rewriting it here is what makes 資料 → 事実 →
@@ -261,6 +275,11 @@ export async function POST(
           placed: images.placed.length,
           unused: images.unused.length,
         },
+        // Kept next to the placement so the log answers both axes: where each
+        // picture went, and what the library now knows it is.
+        classified: classified.applied,
+        classificationKeptByUser: classified.keptByUser,
+        ...(classified.note ? { classificationNote: classified.note } : {}),
       },
     });
 

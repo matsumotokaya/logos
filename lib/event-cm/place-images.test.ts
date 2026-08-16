@@ -21,6 +21,9 @@ const WITH_GUESTS: EventCmBrief = {
 
 const reading = (over: Partial<ImageReading> & { ref: string }): ImageReading => ({
   role: "scene-photo",
+  // Placement reads `role`; `category` is the material's own axis and is not
+  // consulted here. Present so the fixture matches the schema.
+  category: null,
   caption: "",
   visibleText: [],
   personName: null,
