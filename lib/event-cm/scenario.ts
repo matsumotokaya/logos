@@ -11,8 +11,10 @@ import {
   eventCmSceneBudget,
   eventCmSceneKey,
   EVENT_CM_TARGET_SECONDS,
+  EVENT_CM_SCENE_LABELS,
   type EventCmBrief,
   type EventCmScenario,
+  type EventCmSceneRole,
   type EventCmSceneStep,
 } from "@/remotion/event-cm/types";
 
@@ -41,36 +43,31 @@ const openai = (): OpenAI => new OpenAI({ timeout: LLM_TIMEOUT_MS, maxRetries: 2
  * on the presenter's logo with music only, and the narration starts by calling
  * the title — an announcement names itself first rather than teasing.
  */
-const ROLE_BRIEFS: Record<
-  string,
-  { label: string; seconds: number; instruction: string }
-> = {
+// The label is not repeated here: the model is told the same scene name the
+// storyboard shows, so a rename cannot leave the two describing one picture
+// differently (remotion/event-cm/types.ts EVENT_CM_SCENE_LABELS).
+const ROLE_BRIEFS: Record<string, { seconds: number; instruction: string }> = {
   title: {
-    label: "タイトル",
     seconds: 4,
     instruction:
       "イベント名を名乗る。主催とシリーズ名を添えてよい。ここが第一声なので、前置きや誘い文句を置かずタイトルコールから入る。",
   },
   value: {
-    label: "価値",
     seconds: 6,
     instruction:
       "なぜこの回に来る価値があるのか。体験として言う。抽象的な理念で終わらせない。",
   },
   program: {
-    label: "プログラム",
     seconds: 6,
     instruction:
       "実際に何が起きるか。**全部は言えません。** 最も具体的で魅力のあるものを選び、流れとして1〜2文で。列挙にしない。",
   },
   guests: {
-    label: "登壇者",
     seconds: 4,
     instruction:
       "誰が話すか。名前と、その人がなぜ聞く価値があるのかを一言で。全員を読み上げなくてよい。",
   },
   cta: {
-    label: "日程・申し込み",
     seconds: 5,
     instruction: "日付と、場所があれば場所、そして次にすること。それだけ。",
   },
@@ -100,8 +97,8 @@ function systemFor(
           : spec.instruction;
       const label =
         step.role === "program" && step.index !== undefined
-          ? `プログラム${step.index + 1}`
-          : spec.label;
+          ? `${EVENT_CM_SCENE_LABELS.program}${step.index + 1}`
+          : EVENT_CM_SCENE_LABELS[step.role as EventCmSceneRole];
       return `- **${key}（${label}・約${spec.seconds}秒 / ${budget.min}〜${budget.max}字）**: ${instruction}`;
     })
     .join("\n");
@@ -279,7 +276,7 @@ ${EVENT_CM_TARGET_SECONDS}秒のCMナレーションを書いてください。`
     ],
     response_format: zodResponseFormat(draftSchemaFor(keys), "event_cm_scenario"),
     }),
-    "シナリオが長さの上限に達しました。コマ数が多いか、事実の量が多すぎます。プログラムを減らすか、資料を整理してからもう一度お試しください",
+    "シナリオが長さの上限に達しました。シーン数が多いか、事実の量が多すぎます。プログラムを減らすか、資料を整理してからもう一度お試しください",
   );
 
   const parsed = response.choices[0]?.message.parsed;

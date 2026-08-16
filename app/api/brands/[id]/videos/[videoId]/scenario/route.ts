@@ -199,7 +199,7 @@ export async function PATCH(
   // This used to demand a line for every narrated picture, which made saving ONE
   // line impossible the moment the film gained a picture nobody had written yet:
   // splitting three programmes into three pictures left two of them blank, so
-  // every single-line save was refused with 「空のコマがあります」. Everything
+  // every single-line save was refused with 「空のシーンがあります」. Everything
   // downstream already handles a missing line: the timeline falls back to that
   // scene's budget, the captions skip it, and `scenarioIsStale` reports that the
   // narration is not finished. So lines with no words are simply not stored, and

@@ -292,7 +292,7 @@ test("全部揃って焼き付け済みなら、やることは無い", () => {
   assert.deepEqual(pendingFilmSteps(brief, brief), []);
 });
 
-test("コマが増えた直後は、シナリオから追いつかせる", () => {
+test("シーンが増えた直後は、シナリオから追いつかせる", () => {
   const brief = spoken(written(SEEDED, "2026-08-14T10:00:00Z"), "2026-08-14T10:05:00Z");
   const withGuest: EventCmBrief = {
     ...brief,
@@ -307,7 +307,7 @@ test("コマが増えた直後は、シナリオから追いつかせる", () =>
   assert.deepEqual(pendingFilmSteps(withGuest, brief), ["scenario", "voice", "bake"]);
 });
 
-test("コマを削除した直後も、シナリオから追いつかせる", () => {
+test("シーンを削除した直後も、シナリオから追いつかせる", () => {
   // The mirror of the test above, and the one that was broken: deleting the
   // speakers is a suppression, and suppressions used not to stamp the facts —
   // so the film lost a picture while every stamp stayed put. The badge said 0,

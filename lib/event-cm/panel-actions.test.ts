@@ -14,7 +14,7 @@ const WITH_GUESTS: EventCmBrief = {
   guests: [{ name: "宮尾 佳明", role: "宮尾酒造 十一代目当主", photo: null }],
 };
 
-test("登壇者のコマは削除できる（値は残るので戻せる）", () => {
+test("登壇者のシーンは削除できる（値は残るので戻せる）", () => {
   const decision = panelDeletion(WITH_GUESTS, { role: "guests" });
   assert.equal(decision.can, true);
   assert.equal(decision.can && decision.kind, "suppress");
@@ -41,7 +41,7 @@ test("最後のプログラムは削除できない（空の枠が残るだけ�
   assert.match(decision.can === false ? decision.reason : "", /1つ残ります/);
 });
 
-test("構成が固定のコマは削除できず、理由を言う", () => {
+test("構成が固定のシーンは削除できず、理由を言う", () => {
   for (const role of ["logoIn", "title", "value", "cta", "logoOut"] as const) {
     const decision = panelDeletion(SEEDED, { role });
     assert.equal(decision.can, false, `${role} が削除できることになっている`);

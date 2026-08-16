@@ -48,11 +48,11 @@ export async function DELETE(
   const role = url.searchParams.get("role") ?? "";
   const rawIndex = url.searchParams.get("index");
   if (!isSceneRole(role)) {
-    return Response.json({ error: "コマを指定してください" }, { status: 400 });
+    return Response.json({ error: "シーンを指定してください" }, { status: 400 });
   }
   const index = rawIndex === null ? undefined : Number(rawIndex);
   if (index !== undefined && !Number.isInteger(index)) {
-    return Response.json({ error: "コマを指定してください" }, { status: 400 });
+    return Response.json({ error: "シーンを指定してください" }, { status: 400 });
   }
 
   const { data: take, error } = await supabase
@@ -100,7 +100,7 @@ export async function DELETE(
   const validated = validateBrief("event-cm", next);
   if (!validated.ok) {
     return Response.json(
-      { error: `コマを削除できません: ${validated.issues.join(", ")}` },
+      { error: `シーンを削除できません: ${validated.issues.join(", ")}` },
       { status: 400 },
     );
   }

@@ -88,7 +88,7 @@ export async function POST(
         error:
           scenes.length === 0
             ? "先にシナリオを書いてください"
-            : `シナリオが書かれていないコマがあります（${scenes.length}/${expected}コマ）。残りを書いてから読み上げてください`,
+            : `シナリオが書かれていないシーンがあります（${scenes.length}/${expected}シーン）。残りを書いてから読み上げてください`,
       },
       { status: 409 },
     );

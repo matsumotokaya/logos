@@ -50,25 +50,50 @@ import type { CmVoiceTrackOf } from "@/lib/campaign/cm-types";
  * evening, what happens, who speaks, and when.
  */
 export const EVENT_CM_SCENES = [
-  /** 提供 — the presenter's mark, alone. Music only. */
+  /** オープニング — the presenter's mark, alone. Music only. */
   { role: "logoIn", narrated: false, optional: false },
-  /** 主題 — the title screen, and the narration that calls it. */
+  /** タイトル — the title screen, and the narration that calls it. */
   { role: "title", narrated: true, optional: false },
-  /** 価値 — why attend. The one promise the evening makes. */
+  /** テーマ — why attend. The one promise the evening makes. */
   { role: "value", narrated: true, optional: false },
-  /** 中身 — what actually happens. */
+  /** アジェンダ — what actually happens. */
   { role: "program", narrated: true, optional: false },
-  /** 登壇 — who speaks. Dropped entirely when nobody is announced: a picture
-   *  with no people in it is not a speaker line-up, and a scenario line about
-   *  guests who do not exist is worse than silence. */
+  /** 登壇者紹介 — who speaks. Dropped entirely when nobody is announced: a
+   *  picture with no people in it is not a speaker line-up, and a scenario line
+   *  about guests who do not exist is worse than silence. */
   { role: "guests", narrated: true, optional: true },
-  /** 行動 — when, where, and what to do. */
+  /** CTA — when, where, and what to do. */
   { role: "cta", narrated: true, optional: false },
-  /** 余韻 — the mark again, fading. Music only. */
+  /** エンドカード — the mark again, fading. Music only. */
   { role: "logoOut", narrated: false, optional: false },
 ] as const;
 
 export type EventCmSceneRole = (typeof EVENT_CM_SCENES)[number]["role"];
+
+/**
+ * What each scene is called, on screen and in the prompts.
+ *
+ * The roles above are the contract and stay English. This is the vocabulary the
+ * template is *discussed* in — by whoever reads the storyboard, by the refusal
+ * messages, and by the scenario prompt. It used to live in two tables (the
+ * storyboard's own and the prompt's `ROLE_BRIEFS`), which is a way of saying the
+ * screen and the model could be given different names for the same picture.
+ *
+ * The words are an event's, not this tool's: an opening card, a theme, an
+ * agenda, the speakers, the call to action, an end card. `program` is the one
+ * split on purpose — the *values* stay プログラム wherever they are listed,
+ * because that is what the organiser wrote, while アジェンダ names the picture
+ * they go on. A seminar has an agenda; it does not have a 「価値」.
+ */
+export const EVENT_CM_SCENE_LABELS: Record<EventCmSceneRole, string> = {
+  logoIn: "オープニング",
+  title: "タイトル",
+  value: "テーマ",
+  program: "アジェンダ",
+  guests: "登壇者紹介",
+  cta: "CTA",
+  logoOut: "エンドカード",
+};
 
 /** Every scene the template can produce, in film order. */
 export const EVENT_CM_SCENE_ROLES = EVENT_CM_SCENES.map(

@@ -227,12 +227,12 @@ export default function EventCmWorkspace({
           <p>
             {stale === "facts"
               ? "資料や項目が変わったあと、シナリオが書き直されていません。いまの映像は、変わる前の内容を語っています。"
-              : "映像のコマとシナリオの行が合っていません。"}
+              : "映像のシーンとシナリオの行が合っていません。"}
             {storyboard.orphanLines.length > 0
-              ? "いま映像に無いコマの行が残っています。"
+              ? "いま映像に無いシーンの行が残っています。"
               : null}
             {storyboard.panels.some((panel) => panel.narrated && !panel.scenario)
-              ? "シナリオが書かれていないコマがあります。"
+              ? "シナリオが書かれていないシーンがあります。"
               : null}
           </p>
           {storyboard.orphanLines.length > 0 ? (
@@ -310,7 +310,7 @@ export default function EventCmWorkspace({
       {goal.provisional.length > 0 ? (
         <p className="w-full max-w-5xl text-[12px] text-amber-800">
           {goal.provisional.length}件はこちらで仮に決めた値です（
-          {goal.provisional.map((field) => field.label).join("、")}）。各コマの
+          {goal.provisional.map((field) => field.label).join("、")}）。各シーンの
           「仮」の項目を開くと直せます。
         </p>
       ) : null}

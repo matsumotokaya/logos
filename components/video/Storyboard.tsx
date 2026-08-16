@@ -33,6 +33,7 @@ import { focusPosition, TREATMENT_FILTER } from "@/remotion/kit/paint";
 import { captionSafeBottom, type Theme } from "@/remotion/kit/theme";
 import {
   EVENT_CM_CHARS_PER_SECOND,
+  EVENT_CM_SCENE_LABELS,
   eventCmSceneBudget,
   eventCmSceneKey,
   type EventCmBrief,
@@ -51,17 +52,10 @@ import type { BriefSource } from "./BriefSourceIntake";
 import { panelDeletion, type PanelDeletion } from "@/lib/event-cm/panel-actions";
 import FactList, { type FactEdit } from "./FactList";
 
-/** Roles are English in the contract; on screen a scene needs a name that says
- *  what it is for. */
-const ROLE_LABELS: Record<string, string> = {
-  logoIn: "提供（ロゴ）",
-  title: "タイトル",
-  value: "価値",
-  program: "プログラム",
-  guests: "登壇者",
-  cta: "日程・申し込み",
-  logoOut: "余韻（ロゴ）",
-};
+/** Roles are English in the contract; the names shown here are the template's
+ *  own vocabulary, and they live with the roles so the screen and the scenario
+ *  prompt cannot drift apart (remotion/event-cm/types.ts). */
+const ROLE_LABELS: Record<string, string> = EVENT_CM_SCENE_LABELS;
 
 const LAYOUT_LABELS: Record<string, string> = {
   "centre-stack": "中央に積む",
@@ -484,7 +478,7 @@ function ScenarioLine({
           setSaved(false);
         }}
         rows={Math.max(2, Math.ceil(draft.length / 34))}
-        aria-label="このコマのシナリオ"
+        aria-label="このシーンのシナリオ"
         className="w-full rounded-xl border border-hairline px-3 py-2.5 text-[13px] leading-relaxed outline-none focus:border-ink"
       />
       <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -518,7 +512,7 @@ function ScenarioLine({
           </span>
         ) : chars > budget.max ? (
           <span className="text-[11px] text-amber-700">
-            長いぶんコマも伸びます（このコマだけで約{seconds}秒）
+            長いぶんシーンも伸びます（このシーンだけで約{seconds}秒）
           </span>
         ) : null}
         {saved ? (
@@ -527,7 +521,7 @@ function ScenarioLine({
           </span>
         ) : !text ? (
           <span className="text-[11px] text-amber-700">
-            このコマのシナリオはまだありません。書いて保存するか、上の「シナリオを書き直す」でまとめて書けます
+            このシーンのシナリオはまだありません。書いて保存するか、上の「シナリオを書き直す」でまとめて書けます
           </span>
         ) : dirty ? (
           <span className="text-[11px] text-ink-faint">
@@ -570,7 +564,7 @@ function PanelDelete({
   if (!decision.can) {
     return (
       <p className="mt-5 border-t border-hairline pt-4 text-[11px] text-ink-faint">
-        このコマは削除できません — {decision.reason}
+        このシーンは削除できません — {decision.reason}
       </p>
     );
   }
@@ -610,7 +604,7 @@ function PanelDelete({
           disabled={busy}
           className="text-[11px] font-semibold text-red-700 hover:underline disabled:opacity-50"
         >
-          このコマを削除する
+          このシーンを削除する
         </button>
       )}
       {failed ? (
@@ -718,7 +712,7 @@ function materialNameOf(
  * the mapping it is read as. The flat list still exists, in the pipeline's
  * マッピング drawer, which is where a whole-brief view belongs.
  *
- * Read-only: values are typed in the panel (「コマを開くとその中身を直せる」),
+ * Read-only: values are typed in the panel (「シーンを開くとその中身を直せる」),
  * and two editable copies of one row is how they end up disagreeing.
  */
 function PanelFacts({
@@ -815,7 +809,7 @@ function PanelCard({
     panel.index === undefined
       ? (ROLE_LABELS[panel.role] ?? panel.role)
       : `${ROLE_LABELS[panel.role] ?? panel.role}${panel.index + 1}`;
-  const title = `コマ${panel.no} ${label}`;
+  const title = `シーン${panel.no} ${label}`;
   // Controlled so a completed action can close it. A destructive action that
   // leaves its own dialog open has not told the user anything happened.
   const [open, setOpen] = useState(false);
@@ -895,7 +889,7 @@ function PanelCard({
               under the closing card because that is where they appear; a
               speaker's portrait goes under the speakers; a logo appears under
               BOTH mark cards, because it really is on screen twice.
-              Read-only here, editable in the panel: 「コマを開くとその中身を
+              Read-only here, editable in the panel: 「シーンを開くとその中身を
               直せる」 stays the one place values are typed. */}
           <PanelFacts
             brief={brief}
@@ -1032,7 +1026,7 @@ export default function Storyboard({
       </div>
 
       <p className="mt-2 tabular-nums text-[12px] text-ink-muted">
-        {storyboard.panels.length}コマ
+        {storyboard.panels.length}シーン
         <span className="mx-1.5 text-ink-faint">|</span>
         {seconds(storyboard.totalMs)}秒
         <span className="mx-1.5 text-ink-faint">|</span>
@@ -1045,7 +1039,7 @@ export default function Storyboard({
         ) : null}
       </p>
       <p className="mt-1 text-[11px] text-ink-faint">
-        絵コンテは「どのコマに何が乗るか」を確認するものです。配置・文字の大きさ・尺・字幕は実際の映像と同じですが、
+        絵コンテは「どのシーンに何が乗るか」を確認するものです。配置・文字の大きさ・尺・字幕は実際の映像と同じですが、
         <strong className="font-semibold">動く墨の地・金の粒子・タイポの動きは描いていません</strong>
         （縮小では再現できないため）。仕上がりはプレイヤーで確認してください。
       </p>

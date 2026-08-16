@@ -42,11 +42,13 @@ export type PanelDeletion =
   | { can: false; reason: string };
 
 const FIXED: Partial<Record<EventCmSceneRole, string>> = {
-  logoIn: "提供のマークは外せません。最初と最後のコマは「誰の動画か」を言う場所です",
-  logoOut: "提供のマークは外せません。最初と最後のコマは「誰の動画か」を言う場所です",
-  title: "タイトルのコマは外せません。告知は自分の名前を先に言います",
-  value: "価値のコマは外せません。来る理由の無い告知になります",
-  cta: "日程・申し込みのコマは外せません。見た人が次にできることが無くなります",
+  logoIn:
+    "提供のマークは外せません。オープニングとエンドカードは「誰の動画か」を言う場所です",
+  logoOut:
+    "提供のマークは外せません。オープニングとエンドカードは「誰の動画か」を言う場所です",
+  title: "タイトルのシーンは外せません。告知は自分の名前を先に言います",
+  value: "テーマのシーンは外せません。来る理由の無い告知になります",
+  cta: "CTAのシーンは外せません。見た人が次にできることが無くなります",
 };
 
 export function panelDeletion(
@@ -58,7 +60,7 @@ export function panelDeletion(
       can: true,
       kind: "suppress",
       path: "guests",
-      confirm: "登壇者のコマを削除します。登壇者の情報は残るので、あとで戻せます",
+      confirm: "登壇者紹介のシーンを削除します。登壇者の情報は残るので、あとで戻せます",
     };
   }
 
@@ -69,8 +71,11 @@ export function panelDeletion(
     if (brief.programs.length <= 1 || panel.index === undefined) {
       return {
         can: false,
+        // アジェンダ names the picture, プログラム the items on it — the split
+        // is deliberate (EVENT_CM_SCENE_LABELS), so a sentence about both uses
+        // both words.
         reason:
-          "プログラムのコマは1つ残ります。内容はこのコマで直せます（プログラムが2つ以上あるときは、1つずつ削除できます）",
+          "アジェンダのシーンは1つ残ります。内容はこのシーンで直せます（プログラムが2つ以上あるときは、1つずつ削除できます）",
       };
     }
     return {
@@ -81,5 +86,5 @@ export function panelDeletion(
     };
   }
 
-  return { can: false, reason: FIXED[panel.role] ?? "このコマは削除できません" };
+  return { can: false, reason: FIXED[panel.role] ?? "このシーンは削除できません" };
 }

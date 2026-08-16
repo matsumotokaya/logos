@@ -236,15 +236,15 @@ test("シナリオは1行だけでも保存できる（書きかけは正常な�
   // What the PATCH endpoint does now, as data. It used to demand a line for
   // every narrated picture, so the moment the film gained a picture nobody had
   // written yet — three programmes replacing one — every single-line save was
-  // refused with 「空のコマがあります」.
+  // refused with 「空のシーンがあります」.
   const brief: EventCmBrief = {
     ...SEEDED,
     scenario: { version: 1, source: "llm", updatedAt: NOW, angle: "", scenes: [] },
   };
   const steps = eventCmNarratedSteps(brief);
-  assert.ok(steps.length > 2, "このブリーフは複数のコマを持つ");
+  assert.ok(steps.length > 2, "このブリーフは複数のシーンを持つ");
 
-  const edited = new Map([[eventCmSceneKey(steps[2]), "3コマ目だけ書いた"]]);
+  const edited = new Map([[eventCmSceneKey(steps[2]), "3シーン目だけ書いた"]]);
   const scenes = steps
     .map((step) => ({
       role: step.role,
@@ -277,7 +277,7 @@ test("消した項目は、映像の形の判定にも反映される", () => {
   };
   assert.ok(
     eventCmNarratedSteps(withGuests).some((step) => step.role === "guests"),
-    "登壇者が居ればそのコマがある",
+    "登壇者が居ればそのシーンがある",
   );
 
   // Deleted first, written afterwards — which is the real order, and the order
@@ -287,7 +287,7 @@ test("消した項目は、映像の形の判定にも反映される", () => {
   assert.equal(
     eventCmNarratedSteps(off).some((step) => step.role === "guests"),
     false,
-    "消した登壇者のコマがまだ数えられている",
+    "消した登壇者のシーンがまだ数えられている",
   );
 
   // A scenario written for the film as drawn is therefore not stale.

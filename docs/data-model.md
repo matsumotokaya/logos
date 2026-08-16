@@ -110,7 +110,7 @@ Takeは以下を必須とする。
 
 | フィールド | 実体 | 型 |
 | --- | --- | --- |
-| `brief.scenario` | 各コマの**主文**。字幕・尺・シーン構成を規定する**主**(旧 `brief.script`) | `EventCmScenario`([../remotion/event-cm/types.ts](../remotion/event-cm/types.ts)) |
+| `brief.scenario` | 各シーンの**主文**。字幕・尺・シーン構成を規定する**主**(旧 `brief.script`) | `EventCmScenario`([../remotion/event-cm/types.ts](../remotion/event-cm/types.ts)) |
 | — (導出) | 字幕。`scenario`を28字カードへ割った表示単位で、DBには持たない | [../remotion/event-cm/captions.ts](../remotion/event-cm/captions.ts) |
 | `brief.voice` | **読み上げ**。`scenario`を声にした派生物で、BGMと同じくオフにできる(オフは`provenance.voice`のsuppressionとして記録) | `{ track, audio: "material:<uuid>" }` |
 

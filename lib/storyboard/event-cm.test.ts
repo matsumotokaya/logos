@@ -95,7 +95,7 @@ test("映像はロゴで始まりロゴで終わる", () => {
   );
 });
 
-test("ロゴのコマは無音で、それ以外は必ず1行を持つ", () => {
+test("ロゴのシーンは無音で、それ以外は必ず1行を持つ", () => {
   // One message per picture. The two mark scenes are the only silent ones, and
   // they are silent by design rather than because nothing was written.
   const storyboard = eventCmStoryboard(briefWith({ guests: GUESTS }));
@@ -111,7 +111,7 @@ test("ロゴのコマは無音で、それ以外は必ず1行を持つ", () => {
   }
 });
 
-test("1つの字幕が2つのコマにまたがらない", () => {
+test("1つの字幕が2つのシーンにまたがらない", () => {
   // The whole reason the structure changed: a line that ran across a cut made
   // the storyboard and the film disagree about how many pictures there are.
   const storyboard = eventCmStoryboard(briefWith({ guests: GUESTS }));
@@ -120,17 +120,17 @@ test("1つの字幕が2つのコマにまたがらない", () => {
       assert.ok(
         caption.fromMs >= panel.fromMs &&
           caption.toMs <= panel.fromMs + panel.durationMs,
-        `コマ${panel.no}の外へ出る字幕: ${caption.text}`,
+        `シーン${panel.no}の外へ出る字幕: ${caption.text}`,
       );
     }
   }
   const texts = storyboard.panels.flatMap((panel) =>
     panel.captions.map((caption) => caption.text),
   );
-  assert.equal(new Set(texts).size, texts.length, "同じ字幕が2コマに出ている");
+  assert.equal(new Set(texts).size, texts.length, "同じ字幕が2シーンに出ている");
 });
 
-test("登壇者が居なければそのコマは無い", () => {
+test("登壇者が居なければそのシーンは無い", () => {
   const withGuests = eventCmStoryboard(briefWith({ guests: GUESTS }));
   const withoutGuests = eventCmStoryboard(briefWith({ guests: [] }));
   assert.equal(withGuests.panels.length, withoutGuests.panels.length + 1);
@@ -140,9 +140,9 @@ test("登壇者が居なければそのコマは無い", () => {
   );
 });
 
-test("通し番号はラベルであって、コマの identity ではない", () => {
+test("通し番号はラベルであって、シーンの identity ではない", () => {
   // The speakers' picture sits before the closing one, so removing it moves the
-  // number under the picture that follows. Anything that had remembered「コマ6」
+  // number under the picture that follows. Anything that had remembered「シーン6」
   // would now be pointing at a different picture — which is why the number is a
   // string: it cannot be passed where `index` (which programme) is wanted, and
   // it cannot quietly become a React key or an API argument.
@@ -155,7 +155,7 @@ test("通し番号はラベルであって、コマの identity ではない", (
   assert.equal(typeof numberOfCta(withGuests), "string");
 });
 
-test("コマの境目は隙間なく続き、最後は尺で終わる", () => {
+test("シーンの境目は隙間なく続き、最後は尺で終わる", () => {
   const storyboard = eventCmStoryboard(briefWith({ guests: GUESTS }));
   storyboard.panels.forEach((panel, index) => {
     if (index === 0) {
@@ -166,14 +166,14 @@ test("コマの境目は隙間なく続き、最後は尺で終わる", () => {
     assert.equal(
       panel.fromMs,
       previous.fromMs + previous.durationMs,
-      `コマ${panel.no}の開始が前のコマの終わりと一致しない`,
+      `シーン${panel.no}の開始が前のシーンの終わりと一致しない`,
     );
   });
   const last = storyboard.panels[storyboard.panels.length - 1];
   assert.equal(last.fromMs + last.durationMs, storyboard.totalMs);
 });
 
-test("ロゴのコマの尺はイントロ・アウトロの固定値", () => {
+test("ロゴのシーンの尺はイントロ・アウトロの固定値", () => {
   const storyboard = eventCmStoryboard(briefWith({ guests: GUESTS }));
   assert.equal(storyboard.panels[0].durationMs, EVENT_CM_INTRO_MS);
   assert.equal(
@@ -182,7 +182,7 @@ test("ロゴのコマの尺はイントロ・アウトロの固定値", () => {
   );
 });
 
-test("ロゴのコマは主催のマークを見せ、画像が無くても欠けにはならない", () => {
+test("ロゴのシーンは主催のマークを見せ、画像が無くても欠けにはならない", () => {
   // The seeded brief has no logo image. The `logo` component is not "empty" in
   // that case — it has a name, and a name is what it sets, as a mincho credit.
   // So the block reads as filled and the missing *image* is reported per figure.
@@ -191,7 +191,7 @@ test("ロゴのコマは主催のマークを見せ、画像が無くても欠�
   const storyboard = eventCmStoryboard(briefWith());
   const blocks = storyboard.panels[0].regions.flatMap((region) => region.blocks);
   const logo = blocks.find((block) => block.kind === "logo");
-  assert.ok(logo, "冒頭のコマにロゴが無い");
+  assert.ok(logo, "冒頭のシーンにロゴが無い");
   assert.equal(logo.state, "filled");
   assert.equal(logo.figures.length, 1);
   assert.equal(logo.figures[0].hasAsset, false);
@@ -214,7 +214,7 @@ test("値のある部品は、どのフィールドを映しているか言え�
     .flatMap((region) => region.blocks)
     .find((block) => block.kind === "heading");
 
-  assert.ok(heading, "タイトルのコマに見出しがない");
+  assert.ok(heading, "タイトルのシーンに見出しがない");
   assert.equal(heading.state, "filled");
   assert.deepEqual(
     heading.fields.map((field) => field.path),
@@ -263,7 +263,7 @@ test("写真の無い登壇者は「消える」ではなく「代替で描か�
   );
 });
 
-test("会場が無いコマは、空欄ではなく最初から存在しない", () => {
+test("会場が無いシーンは、空欄ではなく最初から存在しない", () => {
   // deliverable-architecture §17.2 — 未定を「未定」と書かない。
   const brief = briefWith();
   const storyboard = eventCmStoryboard({
@@ -295,10 +295,10 @@ test("仮に入れた値は映画全体で1回ずつ数える", () => {
     ),
   ).length;
 
-  assert.ok(showingLogos >= 3, `ロゴを映すコマが${showingLogos}枚しかない`);
+  assert.ok(showingLogos >= 3, `ロゴを映すシーンが${showingLogos}枚しかない`);
   assert.ok(
     storyboard.counts.provisional < summed,
-    "同じ項目が複数のコマに出ているのに、件数が合計と同じになっている",
+    "同じ項目が複数のシーンに出ているのに、件数が合計と同じになっている",
   );
   assert.ok(storyboard.counts.provisional > 0);
 });
@@ -308,7 +308,7 @@ test("絵コンテの尺はタイムラインと同じものを見ている", ()
   assert.equal(eventCmStoryboard(brief).totalMs, eventCmTimeline(brief).totalMs);
 });
 
-test("写真のあるコマは、その写真を絵コンテでも敷く", () => {
+test("写真のあるシーンは、その写真を絵コンテでも敷く", () => {
   const brief = briefWith({
     visuals: {
       value: { src: "material:key", focus: { x: 0.5, y: 0.4 } },
@@ -344,7 +344,7 @@ test("地はどのフィールドから来たかを言えるので、その場�
   assert.equal(field?.editable, true);
 });
 
-test("登壇者のコマは、一人ひとりの写真を直せる場所として差し出す", () => {
+test("登壇者のシーンは、一人ひとりの写真を直せる場所として差し出す", () => {
   const panel = eventCmStoryboard(briefWith({ guests: GUESTS })).panels.find(
     (entry) => entry.role === "guests",
   );
@@ -459,7 +459,7 @@ test("登壇者の写真も、絵コンテがその画像を持つ", () => {
   assert.equal(figures[1].hasAsset, false);
 });
 
-test("コマが喋るかどうかは映像の形で決まる（シナリオの有無ではない）", () => {
+test("シーンが喋るかどうかは映像の形で決まる（シナリオの有無ではない）", () => {
   // The bug this exists to catch: three programme pictures appeared silent —
   // no line, no subtitle, no editor to write one in — because the stored scenario
   // still held a single unindexed `program` line. A picture that speaks speaks

@@ -253,7 +253,7 @@ test("すべての配置が実際に使われているわけではない（未�
   assert.ok(unused.length > 0);
 });
 
-test("プログラムが複数あれば、1つずつ1コマで紹介する", () => {
+test("プログラムが複数あれば、1つずつ1シーンで紹介する", () => {
   const plan = eventCmScenePlan(SAKE);
   const roles = plan.map((step) => step.role);
   // Three programmes, three programme pictures — and the speaker scene still
@@ -284,11 +284,11 @@ test("プログラムが複数あれば、1つずつ1コマで紹介する", () 
   assert.equal(stat?.kind === "stat" ? stat.unit : null, "/ 3");
   for (const scene of [sceneForRole("program", SAKE, 0), second]) {
     const fit = fitScene(scene.components, SUMI_THEME);
-    assert.deepEqual(fit.dropped, [], "プログラムのコマで部品が落ちている");
+    assert.deepEqual(fit.dropped, [], "プログラムのシーンで部品が落ちている");
   }
 });
 
-test("プログラムが1つなら、コマも1つ（既存のTakeは変わらない）", () => {
+test("プログラムが1つなら、シーンも1つ（既存のTakeは変わらない）", () => {
   const one: EventCmBrief = { ...SAKE, programs: [SAKE.programs[0]] };
   const plan = eventCmScenePlan(one);
   assert.equal(plan.filter((step) => step.role === "program").length, 1);
@@ -298,7 +298,7 @@ test("プログラムが1つなら、コマも1つ（既存のTakeは変わら�
   assert.ok(scene.components.some((component) => component.kind === "list"));
 });
 
-test("プログラムのコマは、その分だけシナリオの行を要求する", () => {
+test("プログラムのシーンは、その分だけシナリオの行を要求する", () => {
   const steps = eventCmNarratedSteps(SAKE);
   assert.deepEqual(steps.map(eventCmSceneKey), [
     "title",

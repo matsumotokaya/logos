@@ -470,7 +470,7 @@ export default function BrandVideoDetail({
   }): Promise<boolean> {
     const query = new URLSearchParams({ role: scene.role });
     if (scene.index !== undefined) query.set("index", String(scene.index));
-    busy("コマを削除しています…");
+    busy("シーンを削除しています…");
     try {
       const res = await videoFetch(
         `/api/brands/${brandId}/videos/${videoId}/panels?${query}`,
@@ -481,19 +481,19 @@ export default function BrandVideoDetail({
         kind?: "suppress" | "remove-program";
         removed?: string | null;
       } | null;
-      if (!res.ok) throw new Error(json?.error ?? "コマを削除できませんでした");
+      if (!res.ok) throw new Error(json?.error ?? "シーンを削除できませんでした");
       await load();
       setNotice(
         json?.kind === "remove-program"
-          ? `プログラム「${json.removed ?? ""}」のコマを削除しました。言う内容が変わったので、シナリオは書き直しが必要です`
-          : "登壇者のコマを削除しました。登壇者の情報は残っているので、下の一覧から戻せます",
+          ? `プログラム「${json.removed ?? ""}」のシーンを削除しました。言う内容が変わったので、シナリオは書き直しが必要です`
+          : "登壇者のシーンを削除しました。登壇者の情報は残っているので、下の一覧から戻せます",
       );
       return true;
     } catch (e) {
       // The band above the storyboard, which is where the refusal belongs: it
       // carries the template's own sentence ("告知は自分の名前を先に言います")
       // and leaves the page — and anything being typed in it — standing.
-      setError(e instanceof Error ? e.message : "コマを削除できませんでした");
+      setError(e instanceof Error ? e.message : "シーンを削除できませんでした");
       return false;
     } finally {
       idle();
