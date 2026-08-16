@@ -216,7 +216,14 @@ async function produce(
   brief: unknown,
 ): Promise<Buffer> {
   if (templateId === "event-promo" && format === "mp4") {
-    return renderEventMp4(supabase, takeId, brief);
+    return renderEventMp4(supabase, takeId, brief, "event");
+  }
+  // Same production as event-promo — stage the materials, hand the brief over
+  // as props — differing only in which composition reads it. The narrated film
+  // had no arm here at all, so 「MP4を作成」 answered with the not-connected
+  // error while every other surface behaved as though the video existed.
+  if (templateId === "event-cm" && format === "mp4") {
+    return renderEventMp4(supabase, takeId, brief, "event-cm");
   }
   if (templateId === "product-cm" && format === "mp4") {
     return renderProductCmMp4(supabase, takeId, brief);
@@ -281,6 +288,7 @@ async function renderEventMp4(
   supabase: SupabaseClient,
   takeId: string,
   brief: unknown,
+  composition: "event" | "event-cm",
 ): Promise<Buffer> {
   const dir = await mkdtemp(path.join(tmpdir(), "logos-take-"));
   const propsPath = path.join(dir, "props.json");
@@ -289,7 +297,7 @@ async function renderEventMp4(
   try {
     const stagedBrief = await stageBriefMaterials(supabase, takeId, brief, publicDir);
     await writeFile(propsPath, JSON.stringify({ brief: stagedBrief }));
-    await renderRemotionComposition("event", propsPath, outPath, publicDir);
+    await renderRemotionComposition(composition, propsPath, outPath, publicDir);
     return await readFile(outPath);
   } finally {
     await rm(dir, { recursive: true, force: true });
