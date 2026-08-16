@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isR2Configured, putR2Object } from "@/lib/r2";
+import { measureMaterial, measurementColumns } from "@/lib/materials/measure";
 import { materialUri } from "@/lib/takes/materials";
 import { seedEventCmBrief } from "./seed";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
@@ -76,6 +77,11 @@ async function promoteLogoToMaterial(
   const r2Key = `brands/${brandId}/materials/${checksum}/logo.svg`;
   await putR2Object(r2Key, bytes, "image/svg+xml", "private, max-age=0");
 
+  // An SVG master measures too: it is the one mark that is definitely artwork,
+  // so recording that it carries alpha is what lets a later reader distinguish
+  // it from a logo delivered on a JPEG plate (docs/asset-normalization.md §6).
+  const measurement = await measureMaterial(bytes, "image/svg+xml");
+
   const inserted = await supabase
     .from("brand_materials")
     .insert({
@@ -89,6 +95,7 @@ async function promoteLogoToMaterial(
       logo_candidate_id: candidate.id,
       bytes: bytes.length,
       checksum,
+      ...measurementColumns(measurement),
       source_kind: "derived",
       provenance: { source: "logo_master", logo_id: owner.id, promoted_by: userId },
       created_by: userId,

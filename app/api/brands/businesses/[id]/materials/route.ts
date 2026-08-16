@@ -5,6 +5,7 @@ import {
   requireUser,
 } from "@/lib/supabase/server";
 import { deleteR2Object, isR2Configured, putR2Object } from "@/lib/r2";
+import { measureMaterial, measurementColumns } from "@/lib/materials/measure";
 
 /**
  * Material a brand is built from: the PDF of a brand book, a guideline page,
@@ -112,6 +113,9 @@ export async function POST(
 
     await putR2Object(r2Key, buffer, mediaType, "private, max-age=0");
 
+    // Measured while the bytes are in hand (docs/asset-normalization.md §6).
+    const measurement = await measureMaterial(buffer, mediaType);
+
     const inserted = await supabase
       .from("brand_materials")
       .insert({
@@ -124,6 +128,7 @@ export async function POST(
         r2_key: r2Key,
         bytes: buffer.length,
         checksum,
+        ...measurementColumns(measurement),
         source_kind: "upload",
         provenance: { source: "brand_pipeline_input", uploaded_by: user.id },
       })

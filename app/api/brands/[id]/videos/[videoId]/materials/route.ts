@@ -14,6 +14,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { guardLabsRequest } from "@/lib/labs-access";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { deleteR2Object, isR2Configured, putR2Object } from "@/lib/r2";
+import { measureMaterial, measurementColumns } from "@/lib/materials/measure";
 
 const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -241,6 +242,12 @@ export async function POST(
     const r2Key = `brands/${brandId}/takes/${loaded.take.id}/materials/${checksum}`;
     await putR2Object(r2Key, buffer, mediaType, "private, max-age=0");
 
+    // Measured while the bytes are in hand, and kept on the row. Doing it later
+    // means fetching the object back out of R2; doing it per-run means the same
+    // question gets a fresh answer every time, and a wrong one draws a mark as
+    // a white rectangle (docs/asset-normalization.md §6).
+    const measurement = await measureMaterial(buffer, mediaType);
+
     const materialId = randomUUID();
     const inserted = await supabase
       .from("brand_materials")
@@ -255,6 +262,7 @@ export async function POST(
         r2_key: r2Key,
         bytes: buffer.length,
         checksum,
+        ...measurementColumns(measurement),
         source_kind: "upload",
         provenance: {
           source: "video_brief_input",

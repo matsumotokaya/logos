@@ -1,8 +1,9 @@
 // Naming a duplicated take.
 //
-// Separate from duplicate.ts, which is server-only: the rule for what a copy is
-// called is worth testing on its own, and a test cannot import a module that
-// refuses to load outside the server.
+// Separate from duplicate.ts, which does the database work: the rule for what a
+// copy is called is worth testing on its own. (The test runner now resolves
+// server-only to its empty module, so the split is about the seam, not about
+// what a test can load.)
 
 /** 「秋の展示会」→「秋の展示会のコピー」→「秋の展示会のコピー2」…
  *  Copying a copy keeps one suffix rather than stacking them, so a fifth

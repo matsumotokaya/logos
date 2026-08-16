@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { getR2Object } from "@/lib/r2";
+import { measureArtwork } from "@/lib/materials/measure";
 import { SOURCE_ROLE } from "@/app/api/brands/[id]/videos/[videoId]/materials/route";
 
 // Stage ②: reading the material, mechanically.
@@ -31,22 +32,11 @@ export interface ImageFacts {
   /** width / height. Portrait crops and full-bleed grounds want to know. */
   aspect: number;
   /**
-   * Mean luminance of the non-transparent pixels, 0–1.
-   *
-   * Measured rather than asked, because it decides how a mark is drawn on the
-   * ink ground: a dark logo needs knocking out, an already-white one must be
-   * left alone. A model's guess at "is this artwork dark" is a guess; this is
-   * the answer.
+   * Mean luminance of the non-transparent pixels, and whether the artwork has
+   * a plate behind it. Both come from lib/materials/measure.ts, which is also
+   * what intake stores on the row — so a re-read and the stored value agree.
    */
   luminance: number | null;
-  /**
-   * Whether the artwork has no transparency at all.
-   *
-   * Decisive for a mark, and separate from brightness: a logo delivered as a
-   * JPEG is artwork ON A PLATE, and drawing it as supplied on the ink ground
-   * puts a white rectangle in the film. Brightness cannot tell that apart from
-   * a white mark on transparency, because both measure bright.
-   */
   opaque: boolean;
   /** The media type the model is handed, after preparation. */
   sentAs: string;
@@ -126,48 +116,6 @@ async function prepareImage(body: Buffer): Promise<PreparedImage | null> {
     };
   } catch {
     return null;
-  }
-}
-
-/**
- * The artwork's own brightness, and whether it has a plate behind it.
- *
- * Luminance is weighted by opacity — the mark's brightness, not the brightness
- * of the space around it. Opacity is counted at the same time because the two
- * questions have one answer only when read together: a white mark on
- * transparency and a black mark on a white JPEG plate both measure bright, and
- * on an ink ground they need opposite treatments.
- */
-async function measureArtwork(
-  body: Buffer,
-): Promise<{ luminance: number | null; opaque: boolean }> {
-  try {
-    const { data, info } = await sharp(body, { failOn: "none" })
-      .resize(64, 64, { fit: "inside" })
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-
-    let total = 0;
-    let counted = 0;
-    let transparent = 0;
-    for (let i = 0; i + 3 < data.length; i += info.channels) {
-      const alpha = data[i + 3];
-      if (alpha < 32) {
-        transparent += 1;
-        continue;
-      }
-      total += (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) / 255;
-      counted += 1;
-    }
-    return {
-      luminance: counted > 0 ? Number((total / counted).toFixed(3)) : null,
-      // A couple of stray soft pixels do not make artwork cut out; a real
-      // transparent delivery is transparent over most of its frame.
-      opaque: transparent / Math.max(1, transparent + counted) < 0.02,
-    };
-  } catch {
-    return { luminance: null, opaque: true };
   }
 }
 
