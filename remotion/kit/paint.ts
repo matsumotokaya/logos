@@ -6,7 +6,25 @@
 // only while both read the same conversion, so the conversion lives here and
 // nowhere else.
 
+import { staticFile } from "remotion";
 import type { LogoTreatment } from "@/remotion/event/types";
+
+/**
+ * A src the browser can actually fetch.
+ *
+ * Absolute URLs pass through — that is what the in-app player hands over, since
+ * its materials are signed same-origin URLs. A *relative* src is a file in the
+ * project's public directory, and only `staticFile()` knows where the CLI is
+ * serving that from.
+ *
+ * This was an identity function inside KitComponent, which is a bug you cannot
+ * see from the app: every src there is already absolute. It only surfaces in a
+ * CLI render, where materials are staged as relative paths — the audio resolved
+ * (it went through the event template's own copy of this rule) and every logo
+ * and photograph 404'd. One rule, one place, so the two cannot diverge again.
+ */
+export const resolveSrc = (src: string): string =>
+  /^(https?:)?\//.test(src) ? src : staticFile(src);
 
 /**
  * How a mark is made legible on the stage it lands on.

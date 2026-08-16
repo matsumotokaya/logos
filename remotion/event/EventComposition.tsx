@@ -15,11 +15,11 @@ import {
   Img,
   Sequence,
   interpolate,
-  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
 import { Audio } from "@remotion/media";
+import { resolveSrc } from "@/remotion/kit/paint";
 import type { EventBrief, EventGuest, EventLogo, EventPhoto } from "./types";
 import {
   EVENT_DURATION_FRAMES,
@@ -45,10 +45,16 @@ export type EventVideoProps = {
   brief: EventBrief;
 };
 
-/** A src is a staged path, a signed same-origin URL, or a staticFile name. The
- *  first two are already loadable; only the last needs resolving. */
-export const resolveMediaSrc = (src: string): string =>
-  /^(https?:)?\//.test(src) ? src : staticFile(src);
+/**
+ * A src is a staged path, a signed same-origin URL, or a staticFile name. The
+ * first two are already loadable; only the last needs resolving.
+ *
+ * Kept as a name this template already uses, but the rule itself now lives in
+ * the kit (`remotion/kit/paint.ts`) so the renderer and the storyboard cannot
+ * end up with two answers — which is exactly what happened when the kit carried
+ * an identity function instead.
+ */
+export const resolveMediaSrc = resolveSrc;
 
 // ---------- shared motion helpers ----------
 

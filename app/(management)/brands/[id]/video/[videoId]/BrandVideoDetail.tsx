@@ -24,7 +24,8 @@ import EventVideoWorkspace from "@/components/video/EventVideoWorkspace";
 import EventCmWorkspace from "@/components/video/EventCmWorkspace";
 import NarrationDialog from "@/components/video/NarrationDialog";
 import BgmDialog from "@/components/video/BgmDialog";
-import { DEFAULT_ASSETS } from "@/lib/assets/defaults";
+import ProjectExportDialog from "@/components/video/ProjectExportDialog";
+import { DEFAULT_ASSETS, unlicensedDefaults } from "@/lib/assets/defaults";
 import { narrationVoiceByName } from "@/lib/narration/voices";
 import {
   describeChanges,
@@ -355,6 +356,48 @@ export default function BrandVideoDetail({
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "MP4の作成を開始できませんでした");
+    } finally {
+      idle();
+    }
+  }
+
+  /**
+   * Download this video as a Remotion project.
+   *
+   * The zip comes back on an authenticated fetch, so it cannot be a plain link:
+   * `<a href>` sends no Authorization header. Handing the bytes to an object URL
+   * is what turns the response into a file the browser saves. The busy bar is
+   * the usual one — building the zip reads every material out of R2, which is
+   * seconds rather than instant.
+   */
+  async function downloadProject(): Promise<boolean> {
+    busy("プロジェクトデータを書き出しています…");
+    try {
+      const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/project`);
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error ?? "プロジェクトを書き出せませんでした");
+      }
+      const blob = await res.blob();
+      // `filename*` carries the readable name; the ASCII `filename` beside it is
+      // the fallback, and has had every non-ASCII character replaced.
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const encoded = /filename\*=UTF-8''([^;]+)/.exec(disposition)?.[1];
+      const suggested = encoded
+        ? decodeURIComponent(encoded)
+        : /filename="([^"]+)"/.exec(disposition)?.[1];
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = suggested ?? "remotion-project.zip";
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "プロジェクトを書き出せませんでした");
+      return false;
     } finally {
       idle();
     }
@@ -1315,6 +1358,25 @@ export default function BrandVideoDetail({
                 ? "MP4を作り直す"
                 : "MP4を作成"}
           </button>
+          {video.template === "event-cm" ? (
+            <ProjectExportDialog
+              // Which defaults this video uses is decided from the brief's own
+              // pointer, so the dialog names the ones actually at stake instead
+              // of reciting the whole pool.
+              unlicensed={unlicensedDefaults(
+                (() => {
+                  const brief = video.brief as EventCmBrief;
+                  const uriByUrl = new Map(
+                    Object.entries(video.materialUrls ?? {}).map(([uri, url]) => [url, uri]),
+                  );
+                  const bgm = brief?.bgm ? (uriByUrl.get(brief.bgm) ?? brief.bgm) : null;
+                  return bgm ? [bgm] : [];
+                })(),
+              )}
+              ready={Boolean(video.bakedAt)}
+              onDownload={downloadProject}
+            />
+          ) : null}
           <button
             type="button"
             onClick={() => void togglePublished(!video.published)}

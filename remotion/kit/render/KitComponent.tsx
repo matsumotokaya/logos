@@ -22,9 +22,7 @@ import {
 import type { LogoTreatment } from "@/remotion/event/types";
 import type { Theme } from "../theme";
 import { enterStyle } from "./motion";
-import { focusPosition, TREATMENT_FILTER } from "../paint";
-
-const resolveSrc = (src: string): string => src;
+import { focusPosition, resolveSrc, TREATMENT_FILTER } from "../paint";
 
 function typeStyle(theme: Theme, emphasis: Emphasis, display: boolean): React.CSSProperties {
   const step = theme.scale[emphasis];

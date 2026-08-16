@@ -17,7 +17,7 @@ import {
   type SceneBackdrop,
 } from "../layout";
 import { fitScene } from "../fit";
-import { focusPosition } from "../paint";
+import { focusPosition, resolveSrc } from "../paint";
 import { captionSafeBottom, type Theme } from "../theme";
 import { KitComponent } from "./KitComponent";
 import { enterDelay, sceneFade } from "./motion";
@@ -48,7 +48,7 @@ const Backdrop: React.FC<{
   return (
     <AbsoluteFill>
       <Img
-        src={backdrop.photo.src}
+        src={resolveSrc(backdrop.photo.src)}
         style={{
           width: "100%",
           height: "100%",
