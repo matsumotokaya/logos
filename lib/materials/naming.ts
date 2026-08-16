@@ -49,6 +49,19 @@ export interface NameableMaterial {
   source_kind?: string | null;
 }
 
+/**
+ * The columns a query must select for naming to work, as a select() fragment.
+ *
+ * Every field here is optional on the type, because a missing measurement is a
+ * real state — so a caller that forgets one gets a name that is quietly poorer
+ * rather than an error. That is exactly what happened: the inventory query left
+ * `luminance` out and every mark lost its dark/light word, with the row in the
+ * database holding 0.003 the whole time. Naming a shared constant is cheaper
+ * than remembering.
+ */
+export const MATERIAL_NAMING_COLUMNS =
+  "label, kind, category, media_type, width, opaque, luminance, source_kind";
+
 /** Canonical extension per media type. The stored key has none — it is a
  *  checksum — which is why exports have been shipping extensionless files. */
 const EXTENSION: Record<string, string> = {

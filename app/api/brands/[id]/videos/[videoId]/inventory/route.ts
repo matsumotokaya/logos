@@ -13,6 +13,7 @@
 import { guardLabsRequest } from "@/lib/labs-access";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { eventCmUsageRecord, type MaterialUse } from "@/lib/event-cm/material-usage";
+import { MATERIAL_NAMING_COLUMNS } from "@/lib/materials/naming";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 
 const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -34,6 +35,7 @@ export interface InventoryMaterial {
   width: number | null;
   height: number | null;
   opaque: boolean | null;
+  luminance: number | null;
   created_at: string;
 }
 
@@ -46,8 +48,10 @@ export interface InventoryPayload {
   usage: Record<string, MaterialUse[]>;
 }
 
-const COLUMNS =
-  "id, label, kind, category, category_source, media_type, bytes, scope, source_kind, width, height, opaque, created_at";
+// Naming owns its own column list, so a name never loses a word because a
+// query forgot a measurement (it already did once: without `luminance` every
+// mark dropped its dark/light).
+const COLUMNS = `id, ${MATERIAL_NAMING_COLUMNS}, category_source, bytes, scope, height, created_at`;
 
 export async function GET(
   req: Request,

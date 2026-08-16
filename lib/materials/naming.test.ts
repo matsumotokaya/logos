@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  MATERIAL_NAMING_COLUMNS,
   materialFileName,
   materialFolder,
   materialPath,
@@ -135,6 +136,17 @@ test("同じ名前になる2件は、片方が消えずに区別される", () =
   assert.equal(paths.get("b"), "assets/person/kato_1400w-2.jpg");
   assert.equal(paths.get("c"), "assets/person/kato_1400w-3.jpg");
   assert.equal(new Set(paths.values()).size, 3, "ZIPで1件が黙って消える");
+});
+
+test("名前が読む列は、問い合わせ側と1つの定数で結ばれている", () => {
+  // 実際に起きた事故: インベントリの select が luminance を落としていて、
+  // DBに0.003が入っているのに全マークから dark / light が消えた。
+  // 測定が欠けているのは正常な状態なので型は optional にしてあり、
+  // 取りこぼしても例外にならない——だから列名の側を1箇所に寄せる。
+  const needed = MATERIAL_NAMING_COLUMNS.split(",").map((column) => column.trim());
+  for (const column of ["label", "kind", "category", "media_type", "width", "opaque", "luminance", "source_kind"]) {
+    assert.ok(needed.includes(column), `${column} が定数から抜けている`);
+  }
 });
 
 test("分類を直すと名前もフォルダも動く（保存していないので即座に）", () => {

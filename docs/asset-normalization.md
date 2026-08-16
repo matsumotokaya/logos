@@ -1,7 +1,7 @@
 # 素材の正規化とインベントリ(仕様)
 
 最終更新: 2026-08-16(第2版: 2層の注入モデルとインベントリUIを追加。**段階1〜4を実装**)
-ステータス: **段階1〜4実装済み(既存47行のバックフィルのみ未実行)・段階5以降は仕様のみ**。この文書が「アップロードされた素材をどう整え、どう基盤として効かせるか」の正本
+ステータス: **段階1〜4実装済み(バックフィル実行済み)・段階5以降は仕様のみ**。この文書が「アップロードされた素材をどう整え、どう基盤として効かせるか」の正本
 
 ## 1. この文書が答える問い
 
@@ -339,13 +339,14 @@ public/assets/person/miyao-yoshiaki_portrait_1600w.jpg
 
 ## 14. 段階
 
-1. ~~**測って残す**~~ **✅ 2026-08-16 実装**(migration 0052 の適用待ち)。測定の正本を [lib/materials/measure.ts](../lib/materials/measure.ts) に立て、取り込み3経路——動画の素材アップロード、ブランド素材アップロード、ロゴSVGの昇格——が `width`/`height`/`opaque`/`luminance` を行へ書く。既存47行は `npm run materials:measure`(既定 dry-run・`--apply` で保存)でバックフィルする。見た目は変わらないが、**白板バグの再発条件が消える**
+1. ~~**測って残す**~~ **✅ 2026-08-16 実装・migration 0052 適用済み・バックフィル実行済み**(36件測定・読めなかったもの0件)。測定の正本を [lib/materials/measure.ts](../lib/materials/measure.ts) に立て、取り込み3経路——動画の素材アップロード、ブランド素材アップロード、ロゴSVGの昇格——が `width`/`height`/`opaque`/`luminance` を行へ書く。既存47行は `npm run materials:measure --apply` でバックフィル済み(2026-08-16・36件測定・読めなかったもの0件)。見た目は変わらないが、**白板バグの再発条件が消える**
    - **`source_url` はまだ埋まらない**。埋める側の経路(スクレーピング取り込み)がコードに存在しないため。列は 0028 からあり、URL取り込みを実装する段が最初の書き手になる
 2. ~~**軸1を列にする**~~ **✅ 2026-08-16 実装**(migration 0053 適用済み)。語彙は §5.1、コードの正本は [lib/materials/category.ts](../lib/materials/category.ts)。構造化LLMが2軸を別々に答え、マッピング段が `category` / `category_source` を素材の行へ書く([lib/materials/classify.ts](../lib/materials/classify.ts))。**`user` が付いた行は実行が二度と触らない**
    - **残り: プルダウンで直すUI**。書く側と守る規則(`inferred` は上書き可・`user` は不可)は出来ているが、`user` を立てる操作面がまだ無い。**インベントリUI(段階4)と同時に作る**のが自然——直す場所は一覧の中だから
 3. ~~**名前を正規化する**~~ **✅ 2026-08-16 実装**([lib/materials/naming.ts](../lib/materials/naming.ts))。**保存せず導出する**形に変えた(§8.1)ので migration は無い。一覧・書き出し・レンダー時のステージングが同じ関数を読む
    - **書き出しが `assets/<分類>/<名前>` になった**([lib/takes/materials.ts](../lib/takes/materials.ts))。以前は `materials/<uuid>/<チェックサム>`——DBのIDのディレクトリに拡張子の無いファイル——で、**受け取った人にはまったく読めなかった**
-   - **効きは測定と分類に乗る**。未測定・未分類のままだと `unsorted/` に `kato.jpg` と出るだけで、幅も地の有無も名前に出ない。**バックフィルを走らせて初めて `person/miyao_960w.jpg`・`mark/leopalace21_plate_light_800w.jpg` になる**
+   - **効きは測定と分類に乗る**。未測定・未分類のままだと `unsorted/` に `kato.jpg` と出るだけで、幅も地の有無も名前に出ない
+   - **問い合わせ側は [MATERIAL_NAMING_COLUMNS](../lib/materials/naming.ts) を使う**。測定が欠けているのは正常な状態なので型はすべて optional で、**列を取りこぼしても例外にならず、名前が静かに貧しくなるだけ**。実際にインベントリの select が `luminance` を落とし、DBに0.003が入っているのに全マークから `dark`/`light` が消えていた。列名を1つの定数に寄せてある(テストが結合を守る)
 4. ~~**インベントリUIを立てる**~~ **✅ 2026-08-16 実装**([components/materials/MaterialInventory.tsx](../components/materials/MaterialInventory.tsx))。絵コンテ下とマッピング段ドロワーが**同じ要素**を描く。2段が見え、`assets/<category>/` のディレクトリ表示、各行に種別・由来・寸法・**使用先**が出て、**分類はプルダウンで直せる**(`PATCH /api/brands/[id]/materials/[materialId]` が `category_source='user'` を立て、以後の実行が上書きしない)
    - **使用先の導出は [lib/event-cm/material-usage.ts](../lib/event-cm/material-usage.ts)**。`take_inputs.role` では答えられない——47件中27件が `brief_source` で、それは「読ませるために上げた」であって「映像のここに出る」ではない。**ポインタを持っていることが使われていること**なので、ブリーフのどのパスに `material:` があるかが答え([collectMaterialPaths](../lib/takes/material-uri.ts))。シーン名は `EVENT_CM_SCENE_LABELS` から採るので、絵コンテと同じ言葉になる
    - **名前は未対応**(段階3)。表示名はまだ `label` そのままで、`sake/AdobeStock_1894358160.jpeg` のような名前が並ぶ。ディレクトリの枠は先にできたので、段階3は名前だけを差し替える

@@ -5,7 +5,11 @@ import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getR2Object } from "@/lib/r2";
 import { signedLabsUrl } from "@/lib/labs-output-sign";
-import { uniqueMaterialPaths, type NameableMaterial } from "@/lib/materials/naming";
+import {
+  MATERIAL_NAMING_COLUMNS,
+  uniqueMaterialPaths,
+  type NameableMaterial,
+} from "@/lib/materials/naming";
 import {
   collectMaterialIds,
   materialUri,
@@ -53,9 +57,7 @@ async function pinnedInputs(
 ): Promise<Map<string, InputRow>> {
   const { data, error } = await supabase
     .from("take_inputs")
-    .select(
-      "material_id, brand_materials(r2_key, label, kind, category, media_type, width, opaque, luminance, source_kind)",
-    )
+    .select(`material_id, brand_materials(r2_key, ${MATERIAL_NAMING_COLUMNS})`)
     .eq("take_id", takeId)
     .in("material_id", [...ids]);
   if (error) throw new Error(`入力素材を読めませんでした: ${error.message}`);
