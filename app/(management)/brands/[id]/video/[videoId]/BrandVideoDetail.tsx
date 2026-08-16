@@ -598,6 +598,33 @@ export default function BrandVideoDetail({
     [brandId, loadInventory],
   );
 
+  // Widening is what fills the brand's library, and it needs the core rung —
+  // so the refusal a plain editor gets has to arrive as a sentence, not as a
+  // row that silently fails to move.
+  const promoteMaterial = useCallback(
+    async (materialId: string) => {
+      busy("ブランドの基盤に上げています…");
+      try {
+        const res = await videoFetch(`/api/brands/${brandId}/materials/${materialId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scope: "brand" }),
+        });
+        if (!res.ok) {
+          const json = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(json?.error ?? "ブランドの基盤に上げられませんでした");
+        }
+        await loadInventory();
+        setNotice("ブランドの基盤に上げました。次に作るものからも使えます。");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "ブランドの基盤に上げられませんでした");
+      } finally {
+        idle();
+      }
+    },
+    [brandId, loadInventory],
+  );
+
   // Kept off the synchronous effect path, same as the take load: setting state
   // during the effect body triggers cascading renders.
   useEffect(() => {
@@ -1252,6 +1279,7 @@ export default function BrandVideoDetail({
                       payload={inventory}
                       busy={saving}
                       onClassify={(id, category) => void classifyMaterial(id, category)}
+                      onPromote={(id) => void promoteMaterial(id)}
                     />
                   </div>
                 </div>
@@ -1543,6 +1571,7 @@ export default function BrandVideoDetail({
               payload={inventory}
               busy={saving}
               onClassify={(id, category) => void classifyMaterial(id, category)}
+              onPromote={(id) => void promoteMaterial(id)}
             />
           }
           writing={saving}

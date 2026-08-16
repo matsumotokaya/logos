@@ -135,6 +135,62 @@ function CategoryPicker({
   );
 }
 
+/**
+ * Widening a material to the brand, in two clicks.
+ *
+ * Two because it cannot be undone: 0028's trigger lets a scope widen and
+ * refuses every narrowing, for everyone, so 「戻せます」 would be a lie. Not a
+ * dialog, though — nothing is destroyed, and a modal for an additive act
+ * teaches people to click through modals.
+ */
+function PromoteAction({
+  fileName,
+  disabled,
+  onPromote,
+}: {
+  fileName: string;
+  disabled: boolean;
+  onPromote: () => void;
+}) {
+  const [asking, setAsking] = useState(false);
+
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setAsking(true)}
+        className="shrink-0 text-[11px] text-ink-faint underline underline-offset-2 transition-colors hover:text-accent disabled:opacity-50"
+      >
+        ブランドの基盤へ
+      </button>
+    );
+  }
+  return (
+    <span className="flex shrink-0 items-center gap-2 text-[11px]">
+      <span className="text-ink-muted">戻せません</span>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          setAsking(false);
+          onPromote();
+        }}
+        className="font-semibold text-accent underline underline-offset-2 disabled:opacity-50"
+      >
+        {fileName} を上げる
+      </button>
+      <button
+        type="button"
+        onClick={() => setAsking(false)}
+        className="text-ink-faint underline underline-offset-2"
+      >
+        やめる
+      </button>
+    </span>
+  );
+}
+
 function MaterialRow({
   material,
   fileName,
@@ -142,6 +198,7 @@ function MaterialRow({
   overriddenBy,
   disabled,
   onClassify,
+  onPromote,
 }: {
   material: InventoryMaterial;
   /** The normalised name — what the export writes and the download hands over. */
@@ -151,6 +208,8 @@ function MaterialRow({
   overriddenBy?: string;
   disabled: boolean;
   onClassify: (id: string, category: MaterialCategory | null) => void;
+  /** Widen to the brand. Absent on rows that are already there. */
+  onPromote?: (id: string) => void;
 }) {
   const measured =
     material.width && material.height ? `${material.width}×${material.height}` : null;
@@ -185,13 +244,26 @@ function MaterialRow({
           <span className="font-mono tabular-nums">{readableSize(material.bytes)}</span>
         ) : null}
       </div>
-      {uses && uses.length > 0 ? (
-        <p className="text-[11px] text-ink-muted">{uses.map((use) => use.label).join("、")}</p>
-      ) : (
-        // Not a defect. A deck is read, never shown; a photograph may simply
-        // not have been placed yet. Saying so beats an empty column.
-        <p className="text-[11px] text-ink-faint">この動画には出ていません</p>
-      )}
+      <div className="flex items-baseline gap-3">
+        {uses && uses.length > 0 ? (
+          <p className="min-w-0 flex-1 text-[11px] text-ink-muted">
+            {uses.map((use) => use.label).join("、")}
+          </p>
+        ) : (
+          // Not a defect. A deck is read, never shown; a photograph may simply
+          // not have been placed yet. Saying so beats an empty column.
+          <p className="min-w-0 flex-1 text-[11px] text-ink-faint">
+            この動画には出ていません
+          </p>
+        )}
+        {onPromote ? (
+          <PromoteAction
+            fileName={fileName}
+            disabled={disabled}
+            onPromote={() => onPromote(material.id)}
+          />
+        ) : null}
+      </div>
       {overriddenBy ? (
         <p className="text-[11px] text-amber-800">
           この動画では「{overriddenBy}」を使っています（基盤を上書き中）
@@ -209,6 +281,7 @@ function Tier({
   overrides,
   disabled,
   onClassify,
+  onPromote,
   empty,
 }: {
   title: string;
@@ -218,6 +291,7 @@ function Tier({
   overrides?: Map<string, string>;
   disabled: boolean;
   onClassify: (id: string, category: MaterialCategory | null) => void;
+  onPromote?: (id: string) => void;
   empty: string;
 }) {
   const folders = groupByFolder(materials);
@@ -255,6 +329,7 @@ function Tier({
                   overriddenBy={overrides?.get(material.id)}
                   disabled={disabled}
                   onClassify={onClassify}
+                  onPromote={onPromote}
                 />
               ))}
             </ul>
@@ -292,11 +367,14 @@ export default function MaterialInventory({
   payload,
   busy,
   onClassify,
+  onPromote,
 }: {
   payload: InventoryPayload | null;
   busy?: boolean;
   /** Correct what a file is. Absent = read only. */
   onClassify?: (id: string, category: MaterialCategory | null) => void;
+  /** Widen a material to the brand. Absent = the action is not offered. */
+  onPromote?: (id: string) => void;
 }) {
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -319,22 +397,27 @@ export default function MaterialInventory({
     <div className="flex flex-col gap-5">
       <Tier
         title="この動画の素材"
-        note="この動画に固定されているもの。ここで分類を直すと、この素材を使う他の成果物にも反映されます。"
+        note="この動画に固定されているもの。分類を直すと、この素材を使う他の成果物にも反映されます。ずっと使うものは「ブランドの基盤へ」上げると、次に作るものからも選べます。"
         materials={payload.own}
         usage={payload.usage}
         disabled={disabled || saving !== null}
         onClassify={classify}
+        onPromote={onPromote}
         empty="まだ素材がありません。パイプラインの「入力」から資料や写真を入れてください。"
       />
       <Tier
         title="ブランドの基盤"
-        note="このブランドが持っていて、新しい成果物に最初から入るもの。"
+        // Says what is true today, not what §7.1 will make true. The mark is
+        // already installed into every new event video (seedEventCmFromBrand);
+        // nothing else is injected yet. Promising 「最初から入ります」 for a
+        // photograph would be a promise the code does not keep.
+        note="このブランドのもの。次に作る動画・LPからも使えます。マークは新しい動画へ自動で入り、それ以外はここから選びます。"
         materials={payload.base}
         usage={payload.usage}
         overrides={overrides}
         disabled={disabled || saving !== null}
         onClassify={classify}
-        empty="このブランドにはまだ基盤の素材がありません。この動画の素材を「ブランドの基盤へ」上げると、次に作るものに最初から入ります。"
+        empty="このブランドにはまだ基盤の素材がありません。上の素材を「ブランドの基盤へ」上げると、次に作るものからも使えます。"
       />
     </div>
   );
