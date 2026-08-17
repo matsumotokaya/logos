@@ -350,9 +350,13 @@ export function markUserEdited(
  * reads. Stamping when the words are written would make them stale the instant
  * they were saved, and switching the reading off would ask for a rewrite of a
  * scenario nobody is going to speak.
+ *
+ * `theme` and `brandBase` are here for the music's reason: the palette and the
+ * mark are seen, never said, so declining the brand's base restyles the film
+ * without changing one word of what it announces.
  */
 const UNSPOKEN =
-  /^(bgm$|logos$|visuals\.|guests\[\d+\]\.photo$|scenario$|voice$|narrator$)/;
+  /^(bgm$|logos$|theme$|brandBase$|visuals\.|guests\[\d+\]\.photo$|scenario$|voice$|narrator$)/;
 
 export const isSpokenFact = (path: string): boolean => !UNSPOKEN.test(path);
 
@@ -401,6 +405,35 @@ export const isSuppressed = (brief: EventCmBrief, path: string): boolean =>
   brief.provenance?.[path]?.note === SUPPRESSED_NOTE;
 
 /** Paths the user has taken off screen. The renderer skips these. */
+/**
+ * Switching the BRAND'S BASE off for one deliverable.
+ *
+ * docs/asset-normalization.md §7.1. A collaboration sometimes has to carry the
+ * partner's tone and none of ours — 「自社の雰囲気を完全に残さない」 — so the
+ * base has to be declinable as one act rather than field by field.
+ *
+ * A suppression rather than a new column, for the same reason narration-off is
+ * one: if switching it off only removed the values, the next run would put them
+ * back, and 「基盤は必ず入る」 would quietly beat 「オフにできる」. Recorded as
+ * a decision, it survives.
+ *
+ * What it takes off is the LOOK and the MARK — the two things the brand
+ * contributes to a film's atmosphere (`seedEventCmFromBrand`: the palette and
+ * type from BrandKnowledge, the mark from the canonical logo). What it leaves
+ * alone are FACTS: the presenter is still whoever is presenting, and a film
+ * that hid that would be lying rather than restyled.
+ *
+ * The mark is identified by position — `logos[0]` is the presenter's, which is
+ * what the seed writes and what the opening and closing scenes draw. Partner
+ * marks added later sit behind it and stay; with ours gone, the first of them
+ * opens the film, which is what a collaboration under someone else's tone
+ * looks like.
+ */
+export const BRAND_BASE_PATH = "brandBase";
+
+export const brandBaseIsOff = (brief: EventCmBrief): boolean =>
+  brief.provenance?.[BRAND_BASE_PATH]?.note === SUPPRESSED_NOTE;
+
 export const suppressedPaths = (brief: EventCmBrief): string[] =>
   Object.entries(brief.provenance ?? {})
     .filter(([, entry]) => entry.note === SUPPRESSED_NOTE)

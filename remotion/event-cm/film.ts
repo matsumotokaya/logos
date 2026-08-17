@@ -30,7 +30,7 @@ import {
 } from "@/remotion/kit/layout";
 import { sceneForRole } from "@/remotion/kit/scenes/event-cm";
 import { SUMI_THEME, themeForBrand, type Theme } from "@/remotion/kit/theme";
-import { suppressedPaths } from "@/lib/event-cm/facts";
+import { BRAND_BASE_PATH, suppressedPaths } from "@/lib/event-cm/facts";
 import { captionsFor, type Caption } from "./captions";
 import { eventCmTimeline, type TimingSource } from "./timeline";
 import {
@@ -157,7 +157,23 @@ function applySuppression(brief: EventCmBrief): EventCmBrief {
           off(`guests[${index}].photo`) ? { ...guest, photo: null } : guest,
         ),
     cta: off("cta") ? "" : brief.cta,
-    logos: off("logos") ? [] : brief.logos,
+    // The brand's base, declined as one act (lib/event-cm/facts.ts
+    // BRAND_BASE_PATH). It takes off the two things the brand contributes to
+    // the atmosphere — its mark and its look — and nothing else: the presenter
+    // is a fact, and a film that hid who was presenting would be lying rather
+    // than restyled.
+    logos: off("logos")
+      ? []
+      : off(BRAND_BASE_PATH)
+        ? // Ours is logos[0] by construction (the seeder writes it, and the
+          // opening and closing scenes draw it). Partner marks stay, and the
+          // first of them now opens the film.
+          brief.logos.slice(1)
+        : brief.logos,
+    // Undefined, not empty: themeOf() reads `brief.theme ? … : SUMI_THEME`, so
+    // removing it is what returns the template's own art direction rather than
+    // a brand theme with nothing in it.
+    theme: off(BRAND_BASE_PATH) ? undefined : brief.theme,
     bgm: off("bgm") ? null : brief.bgm,
     schedule: {
       ...brief.schedule,

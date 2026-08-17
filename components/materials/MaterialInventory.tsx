@@ -368,6 +368,8 @@ export default function MaterialInventory({
   busy,
   onClassify,
   onPromote,
+  baseOff,
+  onToggleBase,
 }: {
   payload: InventoryPayload | null;
   busy?: boolean;
@@ -375,6 +377,11 @@ export default function MaterialInventory({
   onClassify?: (id: string, category: MaterialCategory | null) => void;
   /** Widen a material to the brand. Absent = the action is not offered. */
   onPromote?: (id: string) => void;
+  /** Whether this deliverable has declined the brand's base. */
+  baseOff?: boolean;
+  /** Decline or restore it. Absent = the switch is not offered (the template
+   *  has no base to decline). */
+  onToggleBase?: (off: boolean) => void;
 }) {
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -405,13 +412,44 @@ export default function MaterialInventory({
         onPromote={onPromote}
         empty="まだ素材がありません。パイプラインの「入力」から資料や写真を入れてください。"
       />
+      {/* Declining the base is a property of THIS deliverable, so it sits on
+          the tier it declines rather than in the header with the film-wide
+          controls (docs/asset-normalization.md §7.1). */}
+      {onToggleBase ? (
+        <div
+          className={cn(
+            "flex items-start gap-3 rounded-xl border px-3 py-2.5",
+            baseOff ? "border-amber-300 bg-amber-50" : "border-hairline",
+          )}
+        >
+          <label className="flex items-center gap-2 text-[12px] font-medium text-ink">
+            <input
+              type="checkbox"
+              checked={!baseOff}
+              disabled={disabled}
+              onChange={(event) => onToggleBase(!event.target.checked)}
+              className="size-3.5 accent-ink"
+            />
+            ブランドの基盤を使う
+          </label>
+          <p className="min-w-0 flex-1 text-[11px] text-ink-muted">
+            {baseOff
+              ? "この動画は自社のマークと配色・書体を使いません。テンプレートの地で描かれます。イベント名や日程などの事実は残ります。"
+              : "このブランドのマークと、採用済みの配色・書体で描きます。コラボレーションなど、自社の雰囲気を出さないときは外せます。"}
+          </p>
+        </div>
+      ) : null}
       <Tier
         title="ブランドの基盤"
         // Says what is true today, not what §7.1 will make true. The mark is
         // already installed into every new event video (seedEventCmFromBrand);
         // nothing else is injected yet. Promising 「最初から入ります」 for a
         // photograph would be a promise the code does not keep.
-        note="このブランドのもの。次に作る動画・LPからも使えます。マークは新しい動画へ自動で入り、それ以外はここから選びます。"
+        note={
+          baseOff
+            ? "この動画では使いません。ブランドのものとしては残っているので、次に作るものからは使えます。"
+            : "このブランドのもの。次に作る動画・LPからも使えます。マークは新しい動画へ自動で入り、それ以外はここから選びます。"
+        }
         materials={payload.base}
         usage={payload.usage}
         overrides={overrides}

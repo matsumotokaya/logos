@@ -35,6 +35,7 @@ import {
   type FilmStep,
 } from "@/lib/event-cm/bake";
 import { eventCmFilm } from "@/remotion/event-cm/film";
+import { BRAND_BASE_PATH, brandBaseIsOff } from "@/lib/event-cm/facts";
 import { EVENT_WIDTH, EVENT_HEIGHT } from "@/remotion/event/palette";
 import type { FactEdit } from "@/components/video/FactList";
 import BriefSourceIntake, { type BriefSource } from "@/components/video/BriefSourceIntake";
@@ -1280,6 +1281,10 @@ export default function BrandVideoDetail({
                       busy={saving}
                       onClassify={(id, category) => void classifyMaterial(id, category)}
                       onPromote={(id) => void promoteMaterial(id)}
+                      baseOff={brandBaseIsOff(video.brief as EventCmBrief)}
+                      onToggleBase={(off) =>
+                        void editFact({ path: BRAND_BASE_PATH, suppressed: off })
+                      }
                     />
                   </div>
                 </div>
@@ -1572,6 +1577,14 @@ export default function BrandVideoDetail({
               busy={saving}
               onClassify={(id, category) => void classifyMaterial(id, category)}
               onPromote={(id) => void promoteMaterial(id)}
+              // Declining the base is an ordinary suppression, so it goes
+              // through the same endpoint every other 「この項目を出さない」
+              // does — no new route, and it lands in provenance where a re-run
+              // will not undo it.
+              baseOff={brandBaseIsOff(eventCm.working)}
+              onToggleBase={(off) =>
+                void editFact({ path: BRAND_BASE_PATH, suppressed: off })
+              }
             />
           }
           writing={saving}
