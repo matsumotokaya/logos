@@ -10,7 +10,7 @@ import { GoogleGenAI } from "@google/genai";
 
 // Hard API-quality limit. Duplicated on purpose: labs runs as plain ESM scripts
 // with no path aliases, so it cannot import the app's copy. The app's is
-// lib/narration/limits.ts `TTS_MAX_SECTION_CHARS`, which points back here —
+// lib/voice/limits.ts `TTS_MAX_SECTION_CHARS`, which points back here —
 // change one and change the other, or the editor will accept a line this
 // refuses.
 const MAX_SECTION_CHARS = 2000;

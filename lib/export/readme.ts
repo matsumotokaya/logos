@@ -8,7 +8,7 @@
 //
 // It is written for a person and for an agent at once. An agent reading this
 // needs the same things a person does, plus the rules that are not visible in
-// the code: that the scenario decides the length, that a fact absent from the
+// the code: that the narration decides the length, that a fact absent from the
 // brief is absent from the picture by design, and that the storyboard's
 // arithmetic lives in one function.
 
@@ -27,9 +27,10 @@ export interface ReadmeInput {
 
 const sceneTable = (): string =>
   EVENT_CM_SCENES.map((scene) => {
-    const optional = scene.optional ? "登壇者が居なければ消える" : "必ず出る";
+    const count = scene.count > 1 ? `${scene.count}枚` : "1枚";
+    const optional = scene.removable ? "消せる" : "必ず出る";
     const voice = scene.narrated ? "読み上げあり" : "無音";
-    return `| \`${scene.role}\` | ${EVENT_CM_SCENE_LABELS[scene.role]} | ${voice} | ${optional} |`;
+    return `| \`${scene.role}\` | ${EVENT_CM_SCENE_LABELS[scene.role]} | ${voice} | ${count}・${optional} |`;
   }).join("\n");
 
 export function projectReadme(input: ReadmeInput): string {
@@ -87,18 +88,18 @@ ${sceneTable()}
 
 ## 知っておくと早いこと
 
-- **尺はシナリオが決めます。** \`props.json\` の \`scenario.scenes[].text\` を長くすると、そのシーンが伸びて動画全体が伸びます。固定尺ではありません
+- **尺はナレーションが決めます。** \`props.json\` の \`narration.scenes[].text\` を長くすると、そのシーンが伸びて動画全体が伸びます。固定尺ではありません
 - **無いものは描かれません。** \`schedule.venue\` を \`null\` にすると会場の行が消えます。空欄やダミー枠は出ません——これは設計であって不具合ではないので、埋まっていない項目を無理に埋める必要はありません
-- **字幕はシナリオから作られます**(\`src/remotion/event-cm/captions.ts\`)。音声が無くても出ます。1枚28字で割れます
+- **字幕はナレーションから作られます**(\`src/remotion/event-cm/captions.ts\`)。音声が無くても出ます。1枚28字で割れます
 - **「このブリーフがどんな映像になるか」の導出は \`src/remotion/event-cm/film.ts\` の \`eventCmFilm()\` 1箇所**です。尺・部品・字幕・非表示の反映は全部ここを通ります。表示を変えたいときにまず読む場所で、ここを迂回して別の場所で尺を計算すると噛み合わなくなります
-- 読み上げ音声は \`public/assets/audio/\` に入っています。差し替えるときは \`props.json\` の \`voice\` が指すパスを変えてください。声を消すと、尺はシナリオの文字数からの推定に戻ります
+- 読み上げ音声は \`public/assets/audio/\` に入っています。差し替えるときは \`props.json\` の \`voice\` が指すパスを変えてください。声を消すと、尺はナレーションの文字数からの推定に戻ります
 
 ## AIエージェントへ
 
 このプロジェクトを引き継いで作業する場合、次の3点を守ってください。
 
-1. **事実を捏造しない。** \`props.json\` に無い日時・会場・料金・人名を補完しない。未定のものは \`null\` のままにする(そのように描かれる設計です)
-2. **尺を固定値で書かない。** 動画の長さは \`eventCmFilm()\` が返す \`totalMs\` から導きます。\`durationInFrames\` を定数にすると、シナリオを直したときに映像が切れます
+1. **決まった事実を勝手に書き換えない。** \`props.json\` の日時・会場・料金・人名は、この動画の持ち主が確定させた値です。読みやすさのために言い換えたり、空いている項目を埋めたりしないでください(\`null\` はそのように描かれる設計です)
+2. **尺を固定値で書かない。** 動画の長さは \`eventCmFilm()\` が返す \`totalMs\` から導きます。\`durationInFrames\` を定数にすると、ナレーションを直したときに映像が切れます
 3. **アートディレクションを勝手に足さない。** 墨黒×金×明朝で、金は「誰かが決めた」という意味を持ちます。枠や飾りを金で足すと、意味のある色が意味を失います
 
 デザイン変更を頼まれたときは、まず \`src/remotion/kit/theme.ts\`(色・書体・型スケール・モーション)と \`src/remotion/kit/layout.ts\`(配置)を読んでください。シーン側に直接スタイルを書くとテーマを差し替えられなくなります。

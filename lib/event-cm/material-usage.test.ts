@@ -4,7 +4,10 @@ import { eventCmMaterialUsage } from "./material-usage";
 import { seedEventCmBrief } from "./seed";
 import { materialUri } from "@/lib/takes/material-uri";
 import { collectMaterialPaths } from "@/lib/takes/material-uri";
-import type { EventCmBrief } from "@/remotion/event-cm/types";
+import {
+  EVENT_CM_SUPPRESSED_NOTE,
+  type EventCmBrief,
+} from "@/remotion/event-cm/types";
 
 const SEEDED = seedEventCmBrief(
   { name: "WealthPark Lab", industry: "金融教育メディア" },
@@ -65,16 +68,24 @@ test("背景とBGMも居場所を持つ", () => {
   assert.equal(usage.get(MUSIC)?.[0].label, "BGM");
 });
 
-test("シーン番号は実際の構成に従う（登壇者が居なければ番号がずれる）", () => {
+test("シーン番号は実際の構成に従う（シーンを消せば番号がずれる）", () => {
+  // An empty guest list no longer changes the shape — the picture is the
+  // template's (EVENT_CM_SCENES). Deleting it does.
+  const deleted: EventCmBrief = {
+    ...FULL,
+    provenance: {
+      ...FULL.provenance,
+      guests: { origin: "user", note: EVENT_CM_SUPPRESSED_NOTE },
+    },
+  };
   const withGuest = eventCmMaterialUsage(FULL).get(HERO)?.[0].label ?? "";
-  const noGuest = eventCmMaterialUsage({ ...FULL, guests: [] }).get(HERO)?.[0].label ?? "";
+  const noGuest = eventCmMaterialUsage(deleted).get(HERO)?.[0].label ?? "";
   // テーマは登壇者より前なので番号は動かない。動いてはいけない。
   assert.equal(withGuest, noGuest);
 
-  // 一方 CTA は登壇者シーンの後ろなので、居なければ1つ前に繰り上がる。
+  // 一方 CTA は登壇者シーンの後ろなので、消せば1つ前に繰り上がる。
   const ctaWith = eventCmMaterialUsage(FULL).get(PARTNER)?.[0].label ?? "";
-  const ctaWithout =
-    eventCmMaterialUsage({ ...FULL, guests: [] }).get(PARTNER)?.[0].label ?? "";
+  const ctaWithout = eventCmMaterialUsage(deleted).get(PARTNER)?.[0].label ?? "";
   assert.notEqual(ctaWith, ctaWithout, "構成が変わっても同じ番号を名乗っている");
 });
 

@@ -8,10 +8,10 @@ import { eventCmSceneKey, type EventCmBrief } from "./types";
 // people who see it. So subtitles are derived from whatever is known, on the
 // same three-stage principle as the timeline (timeline.ts):
 //
-//   scenario written  → the sentences, timed by character weight
+//   narration written  → the sentences, timed by character weight
 //   voice recorded    → the sentences, timed by the measured track
 //
-// Deriving from the scenario is the part that matters. Reading the voice track's
+// Deriving from the narration is the part that matters. Reading the voice track's
 // own captions would be simpler, and would mean no subtitles until somebody
 // paid for TTS — which is exactly backwards for the reason subtitles exist.
 //
@@ -103,7 +103,7 @@ export function captionsFor(brief: EventCmBrief): Caption[] {
 
   // One line per picture, so a scene's subtitles are bounded by that scene.
   // Nothing spans a cut, and the silent opening and close carry no text at all.
-  for (const scene of brief.scenario.scenes) {
+  for (const scene of brief.narration.scenes) {
     const timing = timingOf.get(eventCmSceneKey(scene));
     if (!timing) continue;
 

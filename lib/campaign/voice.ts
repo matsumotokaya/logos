@@ -3,7 +3,7 @@ import "server-only";
 // Stage 5 (voice) for product-cm: take the Service Brand Kit's structured CM
 // script and speak it.
 //
-// The speaking itself lives in lib/narration/voice.ts, shared with every other
+// The speaking itself lives in lib/voice/synthesize.ts, shared with every other
 // narrated template. What stays here is what is genuinely product-cm's: where
 // the script comes from (the Kit), and how its narrator should sound.
 //
@@ -11,9 +11,9 @@ import "server-only";
 // tone, real timings).
 
 import {
-  generateNarration,
-  narrationVoiceAvailable,
-} from "@/lib/narration/voice";
+  generateVoice,
+  voiceAvailable,
+} from "@/lib/voice/synthesize";
 import type { CampaignBrandKit } from "./schema";
 import type { CmVoiceTrack } from "./cm-types";
 
@@ -21,7 +21,7 @@ const TTS_PERSONA =
   "明るく信頼感のあるCMナレーター。テンポよく、聞き取りやすく読み上げます。";
 
 export function cmVoiceAvailable(): boolean {
-  return narrationVoiceAvailable();
+  return voiceAvailable();
 }
 
 export async function generateCmVoice(
@@ -35,5 +35,5 @@ export async function generateCmVoice(
     );
   }
 
-  return generateNarration(scenes, { persona: TTS_PERSONA, onProgress });
+  return generateVoice(scenes, { persona: TTS_PERSONA, onProgress });
 }

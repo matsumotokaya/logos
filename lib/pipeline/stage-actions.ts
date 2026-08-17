@@ -5,7 +5,7 @@
 // that is disabled for the wrong reason is invisible in a screenshot and obvious
 // in a test — and this file exists because one of them was: `disabled` meant
 // "no material has been added", which is a real reason not to read anything and
-// no reason at all not to write a scenario. A freshly seeded video has no
+// no reason at all not to write a narration. A freshly seeded video has no
 // documents by design (§9.9), so the film step has to stay pressable.
 //
 // Two buttons per drawer, at most:
@@ -14,7 +14,7 @@
 //            opens its drawer — so progress appears where the work happens
 //
 // The chain is input → structure → map → film. The last link is not a stage of
-// `run/[stage]`: it is the scenario, the reading aloud and the fixing, three
+// `run/[stage]`: it is the narration, the reading aloud and the fixing, three
 // endpoints the page owns. So `run: "film"` hands the work back to the page and
 // this file only decides whether there is any (§9.6).
 
@@ -105,7 +105,7 @@ function advanceButton(
   // "Already current" is a different question for the film.
   //
   // A stage is current when its run is newer than its input. A film can be fixed
-  // and still owe work: a recording the scenario has outrun is not a stale
+  // and still owe work: a recording the narration has outrun is not a stale
   // stage, it is a step nobody has taken. So the film asks the steps.
   const done = film ? steps.length === 0 : next?.status === "ready";
   // The step consumes this stage's output, so a stale stage blocks it — fixing a

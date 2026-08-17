@@ -214,9 +214,9 @@ export const TEMPLATES: TemplateEntry[] = [
     rendererRevision: "remotion/event-cm@2026-08-11",
     name: "イベント紹介動画",
     summary:
-      "イベント告知の30秒CM。シナリオを先に書き、その読み上げのタイミングが画面の尺と並びを決めます。絵は和モダン（墨黒×金×明朝）で、素材が無いスロットは設計済みのフォールバックで描かれます。",
-    requires: "イベントの事実（EventBrief）と、そこから書いたシナリオ",
-    duration: "30秒前後（シナリオと読み上げの長さで決まる）",
+      "イベント告知の30秒CM。ナレーションを先に書き、そのボイスのタイミングが画面の尺と並びを決めます。絵は和モダン（墨黒×金×明朝）で、素材が無いスロットは設計済みのフォールバックで描かれます。",
+    requires: "イベントの事実（EventBrief）と、そこから書いたナレーション",
+    duration: "30秒前後（ナレーションとボイスの長さで決まる）",
     narration: true,
     // Placeholder: matches the 墨黒×金×明朝 art direction. Ducks under the
     // narration and returns for the closing mark.

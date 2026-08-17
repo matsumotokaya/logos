@@ -1,6 +1,6 @@
 // Draft the narration for a narrated event promo, from an existing take's brief.
 //
-// A reading tool, not a writing one: it prints the scenario and never stores it.
+// A reading tool, not a writing one: it prints the narration and never stores it.
 // The point is to judge the words — the angle, whether it invents anything,
 // whether it lands near 30 seconds — before the screen work starts.
 //
@@ -8,17 +8,17 @@
 
 import { createAdminSupabase } from "@/lib/supabase/server";
 import {
-  draftEventCmScenario,
-  eventCmScenarioAvailable,
-  type EventCmScenarioInput,
-} from "@/lib/event-cm/scenario";
+  draftEventCmNarration,
+  eventCmNarrationAvailable,
+  type EventCmNarrationInput,
+} from "@/lib/event-cm/narration";
 import {
   EVENT_CM_CHARS_PER_SECOND,
   EVENT_CM_MAX_CHARS,
   EVENT_CM_MIN_CHARS,
   eventCmSceneBudget,
-  scenarioBudgetIssues,
-  scenarioChars,
+  narrationBudgetIssues,
+  narrationChars,
 } from "@/remotion/event-cm/types";
 
 const args = process.argv.slice(2);
@@ -32,7 +32,7 @@ const CHARS_PER_SECOND = EVENT_CM_CHARS_PER_SECOND;
 async function main() {
   const takeId = flag("take");
   if (!takeId) throw new Error("--take <UUID> が必要です");
-  if (!eventCmScenarioAvailable()) {
+  if (!eventCmNarrationAvailable()) {
     throw new Error("OPENAI_API_KEY が設定されていません");
   }
 
@@ -48,22 +48,22 @@ async function main() {
     throw new Error(`イベントTakeではありません: ${data.template_id}`);
   }
 
-  const brief = data.brief as EventCmScenarioInput;
-  const draft = await draftEventCmScenario(brief, {
+  const brief = data.brief as EventCmNarrationInput;
+  const draft = await draftEventCmNarration(brief, {
     notes: flag("notes"),
     now: new Date().toISOString(),
   });
 
-  const chars = scenarioChars(draft.scenario);
+  const chars = narrationChars(draft.narration);
   const seconds = (chars / CHARS_PER_SECOND).toFixed(1);
 
   console.log(`\n■ ${data.title}  (${data.id})`);
   console.log("\n── 渡した事実 ──");
   console.log(draft.facts);
   console.log("\n── 訴求軸 ──");
-  console.log(draft.scenario.angle);
+  console.log(draft.narration.angle);
   console.log("\n── ナレーション ──");
-  for (const [i, scene] of draft.scenario.scenes.entries()) {
+  for (const [i, scene] of draft.narration.scenes.entries()) {
     const sceneChars = scene.text.replace(/\s/g, "").length;
     const budget = eventCmSceneBudget(scene);
     const onSpec = sceneChars >= budget.min && sceneChars <= budget.max;
@@ -78,7 +78,7 @@ async function main() {
       withinBudget ? "✓ 予算内" : `✗ 予算(${EVENT_CM_MIN_CHARS}〜${EVENT_CM_MAX_CHARS}字)外`
     }`,
   );
-  const issues = scenarioBudgetIssues(draft.scenario);
+  const issues = narrationBudgetIssues(draft.narration);
   if (issues.length) {
     console.log(
       `シーン予算外: ${issues

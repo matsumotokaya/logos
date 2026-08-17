@@ -77,7 +77,7 @@ test("戻せる（保存された値は消えていない）", () => {
   assert.equal(eventCmFilm(back).theme.palette.accent, "#c8a15a");
 });
 
-test("基盤のオフはシナリオを古くしない（読み上げないものだから）", () => {
+test("基盤のオフはナレーションを古くしない（読み上げないものだから）", () => {
   // 何も壊れていないのに警告が出る状態は、警告を無視する習慣を作る。
   assert.equal(off(BRANDED).factsUpdatedAt, BRANDED.factsUpdatedAt);
 });

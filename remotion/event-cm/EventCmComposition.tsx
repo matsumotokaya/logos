@@ -10,8 +10,8 @@
 // kept — they live in the kit's components now, where a second template can
 // reach them and a brand's values can change them.
 //
-// The spine is still the narration: scene order comes from the scenario's roles
-// and scene length from the timeline, which sharpens from budget to scenario to
+// The spine is still the narration: scene order comes from the narration's roles
+// and scene length from the timeline, which sharpens from budget to narration to
 // measured voice (timeline.ts).
 
 import React, { useMemo } from "react";
@@ -54,8 +54,8 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
   const hasVoice = film.hasVoice;
   const FULL = 0.62;
   const UNDER_VOICE = 0.16;
-  const startFrame = msToFrame(film.narrationStartMs, fps);
-  const endFrame = msToFrame(film.narrationEndMs, fps);
+  const startFrame = msToFrame(film.voiceStartMs, fps);
+  const endFrame = msToFrame(film.voiceEndMs, fps);
   const duckIn = Math.round(fps * 0.5);
   const duckOut = Math.round(fps * 0.8);
 
@@ -91,7 +91,7 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
       )}
       {brief.voice ? (
         // Held back by the lead-in so the opening belongs to the music.
-        <Sequence from={msToFrame(film.narrationStartMs, fps)}>
+        <Sequence from={msToFrame(film.voiceStartMs, fps)}>
           <Audio src={resolveMediaSrc(brief.voice.audio)} />
         </Sequence>
       ) : null}

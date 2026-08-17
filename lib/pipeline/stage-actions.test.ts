@@ -66,13 +66,13 @@ test("前の段が古いあいだは次へ進めない", () => {
 
 test("資料が1件も無くても映像の段は押せる", () => {
   // The one rule this file exists for. A seeded take has no documents by design
-  // (§9.9) and still has a complete brief, so the scenario, the reading aloud
+  // (§9.9) and still has a complete brief, so the narration, the reading aloud
   // and the fixing all have something to work on. `hasMaterial` gates reading.
   const { advance } = stageActions({
     stageId: "map",
     stages: pipeline(READ),
     hasMaterial: false,
-    filmSteps: ["scenario", "voice", "bake"],
+    filmSteps: ["narration", "voice", "bake"],
   });
   assert.equal(advance?.run, "film");
   assert.equal(advance?.enabled, true);
@@ -86,13 +86,13 @@ test("映像の段のラベルは、実際にやることを並べる", () => {
     stageActions({ stageId: "map", stages: pipeline(READ), hasMaterial: true, filmSteps: steps })
       .advance?.label;
 
-  assert.equal(label(["scenario", "voice", "bake"]), "シナリオを書く・読み上げる・動画に反映する");
+  assert.equal(label(["narration", "voice", "bake"]), "ナレーションを書く・読み上げる・動画に反映する");
   assert.equal(label(["bake"]), "動画に反映する");
   assert.equal(label(["voice", "bake"]), "読み上げる・動画に反映する");
 });
 
 test("映像が最新なら押せず、段の状態ではなく残り工程で判定する", () => {
-  // A film can be fixed and still owe work: a recording the scenario has outrun
+  // A film can be fixed and still owe work: a recording the narration has outrun
   // is not a stale stage, it is a step nobody has taken. So the answer comes
   // from the pending steps, never from `output.status`.
   const fixed = stageActions({

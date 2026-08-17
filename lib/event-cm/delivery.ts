@@ -1,6 +1,6 @@
 // How the narrator reads an event announcement.
 //
-// The words are written elsewhere (scenario.ts); this is the delivery, and it is
+// The words are written elsewhere (narration.ts); this is the delivery, and it is
 // a template-level opinion rather than a per-take setting. An announcement is
 // read by somebody who is glad the thing is happening and expects you to come
 // — which is not the same as a hard sell, and not the same as a measured

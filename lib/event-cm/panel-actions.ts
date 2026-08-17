@@ -1,42 +1,39 @@
-import type { EventCmBrief, EventCmSceneRole } from "@/remotion/event-cm/types";
+import {
+  EVENT_CM_SCENES,
+  eventCmScenePath,
+  eventCmScenePlan,
+  type EventCmBrief,
+  type EventCmSceneRole,
+} from "@/remotion/event-cm/types";
 
 // What you can do to one picture of the film, and what to say when you cannot.
 //
 // Same shape as lib/brand-tree-actions.ts, and for the same reason: the answer
 // is a rule about the template, so it lives next to the template rather than
 // inside a button. A menu is not the authority — the server applies the same
-// function before writing anything, and it decides what removing a picture
-// MEANS as well as whether it is allowed (app/api/brands/[id]/videos/[videoId]/
+// function before writing anything (app/api/brands/[id]/videos/[videoId]/
 // panels/route.ts). The client used to compose that write itself, which made
 // the button a second author of briefs.
 //
-// Deleting a picture is not a generic operation here. This template's structure
-// is fixed and says so (remotion/event-cm/types.ts EVENT_CM_SCENES): the film
-// opens and closes on the presenter's mark, names itself, says why to come, says
-// what happens, and says what to do. A picture is removable only when its
-// absence is a shape the film already has:
+// The template's shape is fixed and declares itself (remotion/event-cm/types.ts
+// EVENT_CM_SCENES): nine pictures, of which `guests` and the three `program`
+// pictures carry `removable: true`. This file does not keep its own list of
+// what may go — it asks. The two used to be written down separately, which is
+// a way of saying the menu and the renderer could disagree about the film.
 //
-//   the speakers   — the scene exists because speakers were announced, and
-//                    disappears when they are switched off. Reversible.
-//   one programme  — each programme has its own picture, so removing the
-//                    programme removes the picture. Destructive to the list.
-//
-// Everything else would leave an empty frame rather than one fewer frame, and
-// calling that "delete" would be a lie. So those say why instead.
+// Deletion is always a SUPPRESSION now: the picture goes, the values stay, and
+// it can be put back. Removing a programme from `programs` used to be how an
+// agenda picture went away, which only worked while the number of pictures
+// followed the number of items. With three pictures fixed, dropping the item
+// leaves the frame standing with nothing in it — and calling that "delete"
+// would be a lie.
 
 export type PanelDeletion =
   | {
       can: true;
-      /** Switch a field off: the value stays, the picture goes. */
+      /** Switch the picture off: the values stay, the picture goes. */
       kind: "suppress";
       path: string;
-      confirm: string;
-    }
-  | {
-      can: true;
-      /** Take one programme out of the list. The picture goes with it. */
-      kind: "remove-program";
-      index: number;
       confirm: string;
     }
   | { can: false; reason: string };
@@ -55,6 +52,11 @@ export function panelDeletion(
   brief: EventCmBrief,
   panel: { role: EventCmSceneRole; index?: number },
 ): PanelDeletion {
+  const declared = EVENT_CM_SCENES.find((scene) => scene.role === panel.role);
+  if (!declared?.removable) {
+    return { can: false, reason: FIXED[panel.role] ?? "このシーンは削除できません" };
+  }
+
   if (panel.role === "guests") {
     return {
       can: true,
@@ -64,27 +66,28 @@ export function panelDeletion(
     };
   }
 
-  if (panel.role === "program") {
-    // The last programme keeps its picture: the programme scene is part of the
-    // structure, so removing the final item would leave the frame standing with
-    // nothing in it. Editing the text is the operation that case wants.
-    if (brief.programs.length <= 1 || panel.index === undefined) {
-      return {
-        can: false,
-        // アジェンダ names the picture, プログラム the items on it — the split
-        // is deliberate (EVENT_CM_SCENE_LABELS), so a sentence about both uses
-        // both words.
-        reason:
-          "アジェンダのシーンは1つ残ります。内容はこのシーンで直せます（プログラムが2つ以上あるときは、1つずつ削除できます）",
-      };
-    }
+  // アジェンダ names the picture, プログラム the items on it — the split is
+  // deliberate (EVENT_CM_SCENE_LABELS), so a sentence about both uses both.
+  if (panel.index === undefined) {
+    return { can: false, reason: "どのアジェンダのシーンかが分かりません" };
+  }
+  // The last agenda picture keeps its place: the template opens the middle of
+  // the film with what happens at the event, and a film that skips it announces
+  // an evening with no content. Editing the text is what that case wants.
+  const showing = eventCmScenePlan(brief).filter(
+    (scene) => scene.role === "program",
+  ).length;
+  if (showing <= 1) {
     return {
-      can: true,
-      kind: "remove-program",
-      index: panel.index,
-      confirm: `「${brief.programs[panel.index]?.title ?? ""}」をプログラムから削除します`,
+      can: false,
+      reason:
+        "アジェンダのシーンは1つ残ります。内容はこのシーンで直せます（2つ以上出ているときは、1つずつ削除できます）",
     };
   }
-
-  return { can: false, reason: FIXED[panel.role] ?? "このシーンは削除できません" };
+  return {
+    can: true,
+    kind: "suppress",
+    path: eventCmScenePath(panel),
+    confirm: `アジェンダ${panel.index + 1}のシーンを削除します。プログラムの内容は残るので、あとで戻せます`,
+  };
 }

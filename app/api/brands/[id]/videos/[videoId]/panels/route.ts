@@ -16,7 +16,7 @@
 import { guardLabsRequest } from "@/lib/labs-access";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { validateBrief } from "@/lib/templates/brief-schemas";
-import { markUserEdited, setSuppressed } from "@/lib/event-cm/facts";
+import { setSuppressed } from "@/lib/event-cm/facts";
 import { panelDeletion } from "@/lib/event-cm/panel-actions";
 import {
   EVENT_CM_SCENES,
@@ -79,23 +79,11 @@ export async function DELETE(
     return Response.json({ error: decision.reason }, { status: 409 });
   }
 
-  let next: EventCmBrief;
-  let removed: string | null = null;
-  if (decision.kind === "suppress") {
-    next = setSuppressed(brief, decision.path, true);
-  } else {
-    // Filtered rather than rewritten through `applyFactEdit`, which takes lines
-    // of text: a programme is an object, and reducing it to its title to put it
-    // back would quietly drop anything else the type grows.
-    removed = brief.programs[decision.index]?.title ?? null;
-    next = markUserEdited(
-      {
-        ...brief,
-        programs: brief.programs.filter((_, at) => at !== decision.index),
-      },
-      "programs",
-    );
-  }
+  // Every deletion is a suppression: the picture goes, the values stay. The
+  // agenda used to be the exception — one programme dropped out of `programs`
+  // and the picture went with it — which stopped being true when the template
+  // fixed the number of agenda pictures (EVENT_CM_PROGRAM_SCENES).
+  const next: EventCmBrief = setSuppressed(brief, decision.path, true);
 
   const validated = validateBrief("event-cm", next);
   if (!validated.ok) {
@@ -111,5 +99,5 @@ export async function DELETE(
   if (saveError) {
     return Response.json({ error: saveError.message }, { status: 500 });
   }
-  return Response.json({ ok: true, kind: decision.kind, removed });
+  return Response.json({ ok: true, kind: decision.kind });
 }

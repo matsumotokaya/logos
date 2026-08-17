@@ -1,17 +1,17 @@
 // Speak this video's narration.
 //
-// The last step that turns a proposal into a film: the scenario is read aloud,
+// The last step that turns a proposal into a film: the narration is read aloud,
 // the WAV is pinned to the take, and the timeline stops estimating from
 // character counts and starts following the measured track.
 
 import { guardLabsRequest } from "@/lib/labs-access";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
-import { generateNarration, narrationVoiceAvailable } from "@/lib/narration/voice";
+import { generateVoice, voiceAvailable } from "@/lib/voice/synthesize";
 import {
-  DEFAULT_NARRATION_VOICE,
-  narrationVoiceById,
-  narrationVoiceByName,
-} from "@/lib/narration/voices";
+  DEFAULT_VOICE_PRESET,
+  voicePresetById,
+  voicePresetByName,
+} from "@/lib/voice/voices";
 import { EVENT_CM_PERSONA } from "@/lib/event-cm/delivery";
 import { isSuppressed, setSuppressed } from "@/lib/event-cm/facts";
 import { attachTakeNarration } from "@/lib/takes/narration";
@@ -65,7 +65,7 @@ export async function POST(
       { status: 400 },
     );
   }
-  if (!narrationVoiceAvailable()) {
+  if (!voiceAvailable()) {
     return Response.json(
       { error: "音声の生成が設定されていません（GEMINI_API_KEY / CAMPAIGN_TTS_MOCK）" },
       { status: 503 },
@@ -73,22 +73,22 @@ export async function POST(
   }
 
   const brief = take.brief as EventCmBrief;
-  const scenes = brief.scenario.scenes;
+  const scenes = brief.narration.scenes;
   // The film's own shape decides how many lines are expected: four when nobody
   // is announced, one per programme when several are listed, and none for a
   // field the user switched off. The film object is the one place that shape
   // is derived, so the count comes from it.
   const expected = eventCmFilm(brief).scenes.filter((scene) => scene.narrated).length;
   if (scenes.length !== expected) {
-    // Says which state it is in. A partial scenario is the ordinary state while
-    // somebody is writing, and 「先にシナリオを書いてください」 reads as though
+    // Says which state it is in. A partial narration is the ordinary state while
+    // somebody is writing, and 「先にナレーションを書いてください」 reads as though
     // nothing had been written at all.
     return Response.json(
       {
         error:
           scenes.length === 0
-            ? "先にシナリオを書いてください"
-            : `シナリオが書かれていないシーンがあります（${scenes.length}/${expected}シーン）。残りを書いてから読み上げてください`,
+            ? "先にナレーションを書いてください"
+            : `ナレーションが書かれていないシーンがあります（${scenes.length}/${expected}シーン）。残りを書いてから読み上げてください`,
       },
       { status: 409 },
     );
@@ -100,10 +100,10 @@ export async function POST(
   // recording so the one button honours a choice made in the dialog — which is
   // the whole point of choosing being separate from recording.
   const chosen =
-    narrationVoiceById(requestedVoiceId) ??
-    narrationVoiceById(brief.narrator) ??
-    narrationVoiceByName(brief.voice?.track.voice) ??
-    DEFAULT_NARRATION_VOICE;
+    voicePresetById(requestedVoiceId) ??
+    voicePresetById(brief.narrator) ??
+    voicePresetByName(brief.voice?.track.voice) ??
+    DEFAULT_VOICE_PRESET;
 
   // Asking for it read aloud is the decision to have a narration, so a previous
   // "off" is withdrawn here — before the call rather than after it, because the
@@ -121,7 +121,7 @@ export async function POST(
   }
 
   try {
-    const { wav, track } = await generateNarration(scenes, {
+    const { wav, track } = await generateVoice(scenes, {
       persona: EVENT_CM_PERSONA,
       voice: chosen.voice,
       // The same pause the pre-recording timeline assumes (timeline.ts).
@@ -134,8 +134,8 @@ export async function POST(
       wav,
       track,
       role: "event_cm_voice",
-      label: "イベント紹介動画の読み上げ",
-      sourceRef: { scenario_updated_at: brief.scenario.updatedAt },
+      label: "イベント紹介動画のボイス",
+      sourceRef: { narration_updated_at: brief.narration.updatedAt },
     });
     return Response.json({
       ok: true,
@@ -194,7 +194,7 @@ export async function PATCH(
   } catch {
     // Falls through to the 400 below: this call is only ever about a choice.
   }
-  const chosen = narrationVoiceById(voiceId);
+  const chosen = voicePresetById(voiceId);
   if (!chosen) {
     return Response.json({ error: "その声は選べません" }, { status: 400 });
   }
@@ -240,7 +240,7 @@ export async function PATCH(
  * the take, because deleting the recording would make "off" an irreversible
  * act — and because the material list is where a person looks for what this
  * take is made of. Off means the film stops speaking: the timeline falls back
- * to estimating from the scenario, the captions come from the scenario's own text,
+ * to estimating from the narration, the captions come from the narration's own text,
  * and the music plays at full level throughout. All three of those are
  * behaviours the composition already had for a take that had never been read
  * aloud (remotion/event-cm/timeline.ts), which is why this needs nothing else.

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/cn";
 
-// The dot beside 「BGM」 and 「読み上げ」 in the video header.
+// The dot beside 「BGM」 and 「ボイス」 in the video header.
 //
 // It used to answer only "is this on", which left the most important question
 // of the screen unanswered: a user who had just chosen a different track saw a

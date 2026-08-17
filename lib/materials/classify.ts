@@ -20,7 +20,7 @@ import {
 //   A run may replace what a run decided.  (category_source = 'inferred')
 //   A run may never replace what a person decided.  (category_source = 'user')
 //
-// The second is the same contract the scenario has with source='human', and it
+// The second is the same contract the narration has with source='human', and it
 // is what makes "決めつけて入れ、直せるようにする" safe: guessing is only
 // acceptable when the guess can be corrected and the correction sticks.
 

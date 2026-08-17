@@ -7,8 +7,8 @@ import { validateBrief } from "@/lib/templates/brief-schemas";
 import {
   eventCmNarratedSteps,
   eventCmSceneKey,
-  scenarioIsStale,
-  scenarioStaleness,
+  narrationIsStale,
+  narrationStaleness,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 import type { EventFacts } from "./structure";
@@ -18,9 +18,9 @@ const SEEDED = seedEventCmBrief(
   { now: new Date("2026-08-11T09:00:00+09:00"), seed: "take-1" },
 );
 
-const withScenario = (brief: EventCmBrief, at: string, source: "llm" | "human" = "llm"): EventCmBrief => ({
+const withNarration = (brief: EventCmBrief, at: string, source: "llm" | "human" = "llm"): EventCmBrief => ({
   ...brief,
-  scenario: {
+  narration: {
     version: 1,
     scenes: eventCmNarratedSteps(brief).map(({ role, index }) => ({
       role,
@@ -108,8 +108,14 @@ test("消すと決めた項目は資料でも復活しない", () => {
   assert.notEqual(result.brief.seriesLabel, "第3弾");
 });
 
-test("登壇者は資料に書いてあれば入る（シードは絶対に埋めない項目）", () => {
-  assert.deepEqual(SEEDED.guests, []);
+test("登壇者は資料に書いてあれば入る（シードが置くのは役割だけ）", () => {
+  // The seeder proposes roles so the speaker picture has something on it, and
+  // never a name — a guessed name is a person who does not exist. Reading one
+  // from a document replaces the placeholder outright.
+  assert.deepEqual(
+    SEEDED.guests.map((guest) => guest.name),
+    ["ゲストスピーカー", "モデレーター"],
+  );
   const result = mapFactsIntoBrief(
     SEEDED,
     {
@@ -157,8 +163,8 @@ test("資料を読み直しても、登壇者に置かれた写真は消えな�
 test("事実が変わるとナレーションが古くなる", () => {
   // The bug this exists to catch: reading a flyer changed the event and left
   // the film narrating the seeded proposal.
-  const written = withScenario(SEEDED, "2026-08-11T10:00:00.000Z");
-  assert.equal(scenarioIsStale(written), false);
+  const written = withNarration(SEEDED, "2026-08-11T10:00:00.000Z");
+  assert.equal(narrationIsStale(written), false);
 
   const result = mapFactsIntoBrief(
     written,
@@ -167,43 +173,60 @@ test("事実が変わるとナレーションが古くなる", () => {
     NOW,
   );
 
-  assert.equal(scenarioIsStale(result.brief), true);
+  assert.equal(narrationIsStale(result.brief), true);
 });
 
 test("項目を手で直してもナレーションが古くなる", () => {
-  const written = withScenario(SEEDED, "2026-08-11T10:00:00.000Z");
+  const written = withNarration(SEEDED, "2026-08-11T10:00:00.000Z");
   const edited = markUserEdited(written, "schedule.date", NOW);
-  assert.equal(scenarioIsStale(edited), true);
+  assert.equal(narrationIsStale(edited), true);
 });
 
-test("シナリオが無いうちは「古い」にならない", () => {
+test("1行も書かれていないナレーションは「古い」にならない", () => {
+  const unwritten: EventCmBrief = {
+    ...SEEDED,
+    narration: { ...SEEDED.narration, scenes: [] },
+  };
+  const result = mapFactsIntoBrief(
+    unwritten,
+    { ...EMPTY_FACTS, title: "世界が恋する日本酒" },
+    "フライヤー.pdf",
+    NOW,
+  );
+  assert.equal(result.brief.narration.scenes.length, 0);
+  assert.equal(narrationIsStale(result.brief), false);
+});
+
+test("シードの下書きは、資料を読んだ時点で古くなる", () => {
+  // The seeded draft says what each picture is FOR and no facts, so the moment
+  // a document supplies a title it is describing an older version of the film.
+  // That is the signal the mapping stage rewrites on.
+  assert.equal(narrationIsStale(SEEDED), false, "読む前は古くない");
   const result = mapFactsIntoBrief(
     SEEDED,
     { ...EMPTY_FACTS, title: "世界が恋する日本酒" },
     "フライヤー.pdf",
     NOW,
   );
-  assert.equal(result.brief.scenario.scenes.length, 0);
-  assert.equal(scenarioIsStale(result.brief), false);
+  assert.equal(narrationIsStale(result.brief), true);
 });
 
-test("シナリオの1行だけを直せる（役割で対応し、位置で対応しない）", () => {
-  // What the PATCH endpoint does, as data: the scenario holds the narrated roles
+test("ナレーションの1行だけを直せる（役割で対応し、位置で対応しない）", () => {
+  // What the PATCH endpoint does, as data: the narration holds the narrated roles
   // for this brief, so an edit is looked up by role and the rest is carried
   // over. Indexing by array position used to line line 1 up against scene 0 and
   // demand words for the two silent mark scenes.
   const brief: EventCmBrief = {
     ...SEEDED,
     guests: [{ name: "宮尾 佳明", role: "宮尾酒造 十一代目当主", photo: null }],
-    scenario: {
+    narration: {
       version: 1,
       source: "llm",
       updatedAt: NOW,
       angle: "…",
-      scenes: eventCmNarratedSteps({
-        guests: [{ name: "宮尾 佳明", role: "", photo: null }],
-        programs: SEEDED.programs,
-      }).map(({ role, index }) => ({
+      // The template's pictures, not this brief's: the shape stopped depending
+      // on who is announced or how many programmes are listed (EVENT_CM_SCENES).
+      scenes: eventCmNarratedSteps({}).map(({ role, index }) => ({
         role,
         ...(index === undefined ? {} : { index }),
         text: index === undefined ? `${role}の行` : `${role}${index}の行`,
@@ -213,7 +236,7 @@ test("シナリオの1行だけを直せる（役割で対応し、位置で対�
 
   const steps = eventCmNarratedSteps(brief);
   const previous = new Map(
-    brief.scenario.scenes.map((scene) => [eventCmSceneKey(scene), scene.text]),
+    brief.narration.scenes.map((scene) => [eventCmSceneKey(scene), scene.text]),
   );
   const edited = new Map([["value", "書き直した価値の行"]]);
   const scenes = steps.map((step) => {
@@ -224,7 +247,7 @@ test("シナリオの1行だけを直せる（役割で対応し、位置で対�
   assert.deepEqual(
     scenes.map(eventCmSceneKey),
     steps.map(eventCmSceneKey),
-    "シナリオの並びは映像の並びと同じ",
+    "ナレーションの並びは映像の並びと同じ",
   );
   const value = scenes.find((scene) => scene.role === "value")!;
   assert.equal(value.text, "書き直した価値の行");
@@ -232,14 +255,14 @@ test("シナリオの1行だけを直せる（役割で対応し、位置で対�
   assert.ok(scenes.every((scene) => scene.text), "空の行が残っている");
 });
 
-test("シナリオは1行だけでも保存できる（書きかけは正常な状態）", () => {
+test("ナレーションは1行だけでも保存できる（書きかけは正常な状態）", () => {
   // What the PATCH endpoint does now, as data. It used to demand a line for
   // every narrated picture, so the moment the film gained a picture nobody had
   // written yet — three programmes replacing one — every single-line save was
   // refused with 「空のシーンがあります」.
   const brief: EventCmBrief = {
     ...SEEDED,
-    scenario: { version: 1, source: "llm", updatedAt: NOW, angle: "", scenes: [] },
+    narration: { version: 1, source: "llm", updatedAt: NOW, angle: "", scenes: [] },
   };
   const steps = eventCmNarratedSteps(brief);
   assert.ok(steps.length > 2, "このブリーフは複数のシーンを持つ");
@@ -256,12 +279,12 @@ test("シナリオは1行だけでも保存できる（書きかけは正常な�
   // Stored as one line, in the film's order, and legal to save.
   assert.equal(scenes.length, 1);
   assert.equal(
-    validateBrief("event-cm", { ...brief, scenario: { ...brief.scenario, scenes } }).ok,
+    validateBrief("event-cm", { ...brief, narration: { ...brief.narration, scenes } }).ok,
     true,
   );
   // Still reported as unfinished, which is what the screen warns about.
   assert.equal(
-    scenarioIsStale({ ...brief, scenario: { ...brief.scenario, scenes } }),
+    narrationIsStale({ ...brief, narration: { ...brief.narration, scenes } }),
     true,
   );
 });
@@ -281,7 +304,7 @@ test("消した項目は、映像の形の判定にも反映される", () => {
   );
 
   // Deleted first, written afterwards — which is the real order, and the order
-  // the stamps have to be in for the scenario to count as current. Switching a
+  // the stamps have to be in for the narration to count as current. Switching a
   // field off IS a change to the facts (facts.ts `setSuppressed`).
   const off = setSuppressed(withGuests, "guests", true, "2026-08-11T00:00:00.000Z");
   assert.equal(
@@ -290,10 +313,10 @@ test("消した項目は、映像の形の判定にも反映される", () => {
     "消した登壇者のシーンがまだ数えられている",
   );
 
-  // A scenario written for the film as drawn is therefore not stale.
+  // A narration written for the film as drawn is therefore not stale.
   const written: EventCmBrief = {
     ...off,
-    scenario: {
+    narration: {
       version: 1,
       source: "human",
       updatedAt: NOW,
@@ -305,14 +328,14 @@ test("消した項目は、映像の形の判定にも反映される", () => {
       })),
     },
   };
-  assert.equal(scenarioStaleness(written), null, "正しいシナリオが古い扱いになっている");
+  assert.equal(narrationStaleness(written), null, "正しいナレーションが古い扱いになっている");
 });
 
 test("食い違いの種類を言い分ける（形が違う／事実が新しい）", () => {
   const base: EventCmBrief = {
     ...SEEDED,
     factsUpdatedAt: "2026-08-14T00:00:00.000Z",
-    scenario: {
+    narration: {
       version: 1,
       source: "llm",
       updatedAt: "2026-08-13T00:00:00.000Z",
@@ -325,12 +348,12 @@ test("食い違いの種類を言い分ける（形が違う／事実が新し�
     },
   };
   // Right set of lines, written before the facts changed.
-  assert.equal(scenarioStaleness(base), "facts");
+  assert.equal(narrationStaleness(base), "facts");
 
   // Wrong set of lines: a picture has no line, or a line has no picture.
   const shape: EventCmBrief = {
     ...base,
-    scenario: { ...base.scenario, scenes: base.scenario.scenes.slice(0, 2) },
+    narration: { ...base.narration, scenes: base.narration.scenes.slice(0, 2) },
   };
-  assert.equal(scenarioStaleness(shape), "shape");
+  assert.equal(narrationStaleness(shape), "shape");
 });

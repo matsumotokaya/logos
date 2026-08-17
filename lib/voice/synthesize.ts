@@ -3,7 +3,7 @@ import "server-only";
 // Reading words aloud — shared by every narrated template.
 //
 // Template-neutral on purpose, so the words it is handed are just words: event-cm
-// calls them the scenario (remotion/event-cm/types.ts), product-cm still calls
+// calls them the narration (remotion/event-cm/types.ts), product-cm still calls
 // them `cm_script`. This module never learns which.
 //
 // This used to live inside lib/campaign/voice.ts, reachable only through a
@@ -40,10 +40,10 @@ export const TTS_VOICE = "Schedar";
 // (./limits.ts, mirrored in labs/campaign/audio/tts-lib/tts.mjs).
 const MIX_SAMPLE_RATE = 24000; // Gemini TTS native rate; no resampling needed
 
-export interface NarrationVoiceOptions {
+export interface VoiceOptions {
   /** How the narrator should read — the one knob a template turns. */
   persona: string;
-  /** Which prebuilt voice reads it (lib/narration/voices.ts). Defaults to the
+  /** Which prebuilt voice reads it (lib/voice/voices.ts). Defaults to the
    *  even-delivery narrator this template has always used. */
   voice?: string;
   /**
@@ -56,13 +56,13 @@ export interface NarrationVoiceOptions {
   onProgress?: (message: string, level?: "info" | "success" | "warn") => void;
 }
 
-export function narrationVoiceAvailable(): boolean {
+export function voiceAvailable(): boolean {
   return Boolean(process.env.GEMINI_API_KEY) || process.env.CAMPAIGN_TTS_MOCK === "1";
 }
 
-export async function generateNarration<Scene extends { text: string }>(
+export async function generateVoice<Scene extends { text: string }>(
   scenes: readonly Scene[],
-  options: NarrationVoiceOptions,
+  options: VoiceOptions,
 ): Promise<{ wav: Buffer; track: CmVoiceTrackOf<Scene> }> {
   const progress = (message: string, level: "info" | "success" | "warn" = "info") =>
     options.onProgress?.(message, level);

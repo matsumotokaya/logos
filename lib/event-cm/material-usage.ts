@@ -70,7 +70,7 @@ function describePath(brief: EventCmBrief, path: string): string {
   if (path === "visuals.programs.src") return `${sceneLabel(brief, "program")} の背景`;
   if (path === "visuals.closing.src") return `${sceneLabel(brief, "cta")} の背景`;
   if (path === "bgm") return "BGM";
-  if (path === "voice.audio") return "読み上げ";
+  if (path === "voice.audio") return "ボイス";
 
   // An unnamed path prints as itself. It looks like a bug because it is one —
   // a pointer the vocabulary has not learned — and a silent 「この動画には出て

@@ -108,27 +108,27 @@ Takeは以下を必須とする。
 
 **焼き付けを持つのは現時点で`event-cm`だけ**。他のテンプレートは`baked_brief`がnullのままで、レンダーは従来どおり`brief`を読む(`baked_brief ?? brief`)。書き込むのは`POST /api/brands/[id]/videos/[videoId]/bake`だけで、一括実行の最終段だけが呼ぶ。
 
-分けた理由は、**編集が即座に成果物へ届いてしまう**状態を無くすため——シナリオを1行保存すると、その場でプレイヤーの尺と字幕が変わっていた。「作業場と成果は違っていてよい。違いは画面が言う」が現在の契約で、差分判定の正本は [../lib/event-cm/bake.ts](../lib/event-cm/bake.ts)(設計の経緯は [event-cm-refactor-plan.md §9.5 / §11.1](old/event-cm-refactor-plan.md)・アーカイブ)。**差分の見せ方(フィールド単位のマニフェスト・琥珀/緑/赤の3色)は [video-state-model.md](video-state-model.md) が仕様**(2026-08-15確定・実装前)。
+分けた理由は、**編集が即座に成果物へ届いてしまう**状態を無くすため——ナレーションを1行保存すると、その場でプレイヤーの尺と字幕が変わっていた。「作業場と成果は違っていてよい。違いは画面が言う」が現在の契約で、差分判定の正本は [../lib/event-cm/bake.ts](../lib/event-cm/bake.ts)(設計の経緯は [event-cm-refactor-plan.md §9.5 / §11.1](old/event-cm-refactor-plan.md)・アーカイブ)。**差分の見せ方(フィールド単位のマニフェスト・琥珀/緑/赤の3色)は [video-state-model.md](video-state-model.md) が仕様**(2026-08-15確定・実装前)。
 
-**2つある列は、briefのキーを改名するときも2つある**。migration 0051(`script` → `scenario`)は同じ式を`brief`と`baked_brief`の両方に当てている。片方だけ改名すると既存の動画が「シナリオ空」として想定尺へ落ちるので、以後 brief のキーを変える migration はこの2列を必ずセットで扱う。
+**2つある列は、briefのキーを改名するときも2つある**。migration 0051(`script` → `narration`)は同じ式を`brief`と`baked_brief`の両方に当てている。片方だけ改名すると既存の動画が「ナレーション空」として想定尺へ落ちるので、以後 brief のキーを変える migration はこの2列を必ずセットで扱う。
 
-### 4.2 event-cm briefの語彙(`scenario` / 字幕 / `voice`)
+### 4.2 event-cm briefの語彙(`narration` / 字幕 / `voice`)
 
 `event-cm`の`brief`が持つ主要フィールドは3語に割れている(migration 0051 で改名。経緯は [event-cm-refactor-plan.md §9.1](old/event-cm-refactor-plan.md))。
 
 | フィールド | 実体 | 型 |
 | --- | --- | --- |
-| `brief.scenario` | 各シーンの**主文**。字幕・尺・シーン構成を規定する**主**(旧 `brief.script`) | `EventCmScenario`([../remotion/event-cm/types.ts](../remotion/event-cm/types.ts)) |
-| — (導出) | 字幕。`scenario`を28字カードへ割った表示単位で、DBには持たない | [../remotion/event-cm/captions.ts](../remotion/event-cm/captions.ts) |
-| `brief.voice` | **読み上げ**。`scenario`を声にした派生物で、BGMと同じくオフにできる(オフは`provenance.voice`のsuppressionとして記録) | `{ track, audio: "material:<uuid>" }` |
+| `brief.narration` | 各シーンの**主文**。字幕・尺・シーン構成を規定する**主**(旧 `brief.script`) | `EventCmNarration`([../remotion/event-cm/types.ts](../remotion/event-cm/types.ts)) |
+| — (導出) | 字幕。`narration`を28字カードへ割った表示単位で、DBには持たない | [../remotion/event-cm/captions.ts](../remotion/event-cm/captions.ts) |
+| `brief.voice` | **読み上げ**。`narration`を声にした派生物で、BGMと同じくオフにできる(オフは`provenance.voice`のsuppressionとして記録) | `{ track, audio: "material:<uuid>" }` |
 
-`brief.scenario`は**必須**(zodスキーマ [../remotion/event-cm/brief-schema.ts](../remotion/event-cm/brief-schema.ts) で non-optional)。読み手が`scenario?.`と防御しないのはこのため——例外は`eventCmFilm()`の1箇所だけで、そこは「常に答える導出」であることを守るために欠損を空シナリオとして扱う。
+`brief.narration`は**必須**(zodスキーマ [../remotion/event-cm/brief-schema.ts](../remotion/event-cm/brief-schema.ts) で non-optional)。読み手が`narration?.`と防御しないのはこのため——例外は`eventCmFilm()`の1箇所だけで、そこは「常に答える導出」であることを守るために欠損を空ナレーションとして扱う。
 
 **`EventCmBrief`は`EventBrief`(event-promo)を継承しない**。共有するのは値の型(`EventPhoto` / `EventLogo` / `EventGuest` / `EventProgram` / `EventSchedule`)だけで、フィールドの一覧は別。継承していた頃は`sideCopy` / `visuals.inkArt` / `visuals.texture`という**どのシーンも描かない3つ**を持ち、それが goal と fact list に並んでいた。以後の規則: **ブリーフに足したフィールドは、どこかのシーンが読むこと**。
 
 **briefのキーを消すときは migration が要らないことが多い**。zod 4 の `z.object()` は未知キーを strip し、書き込み経路はすべて `validateBrief` の**出力**を保存するので、次に保存された時点で消える。**キーを増やす/改名するときは焼き替えが必要**(strip では足せない)——その場合は上記のとおり`brief`と`baked_brief`の両方に当てる。
 
-**`product-cm`はまだ`cm_script`のまま**。同じ「各シーンの主文」構造だが、共通語彙にするかは未決定([event-cm-refactor-plan.md §9.10](old/event-cm-refactor-plan.md))。共有コードの [../lib/narration/voice.ts](../lib/narration/voice.ts) はどちらの綴りも知らない。
+**`product-cm`はまだ`cm_script`のまま**。同じ「各シーンの主文」構造だが、共通語彙にするかは未決定([event-cm-refactor-plan.md §9.10](old/event-cm-refactor-plan.md))。共有コードの [../lib/voice/synthesize.ts](../lib/voice/synthesize.ts) はどちらの綴りも知らない。
 
 ## 5. Templateと成果物
 

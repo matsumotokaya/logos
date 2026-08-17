@@ -9,7 +9,7 @@ import {
 } from "./stages";
 import {
   EVENT_CM_SUPPRESSED_NOTE,
-  scenarioChars,
+  narrationChars,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 
@@ -55,8 +55,8 @@ export const EVENT_CM_GOAL: readonly GoalField[] = [
   { path: "visuals.closing", label: "締めの背景", required: false },
   { path: "bgm", label: "BGM", required: false },
   // What it says
-  { path: "scenario", label: "シナリオ", required: true },
-  { path: "voice", label: "読み上げ音声", required: false },
+  { path: "narration", label: "ナレーション", required: true },
+  { path: "voice", label: "ボイス", required: false },
 ];
 
 /** Whether each goal field currently holds anything. Structure only — an empty
@@ -88,7 +88,7 @@ function filledPaths(brief: EventCmBrief): string[] {
   if (brief.visuals?.programs) paths.push("visuals.programs");
   if (brief.visuals?.closing) paths.push("visuals.closing");
   text("bgm", brief.bgm);
-  if (scenarioChars(brief.scenario) > 0) paths.push("scenario");
+  if (narrationChars(brief.narration) > 0) paths.push("narration");
   if (brief.voice) paths.push("voice");
 
   return paths;

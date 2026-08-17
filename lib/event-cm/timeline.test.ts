@@ -7,14 +7,16 @@ import {
   EVENT_CM_SCENE_GAP_MS,
 } from "@/remotion/event-cm/timeline";
 import {
+  EVENT_CM_SUPPRESSED_NOTE,
   eventCmNarratedSteps,
   eventCmScenePlan,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 import { seedEventCmBrief } from "./seed";
 
-// The seeded brief announces nobody: people are never invented (seed.ts), so
-// this film has no speaker picture and four scenario lines.
+// The seeded brief names nobody — people are never invented (seed.ts) — but it
+// still has the speaker picture, with the roles the seeder proposes on it. The
+// film's shape is the template's, not the facts'.
 const SEEDED = seedEventCmBrief(
   { name: "WealthPark Lab", industry: "金融教育メディア" },
   { now: new Date("2026-08-11T09:00:00+09:00"), seed: "take-1" },
@@ -25,10 +27,10 @@ const GUESTS = [
   { name: "大西 美香", role: "Miss SAKE 代表理事", photo: null },
 ];
 
-const withScenario = (brief: EventCmBrief, texts: string[]): EventCmBrief => ({
+const withNarration = (brief: EventCmBrief, texts: string[]): EventCmBrief => ({
   ...brief,
-  scenario: {
-    ...brief.scenario,
+  narration: {
+    ...brief.narration,
     // One line per narrated PICTURE. A brief that lists three programmes has
     // three programme pictures, so a fixture handing over four lines pads with
     // its last one rather than leaving scenes wordless (which would silently
@@ -41,10 +43,15 @@ const withScenario = (brief: EventCmBrief, texts: string[]): EventCmBrief => ({
   },
 });
 
-test("シナリオが無くても全シーンの尺が決まる", () => {
+test("ナレーションが無くても全シーンの尺が決まる", () => {
   // This is what makes "add a video" produce something that plays: no LLM
-  // call, no render, and still a complete film.
-  const timeline = eventCmTimeline(SEEDED);
+  // call, no render, and still a complete film. The seeded take now arrives
+  // WITH a draft, so `budget` is the stage below that — a take whose lines have
+  // all been cleared.
+  const timeline = eventCmTimeline({
+    ...SEEDED,
+    narration: { ...SEEDED.narration, scenes: [] },
+  });
 
   assert.equal(timeline.source, "budget");
   assert.deepEqual(
@@ -70,23 +77,28 @@ test("ロゴで始まりロゴで終わる", () => {
 
 test("ナレーションは2番目のシーンから始まり、締めのロゴの前で終わる", () => {
   const timeline = eventCmTimeline(SEEDED);
-  assert.equal(timeline.narrationStartMs, EVENT_CM_INTRO_MS);
+  assert.equal(timeline.voiceStartMs, EVENT_CM_INTRO_MS);
   assert.equal(timeline.scenes[1].role, "title");
   assert.equal(timeline.scenes[1].fromMs, EVENT_CM_INTRO_MS);
-  assert.equal(timeline.narrationEndMs, timeline.totalMs - EVENT_CM_OUTRO_MS);
+  assert.equal(timeline.voiceEndMs, timeline.totalMs - EVENT_CM_OUTRO_MS);
 });
 
-test("登壇者が居なければそのシーンは存在しない", () => {
-  // A speaker picture with nobody in it is not a line-up, and a scenario line
-  // about guests who do not exist is worse than silence.
-  const withoutGuests = eventCmTimeline(SEEDED).scenes.map((scene) => scene.role);
-  const withGuests = eventCmTimeline({ ...SEEDED, guests: GUESTS }).scenes.map(
-    (scene) => scene.role,
-  );
+test("登壇者のシーンは、消したときだけ存在しない", () => {
+  // The picture belongs to the template (EVENT_CM_SCENES), so it is there from
+  // the start. An empty guest list used to remove it, which meant the film's
+  // shape moved whenever the facts did.
+  const present = eventCmTimeline(SEEDED).scenes.map((scene) => scene.role);
+  const deleted = eventCmTimeline({
+    ...SEEDED,
+    provenance: {
+      ...SEEDED.provenance,
+      guests: { origin: "user", note: EVENT_CM_SUPPRESSED_NOTE },
+    },
+  }).scenes.map((scene) => scene.role);
 
-  assert.equal(withoutGuests.includes("guests"), false);
-  assert.equal(withGuests.includes("guests"), true);
-  assert.equal(withGuests.length, withoutGuests.length + 1);
+  assert.equal(present.includes("guests"), true);
+  assert.equal(deleted.includes("guests"), false);
+  assert.equal(present.length, deleted.length + 1);
 });
 
 test("シーンは隙間なく連続する", () => {
@@ -109,7 +121,7 @@ test("章のあいだに間がある", () => {
   // Each picture is a chapter. Without air between them the next line starts
   // before the last one has landed.
   const line = "あ".repeat(35);
-  const timeline = eventCmTimeline(withScenario(SEEDED, [line, line, line, line]));
+  const timeline = eventCmTimeline(withNarration(SEEDED, [line, line, line, line]));
   const spokenMs = Math.round((35 / 7) * 1000);
   for (const scene of timeline.scenes) {
     if (scene.role === "logoIn" || scene.role === "logoOut") continue;
@@ -130,14 +142,14 @@ test("30秒を超えてよい——正しい尺が要件", () => {
   assert.ok(timeline.totalMs < 50_000, `${timeline.totalMs}ms — 長すぎる`);
 });
 
-test("シナリオを書くと尺がその文字数に従う", () => {
-  const short = withScenario(SEEDED, [
+test("ナレーションを書くと尺がその文字数に従う", () => {
+  const short = withNarration(SEEDED, [
     "あ".repeat(28),
     "い".repeat(45),
     "う".repeat(44),
     "え".repeat(36),
   ]);
-  const long = withScenario(SEEDED, [
+  const long = withNarration(SEEDED, [
     "あ".repeat(28),
     "い".repeat(45),
     "う".repeat(140),
@@ -147,18 +159,18 @@ test("シナリオを書くと尺がその文字数に従う", () => {
   const shortTimeline = eventCmTimeline(short);
   const longTimeline = eventCmTimeline(long);
 
-  assert.equal(shortTimeline.source, "scenario");
+  assert.equal(shortTimeline.source, "narration");
   const shortProgram = shortTimeline.scenes.find((s) => s.role === "program")!;
   const longProgram = longTimeline.scenes.find((s) => s.role === "program")!;
-  assert.ok(longProgram.durationMs > shortProgram.durationMs * 2, "長いシナリオは長いシーンになる");
+  assert.ok(longProgram.durationMs > shortProgram.durationMs * 2, "長いナレーションは長いシーンになる");
   assert.ok(longTimeline.totalMs > shortTimeline.totalMs);
 });
 
-test("無音のシーンはシナリオの長さに影響されない", () => {
-  // Their job is fixed: establish the mark, and let it go. A long scenario must
+test("無音のシーンはナレーションの長さに影響されない", () => {
+  // Their job is fixed: establish the mark, and let it go. A long narration must
   // not stretch the opening logo.
   const timeline = eventCmTimeline(
-    withScenario(SEEDED, ["あ".repeat(200), "い", "う", "え"]),
+    withNarration(SEEDED, ["あ".repeat(200), "い", "う", "え"]),
   );
   assert.equal(timeline.scenes[0].durationMs, EVENT_CM_INTRO_MS);
   assert.equal(
@@ -168,7 +180,7 @@ test("無音のシーンはシナリオの長さに影響されない", () => {
 });
 
 test("短すぎる一行でも読める最小の尺を確保する", () => {
-  const terse = withScenario(SEEDED, ["短い", "短い", "短い", "短い"]);
+  const terse = withNarration(SEEDED, ["短い", "短い", "短い", "短い"]);
   const timeline = eventCmTimeline(terse);
   const narrated = eventCmNarratedSteps(SEEDED).map((step) => step.role);
   assert.ok(
@@ -179,9 +191,9 @@ test("短すぎる一行でも読める最小の尺を確保する", () => {
   );
 });
 
-test("音声があれば実測がシナリオの推定を上書きする", () => {
+test("音声があれば実測がナレーションの推定を上書きする", () => {
   const roles = eventCmNarratedSteps(SEEDED).map((step) => step.role);
-  const written = withScenario(SEEDED, roles.map((_, i) => "あ".repeat(30 + i)));
+  const written = withNarration(SEEDED, roles.map((_, i) => "あ".repeat(30 + i)));
   const spoken: EventCmBrief = {
     ...written,
     voice: {
@@ -216,6 +228,6 @@ test("音声があれば実測がシナリオの推定を上書きする", () =>
   );
   assert.equal(timeline.scenes[1].fromMs, EVENT_CM_INTRO_MS);
   assert.equal(timeline.scenes[2].fromMs, 6_200 + EVENT_CM_INTRO_MS);
-  assert.equal(timeline.narrationStartMs, EVENT_CM_INTRO_MS);
-  assert.equal(timeline.narrationEndMs, roles.length * 6_200 + EVENT_CM_INTRO_MS);
+  assert.equal(timeline.voiceStartMs, EVENT_CM_INTRO_MS);
+  assert.equal(timeline.voiceEndMs, roles.length * 6_200 + EVENT_CM_INTRO_MS);
 });

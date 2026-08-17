@@ -90,7 +90,7 @@ export const RemotionRoot: React.FC = () => {
       durationInFrames={EVENT_DURATION_FRAMES}
       defaultProps={{ brief: sake2026Brief }}
     />
-    {/* Narrated event film. Length is never a constant here: the scenario
+    {/* Narrated event film. Length is never a constant here: the narration
         decides it, so the same derivation the player uses answers for the CLI
         (eventCmDurationInFrames → eventCmFilm). A fixed durationInFrames would
         cut the video off the moment somebody wrote a longer line. */}

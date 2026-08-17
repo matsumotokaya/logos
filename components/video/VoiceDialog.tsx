@@ -1,16 +1,17 @@
 "use client";
 
-// The reading-aloud control: one button, always the same button.
+// The voice control: one button, always the same button.
 //
-// Reading a scenario aloud is not a step that completes. The words change, the
+// Reading a narration aloud is not a step that completes. The words change, the
 // delivery can be wrong, a different voice may suit the event better — so the
 // control does not advertise a state ("読み上げる" → "読み上げ直す") and does not
-// go away once a recording exists. It says 読み上げ, it opens, and inside you can
+// go away once a recording exists. It says ボイス, it opens, and inside you can
 // record over whatever is there as many times as you like.
 //
-// It is called 読み上げ and not ナレーション because the words themselves are the
-// SCENARIO (§9.1). One word for the story and its recording is what let three
-// surfaces argue about which one the film was made from.
+// It is called ボイス and not ナレーション because the words themselves are the
+// NARRATION: the narration is what the film says, and the voice is one of the
+// two ways it says it (the other is the subtitles). One word for both is what
+// let three surfaces argue about which one the film was made from.
 //
 // Off is a first-class choice, not a failure to record: an event film with
 // music and subtitles and no voice is a finished thing. Turning it off keeps
@@ -27,9 +28,9 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
 import StatusDot from "./StatusDot";
-import { NARRATION_VOICES } from "@/lib/narration/voices";
+import { VOICE_PRESETS } from "@/lib/voice/voices";
 
-export default function NarrationDialog({
+export default function VoiceDialog({
   hasVoice,
   currentVoiceId,
   narrator,
@@ -54,7 +55,7 @@ export default function NarrationDialog({
   onChoose: (voiceId: string) => Promise<boolean>;
   onTurnOff: () => Promise<boolean>;
 }) {
-  const set = narrator ?? currentVoiceId ?? NARRATION_VOICES[0].id;
+  const set = narrator ?? currentVoiceId ?? VOICE_PRESETS[0].id;
   const [chosen, setChosen] = useState<string>(set);
   const [open, setOpen] = useState(false);
   // What just happened, said in the dialog that asked for it.
@@ -94,7 +95,7 @@ export default function NarrationDialog({
         }
       >
         <span className="inline-flex items-center gap-2">
-          読み上げ
+          ボイス
           {/* Whether the film speaks, AND whether the film being played is the
               one that says it. The label never changes, because the action
               available is the same either way (components/video/StatusDot.tsx). */}
@@ -109,7 +110,7 @@ export default function NarrationDialog({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <Dialog.Title className="font-display text-base font-semibold">
-                  読み上げ
+                  ボイス
                 </Dialog.Title>
                 <Dialog.Description className="mt-1 text-[12px] text-ink-muted">
                   {hasVoice
@@ -132,7 +133,7 @@ export default function NarrationDialog({
                 読み上げる声
               </legend>
               <div className="mt-2 flex flex-col gap-1.5">
-                {NARRATION_VOICES.map((voice) => (
+                {VOICE_PRESETS.map((voice) => (
                   <label
                     key={voice.id}
                     className={cn(
@@ -191,11 +192,11 @@ export default function NarrationDialog({
                 {hasVoice ? (
                   <button
                     type="button"
-                    onClick={() => void run(onTurnOff, "読み上げをオフにしました")}
+                    onClick={() => void run(onTurnOff, "ボイスをオフにしました")}
                     disabled={busy || Boolean(done)}
                     className="rounded-full border border-hairline px-4 py-2 text-xs font-semibold transition hover:border-ink disabled:opacity-50"
                   >
-                    読み上げをオフにする
+                    ボイスをオフにする
                   </button>
                 ) : null}
                 <button

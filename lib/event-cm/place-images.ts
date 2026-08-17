@@ -374,7 +374,7 @@ export function placeImagesIntoBrief(
   // `factsUpdatedAt` is deliberately NOT stamped. It exists to tell the
   // narration it is describing an older event, and a photograph is not
   // something the narration says: placing one changes what the film shows, not
-  // what it claims. Stamping here would mark every scenario stale and rewrite
+  // what it claims. Stamping here would mark every narration stale and rewrite
   // perfectly current words because a picture arrived.
   return { brief: { ...next, provenance }, placed, unused };
 }

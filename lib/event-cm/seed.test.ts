@@ -8,7 +8,10 @@ import { eventCmGoalState } from "@/lib/pipeline/event-cm";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import {
   eventCmNarratedSteps,
-  scenarioIsStale,
+  eventCmSceneBudget,
+  eventCmSceneKey,
+  narrationIsStale,
+  sceneChars,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 
@@ -35,17 +38,22 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   const brief = seedFor(WEALTHPARK_LAB);
   const narrated = eventCmNarratedSteps(brief).map((step) => step.role);
 
-  // Not written yet: legal, and what a seeded take looks like.
+  // A half-written narration is legal, and so is the seeded draft.
   assert.equal(validateBrief("event-cm", brief).ok, true);
+  assert.equal(
+    validateBrief("event-cm", { ...brief, narration: { ...brief.narration, scenes: [] } })
+      .ok,
+    true,
+  );
 
-  // Fully written for this brief. The seeded one announces nobody, so the
-  // speaker scene does not exist and neither does its line.
-  assert.equal(narrated.includes("guests"), false);
+  // The speaker picture is the template's, so its line is expected from the
+  // start — it no longer waits for somebody to be announced.
+  assert.equal(narrated.includes("guests"), true);
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      scenario: {
-        ...brief.scenario,
+      narration: {
+        ...brief.narration,
         scenes: eventCmNarratedSteps(brief).map(({ role, index }) => ({
           role,
           ...(index === undefined ? {} : { index }),
@@ -60,7 +68,7 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      scenario: { ...brief.scenario, scenes: [{ role: "logoIn", text: "…" }] },
+      narration: { ...brief.narration, scenes: [{ role: "logoIn", text: "…" }] },
     }).ok,
     false,
   );
@@ -71,8 +79,8 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      scenario: {
-        ...brief.scenario,
+      narration: {
+        ...brief.narration,
         scenes: [
           { role: "title", text: "…" },
           { role: "program", index: 0, text: "…" },
@@ -86,8 +94,8 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      scenario: {
-        ...brief.scenario,
+      narration: {
+        ...brief.narration,
         scenes: [
           { role: "program", index: 1, text: "…" },
           { role: "program", index: 0, text: "…" },
@@ -102,8 +110,8 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      scenario: {
-        ...brief.scenario,
+      narration: {
+        ...brief.narration,
         scenes: [
           { role: "title", text: "…" },
           { role: "title", text: "…" },
@@ -115,8 +123,8 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   assert.equal(
     validateBrief("event-cm", {
       ...brief,
-      scenario: {
-        ...brief.scenario,
+      narration: {
+        ...brief.narration,
         scenes: [
           { role: "cta", text: "…" },
           { role: "title", text: "…" },
@@ -127,15 +135,18 @@ test("スキーマが拒むのは、映像に置き場のない行だけ", () =>
   );
 });
 
-test("シーンが増えたら、保存を拒まず「シナリオが古い」と言う", () => {
-  // The flow this protects: drop in a flyer that names a speaker. The film gains
-  // a scene the scenario has no line for, and refusing to save the speaker would
-  // be the wrong answer to a fact somebody just supplied.
+test("事実が新しくなったら、保存を拒まず「ナレーションが古い」と言う", () => {
+  // The flow this protects: drop in a flyer that names a speaker. The words are
+  // now about an older version of the event, and refusing to save the speaker
+  // would be the wrong answer to a fact somebody just supplied.
+  //
+  // The film no longer gains a PICTURE here — the speaker scene was always
+  // there (EVENT_CM_SCENES) — so what goes stale is the facts, not the shape.
   const brief = seedFor(WEALTHPARK_LAB);
   const written: EventCmBrief = {
     ...brief,
-    scenario: {
-      ...brief.scenario,
+    narration: {
+      ...brief.narration,
       scenes: eventCmNarratedSteps(brief).map(({ role, index }) => ({
         role,
         ...(index === undefined ? {} : { index }),
@@ -144,14 +155,17 @@ test("シーンが増えたら、保存を拒まず「シナリオが古い」�
       updatedAt: "2026-08-13T00:00:00.000Z",
     },
   };
-  assert.equal(scenarioIsStale(written), false);
+  assert.equal(narrationIsStale(written), false);
 
   const withGuest: EventCmBrief = {
     ...written,
     guests: [{ name: "宮尾 佳明", role: "宮尾酒造 十一代目当主", photo: null }],
+    // Stamped by whoever wrote the fact — the mapping stage, or an edit in the
+    // fact list. It is what tells the narration it is describing an older event.
+    factsUpdatedAt: "2026-08-14T00:00:00.000Z",
   };
   assert.equal(validateBrief("event-cm", withGuest).ok, true, "保存は通る");
-  assert.equal(scenarioIsStale(withGuest), true, "シナリオは古いと分かる");
+  assert.equal(narrationIsStale(withGuest), true, "ナレーションは古いと分かる");
 });
 
 test("提案する日付は4週間以上先の最初の金曜日", () => {
@@ -170,12 +184,15 @@ test("業種が読めなければ一般セミナーに落ちる", () => {
   assert.equal(archetypeFor({ industry: "", description: "" }).id, "general-seminar");
 });
 
-test("シードだけでシナリオ以外の必須項目が埋まる", () => {
+test("シードだけで必須項目が全部埋まる", () => {
+  // Including the narration: every picture that speaks arrives with a draft
+  // line. 「追加した瞬間に完成した映像が再生される」 used to be true of the
+  // pictures and false of the words.
   const state = eventCmGoalState(seedFor(WEALTHPARK_LAB));
   assert.deepEqual(
     state.progress.missingRequired.map((field) => field.path),
-    ["scenario"],
-    "残る必須項目はシナリオだけ",
+    [],
+    "残っている必須項目がある",
   );
 });
 
@@ -190,9 +207,51 @@ test("推定した値だけが暫定として報告される", () => {
   assert.ok(!provisional.includes("presenter"));
 });
 
-test("登壇者を捏造しない", () => {
-  // A guessed date is a proposal. A guessed speaker is a fabricated person.
-  assert.deepEqual(seedFor(WEALTHPARK_LAB).guests, []);
+test("登壇者は役割で提案し、氏名は発明しない", () => {
+  // A guessed date is a proposal somebody corrects in five seconds. A guessed
+  // NAME is a person who does not exist — and place-images.ts will attach a
+  // real photograph to it the moment a caption seems to match.
+  //
+  // The picture is part of the template now, so the list cannot be empty: an
+  // empty one would open the film's fifth picture with nothing on it.
+  const guests = seedFor(WEALTHPARK_LAB).guests;
+  assert.deepEqual(
+    guests.map((guest) => guest.name),
+    ["ゲストスピーカー", "モデレーター"],
+  );
+  assert.ok(
+    guests.every((guest) => guest.role === "" && guest.photo === null),
+    "肩書きや所属は事実なので、提案しない",
+  );
+});
+
+test("シードのナレーションは、喋る全シーンに1行ずつ入る", () => {
+  const brief = seedFor(WEALTHPARK_LAB);
+  assert.deepEqual(
+    brief.narration.scenes.map((scene) => eventCmSceneKey(scene)),
+    eventCmNarratedSteps(brief).map((step) => eventCmSceneKey(step)),
+  );
+  assert.equal(brief.narration.source, "llm", "下書きなので上書きできる");
+  assert.equal(narrationIsStale(brief), false);
+});
+
+test("シードのナレーションは事実を語らず、尺の目安に収まる", () => {
+  // The lines are spoken and shown as subtitles, and a subtitle carries no
+  // 「仮に入れた値」 label — so a draft that stated a date would read as an
+  // announcement. They say what their scene is FOR (README「捏造の方針」).
+  for (const scene of seedFor(WEALTHPARK_LAB).narration.scenes) {
+    assert.doesNotMatch(
+      scene.text,
+      /[0-9０-９]/,
+      `${scene.role} の下書きが数字を語っている: ${scene.text}`,
+    );
+    const budget = eventCmSceneBudget(scene);
+    const chars = sceneChars(scene);
+    assert.ok(
+      chars >= budget.min && chars <= budget.max,
+      `${scene.role} が目安${budget.min}〜${budget.max}字を外れている (${chars}字)`,
+    );
+  }
 });
 
 test("誰も言っていない事実は空のままにする", () => {

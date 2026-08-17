@@ -78,7 +78,8 @@ test("編集できない項目への書き込みは拒否される", () => {
 
 test("一覧の表示は生のJSONではなく読める形にする", () => {
   assert.equal(previewOf(SEEDED, "programs"), SEEDED.programs.map((p) => p.title).join(" / "));
-  assert.equal(previewOf(SEEDED, "guests"), "");
+  // Roles, not names — what the seeder proposes for the speaker picture.
+  assert.equal(previewOf(SEEDED, "guests"), SEEDED.guests.map((g) => g.name).join("、"));
   assert.equal(previewOf(SEEDED, "schedule.date"), SEEDED.schedule.date);
 });
 
@@ -121,10 +122,10 @@ test("音楽や写真を選び直しても、ナレーションは古くなら�
   assert.equal(bgm.provenance?.bgm?.origin, "user");
 });
 
-test("項目を消すのも事実の変更（シナリオが古くなる）", () => {
+test("項目を消すのも事実の変更（ナレーションが古くなる）", () => {
   // Switching a field off changes what the film says as well as what it draws:
-  // a suppressed field is emptied before the scenario is written. Without the
-  // stamp the deletion was invisible downstream — the scenario stayed "current"
+  // a suppressed field is emptied before the narration is written. Without the
+  // stamp the deletion was invisible downstream — the narration stayed "current"
   // while describing speakers that were no longer in the film, and bakeState
   // reported nothing to reflect, so the player kept the deleted picture.
   const off = setSuppressed(SEEDED, "guests", true, "2026-08-15T00:00:00.000Z");
@@ -139,7 +140,7 @@ test("見せるだけの項目と、読み上げそのものは消しても古�
   // teaches people to ignore warnings. `voice` is here because it IS the
   // narration — switching the reading off must not ask for a rewrite of words
   // nobody is going to speak.
-  for (const path of ["bgm", "visuals.closing", "guests[0].photo", "voice", "scenario"]) {
+  for (const path of ["bgm", "visuals.closing", "guests[0].photo", "voice", "narration"]) {
     const off = setSuppressed(SEEDED, path, true, "2026-08-15T00:00:00.000Z");
     assert.equal(off.factsUpdatedAt, SEEDED.factsUpdatedAt, path);
   }

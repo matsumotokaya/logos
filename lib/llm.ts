@@ -9,7 +9,7 @@ import { LengthFinishReasonError } from "openai/error";
 // thousand tokens of flyers under a budget of thirty thousand; what it may not
 // do is think and write more than thirty thousand. On a reasoning model most
 // of a budget goes to the thinking, which is why these numbers are far larger
-// than the answers they carry (a scenario measures ~2,400, a Brand Kit ~4,000).
+// than the answers they carry (a narration measures ~2,400, a Brand Kit ~4,000).
 //
 // WHY IT IS CAPPED AT ALL: a ceiling is not a reservation — nothing is billed
 // for room left unused — so a generous limit costs nothing on an ordinary run.
@@ -17,7 +17,7 @@ import { LengthFinishReasonError } from "openai/error";
 // spend every token it is allowed. The cap is what stops one confused call from
 // running up a bill, so it stays finite.
 //
-// WHY THEY ARE THIS LARGE: the first version of the scenario call allowed 4,000
+// WHY THEY ARE THIS LARGE: the first version of the narration call allowed 4,000
 // against a typical spend of 2,352. That is not a limit that fails — it is one
 // that fails SOMETIMES, which is worse, because a stage that usually works and
 // occasionally dies of an English sentence about a length limit reads as
@@ -26,7 +26,7 @@ import { LengthFinishReasonError } from "openai/error";
 export const LLM_BUDGET = {
   /**
    * Reasoning plus a structured answer of real size: reading a stack of
-   * documents, writing a scenario, assembling a Brand Kit.
+   * documents, writing a narration, assembling a Brand Kit.
    */
   long: 30_000,
   /**

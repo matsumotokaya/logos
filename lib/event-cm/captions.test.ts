@@ -7,7 +7,14 @@ import {
   splitSentences,
 } from "@/remotion/event-cm/captions";
 import { eventCmTimeline, EVENT_CM_INTRO_MS } from "@/remotion/event-cm/timeline";
-import { eventCmNarratedSteps, type EventCmBrief } from "@/remotion/event-cm/types";
+import {
+  EVENT_CM_CAPTIONS_PATH,
+  EVENT_CM_SUPPRESSED_NOTE,
+  eventCmNarratedSteps,
+  type EventCmBrief,
+} from "@/remotion/event-cm/types";
+import { eventCmFilm } from "@/remotion/event-cm/film";
+import { isSpokenFact } from "./facts";
 import { seedEventCmBrief } from "./seed";
 
 const SEEDED = seedEventCmBrief(
@@ -27,7 +34,7 @@ const SPOKEN: Record<string, string> = {
 
 const written: EventCmBrief = {
   ...SEEDED,
-  scenario: {
+  narration: {
     version: 1,
     scenes: eventCmNarratedSteps(SEEDED).map(({ role, index }) => ({
       role,
@@ -46,20 +53,22 @@ test("文で割る（句点を残す）", () => {
   assert.deepEqual(splitSentences("  "), []);
 });
 
-test("シナリオがあれば、音声を待たずに字幕が出る", () => {
-  // The whole reason subtitles are derived from the scenario: a film watched
+test("ナレーションがあれば、音声を待たずに字幕が出る", () => {
+  // The whole reason subtitles are derived from the narration: a film watched
   // muted must be readable before anyone has paid for TTS.
   const captions = captionsFor(written);
   assert.ok(
-    captions.length > written.scenario.scenes.length,
+    captions.length > written.narration.scenes.length,
     "シーン数より多い＝文単位で割れている",
   );
   // The first thing anyone reads is the title call.
   assert.equal(captions[0].text, "ウェルスパークラボがおくる、パッションアセットの世界。");
 });
 
-test("シナリオが無ければ字幕も無い", () => {
-  assert.deepEqual(captionsFor(SEEDED), []);
+test("ナレーションが無ければ字幕も無い", () => {
+  // Not the seeded brief any more: that arrives with a draft line per picture.
+  const unwritten = { ...SEEDED, narration: { ...SEEDED.narration, scenes: [] } };
+  assert.deepEqual(captionsFor(unwritten), []);
 });
 
 test("字幕は重ならず、隙間なく続く", () => {
@@ -88,7 +97,7 @@ test("字幕は締めのロゴシーンには残らない", () => {
   const captions = captionsFor(written);
   const timeline = eventCmTimeline(written);
   const last = captions[captions.length - 1];
-  assert.equal(last.toMs, timeline.narrationEndMs, "最後の字幕はナレーションの終わりで消える");
+  assert.equal(last.toMs, timeline.voiceEndMs, "最後の字幕はナレーションの終わりで消える");
   assert.ok(last.toMs < timeline.totalMs);
 });
 
@@ -97,7 +106,7 @@ test("長い文には長く出る（文字数で配分する）", () => {
   // absorbs the rounding so its subtitle ends exactly where the scene does.
   const brief: EventCmBrief = {
     ...SEEDED,
-    scenario: {
+    narration: {
       version: 1,
       scenes: eventCmNarratedSteps(SEEDED).map(({ role, index }) => ({
         role,
@@ -133,12 +142,12 @@ test("どの瞬間にも字幕は最大1枚", () => {
   }
 });
 
-/** The same scenario, with one picture's line replaced. */
+/** The same narration, with one picture's line replaced. */
 const briefWith = (valueText: string): EventCmBrief => ({
   ...written,
-  scenario: {
-    ...written.scenario,
-    scenes: written.scenario.scenes.map((scene) =>
+  narration: {
+    ...written.narration,
+    scenes: written.narration.scenes.map((scene) =>
       scene.role === "value" ? { ...scene, text: valueText } : scene,
     ),
   },
@@ -171,4 +180,37 @@ test("読点があれば、そこで割る", () => {
   assert.ok(cards.every((card) => card.length <= 28));
   // Nothing is lost.
   assert.equal(cards.join(""), "百貨店には並ばない蔵出しの日本酒を、五種類、じっくり味わいながら、その楽しみ方を学びます");
+});
+
+test("字幕はオフにできる。言葉も尺も動かない", () => {
+  // The narration has two outputs — spoken and shown — and both can be
+  // declined. Only the spoken one could until 2026-08-17, which made the pair
+  // asymmetric for no reason anyone could state.
+  const off: EventCmBrief = {
+    ...written,
+    provenance: {
+      ...written.provenance,
+      [EVENT_CM_CAPTIONS_PATH]: { origin: "user", note: EVENT_CM_SUPPRESSED_NOTE },
+    },
+  };
+
+  assert.ok(eventCmFilm(written).captions.length > 0, "オンのときに字幕が出ていない");
+  assert.deepEqual(eventCmFilm(off).captions, []);
+
+  // The point of the feature: what disappears is the DISPLAY. The words are
+  // still there, and they still decide how long each picture runs — a film that
+  // got shorter when the subtitles went away would be a different film.
+  assert.deepEqual(
+    eventCmFilm(off).drawn.narration.scenes,
+    eventCmFilm(written).drawn.narration.scenes,
+  );
+  assert.equal(eventCmTimeline(off).totalMs, eventCmTimeline(written).totalMs);
+});
+
+test("字幕を切ってもナレーションは古くならない", () => {
+  // `factsUpdatedAt` exists to say the words describe an older event. The
+  // subtitles ARE the words, letter for letter, so switching them off cannot
+  // make them wrong — and a warning that appears when nothing is wrong is a
+  // warning people learn to ignore.
+  assert.equal(isSpokenFact(EVENT_CM_CAPTIONS_PATH), false);
 });

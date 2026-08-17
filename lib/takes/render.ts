@@ -89,7 +89,7 @@ export async function renderTake(
   // The export is a file of the film the player showed, not of the workbench.
   //
   // Reading the working brief here would hand somebody an MP4 of edits they
-  // were still making — including a scenario with no recording, which would
+  // were still making — including a narration with no recording, which would
   // export at the estimated length rather than the measured one. Templates with
   // no fixing step (product-cm, event-promo) have no `baked_brief`, and for
   // them this is the brief it always was (migration 0050, §9.4).

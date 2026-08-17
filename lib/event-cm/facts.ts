@@ -61,7 +61,7 @@ const INPUT_BY_PATH: Record<string, FactInput> = {
   "visuals.programs": "asset",
   "visuals.closing": "asset",
   bgm: "asset",
-  scenario: "generated",
+  narration: "generated",
   voice: "generated",
 };
 
@@ -138,9 +138,9 @@ export function previewOf(brief: EventCmBrief, path: string): string {
       return brief.visuals.closing ? "写真あり" : "";
     case "bgm":
       return brief.bgm ? "あり" : "";
-    case "scenario":
-      return brief.scenario.scenes.length > 0
-        ? brief.scenario.scenes.map((scene) => scene.text).join("").slice(0, 60)
+    case "narration":
+      return brief.narration.scenes.length > 0
+        ? brief.narration.scenes.map((scene) => scene.text).join("").slice(0, 60)
         : "";
     case "voice":
       return brief.voice ? `${Math.round(brief.voice.track.totalMs / 1000)}秒` : "";
@@ -340,23 +340,28 @@ export function markUserEdited(
  * Fields the narration could be reading.
  *
  * `factsUpdatedAt` exists for one job: telling the narration that it is
- * describing an older event (`scenarioIsStale`). So it must move when a spoken
+ * describing an older event (`narrationIsStale`). So it must move when a spoken
  * fact changes — and must not move for something the film only shows or plays.
  * Picking a different music track used to stamp it, which put 「ナレーションが
  * 書き直されていません」 on a film whose words were perfectly current. A warning
  * that appears when nothing is wrong is a warning people learn to ignore.
  *
- * `scenario` and `voice` are here because they are the narration, not facts it
+ * `narration` and `voice` are here because they are the narration, not facts it
  * reads. Stamping when the words are written would make them stale the instant
  * they were saved, and switching the reading off would ask for a rewrite of a
- * scenario nobody is going to speak.
+ * narration nobody is going to speak.
  *
  * `theme` and `brandBase` are here for the music's reason: the palette and the
  * mark are seen, never said, so declining the brand's base restyles the film
  * without changing one word of what it announces.
+ *
+ * `captions` is here for the sharpest version of the same reason: the subtitles
+ * ARE the narration, letter for letter. Switching them off changes who can read
+ * the words, never what they say — so asking for a rewrite would be asking the
+ * writer to fix something that is not wrong.
  */
 const UNSPOKEN =
-  /^(bgm$|logos$|theme$|brandBase$|visuals\.|guests\[\d+\]\.photo$|scenario$|voice$|narrator$)/;
+  /^(bgm$|logos$|theme$|brandBase$|captions$|visuals\.|guests\[\d+\]\.photo$|narration$|voice$|narrator$)/;
 
 export const isSpokenFact = (path: string): boolean => !UNSPOKEN.test(path);
 
@@ -369,9 +374,9 @@ export const isSpokenFact = (path: string): boolean => !UNSPOKEN.test(path);
  *
  * Stamps the facts for the same reason an edit does. Switching a field off
  * changes what the film draws AND what it says — a suppressed field is not
- * spoken either (`applySuppression` empties it before the scenario is written).
+ * spoken either (`applySuppression` empties it before the narration is written).
  * Without the stamp the change was invisible to everything downstream: the
- * scenario stayed "current" while describing speakers that had been removed,
+ * narration stayed "current" while describing speakers that had been removed,
  * and `bakeState` — which compares these three stamps and nothing else —
  * reported no pending changes, so the one button had no step to run and the
  * player kept the deleted picture until somebody pressed it a second time.

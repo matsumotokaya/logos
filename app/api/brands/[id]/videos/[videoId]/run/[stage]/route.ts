@@ -7,7 +7,7 @@
 //
 //   extract    read the material as far as rules go
 //   structure  work out the event's facts from it — recorded, not applied
-//   map        put those facts into the film, and rewrite the scenario
+//   map        put those facts into the film, and rewrite the narration
 //
 // Each run is recorded in take_runs, which already models exactly this
 // (stage, status, input, steps, usage). The map stage is the only one that
@@ -28,7 +28,7 @@ import {
   type ImageMaterial,
 } from "@/lib/event-cm/place-images";
 import { storeImageClassifications } from "@/lib/materials/classify";
-import { draftEventCmScenario, eventCmScenarioAvailable } from "@/lib/event-cm/scenario";
+import { draftEventCmNarration, eventCmNarrationAvailable } from "@/lib/event-cm/narration";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 
@@ -214,29 +214,29 @@ export async function POST(
       })),
     );
 
-    // The scenario is the film's spine: it decides the scene order and the
+    // The narration is the film's spine: it decides the scene order and the
     // scene lengths, so facts that changed without it are a film narrating a
     // different event. Rewriting it here is what makes 資料 → 事実 →
     // ナレーション → 映像 one chain instead of two branches.
     //
-    // An edited scenario is left alone. That contract is what makes the
+    // An edited narration is left alone. That contract is what makes the
     // unattended path safe: a person who wrote their own words keeps them.
     let rewrote = false;
     let briefToSave = images.brief;
     /** What the rewrite spent, so the log can show it. */
-    let scenarioUsage: { inputTokens: number; outputTokens: number } | null = null;
-    const previous = (take.brief as EventCmBrief).scenario;
+    let narrationUsage: { inputTokens: number; outputTokens: number } | null = null;
+    const previous = (take.brief as EventCmBrief).narration;
     if (
       mapped.applied.length > 0 &&
       previous.scenes.length > 0 &&
       previous.source !== "human" &&
-      eventCmScenarioAvailable()
+      eventCmNarrationAvailable()
     ) {
-      const draft = await draftEventCmScenario(briefToSave, {
+      const draft = await draftEventCmNarration(briefToSave, {
         now: new Date().toISOString(),
       });
-      briefToSave = { ...briefToSave, scenario: draft.scenario };
-      scenarioUsage = draft.usage;
+      briefToSave = { ...briefToSave, narration: draft.narration };
+      narrationUsage = draft.usage;
       // The recording stays, and the next step of the same run replaces it.
       // Deleting it here would leave the workbench silent in the window between
       // this stage and the voice stage — and if the run stopped in between, the
@@ -260,11 +260,11 @@ export async function POST(
       // The rewrite is the only charged call this stage makes, and its cost was
       // going unrecorded — so when it failed on a length limit the log could
       // not say how close to the budget the successful runs had been.
-      ...(scenarioUsage ? { usage: scenarioUsage } : {}),
+      ...(narrationUsage ? { usage: narrationUsage } : {}),
       steps: {
         applied: mapped.applied,
         keptUserValues: mapped.keptUserValues,
-        scenarioRewritten: rewrote,
+        narrationRewritten: rewrote,
         // Both halves, always. A run that placed nothing has to be able to say
         // why each picture was left alone, or "画像が反映されない" comes back
         // as a mystery instead of as a sentence.
@@ -287,8 +287,8 @@ export async function POST(
       ok: true,
       applied: mapped.applied,
       keptUserValues: mapped.keptUserValues,
-      scenarioRewritten: rewrote,
-      scenarioKept: previous.source === "human" && mapped.applied.length > 0,
+      narrationRewritten: rewrote,
+      narrationKept: previous.source === "human" && mapped.applied.length > 0,
       placedImages: images.placed,
       unusedImages: images.unused,
     });

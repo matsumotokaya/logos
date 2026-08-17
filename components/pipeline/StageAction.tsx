@@ -30,7 +30,7 @@ export default function StageAction({
   onRunFilm,
   filmSteps,
   onOpenStage,
-  onRewriteScenario,
+  onRewriteNarration,
 }: {
   stageId: PipelineStageId;
   /**
@@ -50,7 +50,7 @@ export default function StageAction({
   disabled: boolean;
   onRun: (stage: RunnableStage) => void;
   /**
-   * Run the film half of the chain: scenario → reading aloud → fix.
+   * Run the film half of the chain: narration → reading aloud → fix.
    *
    * Absent for templates with no fixing step (product-cm, event-promo), which is
    * what takes the mapping stage's button away — nothing follows the mapping
@@ -69,14 +69,14 @@ export default function StageAction({
    *  so the progress appears where the work is happening. */
   onOpenStage: (stage: PipelineStageId) => void;
   /**
-   * Rewrite the scenario without re-reading anything.
+   * Rewrite the narration without re-reading anything.
    *
    * Offered on the structuring stage because that is where the words are
-   * decided. Applying facts already rewrites the scenario; this is for wanting a
+   * decided. Applying facts already rewrites the narration; this is for wanting a
    * different take on the same facts, which is the commonest reason to touch a
-   * scenario at all.
+   * narration at all.
    */
-  onRewriteScenario?: () => void;
+  onRewriteNarration?: () => void;
 }) {
   const decided = stageActions({
     stageId,
@@ -95,14 +95,14 @@ export default function StageAction({
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
-      {stageId === "structure" && onRewriteScenario && part !== "own" ? (
+      {stageId === "structure" && onRewriteNarration && part !== "own" ? (
         <button
           type="button"
-          onClick={onRewriteScenario}
+          onClick={onRewriteNarration}
           disabled={busy}
           className="mr-auto text-xs text-accent hover:underline disabled:opacity-50"
         >
-          シナリオだけ書き直す
+          ナレーションだけ書き直す
         </button>
       ) : null}
 

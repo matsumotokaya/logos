@@ -1,6 +1,7 @@
 import type { Scene, SceneBackdrop } from "../layout";
 import type { SceneComponent } from "../components";
 import type { EventPhoto } from "@/remotion/event/types";
+import { eventCmScenePlan } from "@/remotion/event-cm/types";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 import type { EventCmSceneRole } from "@/remotion/event-cm/types";
 
@@ -126,7 +127,14 @@ function valueScene(brief: EventCmBrief): Scene {
  */
 function programScene(brief: EventCmBrief, index?: number): Scene {
   const components: SceneComponent[] = [];
-  const one = index === undefined ? null : brief.programs[index];
+  const at = index ?? 0;
+  const one = brief.programs[at] ?? null;
+  // How many agenda pictures this film actually has — the template's three,
+  // less the ones deleted. Asked of the plan rather than of `programs.length`,
+  // which counts items and no longer counts pictures.
+  const total =
+    eventCmScenePlan(brief).filter((scene) => scene.role === "program").length ||
+    1;
 
   if (brief.programsHeading) {
     components.push({
@@ -135,27 +143,23 @@ function programScene(brief: EventCmBrief, index?: number): Scene {
       fields: ["programsHeading"],
     });
   }
+  // The numeral is the scene's own structure: it says which of how many without
+  // a word, which is what lets three consecutive pictures read as one programme
+  // each rather than as three unrelated slides. Drawn even when the slot has no
+  // item yet, because the template has three agenda pictures whatever this
+  // event has put in them — the earlier fallback borrowed the WHOLE list for an
+  // unfilled slot, which said the same thing three times.
+  components.push({
+    kind: "stat",
+    value: `${at + 1}`,
+    unit: `/ ${total}`,
+    fields: ["programs"],
+  });
   if (one) {
-    // The numeral is the scene's own structure: it says which of how many
-    // without a word, which is what lets three consecutive pictures read as one
-    // programme each rather than as three unrelated slides.
-    components.push({
-      kind: "stat",
-      value: `${(index ?? 0) + 1}`,
-      unit: `/ ${brief.programs.length}`,
-      fields: ["programs"],
-    });
     components.push({
       kind: "lines",
       lines: [one.title],
       emphasis: "primary",
-      fields: ["programs"],
-    });
-  } else if (brief.programs.length > 0) {
-    components.push({
-      kind: "list",
-      items: brief.programs.map((program) => program.title),
-      numbered: true,
       fields: ["programs"],
     });
   }

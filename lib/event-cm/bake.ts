@@ -24,11 +24,11 @@
 // read 0, and the player went on playing the old track with no way to tell.
 
 import { isSuppressed, isSpokenFact } from "./facts";
-import { narrationVoiceByName } from "@/lib/narration/voices";
+import { voicePresetByName } from "@/lib/voice/voices";
 import { EVENT_CM_GOAL } from "@/lib/pipeline/event-cm";
 import {
   eventCmSceneKey,
-  scenarioStaleness,
+  narrationStaleness,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 
@@ -39,7 +39,7 @@ import {
  * unreflected" and "where do I correct it" are the same word on screen.
  */
 export interface BakeChange {
-  /** A goal path: "bgm" / "visuals.value" / "guests[0].photo" / "scenario". */
+  /** A goal path: "bgm" / "visuals.value" / "guests[0].photo" / "narration". */
   path: string;
   /** The user's word for it: 「BGM」「主役の写真」. */
   label: string;
@@ -79,16 +79,16 @@ export interface BakeState {
  * `bake` is the fixing itself: copying the working brief over the played one.
  * It is last because the two before it change what would be copied.
  */
-export type FilmStep = "scenario" | "voice" | "bake";
+export type FilmStep = "narration" | "voice" | "bake";
 
 export const FILM_STEP_LABEL: Record<FilmStep, string> = {
-  scenario: "シナリオを書く",
+  narration: "ナレーションを書く",
   voice: "読み上げる",
   bake: "動画に反映する",
 };
 
 /** The order the one button runs them in. Fixing is always last. */
-const FILM_STEP_ORDER: readonly FilmStep[] = ["scenario", "voice", "bake"];
+const FILM_STEP_ORDER: readonly FilmStep[] = ["narration", "voice", "bake"];
 
 /**
  * The value of one field, in a form two briefs can be compared by.
@@ -103,11 +103,11 @@ function factValueOf(brief: EventCmBrief, path: string): string {
     return JSON.stringify(brief.guests[Number(guestPhoto[1])]?.photo ?? null);
   }
   switch (path) {
-    // The words, not their clock: a scenario rewritten to the same sentences is
-    // the same scenario, and re-running the writer must not invent a change.
-    case "scenario":
+    // The words, not their clock: a narration rewritten to the same sentences is
+    // the same narration, and re-running the writer must not invent a change.
+    case "narration":
       return JSON.stringify(
-        brief.scenario.scenes.map((scene) => [eventCmSceneKey(scene), scene.text]),
+        brief.narration.scenes.map((scene) => [eventCmSceneKey(scene), scene.text]),
       );
     // The recording's own stamp, never `voice.audio`: that pointer is rewritten
     // as a freshly signed URL for the client, and a re-record of the same words
@@ -179,7 +179,11 @@ function comparableFields(
   // Not in the goal, because it is never missing — there is always a narrator,
   // and a fact list row saying so would be a row nobody can act on. It is still
   // a setting somebody changes and therefore something the film can be behind.
-  fields.push({ path: "narrator", label: "読み上げの声" });
+  fields.push({ path: "narrator", label: "ボイスの声" });
+  // Same reasoning, and the same shape: never missing, so not a goal row, but a
+  // decision the played film can be behind on. It has no VALUE at all — only an
+  // on/off — which the suppression half of the comparison above already covers.
+  fields.push({ path: "captions", label: "字幕" });
   const people = Math.max(working.guests.length, baked.guests.length);
   for (let index = 0; index < people; index += 1) {
     const name = working.guests[index]?.name ?? baked.guests[index]?.name ?? "";
@@ -204,13 +208,13 @@ function needsFor(path: string, working: EventCmBrief): FilmStep[] {
   const steps: FilmStep[] = [];
   // Changing the reader changes the recording and not one word of it, so the
   // writer stays out of it — the same reason swapping the music costs nothing.
-  const spoken = path === "scenario" || (path !== "narrator" && isSpokenFact(path));
+  const spoken = path === "narration" || (path !== "narrator" && isSpokenFact(path));
   const rerecord = spoken || path === "narrator";
 
-  if (spoken && path !== "scenario" && working.scenario.source !== "human") {
-    steps.push("scenario");
+  if (spoken && path !== "narration" && working.narration.source !== "human") {
+    steps.push("narration");
   }
-  if (rerecord && !narrationIsOff(working) && working.scenario.scenes.length > 0) {
+  if (rerecord && !voiceIsOff(working) && working.narration.scenes.length > 0) {
     steps.push("voice");
   }
   steps.push("bake");
@@ -221,7 +225,7 @@ function needsFor(path: string, working: EventCmBrief): FilmStep[] {
  * Field by field, what the workbench holds that the played film does not.
  *
  * Includes being switched off: a suppressed field is emptied before the film is
- * drawn and before the scenario is written, so deciding to hide the venue is a
+ * drawn and before the narration is written, so deciding to hide the venue is a
  * change to the venue.
  */
 export function bakeChanges(
@@ -246,19 +250,19 @@ export function bakeChanges(
 }
 
 /**
- * Whether the recording says what the scenario now says.
+ * Whether the recording says what the narration now says.
  *
  * Compared text by text against the scene it was read for, rather than by
- * timestamp: a scenario that was rewritten to the same words is the same
+ * timestamp: a narration that was rewritten to the same words is the same
  * narration, and a take whose clock moved is not a reason to spend a TTS call.
  *
  * A recording is what fixes the film's length (§9.9), so this is also the
  * question "does the player know how long this film is".
  */
-export function voiceReadsScenario(brief: EventCmBrief): boolean {
+export function voiceReadsNarration(brief: EventCmBrief): boolean {
   const track = brief.voice?.track;
   if (!track) return false;
-  const lines = brief.scenario.scenes;
+  const lines = brief.narration.scenes;
   if (track.scenes.length !== lines.length) return false;
   const spoken = new Map(
     track.scenes.map((scene) => [eventCmSceneKey(scene), scene.text] as const),
@@ -275,13 +279,13 @@ export function voiceReadsScenario(brief: EventCmBrief): boolean {
  * reach a recording (§9.9), and a narration that was turned off must stay off
  * (§9.3). The first would silently undo the second on the next run.
  */
-export const narrationIsOff = (brief: EventCmBrief): boolean =>
+export const voiceIsOff = (brief: EventCmBrief): boolean =>
   isSuppressed(brief, "voice");
 
 /**
  * Whether the recording is in the voice that was asked for.
  *
- * Separate from `voiceReadsScenario`, which asks whether it says the right
+ * Separate from `voiceReadsNarration`, which asks whether it says the right
  * words. Choosing a different narrator leaves the words untouched and the
  * recording wrong, and without this the setting could be saved, fixed into the
  * film, and never acted on — the film keeping a voice nobody chose.
@@ -295,7 +299,7 @@ export function voiceUsesNarrator(brief: EventCmBrief): boolean {
   // permanent 読み上げ on the button and spend a TTS call to replace a
   // narration nobody had complained about.
   if (!brief.narrator) return true;
-  return narrationVoiceByName(recorded)?.id === brief.narrator;
+  return voicePresetByName(recorded)?.id === brief.narrator;
 }
 
 /**
@@ -314,14 +318,14 @@ export function bakeState(
  * What the one button will do to this video, in order.
  *
  * The count of these is the badge. It is a forward projection, not a status
- * scan: writing the scenario makes the recording stale, and a recording makes
+ * scan: writing the narration makes the recording stale, and a recording makes
  * the fixed copy stale, so a step that WILL become necessary is listed now.
  * A badge that says 1 and then runs three steps is worse than no badge.
  *
  * Two things are never listed:
- *   - a hand-written scenario. It is not overwritten, and counting a change
+ *   - a hand-written narration. It is not overwritten, and counting a change
  *     nobody will make is what makes a badge unclearable (§9.8).
- *   - a narration the user switched off. See `narrationIsOff`.
+ *   - a narration the user switched off. See `voiceIsOff`.
  *
  * MP4 is not here at all. Export is outside the chain (§9.4) — putting it in
  * would run a several-minute render every time somebody tried a voice.
@@ -345,29 +349,29 @@ export function pendingFilmSteps(
   const steps = new Set<FilmStep>();
 
   // What the WORKING brief owes on its own, whatever the player is showing: a
-  // scenario nobody has written yet, or one describing an older event, and a
-  // recording that does not say what the scenario now says.
-  const handWritten = working.scenario.source === "human";
-  const unwritten = working.scenario.scenes.length === 0;
-  const scenarioPending =
-    !handWritten && (options.redo || unwritten || scenarioStaleness(working) !== null);
-  if (scenarioPending) steps.add("scenario");
+  // narration nobody has written yet, or one describing an older event, and a
+  // recording that does not say what the narration now says.
+  const handWritten = working.narration.source === "human";
+  const unwritten = working.narration.scenes.length === 0;
+  const narrationPending =
+    !handWritten && (options.redo || unwritten || narrationStaleness(working) !== null);
+  if (narrationPending) steps.add("narration");
 
   // Always reached unless it was switched off or there is nothing to read: the
   // length of the film is not known until something has been spoken, so "no
   // recording" is pending work rather than a finished state.
   //
-  // `scenarioPending` counts as words-to-come, which is what keeps the badge a
-  // projection: writing the scenario is what makes the recording necessary. But
-  // a scenario nobody is going to write — hand-authored and still empty — has
+  // `narrationPending` counts as words-to-come, which is what keeps the badge a
+  // projection: writing the narration is what makes the recording necessary. But
+  // a narration nobody is going to write — hand-authored and still empty — has
   // nothing to read, and listing it would promise a step that answers 409.
   const voicePending =
-    !narrationIsOff(working) &&
-    (scenarioPending ||
+    !voiceIsOff(working) &&
+    (narrationPending ||
       (!unwritten &&
         (options.redo ||
           !working.voice ||
-          !voiceReadsScenario(working) ||
+          !voiceReadsNarration(working) ||
           !voiceUsesNarrator(working))));
   if (voicePending) steps.add("voice");
 

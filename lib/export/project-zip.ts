@@ -148,7 +148,7 @@ registerRoot(Root);
  * The composition registration.
  *
  * Duration is computed from the brief rather than fixed, the same way the app's
- * player does it: the scenario decides how long the film is, so a longer line
+ * player does it: the narration decides how long the film is, so a longer line
  * has to make a longer video here too.
  */
 const ROOT_TSX = `import React from "react";

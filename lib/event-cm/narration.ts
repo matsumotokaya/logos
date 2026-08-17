@@ -13,12 +13,12 @@ import {
   EVENT_CM_TARGET_SECONDS,
   EVENT_CM_SCENE_LABELS,
   type EventCmBrief,
-  type EventCmScenario,
+  type EventCmNarration,
   type EventCmSceneRole,
   type EventCmSceneStep,
 } from "@/remotion/event-cm/types";
 
-// Write the scenario for a narrated event promo.
+// Write the narration for a narrated event promo.
 //
 // Rules come from deliverable-architecture §17.2: exhaust what is decided
 // before asking the model to decide it. The facts (title, guests, programs,
@@ -104,14 +104,17 @@ function systemFor(
     .join("\n");
   const roles = keys;
 
-  // Vocabulary note: this prompt says ナレーション／読み上げ原稿 while the code
-  // and the UI say シナリオ (§11.2). Deliberate, and not a leftover. The three
-  // words split OUR confusion — which of the subtitle, the words and the
-  // recording is derived from which — and the model has no such confusion: it
-  // is asked once, for the words that will be spoken, and 「読み上げ原稿」 is
-  // the instruction that keeps them speakable. Asking for a 「シナリオ」 invites
-  // the screenplay furniture that rule 2 below then has to forbid. 「台本」 was
-  // removed because it is ambiguous in the same direction, not to rename it.
+  // Vocabulary note: the code, the UI and this prompt now all say ナレーション
+  // (2026-08-17). The parenthetical 「読み上げ原稿」 stays as an INSTRUCTION, not
+  // as a second name: it is what keeps the words speakable, and asking for a
+  // bare 「ナレーション」 invites the screenplay furniture that rule 2 below then
+  // has to forbid. 「台本」 was removed because it is ambiguous in the same
+  // direction, not to rename it.
+  //
+  // The three-way split (ナレーション the words / ボイス the recording / 字幕 the
+  // cards) exists for OUR sake — three surfaces used to argue about which one
+  // the film was made from. The model has no such confusion: it is asked once,
+  // for the words that will be spoken.
   return `あなたは日本のイベント告知CMのコピーライター兼構成作家です。${EVENT_CM_TARGET_SECONDS}秒のCMナレーション（読み上げ原稿）を書きます。
 
 ## 絶対の制約
@@ -171,7 +174,7 @@ const draftSchemaFor = (roles: readonly string[]) =>
 
 /** The facts, written out for the model. Only what the brief actually holds —
  *  an absent fact is absent from the prompt, so it cannot be echoed back. */
-export function describeEventFacts(brief: EventCmScenarioInput): string {
+export function describeEventFacts(brief: EventCmNarrationInput): string {
   const lines: string[] = [];
   const push = (label: string, value: string | null | undefined) => {
     if (value && value.trim()) lines.push(`${label}: ${value.trim()}`);
@@ -211,38 +214,38 @@ export function describeEventFacts(brief: EventCmScenarioInput): string {
   return lines.join("\n");
 }
 
-export interface EventCmScenarioDraft {
-  scenario: EventCmScenario;
+export interface EventCmNarrationDraft {
+  narration: EventCmNarration;
   facts: string;
   usage: { inputTokens: number; outputTokens: number } | null;
 }
 
 /**
- * What writing a scenario needs: the facts, and the shape they imply.
+ * What writing a narration needs: the facts, and the shape they imply.
  *
- * Not the scenario — that is the output, and asking for it as input is how a
+ * Not the narration — that is the output, and asking for it as input is how a
  * caller ends up handing over the words it is about to replace. Not the
  * recording either. Narrow on purpose so an `event-promo` brief can be drafted
- * against too (scripts/draft-event-cm-scenario.ts reads real takes of both
+ * against too (scripts/draft-event-cm-narration.ts reads real takes of both
  * templates to see what the model does with them).
  */
-export type EventCmScenarioInput = Omit<EventCmBrief, "scenario" | "voice">;
+export type EventCmNarrationInput = Omit<EventCmBrief, "narration" | "voice">;
 
-export function eventCmScenarioAvailable(): boolean {
+export function eventCmNarrationAvailable(): boolean {
   return Boolean(process.env.OPENAI_API_KEY);
 }
 
 /**
- * Draft a scenario from the brief's facts.
+ * Draft a narration from the brief's facts.
  *
  * `notes` carries anything the brief cannot hold — the organiser's own words
  * about who this is for, what happened at the last one. It is injected as
  * additional source material, under the same no-invention rule.
  */
-export async function draftEventCmScenario(
-  brief: EventCmScenarioInput,
+export async function draftEventCmNarration(
+  brief: EventCmNarrationInput,
   options: { notes?: string | null; now: string } = { now: new Date().toISOString() },
-): Promise<EventCmScenarioDraft> {
+): Promise<EventCmNarrationDraft> {
   const facts = describeEventFacts(brief);
   const notes = options.notes?.trim();
   // Which lines this brief needs. With nobody announced there is no speaker
@@ -274,13 +277,13 @@ ${facts}${notes ? `\n\n主催者からの補足（事実として扱ってよい
 ${EVENT_CM_TARGET_SECONDS}秒のCMナレーションを書いてください。`,
       },
     ],
-    response_format: zodResponseFormat(draftSchemaFor(keys), "event_cm_scenario"),
+    response_format: zodResponseFormat(draftSchemaFor(keys), "event_cm_narration"),
     }),
-    "シナリオが長さの上限に達しました。シーン数が多いか、事実の量が多すぎます。プログラムを減らすか、資料を整理してからもう一度お試しください",
+    "ナレーションが長さの上限に達しました。シーン数が多いか、事実の量が多すぎます。プログラムを減らすか、資料を整理してからもう一度お試しください",
   );
 
   const parsed = response.choices[0]?.message.parsed;
-  if (!parsed) throw new Error("シナリオを生成できませんでした");
+  if (!parsed) throw new Error("ナレーションを生成できませんでした");
 
   // Order is part of the contract, and the model is asked for it rather than
   // trusted with it: rebuild in the canonical scene order before storing.
@@ -294,11 +297,11 @@ ${EVENT_CM_TARGET_SECONDS}秒のCMナレーションを書いてください。`
     .filter((scene) => !scene.text)
     .map((scene) => eventCmSceneKey(scene));
   if (missing.length) {
-    throw new Error(`シナリオに欠けているシーンがあります: ${missing.join(", ")}`);
+    throw new Error(`ナレーションに欠けているシーンがあります: ${missing.join(", ")}`);
   }
 
   return {
-    scenario: {
+    narration: {
       version: 1,
       scenes,
       source: "llm",

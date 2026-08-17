@@ -1,16 +1,16 @@
 // What a brand gets handed the moment it asks for an event video — read only.
 //
 // Seeds the brief from the brand's adopted values plus the archetype, reports
-// it against the goal with each field's origin, and (with --scenario) writes the
+// it against the goal with each field's origin, and (with --narration) writes the
 // narration on top. Nothing is stored: this is for judging the result before
 // the Take-creation path is built on it.
 //
-//   npm run event-cm:seed -- --brand <UUID> [--scenario]
+//   npm run event-cm:seed -- --brand <UUID> [--narration]
 
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { seedEventCmBrief } from "@/lib/event-cm/seed";
 import { archetypeFor } from "@/lib/event-cm/archetypes";
-import { draftEventCmScenario, eventCmScenarioAvailable } from "@/lib/event-cm/scenario";
+import { draftEventCmNarration, eventCmNarrationAvailable } from "@/lib/event-cm/narration";
 import { eventCmGoalState } from "@/lib/pipeline/event-cm";
 import { EVENT_CM_CHARS_PER_SECOND } from "@/remotion/event-cm/types";
 import { ORIGIN_LABELS } from "@/lib/pipeline/stages";
@@ -100,15 +100,15 @@ async function main() {
     `\n埋まった ${state.progress.filled.length}/${state.fields.length}  必須の不足 ${state.progress.missingRequired.length}  推定 ${state.provisional.length}`,
   );
 
-  if (!has("scenario")) return;
-  if (!eventCmScenarioAvailable()) throw new Error("OPENAI_API_KEY が未設定です");
+  if (!has("narration")) return;
+  if (!eventCmNarrationAvailable()) throw new Error("OPENAI_API_KEY が未設定です");
 
-  const draft = await draftEventCmScenario(brief, { now: new Date().toISOString() });
+  const draft = await draftEventCmNarration(brief, { now: new Date().toISOString() });
   console.log("\n── 訴求軸 ──");
-  console.log(draft.scenario.angle);
+  console.log(draft.narration.angle);
   console.log("\n── ナレーション ──");
   let total = 0;
-  for (const scene of draft.scenario.scenes) {
+  for (const scene of draft.narration.scenes) {
     const chars = scene.text.replace(/\s/g, "").length;
     total += chars;
     console.log(`\n${scene.role}  (${chars}字 / 約${(chars / EVENT_CM_CHARS_PER_SECOND).toFixed(1)}秒)`);

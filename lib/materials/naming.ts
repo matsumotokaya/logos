@@ -138,7 +138,7 @@ export function slugOf(label: string): string {
  * A word for a file the slug could not describe.
  *
  * System-made materials are the common case — 「貼り付けたテキスト」,
- * 「イベント紹介動画の読み上げ」 — and for those we know what they are without
+ * 「イベント紹介動画のボイス」 — and for those we know what they are without
  * guessing, because we made them.
  */
 function fallbackBase(material: NameableMaterial): string {

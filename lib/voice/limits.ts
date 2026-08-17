@@ -1,6 +1,6 @@
 // Limits the narration has to respect, shared by the browser and the server.
 //
-// Separate from lib/narration/voice.ts because that module is `server-only`
+// Separate from lib/voice/synthesize.ts because that module is `server-only`
 // (it reaches the TTS provider), and the editor needs the same number to tell
 // somebody their line is too long BEFORE they ask for it to be read.
 

@@ -12,6 +12,7 @@ import {
   EVENT_CM_OUTRO_MS,
 } from "@/remotion/event-cm/timeline";
 import {
+  EVENT_CM_SUPPRESSED_NOTE,
   eventCmNarratedSteps,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
@@ -51,7 +52,7 @@ const briefWith = (extra: Partial<EventCmBrief> = {}): EventCmBrief => {
   const brief = { ...base(), ...extra };
   return {
     ...brief,
-    scenario: {
+    narration: {
       version: 1,
       source: "llm",
       updatedAt: "2026-08-13T00:00:00Z",
@@ -103,7 +104,7 @@ test("ロゴのシーンは無音で、それ以外は必ず1行を持つ", () =
     const silent = panel.role === "logoIn" || panel.role === "logoOut";
     assert.equal(panel.narrated, !silent, `${panel.role} の narrated が違う`);
     assert.equal(
-      panel.scenario.length > 0,
+      panel.narration.length > 0,
       !silent,
       `${panel.role} のナレーションの有無が違う`,
     );
@@ -130,9 +131,17 @@ test("1つの字幕が2つのシーンにまたがらない", () => {
   assert.equal(new Set(texts).size, texts.length, "同じ字幕が2シーンに出ている");
 });
 
-test("登壇者が居なければそのシーンは無い", () => {
+/** The speaker picture, deleted. An empty guest list no longer removes it —
+ *  the picture is the template's (EVENT_CM_SCENES). */
+const GUESTS_DELETED = {
+  guests: { origin: "user" as const, note: EVENT_CM_SUPPRESSED_NOTE },
+};
+
+test("登壇者のシーンは、消したときだけ無くなる", () => {
   const withGuests = eventCmStoryboard(briefWith({ guests: GUESTS }));
-  const withoutGuests = eventCmStoryboard(briefWith({ guests: [] }));
+  const withoutGuests = eventCmStoryboard(
+    briefWith({ guests: GUESTS, provenance: GUESTS_DELETED }),
+  );
   assert.equal(withGuests.panels.length, withoutGuests.panels.length + 1);
   assert.equal(
     withoutGuests.panels.some((panel) => panel.role === "guests"),
@@ -147,7 +156,9 @@ test("通し番号はラベルであって、シーンの identity ではない"
   // string: it cannot be passed where `index` (which programme) is wanted, and
   // it cannot quietly become a React key or an API argument.
   const withGuests = eventCmStoryboard(briefWith({ guests: GUESTS }));
-  const withoutGuests = eventCmStoryboard(briefWith({ guests: [] }));
+  const withoutGuests = eventCmStoryboard(
+    briefWith({ guests: GUESTS, provenance: GUESTS_DELETED }),
+  );
 
   const numberOfCta = (storyboard: { panels: Array<{ role: string; no: string }> }) =>
     storyboard.panels.find((panel) => panel.role === "cta")?.no;
@@ -198,13 +209,13 @@ test("ロゴのシーンは主催のマークを見せ、画像が無くても�
   assert.equal(logo.figures[0].label, "WealthPark Lab");
 });
 
-test("シナリオがあれば尺の根拠はシナリオ、無ければ想定尺", () => {
-  assert.equal(eventCmStoryboard(briefWith()).timingSource, "scenario");
-  const noScenario = {
+test("ナレーションがあれば尺の根拠はナレーション、無ければ想定尺", () => {
+  assert.equal(eventCmStoryboard(briefWith()).timingSource, "narration");
+  const noNarration = {
     ...base(),
-    scenario: { version: 1 as const, scenes: [], source: "llm" as const, updatedAt: "", angle: "" },
+    narration: { version: 1 as const, scenes: [], source: "llm" as const, updatedAt: "", angle: "" },
   };
-  assert.equal(eventCmStoryboard(noScenario).timingSource, "budget");
+  assert.equal(eventCmStoryboard(noNarration).timingSource, "budget");
 });
 
 test("値のある部品は、どのフィールドを映しているか言える", () => {
@@ -399,7 +410,7 @@ test("絵コンテは、映像が実際に描くものと同じ部品・同じ�
 test("画面から消した項目は、絵コンテからも消える", () => {
   // Suppressing the speakers removes a whole scene from the film. A storyboard
   // that kept the panel would not merely show one stale block: it would show a
-  // picture, its seconds and its scenario line that the film does not have.
+  // picture, its seconds and its narration line that the film does not have.
   const brief = briefWith({ guests: GUESTS });
   const off = setSuppressed(brief, "guests", true);
 
@@ -459,9 +470,9 @@ test("登壇者の写真も、絵コンテがその画像を持つ", () => {
   assert.equal(figures[1].hasAsset, false);
 });
 
-test("シーンが喋るかどうかは映像の形で決まる（シナリオの有無ではない）", () => {
+test("シーンが喋るかどうかは映像の形で決まる（ナレーションの有無ではない）", () => {
   // The bug this exists to catch: three programme pictures appeared silent —
-  // no line, no subtitle, no editor to write one in — because the stored scenario
+  // no line, no subtitle, no editor to write one in — because the stored narration
   // still held a single unindexed `program` line. A picture that speaks speaks
   // whether or not anybody has written its words yet.
   const brief = briefWith({
@@ -469,8 +480,8 @@ test("シーンが喋るかどうかは映像の形で決まる（シナリオ�
   });
   const stale: EventCmBrief = {
     ...brief,
-    scenario: {
-      ...brief.scenario,
+    narration: {
+      ...brief.narration,
       source: "human",
       // Written before the programmes were split into their own pictures.
       scenes: [
@@ -487,7 +498,7 @@ test("シーンが喋るかどうかは映像の形で決まる（シナリオ�
   assert.equal(programs.length, 3);
   for (const panel of programs) {
     assert.equal(panel.narrated, true, `プログラム${panel.index} が無音扱いになっている`);
-    assert.equal(panel.scenario, "", "まだ書かれていない行は空で出る");
+    assert.equal(panel.narration, "", "まだ書かれていない行は空で出る");
   }
 
   // And the words that no longer have a picture are reported rather than

@@ -12,7 +12,7 @@
 // out wrong is one line to fix in this table, which is why the Gemini name and
 // the documented character travel with it on screen.
 
-export interface NarrationVoice {
+export interface VoicePreset {
   /** Stable id stored in the take's voice track. */
   id: string;
   label: string;
@@ -24,7 +24,7 @@ export interface NarrationVoice {
   note: string;
 }
 
-export const NARRATION_VOICES: readonly NarrationVoice[] = [
+export const VOICE_PRESETS: readonly VoicePreset[] = [
   {
     id: "standard",
     label: "標準",
@@ -50,12 +50,12 @@ export const NARRATION_VOICES: readonly NarrationVoice[] = [
   },
 ] as const;
 
-export const DEFAULT_NARRATION_VOICE = NARRATION_VOICES[0];
+export const DEFAULT_VOICE_PRESET = VOICE_PRESETS[0];
 
-export const narrationVoiceById = (id: string | null | undefined) =>
-  NARRATION_VOICES.find((entry) => entry.id === id);
+export const voicePresetById = (id: string | null | undefined) =>
+  VOICE_PRESETS.find((entry) => entry.id === id);
 
 /** Which preset a recorded track came from, matched by the Gemini voice name —
  *  tracks recorded before presets existed still resolve to one. */
-export const narrationVoiceByName = (name: string | null | undefined) =>
-  NARRATION_VOICES.find((entry) => entry.voice === name);
+export const voicePresetByName = (name: string | null | undefined) =>
+  VOICE_PRESETS.find((entry) => entry.voice === name);

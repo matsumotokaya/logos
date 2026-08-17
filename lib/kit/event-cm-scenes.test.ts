@@ -5,6 +5,8 @@ import { fitScene } from "@/remotion/kit/fit";
 import { LAYOUTS, overCapacity } from "@/remotion/kit/layout";
 import { SUMI_THEME, themeForBrand } from "@/remotion/kit/theme";
 import {
+  EVENT_CM_PROGRAM_SCENES,
+  EVENT_CM_SUPPRESSED_NOTE as SUPPRESSED_NOTE,
   eventCmNarratedSteps,
   eventCmSceneBudget,
   eventCmSceneKey,
@@ -55,7 +57,7 @@ const SAKE: EventCmBrief = {
     closing: { src: "material:k", focus: { x: 0.45, y: 0.5 } },
   },
   bgm: "material:m",
-  scenario: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
+  narration: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
 };
 
 const allScenes = (brief: EventCmBrief) =>
@@ -97,16 +99,29 @@ test("墨の地に乗るロゴは白抜きになる", () => {
   );
 });
 
-test("1つの役割は1枚の絵になる", () => {
-  // One picture per role, always. Speakers are their own scene, and the plan —
-  // not the builder — is what drops them when nobody is announced.
+test("登壇者の絵はテンプレートが持ち、消したときだけ消える", () => {
+  // The speaker picture is the template's, not the facts'. An empty guest list
+  // used to remove it, which made the film's shape move underneath a narration
+  // that had already been written and recorded.
   assert.equal(
     eventCmScenePlan(SAKE).filter((step) => step.role === "guests").length,
     1,
   );
+  const noGuests: EventCmBrief = { ...SAKE, guests: [] };
   assert.equal(
-    eventCmScenePlan({ ...SAKE, guests: [] }).filter((step) => step.role === "guests")
-      .length,
+    eventCmScenePlan(noGuests).filter((step) => step.role === "guests").length,
+    1,
+    "登壇者が空でも絵は残る（消すのは削除の操作）",
+  );
+  const deleted: EventCmBrief = {
+    ...SAKE,
+    provenance: {
+      ...SAKE.provenance,
+      guests: { origin: "user", note: SUPPRESSED_NOTE },
+    },
+  };
+  assert.equal(
+    eventCmScenePlan(deleted).filter((step) => step.role === "guests").length,
     0,
   );
 });
@@ -288,17 +303,36 @@ test("プログラムが複数あれば、1つずつ1シーンで紹介する", 
   }
 });
 
-test("プログラムが1つなら、シーンも1つ（既存のTakeは変わらない）", () => {
+test("プログラムが1つでも、アジェンダは3枚のまま", () => {
+  // The picture count is the TEMPLATE's (EVENT_CM_PROGRAM_SCENES), not the
+  // item count. An evening with one programme deletes the two it does not use
+  // — which is a decision somebody makes, not a shape the facts impose.
   const one: EventCmBrief = { ...SAKE, programs: [SAKE.programs[0]] };
   const plan = eventCmScenePlan(one);
-  assert.equal(plan.filter((step) => step.role === "program").length, 1);
-  // Unindexed, so a scenario written before this change still lines up.
-  assert.equal(plan.find((step) => step.role === "program")?.index, undefined);
-  const scene = sceneForRole("program", one);
-  assert.ok(scene.components.some((component) => component.kind === "list"));
+  assert.equal(
+    plan.filter((step) => step.role === "program").length,
+    EVENT_CM_PROGRAM_SCENES,
+  );
+  assert.deepEqual(
+    plan.filter((step) => step.role === "program").map((step) => step.index),
+    [0, 1, 2],
+    "どの絵のことか言えない枚がある",
+  );
+
+  // An empty slot keeps its numeral and says nothing else. It used to borrow
+  // the WHOLE list, so a one-programme evening said the same thing three times.
+  const empty = sceneForRole("program", one, 2);
+  assert.ok(
+    empty.components.some((component) => component.kind === "stat"),
+    "何枚目かを言っていない",
+  );
+  assert.ok(
+    !empty.components.some((component) => component.kind === "list"),
+    "空のスロットが一覧を借りている",
+  );
 });
 
-test("プログラムのシーンは、その分だけシナリオの行を要求する", () => {
+test("プログラムのシーンは、その分だけナレーションの行を要求する", () => {
   const steps = eventCmNarratedSteps(SAKE);
   assert.deepEqual(steps.map(eventCmSceneKey), [
     "title",

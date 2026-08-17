@@ -1,7 +1,13 @@
 import { archetypeFor, subjectFor } from "./archetypes";
 import { templateBgm, templateVisual } from "@/lib/assets/defaults";
 import { currentTemplate } from "@/lib/templates/catalog";
-import type { EventCmBrief, EventCmProvenance } from "@/remotion/event-cm/types";
+import { eventCmNarratedSteps } from "@/remotion/event-cm/types";
+import type {
+  EventCmBrief,
+  EventCmProvenance,
+  EventCmNarration,
+  EventCmSceneRole,
+} from "@/remotion/event-cm/types";
 
 // Hand someone a finished film before they have told us anything.
 //
@@ -79,6 +85,8 @@ export function seedEventCmBrief(
   inferred("schedule.date", "今日から4週間後以降の最初の金曜日");
   inferred("schedule.time", `${archetype.kind}に多い開始時刻`);
   inferred("cta");
+  inferred("guests", "登壇者は役割だけを仮置き。氏名は提案しません");
+  inferred("narration", "テンプレートの下書き。資料を読むと書き直されます");
 
   // The one slot the pool dresses. A null here is not a hole: the composition
   // draws a designed substitute, which is the template's whole premise.
@@ -127,7 +135,7 @@ export function seedEventCmBrief(
     inferred("theme.accent", "このブランドはアクセントを持たないため、テーマの色を使う");
   }
 
-  return {
+  const brief: EventCmBrief = {
     presenter: brand.name,
     seriesLabel: archetype.seriesLabel,
     title: archetype.titleFor(subject),
@@ -137,9 +145,19 @@ export function seedEventCmBrief(
     programsHeading: `${archetype.programs.length}つのプログラム`,
     programs: archetype.programs.map((title) => ({ title })),
     guestsHeading: "登壇者",
-    // Never invented. An empty list omits the scene; a fabricated name would
-    // put a real-looking person on screen.
-    guests: [],
+    // Roles, never names.
+    //
+    // The speaker picture is part of the template now (EVENT_CM_SCENES), so an
+    // empty list would open the film's fifth picture with nothing on it. A
+    // guessed DATE is a proposal somebody corrects in five seconds; a guessed
+    // NAME is a person who does not exist, and place-images.ts will attach a
+    // real photograph to it the moment the caption seems to match — a made-up
+    // name wearing a real face. A role says the same structural thing ("two
+    // people speak here") and names nobody.
+    guests: [
+      { name: "ゲストスピーカー", role: "", photo: null },
+      { name: "モデレーター", role: "", photo: null },
+    ],
     schedule: {
       date: formatDate(date),
       weekday: WEEKDAY_LABEL[date.getDay()],
@@ -163,8 +181,59 @@ export function seedEventCmBrief(
       bodyFont: brand.bodyFont ?? null,
     },
     provenance,
-    // Written by the narration stage. Seeded empty so the brief is valid and
-    // the goal reports the scenario as the one thing still missing.
-    scenario: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
+    narration: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
+  };
+  // Filled last, because which lines a film needs is a question about the film.
+  return { ...brief, narration: draftNarration(brief, options.now) };
+}
+
+/**
+ * A line for every picture that speaks, before anyone has written one.
+ *
+ * The narration is what the film is built on — it decides each scene's length,
+ * its subtitles, and what the voice reads — so a take seeded without one is a
+ * take seeded without its spine. It used to start empty, which made 「追加した
+ * 瞬間に完成した映像が再生される」 true of the PICTURES and false of the words.
+ *
+ * These lines say what their scene is FOR and state no facts. That distinction
+ * is the whole reason they are safe to speak aloud: a seeded date sits in the
+ * fact list wearing a 「仮に入れた値」 label, but a subtitle has no label on it
+ * — 「9月18日、渋谷でお待ちしています」 would read as an announcement, while
+ * 「開催日と会場を、最後にここでお伝えします」 reads as a draft (README
+ * 「捏造の方針」). Lengths sit inside each scene's budget, so the seeded film
+ * runs at roughly the length the written one will.
+ *
+ * `source: "llm"`, not `"human"`: this is a draft, and the mapping stage must
+ * replace it without being asked twice.
+ */
+const DRAFT_LINES: Partial<Record<EventCmSceneRole, string>> = {
+  title: "はじめに、このイベントの名前と主旨をお伝えします。",
+  value:
+    "参加する理由をここでお伝えします。この時間で何が得られるのかを、ひとことでまとめる場所です。",
+  guests: "当日お話しいただく方について、ここでご紹介する場所です。",
+  cta: "開催日と会場、お申し込みの方法を、最後にここでお伝えします。",
+};
+
+const DRAFT_PROGRAM_LINES = [
+  "当日の流れをご紹介します。ひとつめのプログラムについて、ここで話す場所です。",
+  "ふたつめのプログラムについて、ここで話す場所です。",
+  "みっつめのプログラムについて、ここで話す場所です。",
+];
+
+function draftNarration(brief: EventCmBrief, now: Date): EventCmNarration {
+  return {
+    version: 1,
+    scenes: eventCmNarratedSteps(brief).map((step) => ({
+      role: step.role,
+      ...(step.index === undefined ? {} : { index: step.index }),
+      text:
+        step.role === "program"
+          ? (DRAFT_PROGRAM_LINES[step.index ?? 0] ??
+            DRAFT_PROGRAM_LINES[DRAFT_PROGRAM_LINES.length - 1])
+          : (DRAFT_LINES[step.role] ?? ""),
+    })),
+    source: "llm",
+    updatedAt: now.toISOString(),
+    angle: "テンプレートの下書き。資料を読むと書き直されます",
   };
 }

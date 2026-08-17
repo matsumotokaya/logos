@@ -5,23 +5,28 @@ import {
   bakeState,
   describeChanges,
   filmStatus,
-  narrationIsOff,
+  voiceIsOff,
   pendingFilmSteps,
   renderIsBehind,
-  voiceReadsScenario,
+  voiceReadsNarration,
   voiceUsesNarrator,
 } from "./bake";
 import { setSuppressed } from "./facts";
 import { seedEventCmBrief } from "./seed";
 import { eventCmFilm } from "@/remotion/event-cm/film";
-import { eventCmSceneKey, type EventCmBrief } from "@/remotion/event-cm/types";
+import {
+  EVENT_CM_CAPTIONS_PATH,
+  EVENT_CM_SUPPRESSED_NOTE,
+  eventCmSceneKey,
+  type EventCmBrief,
+} from "@/remotion/event-cm/types";
 
 const SEEDED = seedEventCmBrief(
   { name: "WealthPark Lab", industry: "金融教育メディア" },
   { now: new Date("2026-08-14T09:00:00+09:00"), seed: "take-1" },
 );
 
-/** A brief whose scenario covers every narrated picture of its own film. */
+/** A brief whose narration covers every narrated picture of its own film. */
 function written(brief: EventCmBrief, at: string): EventCmBrief {
   const scenes = eventCmFilm(brief)
     .scenes.filter((scene) => scene.narrated)
@@ -32,11 +37,11 @@ function written(brief: EventCmBrief, at: string): EventCmBrief {
     }));
   return {
     ...brief,
-    scenario: { version: 1, scenes, source: "llm", updatedAt: at, angle: "" },
+    narration: { version: 1, scenes, source: "llm", updatedAt: at, angle: "" },
   };
 }
 
-/** That scenario, read aloud. */
+/** That narration, read aloud. */
 function spoken(brief: EventCmBrief, at: string): EventCmBrief {
   return {
     ...brief,
@@ -51,7 +56,7 @@ function spoken(brief: EventCmBrief, at: string): EventCmBrief {
         provider: "mock",
         voice: "Zephyr",
         captions: [],
-        scenes: brief.scenario.scenes.map((scene, index) => ({
+        scenes: brief.narration.scenes.map((scene, index) => ({
           ...scene,
           startMs: index * 5000,
           durationMs: 4000,
@@ -86,16 +91,16 @@ test("差分は変わった項目の名前で言う（何件、ではなく何�
 
   const rewritten: EventCmBrief = {
     ...baked,
-    scenario: {
-      ...baked.scenario,
-      scenes: baked.scenario.scenes.map((scene, index) =>
+    narration: {
+      ...baked.narration,
+      scenes: baked.narration.scenes.map((scene, index) =>
         index === 0 ? { ...scene, text: "別の言葉" } : scene,
       ),
     },
   };
   assert.deepEqual(
     bakeChanges(rewritten, baked).map((change) => change.path),
-    ["scenario"],
+    ["narration"],
   );
 
   assert.deepEqual(
@@ -177,7 +182,7 @@ test("声を選ぶのは設定。読み上げ直しは要るが、書き直し�
 
   assert.deepEqual(
     bakeChanges(picked, baked).map((change) => [change.label, change.needs]),
-    [["読み上げの声", ["voice", "bake"]]],
+    [["ボイスの声", ["voice", "bake"]]],
   );
   assert.deepEqual(pendingFilmSteps(picked, baked), ["voice", "bake"]);
 });
@@ -202,29 +207,29 @@ test("未反映は名前で言い、多すぎるときだけ畳む", () => {
   const change = (label: string) => ({ path: label, label, needs: ["bake" as const] });
   assert.equal(describeChanges([change("BGM")]), "BGM");
   assert.equal(
-    describeChanges([change("BGM"), change("主役の写真"), change("シナリオ")]),
-    "BGM、主役の写真、シナリオ",
+    describeChanges([change("BGM"), change("主役の写真"), change("ナレーション")]),
+    "BGM、主役の写真、ナレーション",
   );
   assert.equal(
     describeChanges([
       change("BGM"),
       change("主役の写真"),
-      change("シナリオ"),
+      change("ナレーション"),
       change("開催日"),
       change("会場"),
     ]),
-    "BGM、主役の写真、シナリオ、他2件",
+    "BGM、主役の写真、ナレーション、他2件",
   );
 });
 
 test("絵コンテと一致していることと、やることが無いことは別", () => {
-  // Found on real data: a take whose scenario no longer covers its pictures had
+  // Found on real data: a take whose narration no longer covers its pictures had
   // zero differences from the played film — it had been fixed in that state —
   // while the button still owed three steps. Calling that 「最新の状態です」 put
   // a green banner directly above a badge reading 未処理3件.
   const settled = { baked: true, changes: [] };
   assert.equal(filmStatus(settled, []), "settled");
-  assert.equal(filmStatus(settled, ["scenario", "voice", "bake"]), "matched");
+  assert.equal(filmStatus(settled, ["narration", "voice", "bake"]), "matched");
 
   const change = { path: "bgm", label: "BGM", needs: ["bake" as const] };
   assert.equal(filmStatus({ baked: true, changes: [change] }, ["bake"]), "behind");
@@ -235,39 +240,50 @@ test("絵コンテと一致していることと、やることが無いこと�
 
 test("読み上げは、いま書かれている言葉と一致するときだけ「合っている」", () => {
   const brief = written(SEEDED, "2026-08-14T10:00:00Z");
-  assert.equal(voiceReadsScenario(brief), false, "録音が無いのに一致と言っている");
+  assert.equal(voiceReadsNarration(brief), false, "録音が無いのに一致と言っている");
 
   const recorded = spoken(brief, "2026-08-14T10:05:00Z");
-  assert.equal(voiceReadsScenario(recorded), true);
+  assert.equal(voiceReadsNarration(recorded), true);
 
   const edited: EventCmBrief = {
     ...recorded,
-    scenario: {
-      ...recorded.scenario,
-      scenes: recorded.scenario.scenes.map((scene, index) =>
+    narration: {
+      ...recorded.narration,
+      scenes: recorded.narration.scenes.map((scene, index) =>
         index === 1 ? { ...scene, text: "書き直した行" } : scene,
       ),
       source: "human",
       updatedAt: "2026-08-14T11:00:00Z",
     },
   };
-  assert.equal(voiceReadsScenario(edited), false);
+  assert.equal(voiceReadsNarration(edited), false);
 });
 
-test("シナリオが未着手なら、書く・読む・反映するの3手", () => {
-  assert.deepEqual(pendingFilmSteps(SEEDED, null), ["scenario", "voice", "bake"]);
+test("シードの下書きは書き直さない。読んで反映するの2手", () => {
+  // A new take arrives with a draft line on every picture that speaks, so the
+  // words are not the missing thing — the recording is. Listing 「ナレーション」
+  // here would offer to rewrite a draft that is not stale.
+  assert.deepEqual(pendingFilmSteps(SEEDED, null), ["voice", "bake"]);
 });
 
-test("手で直したシナリオは書き直さないし、件数にも入れない", () => {
+test("1行も無ければ、書く・読む・反映するの3手", () => {
+  const unwritten: EventCmBrief = {
+    ...SEEDED,
+    narration: { ...SEEDED.narration, scenes: [] },
+  };
+  assert.deepEqual(pendingFilmSteps(unwritten, null), ["narration", "voice", "bake"]);
+});
+
+test("手で直したナレーションは書き直さないし、件数にも入れない", () => {
   const brief = spoken(written(SEEDED, "2026-08-14T10:00:00Z"), "2026-08-14T10:05:00Z");
   const edited: EventCmBrief = {
     ...brief,
-    scenario: { ...brief.scenario, source: "human", updatedAt: "2026-08-14T11:00:00Z" },
+    narration: { ...brief.narration, source: "human", updatedAt: "2026-08-14T11:00:00Z" },
     factsUpdatedAt: "2026-08-14T12:00:00Z",
   };
-  // Facts moved under a hand-written scenario: the film is out of date, and the
+  // Facts moved under a hand-written narration: the film is out of date, and the
   // button still must not offer to rewrite words somebody typed.
-  assert.equal(pendingFilmSteps(edited, brief).includes("scenario"), false);
+  assert.equal(pendingFilmSteps(edited, brief).includes("narration"), false);
 });
 
 test("ナレーションをオフにした動画で、実行が勝手に音声を戻さない", () => {
@@ -275,16 +291,16 @@ test("ナレーションをオフにした動画で、実行が勝手に音声�
   assert.ok(pendingFilmSteps(brief, brief).includes("voice"));
 
   const off = setSuppressed(brief, "voice", true);
-  assert.equal(narrationIsOff(off), true);
+  assert.equal(voiceIsOff(off), true);
   assert.equal(pendingFilmSteps(off, off).includes("voice"), false);
 });
 
-test("シナリオを書き直すなら、読み上げと反映も必ず続く", () => {
+test("ナレーションを書き直すなら、読み上げと反映も必ず続く", () => {
   const stale: EventCmBrief = {
     ...spoken(written(SEEDED, "2026-08-14T10:00:00Z"), "2026-08-14T10:05:00Z"),
     factsUpdatedAt: "2026-08-14T12:00:00Z",
   };
-  assert.deepEqual(pendingFilmSteps(stale, stale), ["scenario", "voice", "bake"]);
+  assert.deepEqual(pendingFilmSteps(stale, stale), ["narration", "voice", "bake"]);
 });
 
 test("全部揃って焼き付け済みなら、やることは無い", () => {
@@ -292,22 +308,22 @@ test("全部揃って焼き付け済みなら、やることは無い", () => {
   assert.deepEqual(pendingFilmSteps(brief, brief), []);
 });
 
-test("シーンが増えた直後は、シナリオから追いつかせる", () => {
+test("シーンが増えた直後は、ナレーションから追いつかせる", () => {
   const brief = spoken(written(SEEDED, "2026-08-14T10:00:00Z"), "2026-08-14T10:05:00Z");
   const withGuest: EventCmBrief = {
     ...brief,
     guests: [{ name: "宮尾 佳明", role: "宮尾酒造 十一代目当主", photo: null }],
   };
-  // The film gained a picture, so the scenario has the wrong set of lines —
-  // exactly the state `scenarioStaleness` calls "shape".
+  // The film gained a picture, so the narration has the wrong set of lines —
+  // exactly the state `narrationStaleness` calls "shape".
   const keys = eventCmFilm(withGuest)
     .scenes.filter((scene) => scene.narrated)
     .map((scene) => scene.key);
   assert.ok(keys.includes(eventCmSceneKey({ role: "guests" })));
-  assert.deepEqual(pendingFilmSteps(withGuest, brief), ["scenario", "voice", "bake"]);
+  assert.deepEqual(pendingFilmSteps(withGuest, brief), ["narration", "voice", "bake"]);
 });
 
-test("シーンを削除した直後も、シナリオから追いつかせる", () => {
+test("シーンを削除した直後も、ナレーションから追いつかせる", () => {
   // The mirror of the test above, and the one that was broken: deleting the
   // speakers is a suppression, and suppressions used not to stamp the facts —
   // so the film lost a picture while every stamp stayed put. The badge said 0,
@@ -328,16 +344,16 @@ test("シーンを削除した直後も、シナリオから追いつかせる",
     bakeChanges(deleted, brief).map((change) => [change.path, change.label]),
     [["guests", "登壇者"]],
   );
-  assert.deepEqual(pendingFilmSteps(deleted, brief), ["scenario", "voice", "bake"]);
+  assert.deepEqual(pendingFilmSteps(deleted, brief), ["narration", "voice", "bake"]);
 });
 
 test("読む言葉が無いのに読み上げを予告しない", () => {
-  // Hand-authored and still empty: the scenario step will not run (it never
+  // Hand-authored and still empty: the narration step will not run (it never
   // overwrites human words) and there is nothing to speak, so listing 読み上げ
-  // would promise a step that can only answer 「先にシナリオを書いてください」.
+  // would promise a step that can only answer 「先にナレーションを書いてください」.
   const empty: EventCmBrief = {
     ...SEEDED,
-    scenario: { version: 1, scenes: [], source: "human", updatedAt: "", angle: "" },
+    narration: { version: 1, scenes: [], source: "human", updatedAt: "", angle: "" },
   };
   assert.deepEqual(pendingFilmSteps(empty, null), ["bake"]);
   assert.deepEqual(pendingFilmSteps(empty, empty), []);
@@ -349,4 +365,27 @@ test("MP4は、焼き付けより古いときだけ古いと言う", () => {
   assert.equal(renderIsBehind("2026-08-14T12:00:00Z", "2026-08-14T11:00:00Z"), false);
   assert.equal(renderIsBehind(null, "2026-08-14T11:00:00Z"), false);
   assert.equal(renderIsBehind("2026-08-14T10:00:00Z", null), false);
+});
+
+test("字幕の切り替えは反映だけで済む（書き直しも読み直しも要らない）", () => {
+  // The subtitles are the narration shown, letter for letter. Switching them
+  // off changes who can read the words and not one of the words, so neither the
+  // writer nor the reader has anything to do — which is what makes this cost
+  // nothing and finish in seconds, like swapping the music.
+  const recorded = spoken(written(SEEDED, "2026-08-14T10:00:00Z"), "2026-08-14T10:05:00Z");
+  const off: EventCmBrief = {
+    ...recorded,
+    provenance: {
+      ...recorded.provenance,
+      [EVENT_CM_CAPTIONS_PATH]: { origin: "user", note: EVENT_CM_SUPPRESSED_NOTE },
+    },
+  };
+
+  assert.deepEqual(bakeState(recorded, recorded).changes, [], "何も変えていないのに差分が出る");
+  assert.deepEqual(
+    bakeState(off, recorded).changes.map((change) => [change.label, change.needs]),
+    [["字幕", ["bake"]]],
+  );
+  // The one button agrees: nothing is written and nothing is read aloud.
+  assert.deepEqual(pendingFilmSteps(off, recorded), ["bake"]);
 });

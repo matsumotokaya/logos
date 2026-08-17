@@ -147,7 +147,7 @@ export const materialCategoryLabel = (value: string | null | undefined): string 
  * `inferred` may be replaced by a later run — that is what makes a wrong guess
  * self-healing. `user` never is: a person who corrected a classification has
  * said something the next model run does not get to overrule. Same shape as the
- * brief's provenance, and the same reason the scenario keeps `source: "human"`.
+ * brief's provenance, and the same reason the narration keeps `source: "human"`.
  */
 export const CATEGORY_SOURCES = ["inferred", "user"] as const;
 export type CategorySource = (typeof CATEGORY_SOURCES)[number];
