@@ -102,6 +102,47 @@ export const defaultAsset = (
   tone: string,
 ): DefaultAsset | null => defaultsOfKind(kind, tone)[0] ?? null;
 
+export const assetById = (id: string): DefaultAsset | null =>
+  DEFAULT_ASSETS.find((asset) => asset.id === id) ?? null;
+
+/**
+ * The track a new take of this template opens with.
+ *
+ * The template names it (`TemplateEntry.defaultBgm`), because the kind of film
+ * decides the music — an event promo and a product film want different tracks,
+ * and that is not a fact about whoever is making one. Passing the id rather
+ * than the whole entry keeps this module free of the catalog, which imports
+ * nothing and must stay that way.
+ *
+ * A template that names no track, or names one the pool has lost, plays
+ * silently. That is a designed state for these templates, not a hole — but it
+ * is worth being unsurprised by, which is why nothing here falls back to
+ * "some other track".
+ */
+export const templateBgm = (bgmId: string | undefined): DefaultAsset | null => {
+  if (!bgmId) return null;
+  const asset = assetById(bgmId);
+  return asset?.kind === "bgm" ? asset : null;
+};
+
+/** Kinds a visual slot can be dressed with. Music is not one of them. */
+const VISUAL_KINDS = new Set<DefaultAssetKind>(["still", "b_roll", "ink_art", "texture"]);
+
+/**
+ * The stock picture a template puts in one of its visual slots.
+ *
+ * Second tier of the ladder: the brand's own picture first, this next, the
+ * composition's designed substitute last. Returns null for anything the pool
+ * has lost or that is not a picture — a wrong-kind id must not put a music
+ * file in a photo slot, and a missing one falls through to tier 3, which is a
+ * finished frame rather than a hole.
+ */
+export const templateVisual = (assetId: string | undefined): DefaultAsset | null => {
+  if (!assetId) return null;
+  const asset = assetById(assetId);
+  return asset && VISUAL_KINDS.has(asset.kind) ? asset : null;
+};
+
 /** Defaults that may not be published — the publish warning lists these. */
 export const unlicensedDefaults = (srcs: readonly string[]): DefaultAsset[] =>
   DEFAULT_ASSETS.filter((asset) => !asset.licensed && srcs.includes(asset.src));

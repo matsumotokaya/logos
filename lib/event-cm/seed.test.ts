@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { proposedDate, seedEventCmBrief } from "./seed";
 import { archetypeFor } from "./archetypes";
+import { templateBgm } from "@/lib/assets/defaults";
+import { currentTemplate } from "@/lib/templates/catalog";
 import { eventCmGoalState } from "@/lib/pipeline/event-cm";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import {
@@ -215,14 +217,21 @@ test("素材プールが空でもブリーフは成立する", () => {
 
 test("新しい動画には最初からBGMが入る", () => {
   // Music is not something a user is asked for; nobody uploads a soundtrack.
+  // Which track is the TEMPLATE's decision, so the expectation reads the
+  // catalog rather than naming a file — swapping the placeholder for a
+  // commissioned track must not break this.
   const brief = seedFor(WEALTHPARK_LAB);
-  assert.equal(brief.bgm, "defaults/bgm/bright-corporate.mp3");
+  const declared = templateBgm(currentTemplate("event-cm")?.defaultBgm);
+  assert.ok(declared, "event-cm が既定BGMを宣言していない");
+  assert.equal(brief.bgm, declared?.src);
   assert.equal(brief.provenance?.bgm?.origin, "inferred");
 });
 
 test("既定のBGMはブランドが違っても同じ", () => {
   // A default that differs between two videos is not a default, it is a
-  // surprise. Variety is what the picker is for.
+  // surprise. Now structural rather than incidental: the track comes from the
+  // template, so the brand cannot reach it (it used to be chosen from the
+  // archetype's tone, which is derived from the brand's industry).
   const other = seedEventCmBrief(
     { name: "別のブランド", industry: "SaaS" },
     { now: NOW, seed: "take-zzz" },

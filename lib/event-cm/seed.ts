@@ -1,5 +1,6 @@
 import { archetypeFor, subjectFor } from "./archetypes";
-import { defaultAsset } from "@/lib/assets/defaults";
+import { templateBgm, templateVisual } from "@/lib/assets/defaults";
+import { currentTemplate } from "@/lib/templates/catalog";
 import type { EventCmBrief, EventCmProvenance } from "@/remotion/event-cm/types";
 
 // Hand someone a finished film before they have told us anything.
@@ -79,14 +80,38 @@ export function seedEventCmBrief(
   inferred("schedule.time", `${archetype.kind}に多い開始時刻`);
   inferred("cta");
 
-  // The one slot the pool can dress. A null here is not a hole: the composition
+  // The one slot the pool dresses. A null here is not a hole: the composition
   // draws a designed substitute, which is the template's whole premise.
   //
   // Ink art and texture used to be seeded here too. Neither is drawn by any
   // event-cm scene — they were event-promo's, inherited by an `extends` that has
   // since been removed (remotion/event-cm/types.ts).
-  const bgm = defaultAsset("bgm", archetype.tone);
-  if (bgm) inferred("bgm", "デフォルトアセット");
+  //
+  // THE TEMPLATE'S TRACK, not the brand's industry's. This used to read
+  // `defaultAsset("bgm", archetype.tone)`, which made the music a consequence
+  // of what business the customer is in — two event videos could open
+  // differently for a reason nobody chose, and the brand had no say either.
+  // Every new take of this template now starts with the same one
+  // (lib/templates/catalog.ts, `defaultBgm`).
+  const template = currentTemplate("event-cm");
+  const bgm = templateBgm(template?.defaultBgm);
+  if (bgm) inferred("bgm", "テンプレートの既定BGM");
+
+  // The visual slots, one tier further down the same ladder.
+  //
+  //   1. the brand's own picture — brands arrive with a logo and a palette,
+  //      almost never with photography, so this is usually empty
+  //   2. the template's stock picture — here, and empty until the artwork lands
+  //   3. the composition's designed substitute — an ink ground and gold
+  //      particles, which is a finished frame, not a hole
+  //
+  // Tier 3 is why this can be empty and the film still complete. That premise
+  // is what lets the pool grow later without touching a template.
+  const visual = (path: string) => {
+    const asset = templateVisual(template?.defaultVisuals?.[path]);
+    if (asset) inferred(path, "テンプレートの既定画像");
+    return asset ? { src: asset.src } : null;
+  };
 
   if (brand.logoSrc) fromBrand("logos");
   else inferred("logos", "ロゴ画像が未解決のため、明朝のクレジット表記で代替");
@@ -127,9 +152,9 @@ export function seedEventCmBrief(
     footnote: null,
     logos: [{ name: brand.name, src: brand.logoSrc ?? null }],
     visuals: {
-      value: null,
-      programs: null,
-      closing: null,
+      value: visual("visuals.value"),
+      programs: visual("visuals.programs"),
+      closing: visual("visuals.closing"),
     },
     bgm: bgm?.src ?? null,
     theme: {

@@ -102,6 +102,47 @@ export interface TemplateEntry {
    * computes. False (the default) means a saved edit is the film.
    */
   bakesBrief?: boolean;
+  /**
+   * Video-specific: the id of the pool track a new take starts with.
+   *
+   * THE DEFAULT BGM BELONGS TO THE TEMPLATE, not to the brand and not to the
+   * brand's industry (owner's decision, 2026-08-17). An event promo and a
+   * product film want different music because they are different kinds of
+   * film — that is a property of the template, and it does not vary by who is
+   * making one. Every new take of a template gets the same track.
+   *
+   * It used to be chosen from the seeded archetype's `tone`, which made the
+   * music a consequence of the brand's industry: two takes of the same template
+   * could open with different music for no reason the user had chosen.
+   *
+   * The ids below are PLACEHOLDERS from the two tracks currently in the pool.
+   * Proper per-template tracks are to be commissioned; swapping them is editing
+   * this field, and nothing else moves — existing takes keep whatever their
+   * brief already points at, because a brief is not re-seeded.
+   */
+  defaultBgm?: string;
+  /**
+   * Video-specific: pool artwork a new take dresses its visual slots with.
+   *
+   * Keyed by the brief path the picture fills (`visuals.value`), valued with a
+   * pool asset id. Same rule as `defaultBgm`, one tier down the ladder:
+   *
+   *   1. the BRAND's own picture, when it has one
+   *   2. the TEMPLATE's stock picture — here
+   *   3. the composition's designed substitute (an ink ground, gold particles)
+   *
+   * Tier 1 is what a key visual should be, and mostly is not: a brand arrives
+   * with a logo, a palette and some type, and hardly ever with photography. So
+   * the template needs a decent picture of its own rather than falling
+   * straight to tier 3 every time.
+   *
+   * EMPTY TODAY, deliberately. The pool carries no images yet (owner is
+   * preparing them, 2026-08-17), and pointing at artwork that does not exist
+   * would put broken slots in every new film. The mechanism is here so that
+   * arriving artwork is a pool entry plus a line in this map — the same shape
+   * the BGM already has.
+   */
+  defaultVisuals?: Record<string, string>;
   stages: PipelineStage[];
   publishSurfaces: PublishSurface[];
   costProfile: CostProfile;
@@ -150,6 +191,9 @@ export const TEMPLATES: TemplateEntry[] = [
     requires: "イベントの文言・日時・登壇者（EventBrief）",
     duration: "30秒",
     narration: false,
+    // Placeholder: the only 和モダン track in the pool. This film has no voice,
+    // so the music carries it alone and deserves its own commissioned track.
+    defaultBgm: "bgm-ink-cinematic",
     // No LLM anywhere: the brief is authored, and the renderer is deterministic.
     stages: ["collect", "render", "publish"],
     publishSurfaces: ["canonical_url", "embed", "social"],
@@ -174,6 +218,9 @@ export const TEMPLATES: TemplateEntry[] = [
     requires: "イベントの事実（EventBrief）と、そこから書いたシナリオ",
     duration: "30秒前後（シナリオと読み上げの長さで決まる）",
     narration: true,
+    // Placeholder: matches the 墨黒×金×明朝 art direction. Ducks under the
+    // narration and returns for the closing mark.
+    defaultBgm: "bgm-ink-cinematic",
     // The storyboard is a workbench: edits collect there and reach the film
     // only when the user asks. The only template that works this way today.
     bakesBrief: true,
@@ -202,6 +249,8 @@ export const TEMPLATES: TemplateEntry[] = [
     requires: "ソース（URL・PDF・テキスト）から生成したService Brand Kit",
     duration: "30秒",
     narration: true,
+    // Placeholder: a product film is not 和モダン, so it takes the other track.
+    defaultBgm: "bgm-bright-corporate",
     // The brief is a Brand Kit plus narration timing: until the voice has been
     // recorded and pinned, there is no length and nothing to play.
     playableFromBrief: false,
