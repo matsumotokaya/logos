@@ -68,6 +68,7 @@
 | [Generative Lab](generative/README.md) | `/labs/generative` | 探索 | ✅ 稼働中(Phase E1) | 生成AIハーネス: 3エンジン・表現テンプレート・ダイヤル4軸・逸脱スコアボード・ショートビデオ |
 | [Campaign Lab](campaign/README.md) | `/campaigns` へ卒業(旧URLはリダイレクト) | 統合 | 🎓 卒業(2026-07-20) | 複数ソース → Service Brand Kit → セールスページ。30秒CM動画は `/campaigns` 上で開発継続 |
 | Event PV | `/labs/event`(正規の置き場所は `/brands/[id]/video/[videoId]`) | 統合 | ✅ 稼働中(v1) | イベント・セミナー軸の30秒PV。ナレーションなし・BGMとタイポで成立させ、**素材ゼロでも完成品が出る**ことを要件にしたテンプレート。詳細は[ルートREADMEの「イベントPVテンプレート」](../README.md#イベントpvテンプレートevent-promo) |
+| [Freehand Lab](freehand/README.md) | —(画面を持たない) | 探索 | 🔬 実験1本目(2026-08-17) | **テンプレートに何が足りないかを、自由に作って測る。** 書き出したプロジェクトを制約なしに作り込み、`git diff` を「語彙に足す / ブリーフに足す / 再現しない」の3つに仕分ける。成果物は動画ではなく要件 |
 
 ## ディレクトリ構成
 
@@ -81,6 +82,7 @@ labs/
   generative/        # Generative Lab 本体(core / engine / templates / components)
   campaign/          # Campaign Lab の引き継ぎ資料・CLI・音声パイプライン
   event/             # イベントPVの素材整形スクリプト(決定論。ロゴのノックアウト等)
+  freehand/          # 書き出したプロジェクトを自由に作り込む実験場。ソースはコミット・素材は除外・型チェック対象外
   <slug>/            # 新しいラボはここに独立したディレクトリを作る
 app/labs/page.tsx        # 研究所インデックス(モード別グルーピング)
 app/labs/motion/page.tsx # 稼働中ラボの薄いルート(workflow / generative も同様)

@@ -30,5 +30,9 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  // labs/freehand holds EXPORTED projects that are edited freely (labs/freehand/README.md).
+  // They are copies of this repository's own sources, so leaving them in would
+  // typecheck the experiment against logos rather than against itself — and a
+  // half-finished experiment would fail `npm run build` here.
+  "exclude": ["node_modules", "labs/freehand"]
 }

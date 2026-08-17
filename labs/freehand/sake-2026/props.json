@@ -1,0 +1,366 @@
+{
+  "bgm": "assets/audio/bgm.mp3",
+  "cta": "詳細・お申し込みはこちら",
+  "logos": [
+    {
+      "src": "assets/logo/wealthpark-lab_transparent_dark_vector.svg",
+      "name": "WealthPark Lab"
+    },
+    {
+      "src": "assets/mark/leopalace21_plate_light_800w.jpg",
+      "name": "leopalace21",
+      "treatment": "light"
+    },
+    {
+      "src": "assets/mark/ft-logo_transparent_light_246w.png",
+      "name": "〆張鶴",
+      "treatment": "light"
+    }
+  ],
+  "theme": {
+    "palette": {
+      "text": "#000000",
+      "primary": "#080808",
+      "background": "#ffffff"
+    },
+    "bodyFont": "Zen Kaku Gothic New",
+    "headingFont": "Zen Kaku Gothic New"
+  },
+  "title": "世界が恋する日本酒",
+  "voice": {
+    "audio": "assets/audio/narration.wav",
+    "track": {
+      "mock": false,
+      "voice": "Aoede",
+      "scenes": [
+        {
+          "role": "title",
+          "text": "レオパレス21とWealthPark Labが贈る、文化資本と投資シリーズ第3弾。世界が恋する日本酒。",
+          "startMs": 0,
+          "durationMs": 9600
+        },
+        {
+          "role": "value",
+          "text": "日本の国酒である日本酒。2026 Miss SAKE 2名とともに、百貨店では出会えない特別な日本酒を味わいながら、その楽しみ方や、世界で高まる日本酒の価値をアップデートしてみませんか。",
+          "startMs": 10500,
+          "durationMs": 14480
+        },
+        {
+          "role": "program",
+          "text": "このイベントでは、3つのプログラムで楽しみ方を深めます。まず、百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング。様々な日本酒を五感で感じていただけます。",
+          "index": 0,
+          "startMs": 25880,
+          "durationMs": 13600
+        },
+        {
+          "role": "program",
+          "text": "2つ目はトークセッションです。しめはりつる、宮尾酒造十一代目当主と、Miss SAKE 代表理事が、知られざる日本酒業界の舞台裏と世界への広がりについて語ります。",
+          "index": 1,
+          "startMs": 40380,
+          "durationMs": 12160
+        },
+        {
+          "role": "program",
+          "text": "3つ目はワークショップです。2026 Miss SAKE 2名とともに、日本酒の楽しみ方を広げる2つのワークショップで、飲み順、味わいの表現、テイスティングのコツについて学びます。",
+          "index": 2,
+          "startMs": 53440,
+          "durationMs": 13480
+        },
+        {
+          "role": "guests",
+          "text": "200年以上の歴史を誇る、新潟・村上の名門酒蔵、宮尾酒造の十一代目当主、宮尾佳明氏と、日本酒の海外普及と日本文化の次世代への継承を担う、一般社団法人 Miss SAKE 代表理事、大西美香氏をゲストに招いての開催となります。",
+          "startMs": 67820,
+          "durationMs": 18600
+        },
+        {
+          "role": "cta",
+          "text": "一杯の日本酒から始まる、新しい出会いと学び。レオパレス21とオーナー様、そしてオーナー様同士の新たな繋がりを育む、特別な午後をご提案します。",
+          "startMs": 87320,
+          "durationMs": 12680
+        }
+      ],
+      "totalMs": 100500,
+      "version": 1,
+      "captions": [
+        {
+          "text": "レオパレス21とWealthPark Labが贈る、文化資本と投資シリーズ第3弾。",
+          "endMs": 7543,
+          "startMs": 0
+        },
+        {
+          "text": "世界が恋する日本酒。",
+          "endMs": 10500,
+          "startMs": 7543
+        },
+        {
+          "text": "日本の国酒である日本酒。",
+          "endMs": 12527,
+          "startMs": 10500
+        },
+        {
+          "text": "2026 Miss SAKE 2名とともに、百貨店では出会えない特別な日本酒を味わいながら、その楽しみ方や、世界で高まる日本酒の価値をアップデートしてみませんか。",
+          "endMs": 25880,
+          "startMs": 12527
+        },
+        {
+          "text": "このイベントでは、3つのプログラムで楽しみ方を深めます。",
+          "endMs": 30463,
+          "startMs": 25880
+        },
+        {
+          "text": "まず、百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング。",
+          "endMs": 36228,
+          "startMs": 30463
+        },
+        {
+          "text": "様々な日本酒を五感で感じていただけます。",
+          "endMs": 40380,
+          "startMs": 36228
+        },
+        {
+          "text": "2つ目はトークセッションです。",
+          "endMs": 42729,
+          "startMs": 40380
+        },
+        {
+          "text": "しめはりつる、宮尾酒造十一代目当主と、Miss SAKE 代表理事が、知られざる日本酒業界の舞台裏と世界への広がりについて語ります。",
+          "endMs": 53440,
+          "startMs": 42729
+        },
+        {
+          "text": "3つ目はワークショップです。",
+          "endMs": 55641,
+          "startMs": 53440
+        },
+        {
+          "text": "2026 Miss SAKE 2名とともに、日本酒の楽しみ方を広げる2つのワークショップで、飲み順、味わいの表現、テイスティングのコツについて学びます。",
+          "endMs": 67820,
+          "startMs": 55641
+        },
+        {
+          "text": "200年以上の歴史を誇る、新潟・村上の名門酒蔵、宮尾酒造の十一代目当主、宮尾佳明氏と、日本酒の海外普及と日本文化の次世代への継承を担う、一般社団法人 Miss SAKE 代表理事、大西美香氏をゲストに招いての開催となります。",
+          "endMs": 87320,
+          "startMs": 67820
+        },
+        {
+          "text": "一杯の日本酒から始まる、新しい出会いと学び。",
+          "endMs": 91437,
+          "startMs": 87320
+        },
+        {
+          "text": "レオパレス21とオーナー様、そしてオーナー様同士の新たな繋がりを育む、特別な午後をご提案します。",
+          "endMs": 100500,
+          "startMs": 91437
+        }
+      ],
+      "provider": "gemini",
+      "sampleRate": 24000,
+      "generatedAt": "2026-08-17T08:56:57.274Z"
+    }
+  },
+  "guests": [
+    {
+      "name": "宮尾佳明",
+      "role": "宮尾酒造 十一代目当主",
+      "photo": {
+        "src": "assets/person/miyao_960w.jpg",
+        "focus": {
+          "x": 0.68,
+          "y": 0.5
+        }
+      }
+    },
+    {
+      "name": "大西美香",
+      "role": "一般社団法人Miss SAKE 代表理事",
+      "photo": {
+        "src": "assets/person/onishi_1400w.jpg",
+        "focus": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      }
+    }
+  ],
+  "visuals": {
+    "value": {
+      "src": "assets/unsorted/adobestock-122637388_3908w.jpg",
+      "focus": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "closing": {
+      "src": "assets/unsorted/adobestock-473760969_6000w.jpg",
+      "focus": {
+        "x": 0.5,
+        "y": 0.38
+      }
+    },
+    "programs": {
+      "src": "assets/product/adobestock-1894358160_5120w.jpg",
+      "focus": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    }
+  },
+  "footnote": null,
+  "programs": [
+    {
+      "title": "百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング"
+    },
+    {
+      "title": "〆張鶴・宮尾酒造十一代目当主と、Miss SAKE代表理事が語る、知られざる日本酒業界の舞台裏と世界への広がり"
+    },
+    {
+      "title": "2026 Miss SAKE 2名と学ぶ、日本酒の楽しみ方を広げる2つのワークショップ（飲み順・味わいの表現・テイスティングのコツ）"
+    }
+  ],
+  "schedule": {
+    "fee": null,
+    "date": "2026年10月3日",
+    "time": "13:00〜16:00（予定）",
+    "venue": "中野坂上 ボードルーム",
+    "weekday": "土"
+  },
+  "subtitle": "世界へつながる、文化資本への投資",
+  "narration": {
+    "angle": "少人数で日本酒を深く学び、味わい、日本文化を楽しむ仲間とのつながりへ導く30秒です。",
+    "scenes": [
+      {
+        "role": "title",
+        "text": "レオパレス21とWealthPark Labが贈る、文化資本と投資シリーズ第3弾。世界が恋する日本酒。"
+      },
+      {
+        "role": "value",
+        "text": "日本の国酒である日本酒。2026 Miss SAKE 2名とともに、百貨店では出会えない特別な日本酒を味わいながら、その楽しみ方や、世界で高まる日本酒の価値をアップデートしてみませんか。"
+      },
+      {
+        "role": "program",
+        "text": "このイベントでは、3つのプログラムで楽しみ方を深めます。まず、百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング。様々な日本酒を五感で感じていただけます。",
+        "index": 0
+      },
+      {
+        "role": "program",
+        "text": "2つ目はトークセッションです。しめはりつる、宮尾酒造十一代目当主と、Miss SAKE 代表理事が、知られざる日本酒業界の舞台裏と世界への広がりについて語ります。",
+        "index": 1
+      },
+      {
+        "role": "program",
+        "text": "3つ目はワークショップです。2026 Miss SAKE 2名とともに、日本酒の楽しみ方を広げる2つのワークショップで、飲み順、味わいの表現、テイスティングのコツについて学びます。",
+        "index": 2
+      },
+      {
+        "role": "guests",
+        "text": "200年以上の歴史を誇る、新潟・村上の名門酒蔵、宮尾酒造の十一代目当主、宮尾佳明氏と、日本酒の海外普及と日本文化の次世代への継承を担う、一般社団法人 Miss SAKE 代表理事、大西美香氏をゲストに招いての開催となります。"
+      },
+      {
+        "role": "cta",
+        "text": "一杯の日本酒から始まる、新しい出会いと学び。レオパレス21とオーナー様、そしてオーナー様同士の新たな繋がりを育む、特別な午後をご提案します。"
+      }
+    ],
+    "source": "human",
+    "version": 1,
+    "updatedAt": "2026-08-17T08:55:52.818Z"
+  },
+  "presenter": "レオパレス21 × WealthPark Lab",
+  "valueChip": "少人数で、深く",
+  "provenance": {
+    "bgm": {
+      "origin": "user"
+    },
+    "cta": {
+      "origin": "inferred"
+    },
+    "logos": {
+      "note": "透過の明るいマークなのでそのまま置きました",
+      "origin": "inferred",
+      "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+    },
+    "theme": {
+      "origin": "brand"
+    },
+    "title": {
+      "origin": "extracted",
+      "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+    },
+    "guests": {
+      "origin": "extracted",
+      "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+    },
+    "programs": {
+      "origin": "extracted",
+      "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+    },
+    "subtitle": {
+      "origin": "extracted",
+      "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+    },
+    "presenter": {
+      "origin": "extracted",
+      "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+    },
+    "valueChip": {
+      "origin": "inferred"
+    },
+    "valueLines": {
+      "origin": "extracted",
+      "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+    },
+    "seriesLabel": {
+      "origin": "extracted",
+      "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+    },
+    "theme.accent": {
+      "note": "このブランドはアクセントを持たないため、テーマの色を使う",
+      "origin": "inferred"
+    },
+    "schedule.date": {
+      "origin": "extracted",
+      "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+    },
+    "schedule.time": {
+      "origin": "extracted",
+      "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+    },
+    "visuals.value": {
+      "note": "木枡に入った日本酒と酒器が写っている。",
+      "origin": "extracted",
+      "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、sake/AdobeStock_2078450052.jpeg、sake/AdobeStock_473760969.jpeg、sake/AdobeStock_96941827.jpeg、貼り付けたテキスト、sake/AdobeStock_1858867289.jpeg、sake/AdobeStock_122637388.jpeg、sake/AdobeStock_2004753626.jpeg"
+    },
+    "schedule.venue": {
+      "origin": "extracted",
+      "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+    },
+    "guests[0].photo": {
+      "note": "ファイル名から「宮尾佳明」と確認",
+      "origin": "extracted",
+      "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+    },
+    "guests[1].photo": {
+      "note": "ファイル名から「大西美香」と確認",
+      "origin": "extracted",
+      "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+    },
+    "visuals.closing": {
+      "note": "男性が木枡を手に日本酒の香りを確認している。",
+      "origin": "inferred",
+      "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、sake/AdobeStock_2078450052.jpeg、sake/AdobeStock_473760969.jpeg、sake/AdobeStock_96941827.jpeg、貼り付けたテキスト、sake/AdobeStock_1858867289.jpeg、sake/AdobeStock_122637388.jpeg、sake/AdobeStock_2004753626.jpeg"
+    },
+    "visuals.programs": {
+      "note": "徳利からグラスへ日本酒を注いでいる。",
+      "origin": "extracted",
+      "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、sake/AdobeStock_2078450052.jpeg、sake/AdobeStock_473760969.jpeg、sake/AdobeStock_96941827.jpeg、貼り付けたテキスト、sake/AdobeStock_1858867289.jpeg、sake/AdobeStock_122637388.jpeg、sake/AdobeStock_2004753626.jpeg"
+    }
+  },
+  "valueLines": [
+    "日本酒をより深く楽しめる教養を身につける",
+    "日本文化の魅力を再発見する",
+    "文化を楽しめる仲間との出会い"
+  ],
+  "seriesLabel": "「文化資本と投資」シリーズ 第3弾",
+  "guestsHeading": "登壇者",
+  "factsUpdatedAt": "2026-08-17T05:50:10.213Z",
+  "programsHeading": "3つのプログラム"
+}

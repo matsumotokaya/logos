@@ -1,0 +1,12 @@
+# The媒体 stays out, the source comes in.
+#
+# Same rule as /public/event/*/ at the repository root, and for the same reason:
+# these folders hold licensed stock photography, portraits of real people and
+# supplied music. Pushing them would publish licensed and personal media into
+# git history, which a later delete cannot undo.
+#
+# The SOURCE is committed on purpose — it is the measurement (see README.md).
+*/public/
+*/node_modules/
+*/out/
+*/.remotion/
