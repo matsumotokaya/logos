@@ -7,23 +7,42 @@ import {
   EVENT_WIDTH,
   EVENT_HEIGHT,
 } from "@/remotion/event-cm/EventCmComposition";
+import { FreehandComposition } from "@/freehand/FreehandComposition";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 import briefJson from "../props.json";
 
 const brief = briefJson as unknown as EventCmBrief;
 
 export const Root: React.FC = () => (
-  <Composition
-    id="event-cm"
-    component={EventCmComposition}
-    fps={EVENT_FPS}
-    width={EVENT_WIDTH}
-    height={EVENT_HEIGHT}
-    durationInFrames={eventCmDurationInFrames(brief)}
-    defaultProps={{ brief }}
-    calculateMetadata={({ props }) => ({
-      durationInFrames: eventCmDurationInFrames(props.brief),
-      props,
-    })}
-  />
+  <>
+    {/* The freehand cut — same id the render script targets, so `npm run
+        render` produces the experiment. The baseline template render stays
+        registered below as `event-cm-baseline` for side-by-side comparison. */}
+    <Composition
+      id="event-cm"
+      component={FreehandComposition}
+      fps={EVENT_FPS}
+      width={EVENT_WIDTH}
+      height={EVENT_HEIGHT}
+      durationInFrames={eventCmDurationInFrames(brief)}
+      defaultProps={{ brief }}
+      calculateMetadata={({ props }) => ({
+        durationInFrames: eventCmDurationInFrames(props.brief),
+        props,
+      })}
+    />
+    <Composition
+      id="event-cm-baseline"
+      component={EventCmComposition}
+      fps={EVENT_FPS}
+      width={EVENT_WIDTH}
+      height={EVENT_HEIGHT}
+      durationInFrames={eventCmDurationInFrames(brief)}
+      defaultProps={{ brief }}
+      calculateMetadata={({ props }) => ({
+        durationInFrames: eventCmDurationInFrames(props.brief),
+        props,
+      })}
+    />
+  </>
 );
