@@ -1,0 +1,52 @@
+{
+  "hyoshigi.mp3": {
+    "headDb": -25.2,
+    "meanDb": -25.2,
+    "gain": 1.82
+  },
+  "jidaigeki.mp3": {
+    "headDb": -28.3,
+    "meanDb": -30.4,
+    "gain": 2.6
+  },
+  "koto-glissando.mp3": {
+    "headDb": -18,
+    "meanDb": -23.2,
+    "gain": 0.794
+  },
+  "piano-note.mp3": {
+    "headDb": -16.7,
+    "meanDb": -18.9,
+    "gain": 0.684
+  },
+  "suzu.mp3": {
+    "headDb": -26,
+    "meanDb": -27.8,
+    "gain": 1.995
+  },
+  "taiko-dodon.mp3": {
+    "headDb": -16.3,
+    "meanDb": -18.2,
+    "gain": 0.653
+  },
+  "taiko-don.mp3": {
+    "headDb": -19.9,
+    "meanDb": -25,
+    "gain": 0.989
+  },
+  "taiko-kaka.mp3": {
+    "headDb": -24.2,
+    "meanDb": -24.2,
+    "gain": 1.622
+  },
+  "title-reveal.mp3": {
+    "headDb": -23.6,
+    "meanDb": -25.9,
+    "gain": 1.514
+  },
+  "transition.mp3": {
+    "headDb": -18.3,
+    "meanDb": -21,
+    "gain": 0.822
+  }
+}

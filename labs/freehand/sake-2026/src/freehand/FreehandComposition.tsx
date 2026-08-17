@@ -13,6 +13,7 @@ import { msToFrame, msToFrames } from "@/remotion/event-cm/timeline";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 import type { FilmScene } from "@/remotion/event-cm/film";
 import { FH } from "./palette";
+import { cueFor } from "./sfx";
 import { FreehandCaptions, Grain, Letterbox, Vignette } from "./chrome";
 import {
   FhCtaScene,
@@ -106,6 +107,17 @@ export const FreehandComposition: React.FC<FreehandProps> = ({ brief: raw }) => 
         return (
           <Sequence key={scene.key} from={from} durationInFrames={length}>
             {sceneView(scene, brief, length, programTotal)}
+          </Sequence>
+        );
+      })}
+      {/* Sound cues sit outside the scene Sequences: an effect that marks a cut
+          has to be allowed to ring past it (sfx.ts). */}
+      {film.scenes.map((scene) => {
+        const cue = cueFor(scene.role, scene.index ?? 0);
+        if (!cue) return null;
+        return (
+          <Sequence key={`sfx-${scene.key}`} from={msToFrame(scene.fromMs + cue.atMs, fps)}>
+            <Audio src={resolveMediaSrc(cue.src)} volume={cue.volume} />
           </Sequence>
         );
       })}

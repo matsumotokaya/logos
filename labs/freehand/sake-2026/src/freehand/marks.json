@@ -1,0 +1,30 @@
+{
+  "wealthpark-lab": {
+    "src": "assets/mark/wealthpark-lab_trimmed.png",
+    "ink": "dark",
+    "aspect": 6.3441,
+    "inkRatio": 0.2231,
+    "scale": 0.725
+  },
+  "leopalace21": {
+    "src": "assets/mark/leopalace21_trimmed.png",
+    "ink": "light",
+    "aspect": 4.3712,
+    "inkRatio": 0.3345,
+    "scale": 0.992
+  },
+  "shimeharitsuru": {
+    "src": "assets/mark/shimeharitsuru_trimmed.png",
+    "ink": "light",
+    "aspect": 1,
+    "inkRatio": 0.2966,
+    "scale": 1.478
+  },
+  "miss-sake": {
+    "src": "assets/mark/miss-sake_trimmed.png",
+    "ink": "light",
+    "aspect": 1.8667,
+    "inkRatio": 0.2536,
+    "scale": 1.315
+  }
+}
