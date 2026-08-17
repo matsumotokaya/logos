@@ -34,6 +34,8 @@ import BrandPipelinePanel, {
   type BrandPipelinePayload,
 } from "@/components/pipeline/BrandPipelinePanel";
 import type { BrandMaterial } from "@/components/pipeline/MaterialIntake";
+import BrandAssetSlots from "@/components/brand/BrandAssetSlots";
+import { materialFileName } from "@/lib/materials/naming";
 import type { PipelineStage } from "@/lib/pipeline/stages";
 import { ADDABLE_VIDEO_TEMPLATES } from "@/lib/video/templates";
 
@@ -117,6 +119,16 @@ export default function BrandTop({ brandId }: { brandId: string }) {
   const [openStage, setOpenStage] = useState<string | null>(null);
   const [materials, setMaterials] = useState<BrandMaterial[]>([]);
   const [busy, setBusy] = useState(false);
+
+  // The brand's key visual, if it has declared one.
+  //
+  // `kind` is where this lives rather than `category`, because `kind` has
+  // carried role-ish values since 0028 — `logo` and `font` are roles too, and
+  // `keyvisual` has been in the CHECK constraint all along with nothing
+  // writing it. Reusing it costs no migration and invents no third axis.
+  // `category` stays what the picture DEPICTS (a sake still life is a product
+  // shot whether or not a brand made it their key visual).
+  const keyVisuals = materials.filter((material) => material.kind === "keyvisual");
 
   const load = useCallback(async () => {
     try {
@@ -504,59 +516,43 @@ export default function BrandTop({ brandId }: { brandId: string }) {
           )}
         </div>
 
-        <div className="flex flex-col gap-3">
-          <div className="flex items-baseline gap-3">
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-              ロゴ
-            </h3>
-            <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
-            {logos.length > 0 ? (
-              <Link
-                href={`/brands/${brandId}/logos`}
-                className="shrink-0 text-[11px] text-accent hover:underline"
-              >
-                すべて管理 →
-              </Link>
-            ) : null}
-          </div>
-          {logos.length > 0 ? (
-            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {logos.map((logo) => (
-                <li key={logo.id}>
-                  <Link
-                    href={`/brands/${brandId}/logos/${logo.id}`}
-                    className="flex h-full flex-col gap-3 rounded-2xl border border-hairline bg-white p-4 transition hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                  >
-                    <span className="flex h-20 items-center justify-center overflow-hidden rounded-lg bg-ink/[0.03]">
-                      {logo.previewUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={logo.previewUrl}
-                          alt=""
-                          className="max-h-16 max-w-[80%] object-contain"
-                        />
-                      ) : (
-                        <span className="text-[11px] text-ink-faint">プレビューなし</span>
-                      )}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-semibold text-ink">
-                        {logo.title}
-                      </span>
-                      <span className="mt-0.5 block truncate text-[11px] text-ink-muted">
-                        {logo.subjectEntityName}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="rounded-2xl border border-dashed border-hairline px-4 py-5 text-sm text-ink-muted">
-              まだロゴがありません。サイトから取り込むか、トップからSVGをアップロードします。
-            </p>
-          )}
-        </div>
+        {/* Logos and the key visual as NAMED SLOTS, so an empty one is
+            visible. A brand with no key visual used to render no key-visual
+            section at all, which reads as 「この製品にはその概念が無い」 rather
+            than 「まだ指定していない」. Same component the video page uses, so
+            the two answer the same question in the same shape. */}
+        <BrandAssetSlots
+          slots={[
+            {
+              key: "logo",
+              label: "ロゴ",
+              hint: "動画の冒頭と締め、LPのヘッダーに出ます",
+              items: logos.map((logo) => ({
+                id: logo.id,
+                name: logo.title,
+                previewUrl: logo.previewUrl,
+                note: logo.subjectEntityName,
+                href: `/brands/${brandId}/logos/${logo.id}`,
+              })),
+              emptyNote:
+                "まだロゴがありません。サイトから取り込むか、トップからSVGをアップロードします。無いあいだは明朝のクレジット表記で代替されます。",
+              href: `/brands/${brandId}/logos`,
+            },
+            {
+              key: "keyvisual",
+              label: "キービジュアル",
+              hint: "動画の主役シーンやLPのヒーローの地になります",
+              items: keyVisuals.map((material) => ({
+                id: material.id,
+                name: materialFileName(material),
+                previewUrl: null,
+                note: "ブランドの素材",
+              })),
+              emptyNote:
+                "このブランドはキービジュアルを持っていません。成果物ごとに写真を入れるか、ずっと使う1枚を素材から「ブランドの基盤へ」上げると、ここに出ます。",
+            },
+          ]}
+        />
       </section>
 
       {/* The tools built out of the assets above. */}

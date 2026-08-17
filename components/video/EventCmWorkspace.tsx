@@ -29,6 +29,8 @@ import {
 import type { BriefSource } from "./BriefSourceIntake";
 import { type FactEdit } from "./FactList";
 import Storyboard from "./Storyboard";
+import BrandAssetSlots from "@/components/brand/BrandAssetSlots";
+import { eventCmFilm } from "@/remotion/event-cm/film";
 import { eventCmStoryboard } from "@/lib/storyboard/event-cm";
 import {
   eventCmSceneKey,
@@ -118,6 +120,10 @@ export default function EventCmWorkspace({
   const chars = scenarioChars(brief.scenario);
   const stale = scenarioStaleness(brief);
   const storyboard = eventCmStoryboard(brief);
+  // The sanctioned door to the drawn values (remotion/event-cm/film.ts): the
+  // slots must show what the film actually carries, so a suppressed mark or a
+  // declined brand base is reflected here rather than contradicted.
+  const film = eventCmFilm(brief);
   // The brief arrives with its pointers already signed, so going the other way
   // is how a slot names its file rather than pattern-matching a URL.
   const uriByUrl = new Map(
@@ -341,6 +347,47 @@ export default function EventCmWorkspace({
               どのシーンに置くかは、上の絵コンテでシーンを開いて選びます。
             </p>
           </div>
+
+          {/* The same named slots the brand page shows, answered for THIS film.
+              A video carries its own mark and its own key visual — often not
+              the brand's — and reading them in the same rows is what makes the
+              difference legible instead of requiring a comparison between two
+              differently shaped screens. */}
+          <BrandAssetSlots
+            slots={[
+              {
+                key: "logo",
+                label: "ロゴ",
+                hint: "冒頭・締め・エンドカードに出ます",
+                items: film.drawn.logos.map((logo, index) => ({
+                  id: `${index}-${logo.name}`,
+                  name: logo.name,
+                  previewUrl: logo.src,
+                  note: index === 0 ? "提供者のマーク" : "パートナー",
+                })),
+                emptyNote:
+                  "この動画はマークを持ちません。冒頭と締めは明朝のクレジット表記で描かれます。",
+              },
+              {
+                key: "keyvisual",
+                label: "キービジュアル",
+                hint: "テーマのシーンの地になります",
+                items: film.drawn.visuals.value
+                  ? [
+                      {
+                        id: "visuals.value",
+                        name: "テーマの背景",
+                        previewUrl: film.drawn.visuals.value.src,
+                        note: "シーンを開くと差し替えられます",
+                      },
+                    ]
+                  : [],
+                emptyNote:
+                  "この動画はキービジュアルを持ちません。墨の地と金の粒子で描かれます（設計された代替で、穴ではありません）。",
+              },
+            ]}
+          />
+
           {inventory}
         </section>
       ) : null}
