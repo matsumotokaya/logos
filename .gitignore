@@ -70,3 +70,7 @@ __pycache__/
 # names them IS committed, and marks them unlicensed so they cannot leave in an
 # exported MP4.
 /public/defaults/bgm/*.mp3
+# Default SFX pool: 効果音ラボ forbids redistributing the files themselves, so
+# the bytes stay out and scripts/fetch-default-sfx.mjs restores them anywhere.
+# The committed catalog.json records what belongs here.
+/public/defaults/sfx/*.mp3
