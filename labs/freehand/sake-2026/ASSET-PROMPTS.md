@@ -239,6 +239,172 @@ photorealistic, locked-off camera, seamless loop, first and last frame identical
 
 ---
 
-## 作ったあとの受け渡し
+# 連作(シーケンス)用の静止画プロンプト(2026-08-18 追記)
+
+**目的: ループをカットに置き換える。** 1つのクリップを2〜3回ループさせると継ぎ目で不自然になるので、**似た絵柄のショットを2〜3枚並べてカットで繋ぐ**。ここのプロンプトは**静止画用**(あとから動かす前提)。
+
+## 連作だけの追加ルール
+
+1. **セット内で照明の言葉を変えない。** 各セットの全プロンプトに同じ照明句(`single warm key light from the left, dark charcoal background` 等)を入れてある。ここが揃っていないと、カットした瞬間に「別の日に撮った写真」になる。**セット内の言い換え・省略は不可**
+2. **日本酒は無色透明。** ワインやウイスキーの色(琥珀・金色の液体)が出たら捨てて出し直す。全セット共通でネガティブに追加:
+
+```
+amber liquid, golden liquid, brown liquid, whiskey, brandy, wine, orange tint
+in the liquid, wine glasses
+```
+
+3. **器で「日本酒」と言う。** グラスの形ではなく、お猪口・蛇の目の利き猪口・徳利・枡が画面にあることで日本酒だと分かるようにする(壱の現行画像がワインテイスティングに見える問題への答え)
+4. 既存ルール(16:9・2560px以上・片側の暗部・文字なし・顔なし)はすべて継続
+
+---
+
+## S1. 注ぎの連作(タイトルの地・3枚)
+
+現行の注ぎクリップと同じ照明族。**a=動きの絵、b・c=静の絵**——「注いでいる」だけでなく「注ぎ終わったお酒をただ見ている」時間を作る。
+
+**S1-a 注ぐ(俯瞰気味)**
+
+```
+Clear colorless sake being poured from a ceramic tokkuri into a small white
+porcelain ochoko cup on a black lacquer tray, seen from a slightly high angle,
+thin steady stream, single warm key light from the left, dark charcoal
+background, deep shadow filling the right third, shallow depth of field,
+photorealistic, cinematic still life, 16:9, negative space on the right
+```
+
+**S1-b 注ぎ終わりの静けさ(別角度)**
+
+```
+A small white porcelain ochoko filled to the brim with clear colorless sake,
+resting beside a ceramic tokkuri on a black lacquer tray, low camera angle at
+table level, the liquid surface perfectly still and catching one warm
+reflection, single warm key light from the left, dark charcoal background,
+deep shadow filling the right third, macro detail on the rim, photorealistic,
+16:9, negative space on the right
+```
+
+**S1-c 満たされた枡(寄り)**
+
+```
+A pale hinoki masu box filled to the brim with clear colorless sake, a crystal
+glass seated inside it, thin overflow trails down the wood grain onto a black
+lacquer tray, extreme close-up, single warm key light from the left, dark
+charcoal background, deep shadow filling the right third, photorealistic,
+16:9, negative space on the right
+```
+
+## S2. 液面の連作(テーマの地・2枚)
+
+現行の雫クリップ(枡・藍の布・黒盆)と同じ食卓。**同じ場所の別の瞬間**として作る。
+
+**S2-a 波紋の余韻**
+
+```
+Overhead three-quarter view of a hinoki masu box filled to the brim with clear
+colorless sake, faint concentric ripples settling back to stillness, indigo
+shibori textile underneath, black lacquer tray, warm low-key lighting from the
+upper right, deep shadows on the left half, macro detail on wood grain and
+meniscus, photorealistic, 16:9, negative space on the left
+```
+
+**S2-b 布と枡の引き**
+
+```
+A hinoki masu box of clear colorless sake on a black lacquer tray over indigo
+shibori textile, seen from a low three-quarter angle a step further back, a
+ceramic guinomi cup beside it, warm low-key lighting from the upper right,
+deep shadows on the left half, quiet and composed, photorealistic, 16:9,
+negative space on the left
+```
+
+## S3. テイスティングの連作(壱の地・3枚)— 日本酒と分かる器で
+
+現行の5脚グラスの置き換え。**蛇の目の利き猪口**(白磁に藍の二重丸)が「利き酒」を一語で言う。
+
+**S3-a 蛇の目の利き猪口の列**
+
+```
+A row of five white porcelain kikijoko sake tasting cups, each with the
+traditional double blue ring (janome pattern) visible inside, filled with
+clear colorless sake, on a dark wooden counter, warm tungsten light from
+behind so the rims glow, near-black background, shallow depth of field with
+the nearest cup sharp, photorealistic, editorial photography, 16:9, negative
+space on the left
+```
+
+**S3-b 徳利と猪口のセット(引き)**
+
+```
+A tasting set on a dark wooden counter: three ceramic tokkuri flasks of
+different glazes standing behind a line of small white porcelain ochoko cups
+filled with clear colorless sake, warm tungsten light from behind, near-black
+background, shallow depth of field, quiet and precise, photorealistic, 16:9,
+negative space on the left
+```
+
+**S3-c 蛇の目の真上(寄り)**
+
+```
+Extreme overhead close-up of one white porcelain kikijoko tasting cup with the
+blue double ring (janome pattern) refracted through perfectly clear colorless
+sake, resting on dark wood, a second cup blurred at the frame edge, warm
+tungsten light, near-black background, macro, photorealistic, 16:9, negative
+space on the left
+```
+
+## S4. 手元の連作(参の地・2枚)
+
+現行の手元クリップ(暗いウォルナットの机・記録用紙・ぼけたグラス列)と同じ部屋。**顔なし**継続。
+
+**S4-a 光にかざす**
+
+```
+A hand holding a small white porcelain ochoko of clear colorless sake up
+toward a warm light to examine its clarity, dark walnut table below, tasting
+sheets and small cups blurred in the background, warm low-key lighting, no
+faces visible, shallow depth of field, documentary style, photorealistic,
+16:9, negative space on the left
+```
+
+**S4-b 酌(手元だけ)**
+
+```
+Two pairs of hands at a dark walnut table: one pouring clear colorless sake
+from a ceramic tokkuri into the other person's small ochoko cup, tasting
+sheets beside them, warm low-key lighting, no faces visible, shallow depth of
+field, documentary style, photorealistic, 16:9, negative space on the left
+```
+
+## S5. 秋の連作(挿しの1カット用・2枚)
+
+手元にある秋の静物(`photo/autumn.png`: 徳利+紅葉+行灯)と同じ族。動かせばオープニング・テーマ・CTAのどこにでも挿せる。
+
+**S5-a 枡の縁の紅葉**
+
+```
+Japanese autumn still life at night: a single crimson momiji maple leaf
+resting on the rim of a hinoki masu box filled with clear colorless sake, wet
+black stone surface, a warm paper lantern far out of focus behind, drops of
+water on the leaf, deep black background, moody and restrained, macro
+photography, photorealistic, 16:9, negative space on the right
+```
+
+**S5-b 紅葉の上の徳利(引き)**
+
+```
+A ceramic tokkuri and one small ochoko cup of clear colorless sake standing on
+wet black stone scattered with a few crimson and orange momiji maple leaves, a
+warm paper lantern glowing far out of focus behind, night, deep black
+background, moody and restrained, photorealistic still life, 16:9, negative
+space on the right
+```
+
+---
+
+## 動かすときのメモ(こちらの組み込み前提)
+
+- 1シーン=セット内の2〜3ショットを**尺で等分してカット**で繋ぐ(ループはしない)。カットの瞬間は現行の章転換と同じ扱いにする
+- だから**各ショット5秒あれば足りる**(13秒のシーンでも3カットなら1本あたり4.3秒)
+- 受け渡しは `public/assets/video/` に `s1a.mp4` `s1b.mp4` のようなセット記号の名前で。静止画のまま渡してもらえれば、こちらでKen Burnsを掛けて動かすこともできる(その場合は `public/assets/photo/` へ)
 
 `labs/freehand/sake-2026/public/assets/video/` へ **V番号の名前**(`v1-pour.mp4` 等)で置いてもらえれば、こちらで尺合わせ・ループ点の処理・減光を入れて組み込む。**元ファイルは無加工のまま**渡してほしい(トリミングや色調整はこちらの層でやるので、二重にかかると戻せない)。
