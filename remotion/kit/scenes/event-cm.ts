@@ -1,5 +1,8 @@
 import type { Scene, SceneBackdrop } from "../layout";
 import type { SceneComponent } from "../components";
+
+/** Plain kanji numerals for the agenda trio (stat variant "seal"). */
+const KANJI_NUMERALS = ["一", "二", "三"] as const;
 import type { EventPhoto } from "@/remotion/event/types";
 import { eventCmScenePlan } from "@/remotion/event-cm/types";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
@@ -82,7 +85,14 @@ function markScene(brief: EventCmBrief, opening: boolean): Scene {
   return { layout: "centre-stack", components };
 }
 
-/** The title screen. The narration's first line calls this title. */
+/**
+ * The title screen. The narration's first line calls this title.
+ *
+ * It stands on the programme photograph, as a hero — the film's most dynamic
+ * picture opening its most important line (Freehand's casting, kept). One
+ * photograph reads as several shots when its scenes treat it differently:
+ * here at full presence under the title, in the agenda dimmed behind a list.
+ */
 function titleScene(brief: EventCmBrief): Scene {
   const components: SceneComponent[] = [
     { kind: "heading", text: brief.title, fields: ["title"] },
@@ -90,7 +100,11 @@ function titleScene(brief: EventCmBrief): Scene {
   if (brief.subtitle) {
     components.push({ kind: "subheading", text: brief.subtitle, fields: ["subtitle"] });
   }
-  return { layout: "centre-stack", components };
+  return {
+    layout: "centre-stack",
+    components,
+    ...backdropFor(brief.visuals.programs, "hero", "visuals.programs"),
+  };
 }
 
 function valueScene(brief: EventCmBrief): Scene {
@@ -149,10 +163,15 @@ function programScene(brief: EventCmBrief, index?: number): Scene {
   // item yet, because the template has three agenda pictures whatever this
   // event has put in them — the earlier fallback borrowed the WHOLE list for an
   // unfilled slot, which said the same thing three times.
+  //
+  // Plain kanji in a seal box. The digits read as pagination, the formal 壱弐参
+  // as overdressed (client call) — 一二三 in a hairline square is the register
+  // an invitation actually uses. The latin micro-label carries the "of three".
   components.push({
     kind: "stat",
-    value: `${at + 1}`,
-    unit: `/ ${total}`,
+    value: KANJI_NUMERALS[at % KANJI_NUMERALS.length],
+    unit: `PROGRAM ${at + 1} / ${total}`,
+    variant: "seal",
     fields: ["programs"],
   });
   if (one) {
@@ -172,27 +191,33 @@ function programScene(brief: EventCmBrief, index?: number): Scene {
   };
 }
 
+/**
+ * Who speaks — as full-height panels, not medallions in space.
+ *
+ * The speakers are the scene, so they fill it: portrait panels split by a
+ * hairline seam, names set into each panel's own shadow. `full-bleed-overlay`
+ * because its full slot is where distribute() already sends people, and its
+ * bottom-left slot takes the heading. The medallion row this replaces was the
+ * Freehand Lab's plainest verdict: "small circles floating in empty space".
+ */
 function guestsScene(brief: EventCmBrief): Scene {
   return {
-    layout: "row",
+    layout: "full-bleed-overlay",
     components: [
-      ...(brief.guestsHeading
-        ? [
-            {
-              kind: "kicker",
-              text: brief.guestsHeading,
-              fields: ["guestsHeading"],
-            } as SceneComponent,
-          ]
-        : []),
       {
         kind: "people",
         people: brief.guests,
+        presentation: "panels",
+        emphasis: "hero",
         // The list and each portrait separately: correcting who is announced
         // and choosing the picture of one of them are different decisions, and
         // the panel has to be able to offer both.
         fields: ["guests", ...brief.guests.map((_, index) => `guests[${index}].photo`)],
       },
+      // No heading over the panels — the overlay slot sits exactly where the
+      // panels set their names, and two speakers filling the frame do not need
+      // to be captioned "登壇者" (the heading still edits in the mapping
+      // drawer; it just has no seat in this picture).
     ],
   };
 }

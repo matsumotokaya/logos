@@ -40,6 +40,35 @@ export const CaptionBand: React.FC<{ captions: Caption[]; theme: Theme }> = ({
 
   const plate = theme.caption.backdrop === "plate";
 
+  // Inside the bottom letterbox bar: black that is already there, so the line
+  // never lands on the picture and never needs its own plate.
+  if (theme.caption.backdrop === "bar") {
+    const bar = theme.chrome.letterbox ?? 0;
+    return (
+      <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center" }}>
+        <div
+          style={{
+            height: bar,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            maxWidth: 1600,
+            fontFamily: theme.textFont,
+            fontWeight: 600,
+            fontSize: theme.caption.size,
+            lineHeight: 1.4,
+            letterSpacing: "0.06em",
+            color: theme.caption.color,
+            opacity,
+          }}
+        >
+          {caption.text}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
   return (
     <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center" }}>
       {theme.caption.backdrop === "scrim" ? (

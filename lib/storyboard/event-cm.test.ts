@@ -334,10 +334,12 @@ test("写真のあるシーンは、その写真を絵コンテでも敷く", ()
   assert.equal(panelFor("value")?.backdrop?.src, "material:key");
   assert.deepEqual(panelFor("value")?.backdrop?.focus, { x: 0.5, y: 0.4 });
   assert.equal(panelFor("program")?.backdrop?.src, "material:room");
+  // The title stands on the programme photograph as a hero (one photograph,
+  // several shots — Freehand's casting, kept in the scene builder).
+  assert.equal(panelFor("title")?.backdrop?.src, "material:room");
   // No photograph is not an empty frame: the ink ground is the designed state,
   // and the panel says so by carrying no backdrop at all.
   assert.equal(panelFor("cta")?.backdrop, null);
-  assert.equal(panelFor("title")?.backdrop, null);
 });
 
 test("地はどのフィールドから来たかを言えるので、その場で直せる", () => {

@@ -68,13 +68,15 @@ npm run render
 2. **SFXをシステム既定素材に**(依頼者指示: 最初から導入する)。**保管は完了(2026-08-18)**: 出自は**効果音ラボ**(商用利用無料・クレジット不要・**ただしファイル再配布は不可**)と判明し——支給10個の実測dBが同サイトのファイルと完全一致——演出用50個を [scripts/fetch-default-sfx.mjs](../../scripts/fetch-default-sfx.mjs) で取得する形にした(BGM既定と同じくmp3はgitignore、`public/defaults/sfx/catalog.json` に台帳=ラベル・出典URL・実測`headDb`→`gain`)。**残り**: `lib/assets/defaults.ts` への `kind:"sfx"` 追加とテンプレートからの参照、そして**gitignoreされた既定素材はVercelに乗らない問題**(BGMも同じ)の配備先決定
 3. **「人物が写っているか」を素材の測定に足す**。人物入り写真は背景スロットに使えない(v1で実証: coverでは顔を画角外に追い出せない)。`place-images.ts` が顔の根拠で登壇者写真を選ぶのと対称の判定を、背景適性にも
 
-### Phase B — kitの語彙拡張(表現のオブジェクト化)
+### Phase B — kitの語彙拡張(表現のオブジェクト化)— ✅ 持ち帰り済み(2026-08-18)
 
-4. **シネスコ帯+帯内字幕**。費用対効果が最大だった1手。`ThemeCaption.backdrop` に `"bar"` を足し、帯はテーマの装飾(`ThemeOrnament` か新設 `ThemeChrome`)が持つ。黒プレート字幕はこの瞬間に不要になる
-5. **地の語彙を広げる**。`Scene.backdrop`(写真1枚)を **Ground**(`image | video | collage | sequence`)へ。付随する規則もオブジェクトの一部: **クリップは据える(ループ禁止・尺が切れる前にカット)/静止画は動かす/減光の決定は1箇所**。`ThemeBackdrop` に「主役級の見え方」(opacity≈1+**方向性スクリム**)を追加——全面減光0.22はアジェンダをほぼ黒画面にしていた張本人
-6. **カメラムーブをテーマの語彙に**。`ThemeMotion` に push/pull/pan(Ken Burns)を足す。「止まった画面が存在しない」の実装
-7. **部品のバリアント**: `people` に全画面分割パネル(縫い目+縦書き見出し)/ `stat` に**印章numeral**(細金枠+漢数字。一二三は裸だと棒に見える)/ 配置に**縦書きタイトル**(vertical-rl。1本に1箇所まで)
-8. **SFXキューシートをテンプレートの意見に**。[sfx.ts](sake-2026/src/freehand/sfx.ts) の形——役割→`cue(file, presence, atMs)`、**presence(前に出る度合い)と実測gainの分離**——を [delivery.ts](../../lib/event-cm/delivery.ts)(読み方)と同格の「鳴らし方」として持つ。無音の場面(テーマ・エンドカード)を持つのも意見のうち
+**event-cm はテンプレート「イベント紹介動画 - モダンジャパニーズ」になった**([lib/templates/catalog.ts](../../lib/templates/catalog.ts))。同じ実案件ブリーフでのレンダリング比較で確認済み・325テスト通過。
+
+4. ✅ **シネスコ帯+帯内字幕**。`ThemeChrome`(letterbox)+`ThemeCaption.backdrop:"bar"`。黒プレート字幕は sumi テーマから消えた
+5. ✅(静止画のぶんだけ)**地の見え方**: `ThemeBackdrop.directional`(方向性スクリム・向きは `LayoutSpec.copySide` が知っている)+ opacity 1.0/0.88。タイトルはプログラム写真の上に立つ(1素材Nショットの配役をシーンビルダーに固定)。**video / collage / sequence の Ground はまだ**(brief契約に触るのでPhase C)
+6. ✅ Ken Burns は既存の `backdrop.push` がそのまま担う(新語彙は不要だった)
+7. ✅ **部品のバリアント**: `people` の `presentation:"panels"`(全画面分割パネル+縫い目)/ `stat` の `variant:"seal"`(印章numeral・一二三)。縦書きタイトルは見送り(地がまだ写真1枚なので効果が薄い。Ground実装後に再訪)
+8. ✅ **SFXキューシート** = [lib/event-cm/sfx-cues.ts](../../lib/event-cm/sfx-cues.ts)(delivery.ts と同格)。既定プールの実測gain(catalog.json)× presence。**あわせて `themeForBrand` は色だけ継ぐ**(組版は据え置き——LPテンプレートと同じ規則)
 
 ### Phase C — ブリーフとパイプライン
 

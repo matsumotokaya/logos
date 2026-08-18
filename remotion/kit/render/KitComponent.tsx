@@ -355,6 +355,112 @@ export const KitComponent: React.FC<{
       );
 
     case "people":
+      // Full-height panels: the speakers ARE the scene, not items on it.
+      // Freehand Lab's measured verdict on the medallion row was "small
+      // circles floating in empty space"; the panels are what replaced it.
+      if (component.presentation === "panels") {
+        return (
+          <div style={{ display: "flex", width: "100%", height: "100%" }}>
+            {component.people.map((person, i) => {
+              const t = interpolate(frame, [delay + i * 8, delay + i * 8 + 22], [0, 1], {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              });
+              const ease = 1 - Math.pow(1 - t, 3);
+              const dir = i === 0 ? -1 : 1;
+              return (
+                <div
+                  key={`${person.name}-${i}`}
+                  style={{
+                    position: "relative",
+                    flex: 1,
+                    overflow: "hidden",
+                    opacity: ease,
+                    transform: `translateX(${(1 - ease) * dir * 60}px)`,
+                    // The seam: a hairline of accent between panels, not a gap.
+                    borderLeft: i > 0 ? `1px solid ${theme.palette.accent}66` : undefined,
+                    backgroundColor: theme.palette.ground,
+                  }}
+                >
+                  {person.photo ? (
+                    <>
+                      <Img
+                        src={resolveSrc(person.photo.src)}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          objectPosition: focusPosition(person.photo),
+                          transform: `scale(${person.photo.zoom ?? 1.06})`,
+                        }}
+                      />
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          height: "46%",
+                          background: `linear-gradient(to top, ${theme.palette.ground}e6 0%, transparent 100%)`,
+                        }}
+                      />
+                    </>
+                  ) : (
+                    // No photograph: the medallion, centred on the ink — the
+                    // same designed substitute, at panel scale.
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Portrait theme={theme} person={person} size={240} />
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: 90,
+                      bottom: (theme.chrome.letterbox ?? 0) + 64,
+                      textAlign: "left",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: theme.displayFont,
+                        fontSize: theme.scale.primary.size,
+                        fontWeight: 600,
+                        letterSpacing: "0.1em",
+                        color: theme.palette.ink,
+                        textShadow: `0 2px 20px ${theme.palette.ground}`,
+                      }}
+                    >
+                      {person.name}
+                    </div>
+                    {person.role ? (
+                      <div
+                        style={{
+                          marginTop: 12,
+                          fontFamily: theme.textFont,
+                          fontSize: theme.scale.caption.size,
+                          letterSpacing: "0.12em",
+                          color: theme.palette.muted,
+                          whiteSpace: "pre-line",
+                        }}
+                      >
+                        {person.role}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
       return (
         <div style={{ ...enter, display: "flex", gap: 72, justifyContent: "center" }}>
           {component.people.map((person, i) => (
@@ -409,6 +515,52 @@ export const KitComponent: React.FC<{
       );
 
     case "stat":
+      // The seal: a hairline box carrying the numeral, the unit riding beside
+      // it small. Made for 一二三 — bare at 250px they read as bars, and the
+      // formal 壱弐参 read as overdressed (both measured in the Freehand Lab).
+      if (component.variant === "seal") {
+        return (
+          <div style={{ ...enter, display: "flex", alignItems: "flex-end", gap: 28 }}>
+            <div
+              style={{
+                width: step.size * 3,
+                height: step.size * 3,
+                border: `1px solid ${theme.palette.accent}88`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: `${theme.palette.ground}59`,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: theme.displayFont,
+                  fontWeight: 700,
+                  fontSize: step.size * 1.7,
+                  lineHeight: 1,
+                  color: theme.palette.accentBright,
+                  textShadow: `0 2px 24px ${theme.palette.ground}`,
+                }}
+              >
+                {component.value}
+              </span>
+            </div>
+            {component.unit ? (
+              <span
+                style={{
+                  fontFamily: theme.textFont,
+                  fontSize: theme.scale.caption.size * 0.92,
+                  letterSpacing: "0.5em",
+                  color: theme.palette.accent,
+                  paddingBottom: 10,
+                }}
+              >
+                {component.unit}
+              </span>
+            ) : null}
+          </div>
+        );
+      }
       return (
         <div style={{ ...enter, textAlign: "center" }}>
           <span style={{ ...typeStyle(theme, emphasis, true), color: theme.palette.accentBright }}>

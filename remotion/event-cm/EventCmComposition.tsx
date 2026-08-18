@@ -24,6 +24,7 @@ import { Stage } from "@/remotion/kit/render/Stage";
 import { CaptionBand } from "@/remotion/kit/render/CaptionBand";
 import { eventCmFilm } from "./film";
 import { msToFrame, msToFrames } from "./timeline";
+import { eventCmSfxCue } from "@/lib/event-cm/sfx-cues";
 import type { EventCmBrief } from "./types";
 
 export { EVENT_FPS, EVENT_WIDTH, EVENT_HEIGHT };
@@ -108,7 +109,44 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
           </Sequence>
         );
       })}
-      {/* Above every scene. Subtitles are not one scene's business. */}
+      {/* Sound cues sit outside the scene Sequences: a cue marking a cut is
+          allowed to ring past it (lib/event-cm/sfx-cues.ts). */}
+      {film.scenes.map((scene) => {
+        const sfx = eventCmSfxCue(scene.role, scene.index ?? 0);
+        if (!sfx) return null;
+        return (
+          <Sequence key={`sfx-${scene.key}`} from={msToFrame(scene.fromMs + sfx.atMs, fps)}>
+            <Audio src={resolveMediaSrc(sfx.src)} volume={sfx.volume} />
+          </Sequence>
+        );
+      })}
+      {/* The letterbox: above the scenes, below the captions that live in it. */}
+      {theme.chrome.letterbox ? (
+        <>
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: theme.chrome.letterbox,
+              background: "#040302",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: theme.chrome.letterbox,
+              background: "#040302",
+            }}
+          />
+        </>
+      ) : null}
+      {/* Above every scene and inside the bar. Subtitles are not one scene's
+          business. */}
       <CaptionBand captions={film.captions} theme={theme} />
     </AbsoluteFill>
   );

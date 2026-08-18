@@ -252,7 +252,11 @@ test("シードしたWealthPark Labのブリーフも同じ条件を満たす", 
     { now: new Date("2026-08-11T09:00:00+09:00"), seed: "take-1" },
   );
   const theme = themeForBrand(SUMI_THEME, seeded.theme ?? {});
-  assert.ok(theme.displayFont.startsWith('"Zen Kaku Gothic New"'), "ブランドの書体が載る");
+  // Colour only: the brand's gothic must NOT displace the template's mincho.
+  // The sake film rendered in the brand face and it was the first thing that
+  // broke the art direction (Freehand Lab, 2026-08-18) — the same rule the LP
+  // templates carry ("色だけ継いで組版は継がない").
+  assert.equal(theme.displayFont, SUMI_THEME.displayFont, "組版はテンプレートのもの");
 
   for (const scene of allScenes(seeded)) {
     const fit = fitScene(scene.components, theme);
@@ -295,8 +299,10 @@ test("プログラムが複数あれば、1つずつ1シーンで紹介する", 
   const lines = second.components.find((component) => component.kind === "lines");
   assert.deepEqual(lines?.kind === "lines" ? lines.lines : [], [SAKE.programs[1].title]);
   const stat = second.components.find((component) => component.kind === "stat");
-  assert.equal(stat?.kind === "stat" ? stat.value : null, "2");
-  assert.equal(stat?.kind === "stat" ? stat.unit : null, "/ 3");
+  // Plain kanji in a seal box: digits read as pagination, bare kanji as bars.
+  assert.equal(stat?.kind === "stat" ? stat.value : null, "二");
+  assert.equal(stat?.kind === "stat" ? stat.unit : null, "PROGRAM 2 / 3");
+  assert.equal(stat?.kind === "stat" ? stat.variant : null, "seal");
   for (const scene of [sceneForRole("program", SAKE, 0), second]) {
     const fit = fitScene(scene.components, SUMI_THEME);
     assert.deepEqual(fit.dropped, [], "プログラムのシーンで部品が落ちている");

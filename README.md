@@ -223,9 +223,9 @@ node labs/event/scripts/prepare-assets.mjs --src <dir> --slug sake-2026
 
 **素材はリポジトリに入っていない**(`.gitignore` 参照)。ライセンス写真・実在人物のポートレート・支給BGMをgit履歴へ載せると後から取り消せないため、`public/event/*/photos/` `art/` `bgm.mp3` は除外し、**パートナーロゴ(`logos/`)だけコミットしている**。新しい環境では先に `prepare-assets.mjs` を実行する。sake-2026のブリーフはこれらのファイル名を指しているため、未実行のまま `event:render` すると失敗する(Remotionは画像の欠落でレンダーを止める。「素材が無い」と「ブリーフが null」を区別したいので、この挙動が正しい)。
 
-## イベント紹介動画(event-cm・ナレーション駆動)
+## イベント紹介動画 - モダンジャパニーズ(event-cm・ナレーション駆動)
 
-`event-promo` と同じ和モダンのアートディレクションを、**ナレーションを背骨にして**組み直したテンプレート。設計判断の正本は [docs/deliverable-architecture.md §18](docs/deliverable-architecture.md)。
+`event-promo` と同じ和モダンのアートディレクションを、**ナレーションを背骨にして**組み直したテンプレート。設計判断の正本は [docs/deliverable-architecture.md §18](docs/deliverable-architecture.md)。**2026-08-18 に Freehand Lab の成果を持ち帰り、名称を「イベント紹介動画 - モダンジャパニーズ」に改めた**: シネスコ帯と帯内字幕(`ThemeChrome` / `ThemeCaption.backdrop:"bar"`)、写真を主役にする方向性スクリム(`ThemeBackdrop.directional` × `LayoutSpec.copySide`)、登壇者の全画面分割パネル(`people` の `presentation:"panels"`)、印章numeral(`stat` の `variant:"seal"`・一二三)、和のSFXキューシート([lib/event-cm/sfx-cues.ts](lib/event-cm/sfx-cues.ts)=既定プール [scripts/fetch-default-sfx.mjs](scripts/fetch-default-sfx.mjs) の実測gain×presence)、そして**ブランドから継ぐのは色だけ**(組版はテンプレートのもの——LPと同じ規則を `themeForBrand` が持つ)。**SFXの実ファイルはgitに無い**ので、新しい環境では `node scripts/fetch-default-sfx.mjs` を先に実行する(BGM既定と同じ規則)。
 
 - **語彙は3語に割れている**(migration 0051 で改名)。ここを混ぜると「どちらが正本か」で画面同士が食い違うので、コードもUIもこの3語だけを使う:
 
@@ -479,7 +479,7 @@ Vercelにデプロイする場合は同じ環境変数を Settings → Environme
 
 ### 次のセッションの出発点(2026-08-18 時点)
 
-**2026-08-18: Freehand Lab の実験が完了し、テンプレートへの持ち帰り計画が確定した。** 「世界が恋する日本酒」をテンプレートの制約なしで作り直した結果(v8)、依頼者が納品水準と評価。**実行計画の正本は [labs/freehand/README.md](labs/freehand/README.md) の「持ち帰り計画」**(Phase A: ロゴ正規化のプロダクト化=asset-normalization段階7・SFXのシステム既定素材化 → Phase B: kitの語彙拡張=シネスコ帯・地のGround化・カメラムーブ・部品バリアント・SFXキューシート → Phase C: 連作スロット・不足素材の生成プロンプト)。証拠と設計判断は [labs/freehand/sake-2026/FINDINGS.md](labs/freehand/sake-2026/FINDINGS.md)。**次のセッションはここから**。
+**2026-08-18: Freehand Lab の実験が完了し、Phase B(kitの語彙拡張)を持ち帰った。** 「世界が恋する日本酒」をテンプレートの制約なしで作り直した結果(v8)、依頼者が納品水準と評価。同日中に kit へ持ち帰り、event-cm は**「イベント紹介動画 - モダンジャパニーズ」**になった(シネスコ帯・帯内字幕・方向性スクリム・分割パネル・印章numeral・SFXキューシート・色だけ継ぐ。上記 event-cm 節を参照)。**実行計画の正本は [labs/freehand/README.md](labs/freehand/README.md) の「持ち帰り計画」**——残りは **Phase A1: ロゴ正規化のプロダクト化**(要件確定済み・[docs/asset-normalization.md](docs/asset-normalization.md) §11。**次の実装セッションはここから**)、A3: 人物有無の測定、Phase C: 連作スロット・Groundのvideo/collage化・不足素材の生成プロンプト・**配役の自動化**(第12項=唯一まだ人手のもの)。証拠と設計判断は [labs/freehand/sake-2026/FINDINGS.md](labs/freehand/sake-2026/FINDINGS.md)。
 
 ---
 

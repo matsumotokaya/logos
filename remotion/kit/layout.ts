@@ -126,12 +126,22 @@ export interface LayoutSpec {
    * the same honesty rule as the fitter (fit.ts).
    */
   capacity: number;
+  /**
+   * Which side of the frame the copy occupies — where a backdrop photograph
+   * must yield to type. This is the arrangement's knowledge, not the scene's:
+   * the scene says WHAT stands behind it, the layout knows WHERE its words
+   * sit, and the theme says how dark the yielding side goes
+   * (ThemeBackdrop.directional). `centre` means no side is safe, so the
+   * renderer falls back to the theme's radial scrim.
+   */
+  copySide: "left" | "right" | "bottom" | "centre";
 }
 
 export const LAYOUTS: Record<SceneLayout, LayoutSpec> = {
   "centre-stack": {
     slots: [{ region: "centre", align: "centre", gap: 36 }],
     capacity: 5,
+    copySide: "centre",
   },
   "split-copy-figure": {
     slots: [
@@ -139,6 +149,7 @@ export const LAYOUTS: Record<SceneLayout, LayoutSpec> = {
       { region: "right", align: "centre", gap: 20 },
     ],
     capacity: 6,
+    copySide: "left",
   },
   "split-figure-copy": {
     slots: [
@@ -146,6 +157,7 @@ export const LAYOUTS: Record<SceneLayout, LayoutSpec> = {
       { region: "right", align: "start", gap: 28 },
     ],
     capacity: 6,
+    copySide: "right",
   },
   "full-bleed-overlay": {
     slots: [
@@ -153,14 +165,22 @@ export const LAYOUTS: Record<SceneLayout, LayoutSpec> = {
       { region: "bottom-left", align: "start", gap: 24 },
     ],
     capacity: 4,
+    copySide: "left",
   },
   row: {
     slots: [{ region: "centre", align: "centre", gap: 72 }],
     capacity: 4,
+    copySide: "bottom",
   },
   "numbered-stack": {
-    slots: [{ region: "centre", align: "start", gap: 34 }],
+    // The left half, not the centre: this arrangement stands on a photograph
+    // (the agenda scenes), and a centred full-width column walks its text
+    // across the photograph's bright side. The copy keeps to the side the
+    // scrim darkens — measured on the carry-back's first render, where the
+    // programme titles crossed the lit glass and lost their edges.
+    slots: [{ region: "left", align: "start", gap: 34 }],
     capacity: 4,
+    copySide: "left",
   },
   "corner-credit": {
     slots: [{ region: "bottom-left", align: "start", gap: 22 }],
@@ -169,6 +189,7 @@ export const LAYOUTS: Record<SceneLayout, LayoutSpec> = {
     // what an announcement actually ends on. They crowd less than they count
     // because nearly all of them are set small.
     capacity: 7,
+    copySide: "left",
   },
 };
 

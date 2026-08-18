@@ -101,9 +101,26 @@ export interface ThemeCaption {
    * - `scrim`  a gradient darkening the lower frame. Gentler, and unreliable
    *            over a bright photo or a light scene.
    * - `shadow` glow only. For films that are always dark.
+   * - `bar`    the bottom letterbox bar (chrome.letterbox). The subtitle sits
+   *            centred inside it, on black that is already there — no plate,
+   *            no collision with the picture, ever. Requires a letterbox.
    * - `none`   nothing.
    */
-  backdrop: "none" | "scrim" | "shadow" | "plate";
+  backdrop: "none" | "scrim" | "shadow" | "plate" | "bar";
+}
+
+/**
+ * The frame around the film.
+ *
+ * A letterbox is the single cheapest move that makes a sequence of stills read
+ * as cinema — it declares an aspect ratio somebody chose (Freehand Lab,
+ * 2026-08-18: it outranked every other change per line of code). It also gives
+ * subtitles a home that can never collide with the picture (`backdrop: "bar"`).
+ * `null` means no bars: the frame is the composition's own edge.
+ */
+export interface ThemeChrome {
+  /** Bar height top and bottom, in composition pixels, or null for none. */
+  letterbox: number | null;
 }
 
 /**
@@ -118,8 +135,20 @@ export interface ThemeCaption {
 export interface ThemeBackdrop {
   /** Photo opacity under the scrim, by what the picture is doing in the scene. */
   opacity: Record<"hero" | "support", number>;
-  /** Drawn over the photograph so type stays legible on any photograph. */
+  /** Drawn over the photograph so type stays legible on any photograph. Used
+   *  when the layout centres its copy — a radial dim is all that works there. */
   scrim: string;
+  /**
+   * The directional alternative: darkness only where the copy is, so the
+   * photograph stays a photograph on its own side of the frame.
+   *
+   * The measured lesson behind it (Freehand Lab): a full-frame dim at 0.22
+   * turned every agenda scene into a near-black screen — "footage of nothing".
+   * With darkness applied directionally, the same photograph carries type at
+   * nearly full presence. The layout says WHICH side (LayoutSpec.copySide);
+   * the theme says how dark and how far. `null` falls back to `scrim`.
+   */
+  directional: { strength: number; reach: number } | null;
   /** Ken Burns: scale at the start of the scene and at the end. */
   push: [number, number];
 }
@@ -137,6 +166,7 @@ export interface Theme {
   ornament: ThemeOrnament;
   backdrop: ThemeBackdrop;
   caption: ThemeCaption;
+  chrome: ThemeChrome;
 }
 
 /**
@@ -174,15 +204,21 @@ export const SUMI_THEME: Theme = {
     transition: "fade",
   },
   ornament: { rules: true, markGlyph: "—", corner: "none" },
+  // Photography at nearly full presence, darkened only on the copy's side.
+  // The old values (hero 0.5, support 0.22 under a full radial scrim) are the
+  // measured reason the agenda scenes read as black screens — the client's
+  // "クリエイティビティがゼロ" verdict traced to exactly this pair of numbers.
   backdrop: {
-    opacity: { hero: 0.5, support: 0.22 },
+    opacity: { hero: 1, support: 0.88 },
     scrim:
-      "radial-gradient(85% 75% at 50% 50%, rgba(11,13,19,0.42) 0%, rgba(11,13,19,0.92) 100%)",
+      "radial-gradient(85% 75% at 50% 50%, rgba(11,13,19,0.42) 0%, rgba(11,13,19,0.8) 100%)",
+    directional: { strength: 0.74, reach: 76 },
     push: [1.04, 1.13],
   },
-  // Set in the text face rather than the display mincho: a subtitle is read,
-  // not composed, and mincho at 34px over moving footage loses its hairlines.
-  caption: { size: 34, bottom: 72, color: "#ffffff", backdrop: "plate" },
+  // Inside the letterbox bar: black that is already there, so the line never
+  // fights the picture and never needs a plate.
+  caption: { size: 34, bottom: 0, color: "#f4efe4", backdrop: "bar" },
+  chrome: { letterbox: 132 },
 };
 
 /**
@@ -200,6 +236,11 @@ export const SUMI_THEME: Theme = {
  * already too tall.
  */
 export const captionSafeBottom = (theme: Theme): number => {
+  // Inside the letterbox bar the subtitle occupies chrome the picture never
+  // had, so scenes only keep clear of the bar itself.
+  if (theme.caption.backdrop === "bar") {
+    return (theme.chrome.letterbox ?? 0) + 40;
+  }
   // The plate's own geometry, as CaptionBand draws it: 1.5 line-height and
   // 0.42em of padding above and below. Guessing a multiple of the font size
   // instead left a nine-pixel overlap — close enough to look like a mistake
@@ -216,9 +257,6 @@ export interface BrandThemeInput {
   bodyFont?: string | null;
 }
 
-const FALLBACK_SANS =
-  '"Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif';
-
 /**
  * Dress a theme in a brand's own values.
  *
@@ -226,12 +264,16 @@ const FALLBACK_SANS =
  * is a real answer, not a gap (lib/brand/site-palette.ts) — keeps the base
  * theme's accent, and the caller records that as the tool's proposal rather
  * than as the brand's colour.
+ *
+ * COLOUR ONLY — the brand's typography is deliberately not adopted (2026-08-18,
+ * from the Freehand Lab's first finding). The sake film rendered in the brand's
+ * gothic, and the gothic was the first thing that broke the art direction: the
+ * gold and the ink lost their meaning under a face that belongs to a business
+ * site. This is the same judgment the LP templates already made — "1顧客ごとに
+ * 変わるべきなのは色であって組版ではない" (README, LPテンプレート) — arriving
+ * at video. The theme's mincho IS the template; the accent is the brand's.
  */
 export function themeForBrand(base: Theme, brand: BrandThemeInput): Theme {
-  const heading = brand.headingFont?.trim();
-  const body = brand.bodyFont?.trim();
-  const quoted = (family: string) => `"${family}", ${FALLBACK_SANS}`;
-
   return {
     ...base,
     id: `${base.id}+brand`,
@@ -239,7 +281,5 @@ export function themeForBrand(base: Theme, brand: BrandThemeInput): Theme {
       ...base.palette,
       ...(brand.palette?.accent ? { accent: brand.palette.accent } : {}),
     },
-    displayFont: heading ? quoted(heading) : base.displayFont,
-    textFont: body ? quoted(body) : base.textFont,
   };
 }

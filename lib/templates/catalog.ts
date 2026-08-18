@@ -211,10 +211,10 @@ export const TEMPLATES: TemplateEntry[] = [
     version: 1,
     toolKind: "video",
     briefSchemaVersion: 1,
-    rendererRevision: "remotion/event-cm@2026-08-11",
-    name: "イベント紹介動画",
+    rendererRevision: "remotion/event-cm@2026-08-18",
+    name: "イベント紹介動画 - モダンジャパニーズ",
     summary:
-      "イベント告知の30秒CM。ナレーションを先に書き、そのボイスのタイミングが画面の尺と並びを決めます。絵は和モダン（墨黒×金×明朝）で、素材が無いスロットは設計済みのフォールバックで描かれます。",
+      "イベント告知のナレーション駆動CM。ナレーションを先に書き、そのボイスのタイミングが画面の尺と並びを決めます。絵はモダンジャパニーズ（墨黒×金×明朝・シネスコ帯・写真主役）で、章の転換や登壇者の登場は和の効果音が刻みます。素材が無いスロットは設計済みのフォールバックで描かれます。",
     requires: "イベントの事実（EventBrief）と、そこから書いたナレーション",
     duration: "30秒前後（ナレーションとボイスの長さで決まる）",
     narration: true,

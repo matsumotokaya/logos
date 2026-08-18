@@ -69,13 +69,17 @@ test("収まらない部品は落とされ、落としたことが報告され�
   assert.equal(scene.clean, false, "黙って完璧なふりをしない");
 });
 
-test("ブランドの書体と色をテーマに載せる", () => {
+test("ブランドから継ぐのは色だけ。組版はテンプレートのもの", () => {
+  // The LP templates' rule arriving at video (2026-08-18): what should change
+  // per customer is the colour, never the typesetting. The brand gothic on the
+  // sake film was the first thing that broke the art direction.
   const themed = themeForBrand(SUMI_THEME, {
     headingFont: "Zen Kaku Gothic New",
     bodyFont: "Zen Kaku Gothic New",
     palette: { accent: "#e11d48" },
   });
-  assert.ok(themed.displayFont.startsWith('"Zen Kaku Gothic New"'));
+  assert.equal(themed.displayFont, SUMI_THEME.displayFont, "見出しの書体は据え置き");
+  assert.equal(themed.textFont, SUMI_THEME.textFont, "本文の書体は据え置き");
   assert.equal(themed.palette.accent, "#e11d48");
   assert.equal(themed.palette.ground, SUMI_THEME.palette.ground, "地はテーマのもの");
 });

@@ -42,9 +42,18 @@ const Backdrop: React.FC<{
   backdrop: SceneBackdrop;
   theme: Theme;
   length: number;
-}> = ({ backdrop, theme, length }) => {
+  /** Where the layout puts its words — the side the photograph yields to. */
+  copySide: "left" | "right" | "bottom" | "centre";
+}> = ({ backdrop, theme, length, copySide }) => {
   const frame = useCurrentFrame();
   const [from, to] = theme.backdrop.push;
+  const directional = theme.backdrop.directional;
+  // Darkness only where the type is. The full-frame dim this replaces is the
+  // measured reason backdrops used to read as black screens (theme.ts).
+  const scrim =
+    directional && copySide !== "centre"
+      ? `linear-gradient(to ${copySide === "left" ? "right" : copySide === "right" ? "left" : "top"}, rgba(8,6,4,${directional.strength}) 0%, rgba(8,6,4,${directional.strength * 0.55}) ${Math.round(directional.reach * 0.45)}%, transparent ${directional.reach}%)`
+      : theme.backdrop.scrim;
   return (
     <AbsoluteFill>
       <Img
@@ -60,7 +69,7 @@ const Backdrop: React.FC<{
           })})`,
         }}
       />
-      <AbsoluteFill style={{ background: theme.backdrop.scrim }} />
+      <AbsoluteFill style={{ background: scrim }} />
     </AbsoluteFill>
   );
 };
@@ -89,11 +98,19 @@ export const Stage: React.FC<{
 
   let order = 0;
   const fullBleed = spec.slots.some((slot) => slot.region === "full");
+  // Content stays out of the letterbox bars: the bars overlay the frame, so a
+  // stage padded only by its own margin would set type underneath them.
+  const padY = Math.max(STAGE.padY, (theme.chrome.letterbox ?? 0) + 48);
 
   return (
     <AbsoluteFill style={{ opacity: sceneFade(theme, frame, length) }}>
       {scene.backdrop ? (
-        <Backdrop backdrop={scene.backdrop} theme={theme} length={length} />
+        <Backdrop
+          backdrop={scene.backdrop}
+          theme={theme}
+          length={length}
+          copySide={spec.copySide}
+        />
       ) : null}
       {groups.map((components, slotIndex) => {
         const slot = spec.slots[slotIndex];
@@ -106,7 +123,7 @@ export const Stage: React.FC<{
               display: "flex",
               flexDirection: "column",
               gap: slot.gap,
-              padding: isFull ? 0 : `${STAGE.padY}px ${STAGE.padX}px`,
+              padding: isFull ? 0 : `${padY}px ${STAGE.padX}px`,
               // The subtitle band owns the bottom of the frame; a region that
               // stacks against the bottom edge stops above it (theme.ts).
               ...(geometry.justifyContent === "flex-end" && !isFull

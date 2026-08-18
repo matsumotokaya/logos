@@ -91,7 +91,11 @@ export type SceneComponent = ComponentMeta &
     /** Ordered items. `numbered` puts a large numeral beside each. */
     | { kind: "list"; items: string[]; numbered?: boolean }
     | { kind: "person"; person: PersonParams }
-    | { kind: "people"; people: PersonParams[] }
+    /** `panels` fills the stage with full-height portrait panels split by a
+     *  hairline seam — the way a film presents two speakers, where `row` (the
+     *  default) presents medallions. Panels only make sense in a bleed slot
+     *  (full-bleed-overlay); the scene that asks for them puts them there. */
+    | { kind: "people"; people: PersonParams[]; presentation?: "row" | "panels" }
     | {
         kind: "logo";
         src: string | null;
@@ -108,7 +112,11 @@ export type SceneComponent = ComponentMeta &
           treatment?: LogoTreatment;
         }>;
       }
-    | { kind: "stat"; value: string; unit?: string; label?: string }
+    /** `seal` draws the value inside a hairline accent square — a 印章. Made
+     *  for plain kanji numerals, which read as bare bars at display size (一
+     *  IS a bar); the box carries the visual mass and the number stays the
+     *  subject. */
+    | { kind: "stat"; value: string; unit?: string; label?: string; variant?: "plain" | "seal" }
     /** Dates need their own setting: the numerals, the weekday and the time are
      *  three different sizes in every well-set announcement. */
     | { kind: "datetime"; date: string; weekday?: string; time?: string }
