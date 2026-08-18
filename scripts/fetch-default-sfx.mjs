@@ -14,9 +14,28 @@
 // and a template asks for a role (sfx.ts asks by presence), not for a mood
 // board. Add entries here when a template needs a role the pool lacks.
 //
+// WHERE THE FILES LIVE — three places, on purpose:
+//
+//   public/defaults/sfx/   this machine, for dev and local MP4 renders. Real
+//                          files in a real directory; the renderer reads them
+//                          through staticFile() like any other public asset.
+//   R2 (--upload)          production. `npm run sfx:sync` puts the pool in the
+//                          private bucket under defaults/sfx/, which is where
+//                          a deployed render must read it from — Vercel builds
+//                          from git, and git deliberately has none of these.
+//   this script            the recipe. Any environment restores the pool from
+//                          the source of record, so nothing is ever "lost".
+//
+// Git holds the catalog and never the bytes: this repository is PUBLIC, and
+// pushing the files would be exactly the redistribution 効果音ラボ forbids.
+// Uploading our own copy to a private bucket for our own rendering is not
+// distribution, and burning the sounds into a customer's MP4 is the licensed
+// use the site grants outright.
+//
 // Run from the repository root:
-//   node scripts/fetch-default-sfx.mjs           # download missing files
-//   node scripts/fetch-default-sfx.mjs --force   # re-download everything
+//   node scripts/fetch-default-sfx.mjs            # download missing files
+//   node scripts/fetch-default-sfx.mjs --force    # re-download everything
+//   node scripts/fetch-default-sfx.mjs --upload   # …and push the pool to R2
 //
 // After downloading it measures each file's first second (same method as
 // labs/freehand/scripts/measure-sfx.mjs) and writes catalog.json next to the
@@ -24,7 +43,7 @@
 // file to −20 dB. Consumers read the catalog, never the raw file list.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const BASE = "https://soundeffect-lab.info/sound/anime/mp3/";
@@ -90,7 +109,35 @@ const SELECTION = [
   ["buzzer-opening1.mp3", "開演ブザー", "映画・演劇の幕開け"],
   ["projector1.mp3", "映写機", "昔の映像・回想"],
   ["piano-single1.mp3", "ピアノの単音", "深く落ち着いた一点"],
+  // Added 2026-08-19 from the client's own selection. Everything they picked
+  // that was not already here — verified byte-identical to this site's files
+  // where it overlapped, so the whole set carries the same licence.
+  ["amount-display1.mp3", "金額表示", "数字・価格の提示"],
+  ["dj-scratch1.mp3", "DJのスクラッチ1", "ズビズビ。切り替え"],
+  ["dj-scratch2.mp3", "DJのスクラッチ2", "バックスピン"],
+  ["flash1.mp3", "ひらめく1", "気づき・発見"],
+  ["pa1.mp3", "パッ", "軽く現れる"],
+  ["papa1.mp3", "パパッ", "続けて現れる"],
+  ["pafu1.mp3", "パフ", "ラッパ。ささやかな祝い"],
+  ["peta1.mp3", "ペタッ", "スタンプ・貼り付け"],
+  ["blink1.mp3", "目をパチパチ", "戸惑い・間"],
+  ["shivering1.mp3", "カタカタ震える", "緊張・寒さ"],
+  ["stupid1.mp3", "間抜け1", "ドジ・軽い失敗"],
+  ["emergency-alert1.mp3", "警報が鳴る", "緊急・注意喚起"],
+  ["costume-drama2.mp3", "時代劇演出2", "キハーダ。和の見得"],
 ];
+
+/**
+ * Supplied sounds this pool cannot take.
+ *
+ * Two files in the client's folder carry `artist=My Recording` ID3 tags where
+ * every 効果音ラボ file carries none, and neither appears in any of the site's
+ * seven categories — so they came from somewhere else and their licence is
+ * unknown. A default asset's whole job is to be safe to burn into anybody's
+ * MP4; an unsourced file cannot do that job. Named here rather than dropped
+ * silently, because "we looked and could not place it" is the useful answer.
+ */
+export const UNSOURCED = ["スポッ.mp3", "歓声と拍手.mp3"];
 
 const REFERENCE_DB = -20;
 const MAX_GAIN = 3;
@@ -145,3 +192,27 @@ for (const [file, label, role] of SELECTION) {
 
 writeFileSync(CATALOG, `${JSON.stringify(catalog, null, 2)}\n`);
 console.log(`\n${downloaded} downloaded, ${SELECTION.length} in pool → ${CATALOG}`);
+
+// The production home. Same keys as the local paths, so a consumer that knows
+// `defaults/sfx/bell1.mp3` finds it either way.
+if (process.argv.includes("--upload")) {
+  const { isR2Configured, putR2Object } = await import("../lib/r2.ts");
+  if (!isR2Configured()) {
+    console.error(
+      "\nR2_* が未設定のためアップロードできません（.env.local を確認してください）",
+    );
+    process.exit(1);
+  }
+  console.log("\nR2 へ同期中…");
+  for (const [file] of SELECTION) {
+    const key = `defaults/sfx/${file}`;
+    await putR2Object(key, readFileSync(path.join(OUT_DIR, file)), "audio/mpeg");
+    console.log(`  ↑ ${key}`);
+  }
+  await putR2Object(
+    "defaults/sfx/catalog.json",
+    Buffer.from(JSON.stringify(catalog, null, 2)),
+    "application/json",
+  );
+  console.log(`\n${SELECTION.length + 1} objects → R2 defaults/sfx/`);
+}

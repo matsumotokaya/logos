@@ -401,6 +401,110 @@
       "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/piano-single1.mp3",
       "headDb": -16.7,
       "gain": 0.684
+    },
+    "amount-display1.mp3": {
+      "label": "金額表示",
+      "role": "数字・価格の提示",
+      "src": "defaults/sfx/amount-display1.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/amount-display1.mp3",
+      "headDb": -24.7,
+      "gain": 1.718
+    },
+    "dj-scratch1.mp3": {
+      "label": "DJのスクラッチ1",
+      "role": "ズビズビ。切り替え",
+      "src": "defaults/sfx/dj-scratch1.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/dj-scratch1.mp3",
+      "headDb": -20.6,
+      "gain": 1.072
+    },
+    "dj-scratch2.mp3": {
+      "label": "DJのスクラッチ2",
+      "role": "バックスピン",
+      "src": "defaults/sfx/dj-scratch2.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/dj-scratch2.mp3",
+      "headDb": -23.3,
+      "gain": 1.462
+    },
+    "flash1.mp3": {
+      "label": "ひらめく1",
+      "role": "気づき・発見",
+      "src": "defaults/sfx/flash1.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/flash1.mp3",
+      "headDb": -24.4,
+      "gain": 1.66
+    },
+    "pa1.mp3": {
+      "label": "パッ",
+      "role": "軽く現れる",
+      "src": "defaults/sfx/pa1.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/pa1.mp3",
+      "headDb": -30.8,
+      "gain": 3
+    },
+    "papa1.mp3": {
+      "label": "パパッ",
+      "role": "続けて現れる",
+      "src": "defaults/sfx/papa1.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/papa1.mp3",
+      "headDb": -24.8,
+      "gain": 1.738
+    },
+    "pafu1.mp3": {
+      "label": "パフ",
+      "role": "ラッパ。ささやかな祝い",
+      "src": "defaults/sfx/pafu1.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/pafu1.mp3",
+      "headDb": -25.2,
+      "gain": 1.82
+    },
+    "peta1.mp3": {
+      "label": "ペタッ",
+      "role": "スタンプ・貼り付け",
+      "src": "defaults/sfx/peta1.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/peta1.mp3",
+      "headDb": -29.7,
+      "gain": 3
+    },
+    "blink1.mp3": {
+      "label": "目をパチパチ",
+      "role": "戸惑い・間",
+      "src": "defaults/sfx/blink1.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/blink1.mp3",
+      "headDb": -28.2,
+      "gain": 2.57
+    },
+    "shivering1.mp3": {
+      "label": "カタカタ震える",
+      "role": "緊張・寒さ",
+      "src": "defaults/sfx/shivering1.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/shivering1.mp3",
+      "headDb": -30.7,
+      "gain": 3
+    },
+    "stupid1.mp3": {
+      "label": "間抜け1",
+      "role": "ドジ・軽い失敗",
+      "src": "defaults/sfx/stupid1.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/stupid1.mp3",
+      "headDb": -24.8,
+      "gain": 1.738
+    },
+    "emergency-alert1.mp3": {
+      "label": "警報が鳴る",
+      "role": "緊急・注意喚起",
+      "src": "defaults/sfx/emergency-alert1.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/emergency-alert1.mp3",
+      "headDb": -21.9,
+      "gain": 1.245
+    },
+    "costume-drama2.mp3": {
+      "label": "時代劇演出2",
+      "role": "キハーダ。和の見得",
+      "src": "defaults/sfx/costume-drama2.mp3",
+      "sourceUrl": "https://soundeffect-lab.info/sound/anime/mp3/costume-drama2.mp3",
+      "headDb": -28.3,
+      "gain": 2.6
     }
   }
 }

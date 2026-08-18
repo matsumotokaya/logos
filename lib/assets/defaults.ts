@@ -5,6 +5,15 @@
 // to the brand, all of it is recorded as `inferred`, and every slot it fills
 // is one the user can replace with their own material.
 //
+// SOUND EFFECTS ARE POOLED SEPARATELY, on purpose. Music is chosen — one track
+// per film, by a person, from a list they read. Effects are not: a template
+// rings its own structure (lib/event-cm/sfx-cues.ts asks for a role and a
+// presence, never for a file), so their catalog is generated at ingest with a
+// measured level per file rather than hand-written here — see
+// scripts/fetch-default-sfx.mjs and public/defaults/sfx/catalog.json. `sfx`
+// stays in ASSET_KINDS so the two pools are one vocabulary the day somebody
+// wants to swap a cue by hand.
+//
 // The point of the pool is that it compounds. A template declares the KINDS of
 // asset its slots take; enriching the pool with better tracks and better
 // footage improves every default film at once, with no template change. So the
@@ -15,7 +24,7 @@
 // where a photo would be), so an empty pool still produces a finished film.
 // That is why this can start nearly bare and grow.
 
-export const ASSET_KINDS = ["bgm", "ink_art", "texture", "b_roll", "still"] as const;
+export const ASSET_KINDS = ["bgm", "sfx", "ink_art", "texture", "b_roll", "still"] as const;
 export type DefaultAssetKind = (typeof ASSET_KINDS)[number];
 
 export interface DefaultAsset {
