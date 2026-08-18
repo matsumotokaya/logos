@@ -13,6 +13,9 @@ import type { EventPhoto } from "@/remotion/event/types";
 import { FH, KANJI_NUMERALS, LETTERBOX } from "./palette";
 import { GoldDust } from "./chrome";
 import { CameraMove, Photo, Scrim } from "./Photo";
+import { CollageGround, VideoGround } from "./Ground";
+import { GROUNDS } from "./sources";
+import marks from "./marks.json";
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -103,6 +106,19 @@ export const FhMarkScene: React.FC<{
     : interpolate(frame, [length - 22, length - 2], [1, 0], clamp);
   return (
     <AbsoluteFill style={{ background: FH.ink, opacity: fadeOut }}>
+      {/* The close stands on Fuji above the clouds, darkened until the mark
+          owns the frame (sources.ts). The opening stays on ink: the film
+          should end wider than it began, not start at its widest. */}
+      {!opening && GROUNDS.logoOut.src ? (
+        <>
+          <VideoGround
+            src={GROUNDS.logoOut.src}
+            grade="saturate(0.85) brightness(0.85)"
+          />
+          <AbsoluteFill style={{ background: "rgba(8,6,4,0.58)" }} />
+          <Scrim side="radial" strength={0.5} />
+        </>
+      ) : null}
       <AbsoluteFill
         style={{
           background: `radial-gradient(ellipse 60% 48% at 50% 46%, rgba(201,162,39,${0.13 * breathe}), transparent 70%)`,
@@ -174,19 +190,12 @@ export const FhTitleScene: React.FC<{ brief: EventCmBrief; length: number }> = (
   length,
 }) => {
   const frame = useCurrentFrame();
-  // The pour: the film's most dynamic photograph opens its most important line.
-  const photo = brief.visuals.programs;
   const chars = Array.from(brief.title);
   return (
     <AbsoluteFill style={{ background: FH.ink }}>
-      {photo ? (
-        <Photo
-          src={photo.src}
-          length={length}
-          move={{ scaleFrom: 1.16, scaleTo: 1.04, xFrom: -1.5, xTo: 1 }}
-          focus={{ x: 0.55, y: 0.42 }}
-          grade="saturate(0.94) brightness(0.92)"
-        />
+      {/* The pour, actually pouring (sources.ts). */}
+      {GROUNDS.title.src ? (
+        <VideoGround src={GROUNDS.title.src} grade="saturate(0.96) brightness(0.95)" />
       ) : (
         <GoldDust />
       )}
@@ -264,17 +273,11 @@ export const FhValueScene: React.FC<{ brief: EventCmBrief; length: number }> = (
   length,
 }) => {
   const frame = useCurrentFrame();
-  const photo = brief.visuals.value;
   return (
     <AbsoluteFill style={{ background: FH.ink }}>
-      {photo ? (
-        <Photo
-          src={photo.src}
-          length={length}
-          move={{ scaleFrom: 1.06, scaleTo: 1.16, xFrom: 2, xTo: -2 }}
-          focus={photo.focus ?? { x: 0.5, y: 0.5 }}
-          grade="saturate(1.02)"
-        />
+      {/* The drop and its ripple, looping (sources.ts). */}
+      {GROUNDS.value.src ? (
+        <VideoGround src={GROUNDS.value.src} grade="saturate(1.02)" />
       ) : (
         <GoldDust />
       )}
@@ -358,41 +361,57 @@ export const FhValueScene: React.FC<{ brief: EventCmBrief; length: number }> = (
 
 /* ---------------------------------------------------------- program scene */
 
+// Each agenda picture stands on the supplied material for ITS programme
+// (sources.ts): five glasses for the tasting, the brewery's own photographs
+// for the talk, hands at work for the workshop. The text side still
+// alternates L→R→L so the trio reads as a sequence.
 const PROGRAM_SHOTS: Array<{
-  visual: (brief: EventCmBrief) => EventPhoto | null;
-  focus: { x: number; y: number };
-  move: CameraMove;
+  /** Ken Burns for the still; clips and the collage move themselves. */
+  move?: CameraMove;
+  focus?: { x: number; y: number };
   grade?: string;
-  /** Which side the text column sits on. */
   side: "left" | "right";
 }> = [
   {
-    // 壱 tasting — the pour, tight on the glass.
-    visual: (b) => b.visuals.programs,
-    focus: { x: 0.42, y: 0.62 },
-    move: { scaleFrom: 1.22, scaleTo: 1.1, yFrom: 1, yTo: -1 },
+    // 壱 tasting — five glasses, five shades. Generated with its dark half on
+    // the left, which is exactly where the text goes.
+    focus: { x: 0.72, y: 0.5 },
+    move: { scaleFrom: 1.02, scaleTo: 1.1, xFrom: 0.5, xTo: -0.5 },
+    grade: "saturate(0.98)",
     side: "left",
   },
   {
-    // 弐 talk — the indigo textile behind the masu, as texture. (The noren
-    // calligraphy was tried first, but the guest photo cannot crop the guest
-    // out — his face entered every frame half-cut.)
-    visual: (b) => b.visuals.value,
-    focus: { x: 0.95, y: 0.08 },
-    move: { scaleFrom: 1.55, scaleTo: 1.68, xFrom: 1, xTo: -1 },
-    grade: "brightness(0.6) saturate(1.05)",
+    // 弐 talk — 〆張鶴's own press photography, tiled.
     side: "right",
   },
   {
-    // 参 workshop — the pour again, but the tray and masu at the glass's foot:
-    // a second reading of the same photograph, not a repeat of 壱's frame.
-    visual: (b) => b.visuals.programs,
-    focus: { x: 0.3, y: 0.9 },
-    move: { scaleFrom: 1.42, scaleTo: 1.28, yFrom: -1, yTo: 1 },
-    grade: "brightness(0.82)",
+    // 参 workshop — hands tasting and writing, looping.
+    grade: "brightness(0.9)",
     side: "left",
   },
 ];
+
+const programGround = (index: number, length: number): React.ReactNode => {
+  const ground = GROUNDS[`program${index}`];
+  const shot = PROGRAM_SHOTS[index % PROGRAM_SHOTS.length];
+  if (!ground) return <GoldDust />;
+  switch (ground.kind) {
+    case "video":
+      return <VideoGround src={ground.src!} grade={shot.grade} />;
+    case "collage":
+      return <CollageGround srcs={ground.srcs!} length={length} />;
+    case "image":
+      return (
+        <Photo
+          src={ground.src!}
+          length={length}
+          move={shot.move ?? { scaleFrom: 1.04, scaleTo: 1.12 }}
+          focus={shot.focus ?? { x: 0.5, y: 0.5 }}
+          grade={shot.grade}
+        />
+      );
+  }
+};
 
 export const FhProgramScene: React.FC<{
   brief: EventCmBrief;
@@ -402,7 +421,6 @@ export const FhProgramScene: React.FC<{
 }> = ({ brief, length, index, total }) => {
   const frame = useCurrentFrame();
   const shot = PROGRAM_SHOTS[index % PROGRAM_SHOTS.length];
-  const photo = shot.visual(brief);
   const numeral = KANJI_NUMERALS[index % KANJI_NUMERALS.length];
   const item = brief.programs[index] ?? null;
   const left = shot.side === "left";
@@ -412,17 +430,7 @@ export const FhProgramScene: React.FC<{
 
   return (
     <AbsoluteFill style={{ background: FH.ink }}>
-      {photo ? (
-        <Photo
-          src={photo.src}
-          length={length}
-          move={shot.move}
-          focus={shot.focus}
-          grade={shot.grade}
-        />
-      ) : (
-        <GoldDust />
-      )}
+      {programGround(index, length)}
       <Scrim side={shot.side} strength={0.74} reach={78} />
       <div
         style={{
@@ -664,22 +672,35 @@ export const FhGuestsScene: React.FC<{ brief: EventCmBrief; length: number }> = 
 
 /* -------------------------------------------------------------- cta scene */
 
+// The credits row, from the normalised marks (scripts/normalize-marks.mjs):
+// trimmed to the artwork's alpha box, sized by ink weight rather than by file
+// height — a two-line lockup at a wordmark's height reads as the junior
+// partner. Replaces the brief's logo list, which still carries the white-plate
+// JPEG. Miss SAKE joins the row: the association is on stage twice (2026 Miss
+// SAKE 2名 and the 代表理事), and its mark arrived 2026-08-18.
+const MARK_ROW = (
+  ["wealthpark-lab", "leopalace21", "shimeharitsuru", "miss-sake"] as const
+).map((name) => ({
+  name,
+  ...(marks as Record<string, { src: string; ink: string; scale: number }>)[name],
+}));
+
 export const FhCtaScene: React.FC<{ brief: EventCmBrief; length: number }> = ({
   brief,
   length,
 }) => {
   const frame = useCurrentFrame();
-  const photo = brief.visuals.closing;
   const { schedule } = brief;
   return (
     <AbsoluteFill style={{ background: FH.ink }}>
-      {photo ? (
+      {/* The room the date invites people into (sources.ts). */}
+      {GROUNDS.cta.src ? (
         <Photo
-          src={photo.src}
+          src={GROUNDS.cta.src}
           length={length}
-          move={{ scaleFrom: 1.04, scaleTo: 1.14, xFrom: 1.2, xTo: -0.6 }}
-          focus={photo.focus ?? { x: 0.5, y: 0.4 }}
-          grade="saturate(0.9) brightness(0.9)"
+          move={{ scaleFrom: 1.02, scaleTo: 1.1, xFrom: 0.6, xTo: -0.6 }}
+          focus={{ x: 0.62, y: 0.45 }}
+          grade="saturate(0.95)"
         />
       ) : (
         <GoldDust />
@@ -788,44 +809,31 @@ export const FhCtaScene: React.FC<{ brief: EventCmBrief; length: number }> = ({
             {brief.cta}
           </div>
         ) : null}
-        {brief.logos.length > 0 ? (
-          <div
-            style={{
-              ...enter(frame, 52),
-              display: "flex",
-              alignItems: "center",
-              gap: 44,
-              marginTop: 22,
-            }}
-          >
-            {brief.logos.map((logo, i) =>
-              logo.src ? (
-                <Img
-                  key={i}
-                  src={resolveSrc(logo.src)}
-                  style={{
-                    height: logo.src.endsWith(".svg") ? 44 : 52,
-                    ...(logo.treatment === "light"
-                      ? { borderRadius: 4, opacity: 0.94 }
-                      : { filter: "brightness(0) invert(1)", opacity: 0.88 }),
-                  }}
-                />
-              ) : (
-                <span
-                  key={i}
-                  style={{
-                    fontFamily: FH.font,
-                    fontSize: 26,
-                    color: FH.paperMuted,
-                    letterSpacing: "0.14em",
-                  }}
-                >
-                  {logo.name}
-                </span>
-              ),
-            )}
-          </div>
-        ) : null}
+        <div
+          style={{
+            ...enter(frame, 52),
+            display: "flex",
+            alignItems: "center",
+            gap: 48,
+            marginTop: 22,
+          }}
+        >
+          {MARK_ROW.map((mark) => (
+            <Img
+              key={mark.name}
+              src={resolveSrc(mark.src)}
+              style={{
+                height: Math.round(40 * mark.scale),
+                // The white-artwork marks sit on the ink as supplied; the dark
+                // vector is knocked out. Same decision place-images.ts makes
+                // from measured luminance.
+                ...(mark.ink === "dark"
+                  ? { filter: "brightness(0) invert(1)", opacity: 0.88 }
+                  : { opacity: 0.92 }),
+              }}
+            />
+          ))}
+        </div>
         {brief.footnote ? (
           <div
             style={{

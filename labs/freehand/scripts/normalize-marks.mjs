@@ -57,6 +57,12 @@ const MARKS = [
   { name: "leopalace21", file: "leopalace21.png", ink: "light" },
   { name: "shimeharitsuru", file: "shimeharitsuru.png", ink: "light" },
   { name: "miss-sake", file: "miss-sake.png", ink: "light" },
+  // Supplied as artwork on an opaque white plate (webp, no alpha at all).
+  // `plate: "white"` is the harness for that whole class of upload: the white
+  // becomes transparency BEFORE the trim, so the same bounding-box and
+  // ink-weight pipeline applies. This is the shape of what the logos product
+  // will need at upload time — users hand over exactly this kind of file.
+  { name: "miss-sake-red", file: "miss-sake-red.webp", ink: "dark", plate: "white" },
 ];
 
 /** The alpha bounding box: the smallest rectangle holding actual artwork. */
@@ -98,15 +104,44 @@ async function inkRatio(buffer) {
 
 mkdirSync(OUT_DIR, { recursive: true });
 
+/**
+ * Artwork on an opaque white plate → artwork on transparency.
+ *
+ * Distance from white, not brightness: a light-grey anti-aliased edge keeps a
+ * proportional alpha, so the mark's edges stay soft instead of being cut to a
+ * hard silhouette.
+ */
+async function liftFromWhitePlate(buffer) {
+  const { data, info } = await sharp(buffer)
+    .flatten({ background: "#ffffff" })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  const out = Buffer.alloc(width * height * 4);
+  for (let i = 0, o = 0; i < data.length; i += channels, o += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    // 0 at pure white, 255 at full distance from it.
+    const alpha = Math.min(255, Math.round(((255 - Math.min(r, g, b)) / 255) * 340));
+    out[o] = r;
+    out[o + 1] = g;
+    out[o + 2] = b;
+    out[o + 3] = alpha;
+  }
+  return sharp(out, { raw: { width, height, channels: 4 } }).png().toBuffer();
+}
+
 const measured = [];
 for (const mark of MARKS) {
   const source = path.join(SOURCE_DIR, mark.file);
   // SVG has no pixels until something asks for them; density gives the
   // rasteriser enough resolution that the trim is not quantised.
-  const raster = await sharp(source, { density: 600 })
+  let raster = await sharp(source, { density: 600 })
     .resize({ height: MEASURE_HEIGHT * 2, fit: "inside" })
     .png()
     .toBuffer();
+  if (mark.plate === "white") raster = await liftFromWhitePlate(raster);
   const box = await alphaBounds(raster);
   const trimmed = await sharp(raster).extract(box).png().toBuffer();
   const meta = await sharp(trimmed).metadata();
