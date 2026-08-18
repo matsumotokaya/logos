@@ -13,7 +13,7 @@ import type { EventPhoto } from "@/remotion/event/types";
 import { FH, KANJI_NUMERALS, LETTERBOX } from "./palette";
 import { GoldDust } from "./chrome";
 import { CameraMove, Photo, Scrim } from "./Photo";
-import { CollageGround, VideoGround } from "./Ground";
+import { CollageGround, SequenceGround, VideoGround } from "./Ground";
 import { GROUNDS } from "./sources";
 import marks from "./marks.json";
 
@@ -107,8 +107,9 @@ export const FhMarkScene: React.FC<{
   return (
     <AbsoluteFill style={{ background: FH.ink, opacity: fadeOut }}>
       {/* The close stands on Fuji above the clouds, darkened until the mark
-          owns the frame (sources.ts). The opening stays on ink: the film
-          should end wider than it began, not start at its widest. */}
+          owns the frame; the opening on the client's black plaster wall with
+          real gold dust in it (sources.ts). The film still ends wider than it
+          began — a wall, then a sky. */}
       {!opening && GROUNDS.logoOut.src ? (
         <>
           <VideoGround
@@ -117,6 +118,12 @@ export const FhMarkScene: React.FC<{
           />
           <AbsoluteFill style={{ background: "rgba(8,6,4,0.58)" }} />
           <Scrim side="radial" strength={0.5} />
+        </>
+      ) : null}
+      {opening ? (
+        <>
+          {groundFor("logoIn", length)}
+          <AbsoluteFill style={{ background: "rgba(8,6,4,0.35)" }} />
         </>
       ) : null}
       <AbsoluteFill
@@ -193,12 +200,8 @@ export const FhTitleScene: React.FC<{ brief: EventCmBrief; length: number }> = (
   const chars = Array.from(brief.title);
   return (
     <AbsoluteFill style={{ background: FH.ink }}>
-      {/* The pour, actually pouring (sources.ts). */}
-      {GROUNDS.title.src ? (
-        <VideoGround src={GROUNDS.title.src} grade="saturate(0.96) brightness(0.95)" />
-      ) : (
-        <GoldDust />
-      )}
+      {/* The pour, then the stillness after it (sources.ts). */}
+      {groundFor("title", length)}
       <Scrim side="left" strength={0.55} reach={64} />
       <Scrim side="bottom" strength={0.5} reach={44} />
       {/* The title, set vertically — the one scene that earns the full 和 move. */}
@@ -275,12 +278,8 @@ export const FhValueScene: React.FC<{ brief: EventCmBrief; length: number }> = (
   const frame = useCurrentFrame();
   return (
     <AbsoluteFill style={{ background: FH.ink }}>
-      {/* The drop and its ripple, looping (sources.ts). */}
-      {GROUNDS.value.src ? (
-        <VideoGround src={GROUNDS.value.src} grade="saturate(1.02)" />
-      ) : (
-        <GoldDust />
-      )}
+      {/* The drop, then the same table at rest (sources.ts). */}
+      {groundFor("value", length)}
       <Scrim side="left" strength={0.72} reach={70} />
       <div
         style={{
@@ -361,43 +360,19 @@ export const FhValueScene: React.FC<{ brief: EventCmBrief; length: number }> = (
 
 /* ---------------------------------------------------------- program scene */
 
-// Each agenda picture stands on the supplied material for ITS programme
-// (sources.ts): five glasses for the tasting, the brewery's own photographs
-// for the talk, hands at work for the workshop. The text side still
-// alternates L→R→L so the trio reads as a sequence.
-const PROGRAM_SHOTS: Array<{
-  /** Ken Burns for the still; clips and the collage move themselves. */
-  move?: CameraMove;
-  focus?: { x: number; y: number };
-  grade?: string;
-  side: "left" | "right";
-}> = [
-  {
-    // 壱 tasting — five glasses, five shades. Generated with its dark half on
-    // the left, which is exactly where the text goes.
-    focus: { x: 0.72, y: 0.5 },
-    move: { scaleFrom: 1.02, scaleTo: 1.1, xFrom: 0.5, xTo: -0.5 },
-    grade: "saturate(0.98)",
-    side: "left",
-  },
-  {
-    // 弐 talk — 〆張鶴's own press photography, tiled.
-    side: "right",
-  },
-  {
-    // 参 workshop — hands tasting and writing, looping.
-    grade: "brightness(0.9)",
-    side: "left",
-  },
-];
+// Grounds live in sources.ts; what the scene keeps is the text side,
+// alternating L→R→L so the trio reads as a sequence.
+const PROGRAM_SIDES: Array<"left" | "right"> = ["left", "right", "left"];
 
-const programGround = (index: number, length: number): React.ReactNode => {
-  const ground = GROUNDS[`program${index}`];
-  const shot = PROGRAM_SHOTS[index % PROGRAM_SHOTS.length];
+/** Any scene's ground, whatever shape sources.ts gave it. */
+const groundFor = (key: string, length: number): React.ReactNode => {
+  const ground = GROUNDS[key];
   if (!ground) return <GoldDust />;
   switch (ground.kind) {
+    case "sequence":
+      return <SequenceGround shots={ground.shots!} length={length} />;
     case "video":
-      return <VideoGround src={ground.src!} grade={shot.grade} />;
+      return <VideoGround src={ground.src!} />;
     case "collage":
       return <CollageGround srcs={ground.srcs!} length={length} />;
     case "image":
@@ -405,9 +380,9 @@ const programGround = (index: number, length: number): React.ReactNode => {
         <Photo
           src={ground.src!}
           length={length}
-          move={shot.move ?? { scaleFrom: 1.04, scaleTo: 1.12 }}
-          focus={shot.focus ?? { x: 0.5, y: 0.5 }}
-          grade={shot.grade}
+          move={ground.move ?? { scaleFrom: 1.04, scaleTo: 1.12 }}
+          focus={ground.focus ?? { x: 0.5, y: 0.5 }}
+          grade={ground.grade}
         />
       );
   }
@@ -420,18 +395,18 @@ export const FhProgramScene: React.FC<{
   total: number;
 }> = ({ brief, length, index, total }) => {
   const frame = useCurrentFrame();
-  const shot = PROGRAM_SHOTS[index % PROGRAM_SHOTS.length];
+  const side = PROGRAM_SIDES[index % PROGRAM_SIDES.length];
   const numeral = KANJI_NUMERALS[index % KANJI_NUMERALS.length];
   const item = brief.programs[index] ?? null;
-  const left = shot.side === "left";
+  const left = side === "left";
 
   const numeralIn = interpolate(frame, [4, 26], [0, 1], clamp);
   const numeralEased = 1 - Math.pow(1 - numeralIn, 3);
 
   return (
     <AbsoluteFill style={{ background: FH.ink }}>
-      {programGround(index, length)}
-      <Scrim side={shot.side} strength={0.74} reach={78} />
+      {groundFor(`program${index}`, length)}
+      <Scrim side={side} strength={0.74} reach={78} />
       <div
         style={{
           position: "absolute",
@@ -454,28 +429,46 @@ export const FhProgramScene: React.FC<{
             />
           </div>
         ) : null}
+        {/* The numeral as a seal: a hairline gold square holding the plain
+            kanji. 一二三 set bare at display size read as bars (一 IS a bar);
+            the box carries the visual mass and the number stays the subject.
+            Replaced the 250px bare-glyph pattern — a second pattern to
+            compare, per the client's ask. */}
         <div
           style={{
             display: "flex",
-            alignItems: "baseline",
-            gap: 30,
+            alignItems: "flex-end",
+            gap: 28,
             flexDirection: left ? "row" : "row-reverse",
+            marginTop: 10,
           }}
         >
-          <span
+          <div
             style={{
-              fontFamily: FH.font,
-              fontWeight: 800,
-              fontSize: 250,
-              lineHeight: 1.05,
-              color: FH.gold,
-              opacity: numeralEased * 0.96,
-              transform: `translateY(${(1 - numeralEased) * 40}px)`,
-              textShadow: "0 4px 40px rgba(5,3,2,0.6)",
+              width: 190,
+              height: 190,
+              border: `1px solid ${FH.goldDim}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: numeralEased,
+              transform: `translateY(${(1 - numeralEased) * 30}px)`,
+              background: "rgba(8,6,4,0.35)",
             }}
           >
-            {numeral}
-          </span>
+            <span
+              style={{
+                fontFamily: FH.font,
+                fontWeight: 700,
+                fontSize: 108,
+                lineHeight: 1,
+                color: FH.goldBright,
+                textShadow: "0 2px 24px rgba(5,3,2,0.55)",
+              }}
+            >
+              {numeral}
+            </span>
+          </div>
           <span
             style={{
               fontFamily: FH.font,
@@ -484,7 +477,7 @@ export const FhProgramScene: React.FC<{
               letterSpacing: "0.5em",
               color: FH.goldDim,
               opacity: numeralEased,
-              transform: "translateY(-34px)",
+              paddingBottom: 8,
             }}
           >
             {`PROGRAM ${index + 1} / ${total}`}
@@ -693,18 +686,8 @@ export const FhCtaScene: React.FC<{ brief: EventCmBrief; length: number }> = ({
   const { schedule } = brief;
   return (
     <AbsoluteFill style={{ background: FH.ink }}>
-      {/* The room the date invites people into (sources.ts). */}
-      {GROUNDS.cta.src ? (
-        <Photo
-          src={GROUNDS.cta.src}
-          length={length}
-          move={{ scaleFrom: 1.02, scaleTo: 1.1, xFrom: 0.6, xTo: -0.6 }}
-          focus={{ x: 0.62, y: 0.45 }}
-          grade="saturate(0.95)"
-        />
-      ) : (
-        <GoldDust />
-      )}
+      {/* A person actually tasting — the invitation, embodied (sources.ts). */}
+      {groundFor("cta", length)}
       <Scrim side="left" strength={0.8} reach={72} />
       <div
         style={{

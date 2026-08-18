@@ -6,9 +6,10 @@
 // layer only grades and darkens.
 
 import React from "react";
-import { AbsoluteFill, Img, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Img, Sequence, interpolate, useCurrentFrame } from "remotion";
 import { Video } from "@remotion/media";
 import { resolveSrc } from "@/remotion/kit/paint";
+import { CameraMove, Photo } from "./Photo";
 
 export const VideoGround: React.FC<{
   src: string;
@@ -16,10 +17,11 @@ export const VideoGround: React.FC<{
   grade?: string;
 }> = ({ src, opacity = 1, grade }) => (
   <AbsoluteFill style={{ overflow: "hidden" }}>
+    {/* No loop, by policy: a clip that has to repeat is a clip in the wrong
+        slot — sequences (SequenceGround) cut to the next shot instead. */}
     <Video
       src={resolveSrc(src)}
       muted
-      loop
       style={{
         width: "100%",
         height: "100%",
@@ -30,6 +32,62 @@ export const VideoGround: React.FC<{
     />
   </AbsoluteFill>
 );
+
+/** One shot of a sequence: a clip played once, or a still with a camera move. */
+export interface GroundShot {
+  kind: "video" | "image";
+  src: string;
+  /**
+   * Share of the scene this shot holds (normalised against the sum). Clips
+   * set theirs so the slot ends BEFORE the file does — a clip that runs out
+   * freezes, and a freeze inside a cut reads as a glitch.
+   */
+  weight?: number;
+  focus?: { x: number; y: number };
+  move?: CameraMove;
+  grade?: string;
+}
+
+/**
+ * Shots cut end-to-end across a scene — the answer to "a looping clip looks
+ * unnatural". Nothing loops: each clip plays once, each still gets the Ken
+ * Burns the clips must not have, and the scene changes shot the way the film
+ * changes scene. Cuts are hard, like the film's own.
+ */
+export const SequenceGround: React.FC<{
+  shots: GroundShot[];
+  length: number;
+}> = ({ shots, length }) => {
+  const total = shots.reduce((sum, shot) => sum + (shot.weight ?? 1), 0);
+  let from = 0;
+  return (
+    <AbsoluteFill>
+      {shots.map((shot, i) => {
+        const slot =
+          i === shots.length - 1
+            ? length - from
+            : Math.round((length * (shot.weight ?? 1)) / total);
+        const start = from;
+        from += slot;
+        return (
+          <Sequence key={i} from={start} durationInFrames={slot}>
+            {shot.kind === "video" ? (
+              <VideoGround src={shot.src} grade={shot.grade} />
+            ) : (
+              <Photo
+                src={shot.src}
+                length={slot}
+                move={shot.move ?? { scaleFrom: 1.04, scaleTo: 1.12 }}
+                focus={shot.focus ?? { x: 0.5, y: 0.5 }}
+                grade={shot.grade}
+              />
+            )}
+          </Sequence>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
 
 /**
  * A tiled wall of photographs, drifting slowly sideways.

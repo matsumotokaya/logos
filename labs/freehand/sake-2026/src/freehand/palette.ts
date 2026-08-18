@@ -30,6 +30,6 @@ export const FH = {
 /** Cinemascope letterbox: bar height in composition pixels (1920×1080). */
 export const LETTERBOX = 132;
 
-/** Kanji numerals for the programme trio. 壱弐参 reads celebratory — sake-label
- *  numbering — where 1/2/3 reads like pagination. */
-export const KANJI_NUMERALS = ["壱", "弐", "参"] as const;
+/** Kanji numerals for the programme trio. Plain 一二三 — the formal 壱弐参 was
+ *  tried first and read as overdressed (client call, 2026-08-18). */
+export const KANJI_NUMERALS = ["一", "二", "三"] as const;

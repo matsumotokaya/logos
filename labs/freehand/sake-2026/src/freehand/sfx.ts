@@ -98,15 +98,16 @@ export const SFX: Partial<Record<EventCmSceneRole, (index: number) => SfxCue | n
   // A single taiko under the vertical title as it draws in — placed before the
   // first line of narration so the two do not fight.
   title: () => cue("taiko-don.mp3", PRESENCE.title, 120, "タイトルが立ち上がる瞬間"),
-  // The chapter turn. Same sound all three times on purpose: three different
-  // transitions read as three unrelated films.
-  program: () => cue("transition.mp3", PRESENCE.chapter, 0, "章が変わる"),
-  // 鈴 for the speakers — the client's own example ("登壇者の紹介の時にちょっと
-  // した効果音"). A bell announces a person without dramatising them.
+  // The chapter turn is the 鈴 now (client call, 2026-08-18 — the woosh felt
+  // synthetic against the acoustic palette). Same sound all three times on
+  // purpose: three different transitions read as three unrelated films.
+  program: () => cue("suzu.mp3", PRESENCE.arrival, 0, "章が変わる"),
+  // 鈴 for the speakers too — a bell announces a person without dramatising
+  // them, and the chapter bell arriving on people reads as the same system.
   guests: () => cue("suzu.mp3", PRESENCE.arrival, 60, "登壇者が現れる"),
-  // 琴の滑奏 runs 3.4s and carries the film into its last chapter, under the
-  // date landing. The only cue that is a phrase rather than a hit.
-  cta: () => cue("koto-glissando.mp3", PRESENCE.closing, 0, "締めへ入る"),
+  // 和太鼓のドドン under the date landing (client call — the koto glissando
+  // didn't sit). The film's one two-beat hit, saved for its biggest fact.
+  cta: () => cue("taiko-dodon.mp3", PRESENCE.closing, 0, "締めへ入る"),
 };
 
 export const cueFor = (role: EventCmSceneRole, index = 0): SfxCue | null =>
