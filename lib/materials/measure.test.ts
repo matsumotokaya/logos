@@ -113,11 +113,45 @@ test("壊れた画像でも例外を投げない（登録は続けられる）",
   assert.deepEqual(broken, UNMEASURED);
 });
 
-test("列は常に4つ揃う（再測定が古い値を残さない）", () => {
+test("列は常に揃う（再測定が古い値を残さない）", () => {
   assert.deepEqual(Object.keys(measurementColumns(UNMEASURED)).sort(), [
     "height",
+    "ink_ratio",
     "luminance",
     "opaque",
+    "trim_height",
+    "trim_width",
     "width",
   ]);
+});
+
+// 取り込み時の測定は「地の有無・明るさ」だけでなく「絵柄がフレームのどこまでか」
+// も返す。§11 の正規化の提案がこの2列の上に乗るので、片方だけ埋まる状態を作らない。
+test("余白のある画像は、絵柄の箱がフレームより小さいと測れる", async () => {
+  const measured = await measureMaterial(await darkOnAlpha(), "image/png");
+  assert.equal(measured.trimWidth, 100, "絵柄の幅が測れていない");
+  assert.equal(measured.trimHeight, 40, "絵柄の高さが測れていない");
+  // 100×40 の塗りが 100×40 の箱を埋めているので、箱の中は 100% インク。
+  assert.ok(
+    measured.inkRatio !== null && measured.inkRatio > 0.98,
+    `箱の中の占有率が想定と違う: ${measured.inkRatio}`,
+  );
+});
+
+test("白地に載ったマークは、地を剥がした後の絵柄として測れる", async () => {
+  const measured = await measureMaterial(await darkOnPlate(), "image/jpeg");
+  // JPEGなので透過は無い。それでも「絵柄はここまで」が出るのがこの測定の要点で、
+  // 出ないとインベントリは白地のロゴを写真と同じに見る。
+  assert.equal(measured.opaque, true);
+  assert.ok(
+    measured.trimWidth !== null && measured.trimWidth < 200,
+    `白地を剥がせていない: ${measured.trimWidth}`,
+  );
+  // 写真は 1.0 に張り付く。ここが 1.0 未満に落ちることが「フレーム全体が絵柄
+  // ではない」の証拠で、実素材（miss-sake-red.webp）は 0.254 まで落ちる。この
+  // フィクスチャは塗りのベタなので、実物ほどは落ちない。
+  assert.ok(
+    measured.inkRatio !== null && measured.inkRatio < 0.95,
+    `絵柄の占有率が写真並みに出ている: ${measured.inkRatio}`,
+  );
 });

@@ -62,9 +62,9 @@ npm run render
 
 **原則: 並行システムを作らない。** kit([remotion/kit/](../../remotion/kit/))は既に「部品17+配置7+テーマ」のオブジェクト体系なので、持ち帰りとは**kitの語彙を増やすこと**。freehand側のコードは正本にせず、証拠(FINDINGS)と実装の参照元として残す。
 
-### Phase A — 素材と測定(kitに触らない。asset-normalization §7の続き)
+### Phase A — 素材と測定(kitに触らない。asset-normalization §7の続き)— A1 ✅(2026-08-19)
 
-1. **ロゴ正規化のプロダクト化**(効果最大・独立して着手可能)。[normalize-marks.mjs](scripts/normalize-marks.mjs) の3操作——白地プレート剥がし(`plate:"white"`=白からの距離をアルファに)・アルファboxトリム・**インク面積スケール**——を取り込み時の測定にする。`brand_materials` の測定列(`opaque`/`luminance` と同じ場所)に `inkRatio`/`aspect` を足し、トリム済み派生物を `derived_from_material_id` で持つ([docs/asset-normalization.md](../../docs/asset-normalization.md) **段階7の実装そのもの**)。ユーザーは雑な素材を渡してくる——Miss SAKEの白枠webpがその実例で、依頼者も「アップロード時に自動で正規化される仕組みが要る」と明言した
+1. ✅ **ロゴ正規化のプロダクト化**(2026-08-19 実装済み。正本は [docs/asset-normalization.md §11.1](../../docs/asset-normalization.md)・migration 0055)。[normalize-marks.mjs](scripts/normalize-marks.mjs) の3操作——白地プレート剥がし(`plate:"white"`=白からの距離をアルファに)・アルファboxトリム・**インク面積スケール**——を取り込み時の測定にする。`brand_materials` の測定列(`opaque`/`luminance` と同じ場所)に `ink_ratio` / `trim_width` / `trim_height` を足し、トリム済み派生物を `derived_from_material_id` で持つ([docs/asset-normalization.md](../../docs/asset-normalization.md) **段階7の実装そのもの**)。ユーザーは雑な素材を渡してくる——Miss SAKEの白枠webpがその実例で、依頼者も「アップロード時に自動で正規化される仕組みが要る」と明言した。**移植はラボの判定値を再現した**(`ink_ratio` 0.2230 / ラボ 0.2231、`scale` 0.716 / 0.725)ので、このマニフェストは以後の基準線として [lib/materials/optical.test.ts](../../lib/materials/optical.test.ts) に固定してある。**`aspect` は列にしなかった**——`trim_width / trim_height` そのものなので、保存すると計算元と食い違う
 2. **SFXをシステム既定素材に**(依頼者指示: 最初から導入する)。**保管は完了(2026-08-18)**: 出自は**効果音ラボ**(商用利用無料・クレジット不要・**ただしファイル再配布は不可**)と判明し——支給10個の実測dBが同サイトのファイルと完全一致——演出用50個を [scripts/fetch-default-sfx.mjs](../../scripts/fetch-default-sfx.mjs) で取得する形にした(BGM既定と同じくmp3はgitignore、`public/defaults/sfx/catalog.json` に台帳=ラベル・出典URL・実測`headDb`→`gain`)。**残り**: `lib/assets/defaults.ts` への `kind:"sfx"` 追加とテンプレートからの参照、そして**gitignoreされた既定素材はVercelに乗らない問題**(BGMも同じ)の配備先決定
 3. **「人物が写っているか」を素材の測定に足す**。人物入り写真は背景スロットに使えない(v1で実証: coverでは顔を画角外に追い出せない)。`place-images.ts` が顔の根拠で登壇者写真を選ぶのと対称の判定を、背景適性にも
 
@@ -90,7 +90,7 @@ npm run render
 
 ### 順序の理由
 
-A1→A2 は独立で今すぐ着手でき、DBに触るのはA1だけ。B4〜B8 は `remotion/kit/` 内で完結しテンプレート契約を壊さない(既定はすべて現行の見え方で、テーマが新語彙を使ったときだけ変わる)。C9 だけがbrief契約に触るので最後。**B5の「地の語彙」が最重要**——freehandの差分の過半はここに畳み込まれる。
+A1→A2 は独立で今すぐ着手でき、DBに触るのはA1だけ(**A1は2026-08-19に完了**・migration 0055)。B4〜B8 は `remotion/kit/` 内で完結しテンプレート契約を壊さない(既定はすべて現行の見え方で、テーマが新語彙を使ったときだけ変わる)。C9 だけがbrief契約に触るので最後。**B5の「地の語彙」が最重要**——freehandの差分の過半はここに畳み込まれる。
 
 ## 実験
 

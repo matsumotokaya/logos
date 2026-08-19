@@ -178,9 +178,33 @@ export async function POST(
       label: string;
       mode: string;
       note?: string;
-      image?: { luminance: number | null; opaque?: boolean; aspect: number };
+      image?: {
+        luminance: number | null;
+        opaque?: boolean;
+        aspect: number;
+        inkRatio?: number | null;
+        trimWidth?: number | null;
+        trimHeight?: number | null;
+      };
     };
     const measured = (lastStructure?.input as { sources?: MeasuredSource[] } | null)?.sources;
+
+    // Which of those files have an approved normalised copy (§11). Looked up
+    // here rather than carried on the run, because approval happens after the
+    // reading: the run that read a padded logo is not wrong, and the placement
+    // that follows it should still draw the trimmed one.
+    const normalizedBy = new Map<string, string>();
+    const readIds = (measured ?? []).map((entry) => entry.materialId).filter(Boolean);
+    if (readIds.length > 0) {
+      const derived = await supabase
+        .from("brand_materials")
+        .select("id, derived_from_material_id")
+        .in("derived_from_material_id", readIds);
+      for (const row of derived.data ?? []) {
+        normalizedBy.set(row.derived_from_material_id as string, row.id as string);
+      }
+    }
+
     const imageMaterials: ImageMaterial[] = (measured ?? [])
       .filter((entry) => entry.image)
       .map((entry) => ({
@@ -191,6 +215,13 @@ export async function POST(
         // knocked out, which is the treatment that cannot fail on ink.
         opaque: entry.image?.opaque ?? true,
         aspect: entry.image?.aspect ?? 0,
+        // Absent on runs recorded before the geometry was measured, and absent
+        // means 「測っていない」: the mark keeps whatever size the brief has
+        // rather than being reset to the row's average.
+        inkRatio: entry.image?.inkRatio ?? null,
+        trimWidth: entry.image?.trimWidth ?? null,
+        trimHeight: entry.image?.trimHeight ?? null,
+        normalizedId: normalizedBy.get(entry.materialId) ?? null,
         sent: entry.mode === "passthrough",
         note: entry.note,
       }));

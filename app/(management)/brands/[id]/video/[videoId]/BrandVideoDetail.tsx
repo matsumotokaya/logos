@@ -626,6 +626,59 @@ export default function BrandVideoDetail({
     [brandId, loadInventory],
   );
 
+  // Normalising is the one material action that WRITES A NEW FILE, so what
+  // happened has to be said in numbers: the person approved 「余白が大きい」 and
+  // is owed the proof. The brief is repointed server-side, which is why the take
+  // is reloaded too — the video now differs from the one that was rendered, and
+  // that difference is what the unreflected badge reports.
+  const normalizeMaterial = useCallback(
+    async (materialId: string) => {
+      busy("正規化バージョンを作成しています…");
+      try {
+        const res = await videoFetch(
+          `/api/brands/${brandId}/materials/${materialId}/normalize`,
+          { method: "POST" },
+        );
+        const json = (await res.json().catch(() => null)) as {
+          error?: string;
+          duplicate?: boolean;
+          operations?: string[];
+          from?: { width: number; height: number } | null;
+          to?: { width: number; height: number };
+        } | null;
+        if (!res.ok) {
+          throw new Error(json?.error ?? "正規化バージョンを作成できませんでした");
+        }
+        await Promise.all([loadInventory(), load()]);
+        if (json?.duplicate) {
+          setNotice("この素材の正規化バージョンはすでにあります。");
+          return;
+        }
+        const size =
+          json?.from && json?.to
+            ? `${json.from.width}×${json.from.height} → ${json.to.width}×${json.to.height}`
+            : null;
+        const did = (json?.operations ?? [])
+          .map((operation) => (operation === "plate" ? "白地を外し" : "余白を切り"))
+          .join("、");
+        setNotice(
+          [
+            "正規化バージョンを作成しました",
+            did ? `（${did}ました${size ? `: ${size}` : ""}）` : "",
+            "。原本はそのまま残っています。",
+          ].join(""),
+        );
+      } catch (e) {
+        setError(
+          e instanceof Error ? e.message : "正規化バージョンを作成できませんでした",
+        );
+      } finally {
+        idle();
+      }
+    },
+    [brandId, load, loadInventory],
+  );
+
   // Kept off the synchronous effect path, same as the take load: setting state
   // during the effect body triggers cascading renders.
   useEffect(() => {
@@ -1281,6 +1334,7 @@ export default function BrandVideoDetail({
                       busy={saving}
                       onClassify={(id, category) => void classifyMaterial(id, category)}
                       onPromote={(id) => void promoteMaterial(id)}
+                      onNormalize={(id) => void normalizeMaterial(id)}
                       baseOff={brandBaseIsOff(video.brief as EventCmBrief)}
                       onToggleBase={(off) =>
                         void editFact({ path: BRAND_BASE_PATH, suppressed: off })
@@ -1597,6 +1651,7 @@ export default function BrandVideoDetail({
               busy={saving}
               onClassify={(id, category) => void classifyMaterial(id, category)}
               onPromote={(id) => void promoteMaterial(id)}
+              onNormalize={(id) => void normalizeMaterial(id)}
               // Declining the base is an ordinary suppression, so it goes
               // through the same endpoint every other 「この項目を出さない」
               // does — no new route, and it lands in provenance where a re-run

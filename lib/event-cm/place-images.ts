@@ -1,7 +1,8 @@
 import type { ImageReading } from "./structure";
 import { isSuppressed } from "./facts";
 import { sameName } from "./names";
-import { materialUri } from "@/lib/takes/material-uri";
+import { materialUri, MATERIAL_URI_PREFIX } from "@/lib/takes/material-uri";
+import { opticalScales, type MeasuredMark } from "@/lib/materials/optical";
 import type { EventPhoto } from "@/remotion/event/types";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 
@@ -34,6 +35,26 @@ export interface ImageMaterial {
   /** No transparency: the artwork arrives on a plate. */
   opaque: boolean;
   aspect: number;
+  /**
+   * The artwork's own extent and ink coverage (docs/asset-normalization.md §11).
+   *
+   * Optional because a run recorded before the measurement existed has none, and
+   * a mark whose weight was never measured must keep whatever size the brief
+   * already gives it rather than be reset.
+   */
+  inkRatio?: number | null;
+  trimWidth?: number | null;
+  trimHeight?: number | null;
+  /**
+   * The normalised copy of this file, when one was approved (§11).
+   *
+   * The film is placed with the copy; the model still reads the original. That
+   * split is what keeps the two decisions separate — 「この画像は何か」 is
+   * answered from what the user handed over, 「どのファイルを描くか」 from the
+   * best form of it we have. Without this, every re-run would put the padded
+   * original back and undo an approval.
+   */
+  normalizedId?: string | null;
   /** Whether this image reached the model at all. */
   sent: boolean;
   /** Why it did not, when it did not. */
@@ -91,8 +112,8 @@ const FOCUS_Y: Record<ImageReading["focusY"], number> = {
   bottom: 0.78,
 };
 
-const photoOf = (reading: ImageReading): EventPhoto => ({
-  src: materialUri(reading.ref),
+const photoOf = (reading: ImageReading, placedId: string): EventPhoto => ({
+  src: materialUri(placedId),
   focus: { x: FOCUS_X[reading.focusX], y: FOCUS_Y[reading.focusY] },
 });
 
@@ -142,6 +163,10 @@ export function placeImagesIntoBrief(
   const materialFor = (reading: ImageReading): ImageMaterial | undefined =>
     byId.get(reading.ref) ??
     materials.find((material) => material.label === reading.ref);
+
+  /** The file the film draws: the approved normalised copy, else the original. */
+  const placedId = (reading: ImageReading): string =>
+    materialFor(reading)?.normalizedId ?? reading.ref;
 
   const drop = (reading: ImageReading, reason: string) => {
     // One line per picture. A portrait that could not be identified is already
@@ -225,7 +250,7 @@ export function placeImagesIntoBrief(
       drop(reading, blocked);
       continue;
     }
-    guests[index] = { ...guests[index], photo: photoOf(reading) };
+    guests[index] = { ...guests[index], photo: photoOf(reading, placedId(reading)) };
     guestsChanged = true;
     claim(
       reading,
@@ -250,7 +275,7 @@ export function placeImagesIntoBrief(
       drop(reading, "ロゴかどうか確信が持てませんでした");
       continue;
     }
-    const uri = materialUri(reading.ref);
+    const uri = materialUri(placedId(reading));
     const material = materialFor(reading);
     const treatment = treatmentFor(material?.luminance ?? null, material?.opaque ?? true);
 
@@ -335,7 +360,10 @@ export function placeImagesIntoBrief(
       .filter((reading) => !used.has(reading.ref) && confident(reading))
       .sort((a, b) => rank(a, wanted) - rank(b, wanted))[0];
     if (!candidate) return;
-    next = { ...next, visuals: { ...next.visuals, [key]: photoOf(candidate) } };
+    next = {
+      ...next,
+      visuals: { ...next.visuals, [key]: photoOf(candidate, placedId(candidate)) },
+    };
     claim(
       candidate,
       path,
@@ -369,6 +397,50 @@ export function placeImagesIntoBrief(
         ? "モデルからこの画像の判定が返りませんでした"
         : (image.note ?? "モデルへ渡していません"),
     });
+  }
+
+  // Balance the credit row by ink, not by height.
+  //
+  // Done once here, after the row is settled, because the answer for one mark
+  // depends on the others: the correction is measured against the median of the
+  // row, so adding a partner's logo legitimately resizes the marks already
+  // there (docs/asset-normalization.md §11, proven in the Freehand Lab).
+  //
+  // Only marks whose geometry was measured get a number. `scale` is a rendering
+  // property with no editing surface of its own — `logos` is an `asset` field in
+  // the fact list, corrected by changing the material — so there is no human
+  // value here to protect; what must be protected is a mark we cannot measure,
+  // which keeps whatever the brief already says.
+  const measuredRow: MeasuredMark[] = [];
+  for (const logo of next.logos) {
+    if (!logo.src?.startsWith(MATERIAL_URI_PREFIX)) continue;
+    const id = logo.src.slice(MATERIAL_URI_PREFIX.length);
+    // The brief may point at a normalised copy, whose measurements ride on its
+    // original's entry here (the copy was never read by the model). Balancing by
+    // the copy's own numbers would be better still — it is the file being drawn —
+    // but the copy is not in this list, and the two differ only by the padding
+    // that ink_ratio already ignores.
+    const material = materials.find(
+      (entry) => entry.materialId === id || entry.normalizedId === id,
+    );
+    if (!material) continue;
+    measuredRow.push({
+      id,
+      inkRatio: material.inkRatio ?? null,
+      trimWidth: material.trimWidth ?? null,
+      trimHeight: material.trimHeight ?? null,
+    });
+  }
+  const scales = opticalScales(measuredRow);
+  if (scales.size > 0) {
+    next = {
+      ...next,
+      logos: next.logos.map((logo) => {
+        if (!logo.src?.startsWith(MATERIAL_URI_PREFIX)) return logo;
+        const scale = scales.get(logo.src.slice(MATERIAL_URI_PREFIX.length));
+        return scale === undefined || logo.scale === scale ? logo : { ...logo, scale };
+      }),
+    };
   }
 
   // `factsUpdatedAt` is deliberately NOT stamped. It exists to tell the

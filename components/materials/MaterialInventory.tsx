@@ -32,6 +32,7 @@ import {
   type MaterialCategory,
 } from "@/lib/materials/category";
 import { materialPath, uniqueMaterialPaths } from "@/lib/materials/naming";
+import { normalizationProposal } from "@/lib/materials/optical";
 import type {
   InventoryMaterial,
   InventoryPayload,
@@ -191,14 +192,55 @@ function PromoteAction({
   );
 }
 
+/**
+ * The normalisation offer: 「この形は使いにくい。直したものも作りますか?」
+ *
+ * docs/asset-normalization.md §11 — proposed, never done silently. The two
+ * measurements that trigger it (a white plate, a frame mostly empty) are facts
+ * of the file, but 「この余白はデザインの一部か」 is a judgement, and the person
+ * who uploaded the file is the one who has it.
+ *
+ * Not a dialog and not two clicks, unlike promotion: nothing is replaced and
+ * nothing is lost. The original stays in the list, still pinned, and the derived
+ * copy appears beside it — which is what makes automatic trimming safe to offer.
+ */
+function NormalizeAction({
+  reasons,
+  disabled,
+  onNormalize,
+}: {
+  reasons: string[];
+  disabled: boolean;
+  onNormalize: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5">
+      <p className="min-w-0 flex-1 text-[11px] text-amber-900">
+        {reasons.join("、")}。正規化バージョンも作成しますか？
+      </p>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onNormalize}
+        className="shrink-0 text-[11px] font-semibold text-amber-900 underline underline-offset-2 disabled:opacity-50"
+      >
+        作成する
+      </button>
+    </div>
+  );
+}
+
 function MaterialRow({
   material,
   fileName,
   uses,
   overriddenBy,
+  normalizedAs,
+  normalizedFrom,
   disabled,
   onClassify,
   onPromote,
+  onNormalize,
 }: {
   material: InventoryMaterial;
   /** The normalised name — what the export writes and the download hands over. */
@@ -206,16 +248,36 @@ function MaterialRow({
   uses: InventoryPayload["usage"][string] | undefined;
   /** Set when a material in the upper tier fills the same place as this one. */
   overriddenBy?: string;
+  /** The normalised copy made from this file, if one exists. */
+  normalizedAs?: string;
+  /** The file this one was cut from, if it is itself a normalised copy. */
+  normalizedFrom?: string;
   disabled: boolean;
   onClassify: (id: string, category: MaterialCategory | null) => void;
   /** Widen to the brand. Absent on rows that are already there. */
   onPromote?: (id: string) => void;
+  /** Make the normalised copy. Absent = the action is not offered. */
+  onNormalize?: (id: string) => void;
 }) {
   const measured =
     material.width && material.height ? `${material.width}×${material.height}` : null;
   // Worth showing only when it differs: repeating 「miyao.jpg（元: miyao.jpg）」
   // on every row buries the cases where the name really did change.
   const renamed = fileName !== material.label;
+  // Offered only where the measurements say there is something to gain, and only
+  // once: a file that already has a normalised copy has been answered.
+  const proposal = normalizationProposal({
+    kind: material.kind,
+    category: material.category,
+    media_type: material.media_type,
+    width: material.width,
+    height: material.height,
+    opaque: material.opaque,
+    inkRatio: material.ink_ratio,
+    trimWidth: material.trim_width,
+    trimHeight: material.trim_height,
+  });
+  const offer = Boolean(onNormalize) && proposal.propose && !normalizedAs && !normalizedFrom;
 
   return (
     <li className="flex flex-col gap-1 rounded-lg border border-hairline px-3 py-2">
@@ -269,6 +331,26 @@ function MaterialRow({
           この動画では「{overriddenBy}」を使っています（基盤を上書き中）
         </p>
       ) : null}
+      {/* Said on both rows, because the pair only makes sense together: the
+          original is why the copy exists, and the copy is why the original is
+          no longer the one on screen. */}
+      {normalizedAs ? (
+        <p className="truncate text-[11px] text-ink-muted">
+          正規化版「{normalizedAs}」を使っています
+        </p>
+      ) : null}
+      {normalizedFrom ? (
+        <p className="truncate text-[11px] text-ink-muted">
+          正規化版（元: {normalizedFrom}）
+        </p>
+      ) : null}
+      {offer ? (
+        <NormalizeAction
+          reasons={proposal.reasons}
+          disabled={disabled}
+          onNormalize={() => onNormalize?.(material.id)}
+        />
+      ) : null}
     </li>
   );
 }
@@ -279,9 +361,11 @@ function Tier({
   materials,
   usage,
   overrides,
+  derivations,
   disabled,
   onClassify,
   onPromote,
+  onNormalize,
   empty,
 }: {
   title: string;
@@ -289,9 +373,12 @@ function Tier({
   materials: InventoryMaterial[];
   usage: InventoryPayload["usage"];
   overrides?: Map<string, string>;
+  /** Both directions of the normalisation pair, keyed by material id. */
+  derivations?: Derivations;
   disabled: boolean;
   onClassify: (id: string, category: MaterialCategory | null) => void;
   onPromote?: (id: string) => void;
+  onNormalize?: (id: string) => void;
   empty: string;
 }) {
   const folders = groupByFolder(materials);
@@ -327,9 +414,12 @@ function Tier({
                   fileName={path.slice(path.lastIndexOf("/") + 1)}
                   uses={usage[material.id]}
                   overriddenBy={overrides?.get(material.id)}
+                  normalizedAs={derivations?.normalizedAs.get(material.id)}
+                  normalizedFrom={derivations?.normalizedFrom.get(material.id)}
                   disabled={disabled}
                   onClassify={onClassify}
                   onPromote={onPromote}
+                  onNormalize={onNormalize}
                 />
               ))}
             </ul>
@@ -338,6 +428,43 @@ function Tier({
       )}
     </section>
   );
+}
+
+export interface Derivations {
+  /** original id → the displayed name of its normalised copy. */
+  normalizedAs: Map<string, string>;
+  /** copy id → the displayed name of the file it was cut from. */
+  normalizedFrom: Map<string, string>;
+}
+
+/**
+ * The normalisation pairs present in this inventory, in both directions.
+ *
+ * Read off the rows rather than fetched: `derived_from_material_id` is already on
+ * the copy, so the pair is a fact of the list. Names come from the same
+ * derivation the rest of the screen uses, so a row refers to its partner by the
+ * name the person is looking at rather than by the label it was uploaded with.
+ */
+function derivationMap(payload: InventoryPayload): Derivations {
+  const rows = [...payload.own, ...payload.base];
+  const paths = uniqueMaterialPaths(rows);
+  const nameOf = (material: InventoryMaterial): string => {
+    const path = paths.get(material.id) ?? materialPath(material);
+    return path.slice(path.lastIndexOf("/") + 1);
+  };
+  const byId = new Map(rows.map((material) => [material.id, material]));
+  const normalizedAs = new Map<string, string>();
+  const normalizedFrom = new Map<string, string>();
+  for (const material of rows) {
+    const originalId = material.derived_from_material_id;
+    if (!originalId) continue;
+    const original = byId.get(originalId);
+    normalizedAs.set(originalId, nameOf(material));
+    // The original may sit outside this inventory (a brand file cut for another
+    // deliverable). Saying 「正規化版」 without naming the source beats silence.
+    normalizedFrom.set(material.id, original ? nameOf(original) : material.label);
+  }
+  return { normalizedAs, normalizedFrom };
 }
 
 /**
@@ -368,6 +495,7 @@ export default function MaterialInventory({
   busy,
   onClassify,
   onPromote,
+  onNormalize,
   baseOff,
   onToggleBase,
 }: {
@@ -377,6 +505,8 @@ export default function MaterialInventory({
   onClassify?: (id: string, category: MaterialCategory | null) => void;
   /** Widen a material to the brand. Absent = the action is not offered. */
   onPromote?: (id: string) => void;
+  /** Make the normalised copy of an awkward file. Absent = not offered. */
+  onNormalize?: (id: string) => void;
   /** Whether this deliverable has declined the brand's base. */
   baseOff?: boolean;
   /** Decline or restore it. Absent = the switch is not offered (the template
@@ -399,6 +529,7 @@ export default function MaterialInventory({
 
   const disabled = Boolean(busy) || !onClassify;
   const overrides = overrideMap(payload);
+  const derivations = derivationMap(payload);
 
   return (
     <div className="flex flex-col gap-5">
@@ -407,9 +538,11 @@ export default function MaterialInventory({
         note="この動画に固定されているもの。分類を直すと、この素材を使う他の成果物にも反映されます。ずっと使うものは「ブランドの基盤へ」上げると、次に作るものからも選べます。"
         materials={payload.own}
         usage={payload.usage}
+        derivations={derivations}
         disabled={disabled || saving !== null}
         onClassify={classify}
         onPromote={onPromote}
+        onNormalize={onNormalize}
         empty="まだ素材がありません。パイプラインの「入力」から資料や写真を入れてください。"
       />
       {/* Declining the base is a property of THIS deliverable, so it sits on
@@ -453,8 +586,10 @@ export default function MaterialInventory({
         materials={payload.base}
         usage={payload.usage}
         overrides={overrides}
+        derivations={derivations}
         disabled={disabled || saving !== null}
         onClassify={classify}
+        onNormalize={onNormalize}
         empty="このブランドにはまだ基盤の素材がありません。上の素材を「ブランドの基盤へ」上げると、次に作るものからも使えます。"
       />
     </div>

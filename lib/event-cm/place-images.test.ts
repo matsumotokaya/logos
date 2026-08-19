@@ -311,3 +311,57 @@ test("初めて置くマークも、なぜその描き方なのかを事実ど�
   assert.equal(darkOnAlpha.brief.logos.at(-1)?.treatment, "knockout");
   assert.match(darkOnAlpha.placed[0]?.reason ?? "", /透過した暗いマーク/);
 });
+
+test("正規化版があるマークは、正規化版が映像に載る（原本は読み取り側に残る）", () => {
+  // 承認された正規化版を無視すると、マッピングを1回まわすたびに余白だらけの原本
+  // が戻り、押したボタンが取り消される（docs/asset-normalization.md §11）。
+  const result = placeImagesIntoBrief(
+    SEEDED,
+    [reading({ ref: "img-1", role: "logo", visibleText: ["Miss SAKE"] })],
+    [material("img-1", { luminance: 0.2, normalizedId: "img-1-trimmed" })],
+    "フライヤー.pdf",
+  );
+  const added = result.brief.logos.at(-1);
+  assert.equal(added?.src, "material:img-1-trimmed");
+  // 判定の記録は原本に対して残る。モデルが見たのは原本なので。
+  assert.equal(result.placed.at(-1)?.materialId, "img-1");
+});
+
+test("マークが2つ以上並んだら、インクの量で大きさを揃える", () => {
+  // 実測の2件（labs/freehand/sake-2026/src/freehand/marks.json）。同じ高さで並べる
+  // と正方形の印章が格下に見えるので、印章を大きく、横長を小さくする。
+  const result = placeImagesIntoBrief(
+    SEEDED,
+    [
+      reading({ ref: "seal", role: "logo", visibleText: ["〆張鶴"] }),
+      reading({ ref: "wordmark", role: "logo", visibleText: ["レオパレス21"] }),
+    ],
+    [
+      material("seal", { inkRatio: 0.2966, trimWidth: 246, trimHeight: 246 }),
+      material("wordmark", { inkRatio: 0.3283, trimWidth: 800, trimHeight: 183 }),
+    ],
+    "フライヤー.pdf",
+  );
+  const seal = result.brief.logos.find((logo) => logo.src === "material:seal");
+  const wordmark = result.brief.logos.find((logo) => logo.src === "material:wordmark");
+  assert.ok(seal?.scale && wordmark?.scale, "スケールが書かれていない");
+  assert.ok(
+    (seal?.scale ?? 0) > (wordmark?.scale ?? 0),
+    `印章 ${seal?.scale} がワードマーク ${wordmark?.scale} を上回っていない`,
+  );
+});
+
+test("測っていないマークにスケールを書かない（1で上書きしない）", () => {
+  const result = placeImagesIntoBrief(
+    SEEDED,
+    [
+      reading({ ref: "unmeasured-a", role: "logo", visibleText: ["A"] }),
+      reading({ ref: "unmeasured-b", role: "logo", visibleText: ["B"] }),
+    ],
+    [material("unmeasured-a"), material("unmeasured-b")],
+    "フライヤー.pdf",
+  );
+  for (const logo of result.brief.logos) {
+    assert.equal(logo.scale, undefined, `${logo.name} に根拠のないスケールが入っている`);
+  }
+});

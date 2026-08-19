@@ -36,6 +36,12 @@ export interface InventoryMaterial {
   height: number | null;
   opaque: boolean | null;
   luminance: number | null;
+  /** Where the artwork sits inside the frame (0055). Null = never measured. */
+  ink_ratio: number | null;
+  trim_width: number | null;
+  trim_height: number | null;
+  /** Set on a normalised copy: the material it was cut from (§11). */
+  derived_from_material_id: string | null;
   created_at: string;
 }
 
@@ -51,7 +57,12 @@ export interface InventoryPayload {
 // Naming owns its own column list, so a name never loses a word because a
 // query forgot a measurement (it already did once: without `luminance` every
 // mark dropped its dark/light).
-const COLUMNS = `id, ${MATERIAL_NAMING_COLUMNS}, category_source, bytes, scope, height, created_at`;
+const COLUMNS =
+  `id, ${MATERIAL_NAMING_COLUMNS}, category_source, bytes, scope, height, ` +
+  // The geometry the normalisation offer is decided from, and the pointer that
+  // says the offer was already taken. Both have to be here or the screen asks a
+  // question it has already been answered (docs/asset-normalization.md §11).
+  `ink_ratio, trim_width, trim_height, derived_from_material_id, created_at`;
 
 export async function GET(
   req: Request,

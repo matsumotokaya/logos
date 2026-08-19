@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { getR2Object } from "@/lib/r2";
 import { measureArtwork } from "@/lib/materials/measure";
+import { measureMark } from "@/lib/materials/normalize";
 import { SOURCE_ROLE } from "@/app/api/brands/[id]/videos/[videoId]/materials/route";
 
 // Stage ②: reading the material, mechanically.
@@ -38,6 +39,17 @@ export interface ImageFacts {
    */
   luminance: number | null;
   opaque: boolean;
+  /**
+   * Where the artwork sits inside the frame, and how much of the box is ink.
+   *
+   * Same function as intake (lib/materials/normalize.ts), for the same reason as
+   * luminance: the mapping stage balances a row of marks by ink weight
+   * (docs/asset-normalization.md §11), and a value measured twice by two
+   * implementations is a value that will disagree with itself.
+   */
+  inkRatio: number | null;
+  trimWidth: number | null;
+  trimHeight: number | null;
   /** The media type the model is handed, after preparation. */
   sentAs: string;
   /** Bytes actually sent, after downscaling. */
@@ -87,7 +99,7 @@ interface PreparedImage {
 }
 
 /** Downscale for sending, and measure while the bytes are already decoded. */
-async function prepareImage(body: Buffer): Promise<PreparedImage | null> {
+async function prepareImage(body: Buffer, mediaType: string): Promise<PreparedImage | null> {
   try {
     const source = sharp(body, { failOn: "none" });
     const meta = await source.metadata();
@@ -102,6 +114,7 @@ async function prepareImage(body: Buffer): Promise<PreparedImage | null> {
       .toBuffer();
 
     const artwork = await measureArtwork(body);
+    const mark = await measureMark(body, mediaType);
     return {
       data: jpeg.toString("base64"),
       facts: {
@@ -110,6 +123,9 @@ async function prepareImage(body: Buffer): Promise<PreparedImage | null> {
         aspect: width > 0 && height > 0 ? Number((width / height).toFixed(3)) : 0,
         luminance: artwork.luminance,
         opaque: artwork.opaque,
+        inkRatio: mark.inkRatio,
+        trimWidth: mark.trimWidth,
+        trimHeight: mark.trimHeight,
         sentAs: "image/jpeg",
         sentBytes: jpeg.length,
       },
@@ -177,7 +193,7 @@ export async function extractTakeSources(
         sources.push({ ...base, mode: "skipped", note: "R2に本体がありません" });
         continue;
       }
-      const prepared = await prepareImage(bytes);
+      const prepared = await prepareImage(bytes, mediaType);
       if (!prepared) {
         // Broken, or a format sharp could not decode. It stays in the list:
         // an image nobody can read is a fact about this take's material.
@@ -240,6 +256,9 @@ export const extractSummary = (sources: ExtractedSource[]) =>
             aspect: source.image.aspect,
             luminance: source.image.luminance,
             opaque: source.image.opaque,
+            inkRatio: source.image.inkRatio,
+            trimWidth: source.image.trimWidth,
+            trimHeight: source.image.trimHeight,
             sentBytes: source.image.sentBytes,
           },
         }

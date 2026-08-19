@@ -2,6 +2,9 @@ import "server-only";
 
 import sharp from "sharp";
 
+import { measureMark } from "./normalize";
+import type { MarkGeometry } from "./optical";
+
 // What a material IS, measured once at intake.
 //
 // docs/asset-normalization.md §6 / §14-1. These properties are true of the
@@ -19,7 +22,7 @@ import sharp from "sharp";
 // Nothing here asks a model. Width, transparency and brightness are facts of
 // the file, and a guess at a fact is worse than the fact.
 
-export interface MaterialMeasurement {
+export interface MaterialMeasurement extends MarkGeometry {
   /** Intrinsic pixel width, or null when the format has none we can read. */
   width: number | null;
   height: number | null;
@@ -45,6 +48,9 @@ export const UNMEASURED: MaterialMeasurement = {
   height: null,
   luminance: null,
   opaque: null,
+  inkRatio: null,
+  trimWidth: null,
+  trimHeight: null,
 };
 
 /** Media types this module can read. Everything else measures as UNMEASURED. */
@@ -111,11 +117,21 @@ export async function measureMaterial(
   try {
     const meta = await sharp(body, { failOn: "none" }).metadata();
     const artwork = await measureArtwork(body);
+    // Where the artwork sits inside the frame, measured for every image rather
+    // than for the ones we think are marks. `kind` at intake comes from the
+    // media type, so the opaque webp of a partner's logo arrives as `photo` —
+    // gating on kind would miss the exact upload §11 was written for. A
+    // photograph simply measures as filling its frame, which costs nothing and
+    // is true.
+    const mark = await measureMark(body, mediaType);
     return {
       width: typeof meta.width === "number" && meta.width > 0 ? meta.width : null,
       height: typeof meta.height === "number" && meta.height > 0 ? meta.height : null,
       luminance: artwork.luminance,
       opaque: artwork.opaque,
+      inkRatio: mark.inkRatio,
+      trimWidth: mark.trimWidth,
+      trimHeight: mark.trimHeight,
     };
   } catch {
     // sharp is built without a decoder for this format, or the file is broken.
@@ -134,4 +150,7 @@ export const measurementColumns = (measurement: MaterialMeasurement) => ({
   height: measurement.height,
   opaque: measurement.opaque,
   luminance: measurement.luminance,
+  ink_ratio: measurement.inkRatio,
+  trim_width: measurement.trimWidth,
+  trim_height: measurement.trimHeight,
 });
