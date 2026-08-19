@@ -94,7 +94,24 @@ export const FreehandComposition: React.FC<FreehandProps> = ({ brief: raw }) => 
   const programTotal = film.scenes.filter((scene) => scene.role === "program").length;
 
   return (
-    <AbsoluteFill style={{ fontFamily: FH.font, backgroundColor: FH.ink }}>
+    // `lang` + `word-break: auto-phrase` is the whole line-breaking policy, set
+    // once: both are inherited, so every text in the film breaks at phrase
+    // boundaries rather than wherever the character count runs out. The client
+    // saw 「深く楽し / める」 and 「特 / 別な」 — a two-line text broken
+    // mid-word reads as a mistake in a way a long paragraph does not.
+    //
+    // `lang` is not decoration here: without it the engine has no language to
+    // segment for and the property silently does nothing. That is why this
+    // looked like a Remotion limitation at first — measured, it was a missing
+    // declaration (FINDINGS.md).
+    <AbsoluteFill
+      lang="ja"
+      style={{
+        fontFamily: FH.font,
+        backgroundColor: FH.ink,
+        ...({ wordBreak: "auto-phrase" } as unknown as React.CSSProperties),
+      }}
+    >
       {brief.bgm && <Audio src={resolveMediaSrc(brief.bgm)} volume={() => bgmVolume} loop />}
       {brief.voice ? (
         <Sequence from={msToFrame(film.voiceStartMs, fps)}>

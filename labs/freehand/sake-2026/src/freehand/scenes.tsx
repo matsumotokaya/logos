@@ -14,7 +14,7 @@ import { FH, KANJI_NUMERALS, LETTERBOX } from "./palette";
 import { GoldDust } from "./chrome";
 import { CameraMove, Photo, Scrim } from "./Photo";
 import { CollageGround, SequenceGround, VideoGround } from "./Ground";
-import { GROUNDS } from "./sources";
+import { GROUNDS, PROGRAM2_WIPE } from "./sources";
 import marks from "./marks.json";
 
 /* ---------------------------------------------------------------- helpers */
@@ -197,72 +197,92 @@ export const FhTitleScene: React.FC<{ brief: EventCmBrief; length: number }> = (
   length,
 }) => {
   const frame = useCurrentFrame();
-  const chars = Array.from(brief.title);
+  // Broken by hand for this deliverable; any other title falls back to one
+  // column rather than inheriting a break that belongs to these words.
+  const titleLines =
+    brief.title === "世界が恋する日本酒" ? ["世界が恋する", "日本酒"] : [brief.title];
   return (
     <AbsoluteFill style={{ background: FH.ink }}>
       {/* The pour, then the stillness after it (sources.ts). */}
       {groundFor("title", length)}
       <Scrim side="left" strength={0.55} reach={64} />
       <Scrim side="bottom" strength={0.5} reach={44} />
-      {/* The title, set vertically — the one scene that earns the full 和 move. */}
+      {/* The title, set vertically — the one scene that earns the full 和 move.
+          Two columns (client: タイトルっぽく): the qualifier reads first on
+          the right, the subject stands a size class above it at ~2×. */}
       <div
         style={{
           position: "absolute",
           top: SAFE_TOP + 48,
-          right: 150,
+          right: 130,
           height: SAFE_HEIGHT - 96,
           display: "flex",
+          flexDirection: "column",
           justifyContent: "center",
+          alignItems: "center",
+          gap: 36,
           writingMode: "vertical-rl",
           fontFamily: FH.font,
           fontWeight: 700,
-          fontSize: 76,
           letterSpacing: "0.16em",
           color: FH.paper,
           textShadow: "0 2px 28px rgba(5,3,2,0.75)",
         }}
       >
-        {chars.map((ch, i) => {
-          const p = interpolate(frame, [12 + i * 3, 12 + i * 3 + 16], [0, 1], clamp);
-          const eased = 1 - Math.pow(1 - p, 3);
+        {titleLines.map((line, li) => {
+          // Char indices keep counting across columns, so the reveal cascades
+          // through the whole title as one gesture.
+          const before = titleLines.slice(0, li).join("").length;
           return (
-            <span key={i} style={{ opacity: eased, transform: `translateX(${(1 - eased) * -20}px)` }}>
-              {ch}
-            </span>
+            <div key={li} style={{ fontSize: titleLines.length === 2 && li === 1 ? 148 : 66 }}>
+              {Array.from(line).map((ch, i) => {
+                const at = before + i;
+                const p = interpolate(frame, [12 + at * 3, 12 + at * 3 + 16], [0, 1], clamp);
+                const eased = 1 - Math.pow(1 - p, 3);
+                return (
+                  <span key={i} style={{ opacity: eased, transform: `translateX(${(1 - eased) * -20}px)` }}>
+                    {ch}
+                  </span>
+                );
+              })}
+            </div>
           );
         })}
       </div>
-      {/* The promise line, quietly, lower left. */}
-      <div
-        style={{
-          position: "absolute",
-          left: 130,
-          bottom: LETTERBOX + 78,
-          display: "flex",
-          flexDirection: "column",
-          gap: 22,
-        }}
-      >
-        <GoldRule width={230} delay={48} frame={frame} />
-        {brief.subtitle ? (
-          <div
-            style={{
-              ...enter(frame, 56, { rise: 16 }),
-              fontFamily: FH.font,
-              fontWeight: 600,
-              fontSize: 30,
-              letterSpacing: "0.28em",
-              color: FH.goldBright,
-              textShadow: "0 1px 14px rgba(5,3,2,0.8)",
-            }}
-          >
-            {brief.subtitle}
-          </div>
-        ) : null}
-      </div>
-      {brief.seriesLabel ? (
-        <div style={{ position: "absolute", left: 130, top: SAFE_TOP + 56, ...enter(frame, 8) }}>
-          <Kicker text={brief.seriesLabel} style={{ fontSize: 22, color: FH.paperFaint }} />
+      {/* Series label and promise line, gathered top left — two captions in
+          two corners read as scatter (client: バラバラした感じをなくす). */}
+      {brief.seriesLabel || brief.subtitle ? (
+        <div
+          style={{
+            position: "absolute",
+            left: 130,
+            top: SAFE_TOP + 56,
+            display: "flex",
+            flexDirection: "column",
+            gap: 20,
+          }}
+        >
+          {brief.seriesLabel ? (
+            <div style={enter(frame, 8)}>
+              <Kicker text={brief.seriesLabel} style={{ fontSize: 22, color: FH.paperFaint }} />
+            </div>
+          ) : null}
+          {brief.subtitle ? (
+            <div
+              style={{
+                ...enter(frame, 22, { rise: 14 }),
+                fontFamily: FH.font,
+                fontWeight: 600,
+                fontSize: 30,
+                letterSpacing: "0.28em",
+                color: FH.goldBright,
+                textShadow: "0 1px 14px rgba(5,3,2,0.8)",
+              }}
+            >
+              {brief.subtitle}
+            </div>
+          ) : null}
+          <GoldRule width={230} delay={36} frame={frame} />
         </div>
       ) : null}
     </AbsoluteFill>
@@ -388,6 +408,69 @@ const groundFor = (key: string, length: number): React.ReactNode => {
   }
 };
 
+/** The workshop scene's wipe: the 2026 Miss SAKE finalists, top right.
+ *  A TV-style inset — slides in from the right edge at ~1:00 of the film
+ *  (frame 77 of the scene), leaves at ~1:10, well before the scene's own
+ *  cut. Sized not to dominate (client: 大きすぎず); hairline gold frame so
+ *  it reads as a decided insert, not a compositing accident. The picture
+ *  drifts up a few percent like every still in the film. */
+const FinalistsWipe: React.FC<{ frame: number }> = ({ frame }) => {
+  const inP = interpolate(frame, [77, 95], [0, 1], clamp);
+  const outP = interpolate(frame, [377, 393], [0, 1], clamp);
+  if (inP <= 0 || outP >= 1) return null;
+  const eased = 1 - Math.pow(1 - inP, 3);
+  const gone = Math.pow(outP, 2);
+  const drift = interpolate(frame, [77, 393], [1.0, 1.07], clamp);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: SAFE_TOP + 44,
+        right: 96,
+        width: 432,
+        opacity: eased * (1 - gone),
+        transform: `translateX(${((1 - eased) + gone) * 90}px)`,
+      }}
+    >
+      <div
+        style={{
+          width: 432,
+          height: 243,
+          overflow: "hidden",
+          border: `1px solid ${FH.goldDim}`,
+          background: FH.inkSoft,
+          boxShadow: "0 10px 44px rgba(5,3,2,0.55)",
+        }}
+      >
+        <Img
+          src={resolveSrc(PROGRAM2_WIPE.src)}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            transform: `scale(${drift})`,
+            filter: "saturate(0.96)",
+          }}
+        />
+      </div>
+      {/* What the picture is (client: 何の写真か明示する). */}
+      <div
+        style={{
+          marginTop: 14,
+          fontFamily: FH.font,
+          fontWeight: 600,
+          fontSize: 21,
+          letterSpacing: "0.3em",
+          color: FH.goldBright,
+          textShadow: "0 1px 12px rgba(5,3,2,0.8)",
+        }}
+      >
+        {PROGRAM2_WIPE.caption}
+      </div>
+    </div>
+  );
+};
+
 export const FhProgramScene: React.FC<{
   brief: EventCmBrief;
   length: number;
@@ -504,6 +587,8 @@ export const FhProgramScene: React.FC<{
           </div>
         ) : null}
       </div>
+      {/* The workshop is Miss SAKE's programme — their finalists, inset. */}
+      {index === 2 ? <FinalistsWipe frame={frame} /> : null}
     </AbsoluteFill>
   );
 };
@@ -647,6 +732,11 @@ export const FhGuestsScene: React.FC<{ brief: EventCmBrief; length: number }> = 
             border: `1px solid ${FH.goldDim}`,
             display: "flex",
             justifyContent: "center",
+            // Centre the vertical text column horizontally too: in
+            // vertical-rl the cross axis runs right-to-left, so without this
+            // the column sits at cross-start — the box's right edge (the
+            // client saw exactly that).
+            alignItems: "center",
             writingMode: "vertical-rl",
             fontFamily: FH.font,
             fontWeight: 600,
@@ -672,7 +762,8 @@ export const FhGuestsScene: React.FC<{ brief: EventCmBrief; length: number }> = 
 // JPEG. Miss SAKE joins the row: the association is on stage twice (2026 Miss
 // SAKE 2名 and the 代表理事), and its mark arrived 2026-08-18.
 const MARK_ROW = (
-  ["wealthpark-lab", "leopalace21", "shimeharitsuru", "miss-sake"] as const
+  // レオパレス21 leads the row (client call, 2026-08-19).
+  ["leopalace21", "wealthpark-lab", "shimeharitsuru", "miss-sake"] as const
 ).map((name) => ({
   name,
   ...(marks as Record<string, { src: string; ink: string; scale: number }>)[name],
@@ -717,14 +808,16 @@ export const FhCtaScene: React.FC<{ brief: EventCmBrief; length: number }> = ({
               {schedule.date}
             </span>
             {schedule.weekday ? (
+              // Same size and same baseline as the date. The boxed chip's
+              // border and padding hung below the baseline — the client read
+              // the 土 as sagging.
               <span
                 style={{
                   fontFamily: FH.font,
-                  fontWeight: 600,
-                  fontSize: 34,
+                  fontWeight: 700,
+                  fontSize: 88,
                   color: FH.goldBright,
-                  border: `1px solid ${FH.goldDim}`,
-                  padding: "6px 16px",
+                  textShadow: "0 2px 26px rgba(5,3,2,0.8)",
                 }}
               >
                 {schedule.weekday}

@@ -42,22 +42,27 @@ export const GROUNDS: Record<string, SceneGround> = {
     move: { scaleFrom: 1.02, scaleTo: 1.08 },
   },
 
-  // Title, ~10.5s: the pour (tokkuri → ochoko, 5.0s clip, plays once) — then
-  // the stillness after it: the filled ochoko at rest beside the tokkuri.
+  // Title, ~10.5s: the pour (tokkuri → ochoko, plays once) — then the
+  // stillness after it: the filled ochoko at rest beside the tokkuri.
   // Motion first, quiet second; the vertical title stands through both.
+  // The clip is a 5.0s file but the slot ends at ~4.1s: after the first pour
+  // it pours AGAIN, spilling (client: その尺はいらない). Measured by frame
+  // extraction — first pour thins out by ~3.7s, the cup rests at 3.9–4.2s,
+  // the second stream appears at ~4.4s. So the cut sits in the rest: the
+  // pour completes, and the spill never happens.
   title: {
     kind: "sequence",
     shots: [
       {
         kind: "video",
         src: "assets/video/pour-ochoko.mp4",
-        weight: 0.45,
+        weight: 0.39,
         grade: "saturate(0.96)",
       },
       {
         kind: "image",
         src: "assets/photo/ochoko-brim.png",
-        weight: 0.55,
+        weight: 0.61,
         focus: { x: 0.35, y: 0.5 },
         move: { scaleFrom: 1.05, scaleTo: 1.14, xFrom: 0.6, xTo: -0.6 },
       },
@@ -160,6 +165,18 @@ export const GROUNDS: Record<string, SceneGround> = {
   // mark owns the frame.
   logoOut: { kind: "video", src: "assets/video/fuji-clouds.mp4" },
 };
+
+/** The workshop scene's picture-in-picture: the 2026 Miss SAKE finalists,
+ *  from the association's own site (client request, 2026-08-19 — 「右上に
+ *  ワイプで大きすぎず」). On screen while the narration says 2026 Miss SAKE
+ *  2名とともに (≈1:00–1:10 of the film).
+ *  Source: https://www.misssake.org/2026-miss-sake-japan-finalists/
+ *  (2026集合写真23名, 2048×1152). */
+export const PROGRAM2_WIPE = {
+  src: "assets/photo/miss-sake-2026-finalists.jpg",
+  /** Written under the frame so the inset names itself (client request). */
+  caption: "2026 Miss SAKE",
+} as const;
 
 /** Unused supplied material, so the next session knows it was seen, not missed:
  *  tokyo-dusk.mp4 (skyline — outranked twice for the CTA), pour.mp4 (kiriko
