@@ -433,6 +433,20 @@ export interface EventCmBrief {
   /** material:<uuid> or a staticFile name of the BGM; null = silent. */
   bgm: string | null;
   provenance?: EventCmProvenance;
+  /**
+   * WHICH art direction this film is painted in (`remotion/kit/theme.ts`).
+   *
+   * Style, not content: changing it does not touch one word of the narration,
+   * one fact, or the length of a single scene. The same brief renders as a
+   * corporate webinar announcement or as a 和モダン campaign piece.
+   *
+   * Absent means the take predates the field, and those were all 墨
+   * (`LEGACY_THEME_ID`) — never the current default, or approved films would
+   * repaint themselves. Not a spoken fact, so changing it does not make the
+   * narration stale (`isSpokenFact`).
+   */
+  artDirection?: string;
+  /** The brand's own colours, dressed onto whichever art direction is chosen. */
   theme?: EventCmThemeInput;
   /**
    * When the facts last changed — a document was read, or somebody corrected

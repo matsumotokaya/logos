@@ -48,11 +48,12 @@ const Backdrop: React.FC<{
   const frame = useCurrentFrame();
   const [from, to] = theme.backdrop.push;
   const directional = theme.backdrop.directional;
+  const tint = directional?.tint.join(",") ?? "";
   // Darkness only where the type is. The full-frame dim this replaces is the
   // measured reason backdrops used to read as black screens (theme.ts).
   const scrim =
     directional && copySide !== "centre"
-      ? `linear-gradient(to ${copySide === "left" ? "right" : copySide === "right" ? "left" : "top"}, rgba(8,6,4,${directional.strength}) 0%, rgba(8,6,4,${directional.strength * 0.55}) ${Math.round(directional.reach * 0.45)}%, transparent ${directional.reach}%)`
+      ? `linear-gradient(to ${copySide === "left" ? "right" : copySide === "right" ? "left" : "top"}, rgba(${tint},${directional.strength}) 0%, rgba(${tint},${directional.strength * 0.55}) ${Math.round(directional.reach * 0.45)}%, transparent ${directional.reach}%)`
       : theme.backdrop.scrim;
   return (
     <AbsoluteFill>

@@ -93,7 +93,7 @@ export const CaptionBand: React.FC<{ captions: Caption[]; theme: Theme }> = ({
           padding: plate
             ? `${Math.round(theme.caption.size * 0.42)}px ${Math.round(theme.caption.size * 0.85)}px`
             : "0 96px",
-          backgroundColor: plate ? "rgba(0,0,0,0.88)" : undefined,
+          backgroundColor: plate ? theme.caption.plate : undefined,
           textAlign: "center",
           fontFamily: theme.textFont,
           fontSize: theme.caption.size,

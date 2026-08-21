@@ -29,7 +29,7 @@ import {
   type Scene,
 } from "@/remotion/kit/layout";
 import { sceneForRole } from "@/remotion/kit/scenes/event-cm";
-import { SUMI_THEME, themeForBrand, type Theme } from "@/remotion/kit/theme";
+import { themeById, themeForBrand, type Theme } from "@/remotion/kit/theme";
 import { BRAND_BASE_PATH, suppressedPaths } from "@/lib/event-cm/facts";
 import { captionsFor, type Caption } from "./captions";
 import { eventCmTimeline, type TimingSource } from "./timeline";
@@ -116,10 +116,22 @@ export interface EventCmFilm {
   hasVoice: boolean;
 }
 
-/** The theme this brief renders under: the reference art direction, wearing
- *  whatever the brand actually has. */
-const themeOf = (brief: EventCmBrief): Theme =>
-  brief.theme ? themeForBrand(SUMI_THEME, brief.theme) : SUMI_THEME;
+/**
+ * The theme this brief renders under: the chosen art direction, wearing
+ * whatever the brand actually has.
+ *
+ * `brief.artDirection` names WHICH art direction; `brief.theme` carries the
+ * brand's own colours to dress it in. Two different things that both used to
+ * be called "theme" — the first was not expressible at all, because the base
+ * was hardcoded to 墨.
+ *
+ * An absent `artDirection` resolves to 墨 (`LEGACY_THEME_ID`), which is what
+ * every take made before the field existed was painted in.
+ */
+const themeOf = (brief: EventCmBrief): Theme => {
+  const base = themeById(brief.artDirection);
+  return brief.theme ? themeForBrand(base, brief.theme) : base;
+};
 
 /**
  * The brief as it should be drawn: suppressed fields emptied out.

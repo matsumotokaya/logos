@@ -3,7 +3,7 @@ import test from "node:test";
 import { BRAND_BASE_PATH, brandBaseIsOff, setSuppressed } from "./facts";
 import { seedEventCmBrief } from "./seed";
 import { eventCmFilm } from "@/remotion/event-cm/film";
-import { SUMI_THEME } from "@/remotion/kit/theme";
+import { themeById } from "@/remotion/kit/theme";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 
 const BRANDED = seedEventCmBrief(
@@ -40,7 +40,13 @@ test("オフにするとブランドの配色・書体が外れ、テンプレ�
   assert.equal(on.theme.palette.accent, "#c8a15a", "ブランドの金が乗っていない");
 
   const collab = eventCmFilm(off(BRANDED));
-  assert.equal(collab.theme.palette.accent, SUMI_THEME.palette.accent);
+  // The accent returns to whatever art direction the brief names — not to 墨
+  // by definition. This assertion used to hardcode SUMI's gold, which was the
+  // same thing only while one art direction existed.
+  assert.equal(
+    collab.theme.palette.accent,
+    themeById(BRANDED.artDirection).palette.accent,
+  );
   assert.equal(collab.drawn.theme, undefined, "空のテーマではなく未指定にする");
 });
 

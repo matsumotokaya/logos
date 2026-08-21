@@ -20,7 +20,7 @@ import {
   type SceneComponent,
 } from "../components";
 import type { LogoTreatment } from "@/remotion/event/types";
-import type { Theme } from "../theme";
+import { captionSafeBottom, type Theme } from "../theme";
 import { enterStyle } from "./motion";
 import { focusPosition, resolveSrc, TREATMENT_FILTER } from "../paint";
 
@@ -424,7 +424,16 @@ export const KitComponent: React.FC<{
                     style={{
                       position: "absolute",
                       left: 90,
-                      bottom: (theme.chrome.letterbox ?? 0) + 64,
+                      // Clear of BOTH the bar and the subtitle. A letterboxed
+                      // theme puts its captions in chrome, so clearing the bar
+                      // was enough; a theme without bars sets the plate inside
+                      // the picture, and this name landed underneath it. max()
+                      // rather than captionSafeBottom() alone so 墨 keeps the
+                      // exact 196px it was approved at.
+                      bottom: Math.max(
+                        (theme.chrome.letterbox ?? 0) + 64,
+                        captionSafeBottom(theme),
+                      ),
                       textAlign: "left",
                     }}
                   >

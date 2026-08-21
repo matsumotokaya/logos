@@ -6,7 +6,11 @@
 import { guardLabsRequest } from "@/lib/labs-access";
 import { campaignCmMp4Exists, getCampaignJob } from "@/lib/campaign/jobs";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
-import { isVideoTemplateId, VIDEO_TEMPLATES } from "@/lib/video/templates";
+import {
+  isVideoTemplateId,
+  videoFamilyIndex,
+  VIDEO_TEMPLATES,
+} from "@/lib/video/templates";
 import { videoState, type VideoState, type VideoSummary } from "@/lib/video/asset";
 import { emptyEventBrief } from "@/remotion/event/briefs";
 import { createTake } from "@/lib/takes/create";
@@ -117,13 +121,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     });
   }
 
+  // Grouped by template family in catalog order, newest first inside a family.
+  // The order lives here rather than in the portal so anything else reading this
+  // endpoint gets the same page the portal shows.
   videos.sort((left, right) => {
-    if (left.template === right.template) {
-      return left.createdAt.localeCompare(right.createdAt);
-    }
-    if (left.template === "product-cm") return -1;
-    if (right.template === "product-cm") return 1;
-    return 0;
+    const byFamily = videoFamilyIndex(left.template) - videoFamilyIndex(right.template);
+    if (byFamily !== 0) return byFamily;
+    return right.createdAt.localeCompare(left.createdAt);
   });
 
   return Response.json({ brand: { id: brand.id, name: brand.name }, videos });

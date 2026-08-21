@@ -2,7 +2,11 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { currentTemplate, type TemplateEntry } from "@/lib/templates/catalog";
+import {
+  currentTemplate,
+  templateName,
+  type TemplateEntry,
+} from "@/lib/templates/catalog";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 
 // Creating a take — the one place where a template version gets pinned.
@@ -61,7 +65,7 @@ export async function createTake(
     };
   }
 
-  const title = input.title?.trim() || template.name;
+  const title = input.title?.trim() || templateName(template);
   const request = {
     brandId: input.brandId,
     variantId: input.variantId ?? null,

@@ -24,7 +24,8 @@
     "event-cm:seed": "NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/seed-event-cm.ts",
     "event-cm:draft": "NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/draft-event-cm-narration.ts",
     "event:render": "remotion render remotion/index.ts event var/event-lab/sake-2026.mp4",
-    "event:studio": "remotion studio remotion/index.ts"
+    "event:studio": "remotion studio remotion/index.ts",
+    "themes:compare": "tsx scripts/compare-art-directions.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1086.0",

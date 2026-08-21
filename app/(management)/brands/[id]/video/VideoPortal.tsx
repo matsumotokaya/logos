@@ -20,7 +20,8 @@ import { cn } from "@/lib/cn";
 import { videoFetch } from "@/lib/video/client";
 import { refreshBrandTree } from "@/lib/brand-events";
 import {
-  ADDABLE_VIDEO_TEMPLATES,
+  DEFAULT_ADDABLE_VIDEO_TEMPLATE,
+  VIDEO_TEMPLATE_FAMILIES,
   VIDEO_TEMPLATES,
   type VideoTemplateId,
 } from "@/lib/video/templates";
@@ -34,7 +35,7 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [template, setTemplate] = useState<VideoTemplateId>("event-promo");
+  const [template, setTemplate] = useState<VideoTemplateId>(DEFAULT_ADDABLE_VIDEO_TEMPLATE);
   const [title, setTitle] = useState("");
 
   const load = useCallback(async () => {
@@ -131,13 +132,29 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
       {videos === null ? (
         <p className="text-sm text-ink-muted">読み込み中…</p>
       ) : (
-        <ul className="space-y-3">
-          {videos.map((video) => (
-            <li key={`${video.template}-${video.id}`}>
-              <VideoRow brandId={brandId} video={video} />
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-8">
+          {VIDEO_TEMPLATE_FAMILIES.map((family) => {
+            const ids = new Set(family.variants.map((variant) => variant.id));
+            const rows = videos.filter((video) => ids.has(video.template));
+            // A category with nothing in it is not shown: the page lists what
+            // this brand has, and the way to start a new kind is the add button.
+            if (rows.length === 0) return null;
+            return (
+              <section key={family.name}>
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+                  {family.name}
+                </h2>
+                <ul className="mt-3 space-y-3">
+                  {rows.map((video) => (
+                    <li key={`${video.template}-${video.id}`}>
+                      <VideoRow brandId={brandId} video={video} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
       )}
 
       {adding ? (
@@ -166,7 +183,7 @@ function VideoRow({ brandId, video }: { brandId: string; video: VideoSummary }) 
         <span className="flex flex-wrap items-center gap-2">
           <span className="truncate text-sm font-semibold">{video.title}</span>
           <span className="rounded-full border border-hairline px-2 py-0.5 text-[10px] text-ink-muted">
-            {template?.name ?? video.template}
+            {template?.variant ?? video.template}
           </span>
           {video.isPlaceholder ? (
             <span className="rounded-full border border-dashed border-ink-faint px-2 py-0.5 text-[10px] text-ink-muted">
@@ -227,7 +244,7 @@ function AddVideoOverlay({
           動画を追加
         </h2>
         <p className="mt-2 text-[12px] text-ink-muted">
-          テンプレートは作成時に決まり、あとから変更できません。シーン構成と素材スロットが変わるためです。
+          テンプレートを選択してください。動画のテンプレートは変更ができないため、別のテンプレートを利用する場合は動画を新規作成してください。
         </p>
 
         <fieldset className="mt-5">
@@ -235,35 +252,48 @@ function AddVideoOverlay({
             テンプレート
           </legend>
           <div className="mt-2.5 space-y-2">
-            {ADDABLE_VIDEO_TEMPLATES.map((item) => (
-              <label
-                key={item.id}
-                className={cn(
-                  "flex cursor-pointer gap-3 rounded-xl border p-3.5 transition",
-                  template === item.id
-                    ? "border-ink bg-ink/[0.04]"
-                    : "border-hairline hover:border-ink-muted",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="video-template"
-                  value={item.id}
-                  checked={template === item.id}
-                  onChange={() => onTemplate(item.id)}
-                  className="mt-1"
-                />
-                <span className="min-w-0">
-                  <span className="block text-[13px] font-semibold">
-                    {item.name}
-                    <span className="ml-2 font-normal text-ink-muted">{item.duration}</span>
-                  </span>
-                  <span className="mt-1 block text-[11px] leading-relaxed text-ink-muted">
-                    {item.summary}
-                  </span>
-                </span>
-              </label>
-            ))}
+            {VIDEO_TEMPLATE_FAMILIES.map((family) => {
+              const active = family.variants.some((item) => item.id === template);
+              return (
+                <div
+                  key={family.name}
+                  className={cn(
+                    "rounded-xl border p-3.5 transition",
+                    active ? "border-ink bg-ink/[0.04]" : "border-hairline hover:border-ink-muted",
+                  )}
+                >
+                  <label className="flex cursor-pointer items-center gap-3">
+                    <input
+                      type="radio"
+                      name="video-template-family"
+                      value={family.name}
+                      checked={active}
+                      // Picking a family lands on its first style, so the pair
+                      // is always a resolvable template id.
+                      onChange={() => onTemplate(family.variants[0].id)}
+                    />
+                    <span className="text-[13px] font-semibold">{family.name}</span>
+                  </label>
+
+                  {active ? (
+                    <label className="mt-2.5 block pl-7">
+                      <span className="text-[11px] text-ink-muted">スタイル</span>
+                      <select
+                        value={template}
+                        onChange={(e) => onTemplate(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-hairline bg-white px-2.5 py-2 text-[12px]"
+                      >
+                        {family.variants.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.variant}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </fieldset>
 
@@ -280,12 +310,12 @@ function AddVideoOverlay({
               type="text"
               value={title}
               onChange={(e) => onTitle(e.target.value)}
-              placeholder="あとから直せます"
+              placeholder="名称未設定"
               autoFocus
               className="mt-2 w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-[13px]"
             />
             <span className="mt-1.5 block text-[11px] text-ink-muted">
-              未入力でも作れます。資料を読み込むと、そこに書かれた名前で置き換わります。
+              あとから変更できます。
             </span>
           </label>
         ) : (
@@ -308,7 +338,7 @@ function AddVideoOverlay({
             disabled={submitting}
             className="rounded-full bg-ink px-5 py-2.5 text-xs font-semibold text-paper transition hover:bg-accent disabled:opacity-50"
           >
-            {submitting ? "追加中…" : "この構成で追加"}
+            {submitting ? "追加中…" : "追加"}
           </button>
         </div>
       </div>

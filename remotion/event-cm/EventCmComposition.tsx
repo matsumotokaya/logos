@@ -86,7 +86,17 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
     <AbsoluteFill
       style={{ fontFamily: theme.textFont, backgroundColor: theme.palette.ground }}
     >
-      <EventBackground />
+      {theme.palette.groundWash ? (
+        <AbsoluteFill style={{ background: theme.palette.groundWash }} />
+      ) : null}
+      {/* The theme decides whether anything lives behind the scenes. This used
+          to be unconditional, which meant a light art direction declared
+          `background: "still"` and still got 墨's drifting indigo field with
+          gold particles painted over its ground — the one part of the art
+          direction that could not be changed. EventBackground IS the 墨 field
+          (EVENT_GOLD, ink-black); a theme that wants a different atmosphere
+          brings its own layer rather than parameterising this one. */}
+      {theme.motion.background === "still" ? null : <EventBackground />}
       {brief.bgm && (
         <Audio src={resolveMediaSrc(brief.bgm)} volume={() => bgmVolume} loop />
       )}
@@ -130,7 +140,7 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
               left: 0,
               right: 0,
               height: theme.chrome.letterbox,
-              background: "#040302",
+              background: theme.chrome.color,
             }}
           />
           <div
@@ -140,7 +150,7 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
               left: 0,
               right: 0,
               height: theme.chrome.letterbox,
-              background: "#040302",
+              background: theme.chrome.color,
             }}
           />
         </>

@@ -24,6 +24,7 @@ URL・資料・ロゴを起点に、Organizationと企業・事業ブランド�
 | [docs/logo-entity-lab-integration.md](docs/logo-entity-lab-integration.md) | Labs↔ロゴ正本エンティティ統合の現行仕様・残課題・ランタイムassetの暫定手動運用                                                                                                                                                                                                                                                                                                                                                    |
 | [docs/launch-plan.md](docs/launch-plan.md)                                 | ベータローンチ準備のマイルストーン(セキュリティ・会員・法務・課金・品質・運用)と進捗チェックリスト                                                                                                                                                                                                                                                                                                                                |
 | [docs/costs.md](docs/costs.md)                                             | **運営コストの正本**: API・動画レンダリング・ライセンス・保存/配信費の単価、実測、試算、未調査項目                                                                                                                                                                                                                                                                                                                                |
+| [docs/device-mockup-fixes.md](docs/device-mockup-fixes.md)               | **デバイスモックアップの正本と残課題**: 「このサービスをPCとスマホに映したもの」を描く実装は `deviceMockupHtml()` の1つだけ、というLP共通部品の規則                                                                                                                                                                                        |
 | [labs/README.md](labs/README.md)                                           | **研究所群の入り口**: モード分類(保証/探索/統合)・体験レイヤー=課金の階段・ラボ一覧と現在地・ラボ追加手順                                                                                                                                                                                                                                                                                                                         |
 | [labs/motion/README.md](labs/motion/README.md)                             | Motion Lab: 16実験カタログ・美的原則・使用技術とLottie比較                                                                                                                                                                                                                                                                                                                                                                        |
 | [AGENTS.md](AGENTS.md)                                                     | AIエージェント向けの開発上の注意([CLAUDE.md](CLAUDE.md) はこれを参照するだけ)                                                                                                                                                                                                                                                                                                                                                     |
@@ -300,6 +301,34 @@ node labs/event/scripts/prepare-assets.mjs --src <dir> --slug sake-2026
 - 由来は4値(`brand` / `extracted` / `inferred` / `user`)。**決めつけて埋め、一覧で正直に「仮に入れた値」と言う**。項目はその場で直せるし、消せる(消すは「不明」と別物)
 - 企画書には掲載用でない値が混ざるため、[lib/event-cm/sanitize.ts](lib/event-cm/sanitize.ts) が決定論で落とす(プレースホルダ・見出し・社内メモ・人数・装飾記号)
 
+### アートディレクションは交換できる(2026-08-21)
+
+**カテゴリーは作成時に決まり変えられない。アートディレクションとアスペクト比は、同じ動画プロジェクトの中で交換できる。** 判定はひとつ——**briefの形が変わるか**。
+
+| 軸 | 例 | briefの形 | 持ち場所 | 状況 |
+| --- | --- | --- | --- | --- |
+| **カテゴリー** | 製品紹介動画 / イベント紹介動画 | **変わる** | テンプレート(別ID) | 両方あり |
+| **役割** | 広告 / 番組 / ティザー | **変わる** | テンプレート(別ID) | 未着手 |
+| **アートディレクション** | スタンダード / モダンジャパニーズ | 変わらない | `brief.artDirection` + `take_renders.theme` | **2種** |
+| **アスペクト比** | 16:9 / 9:16 | 変わらない | `take_renders.aspect_ratio` | 16:9のみ |
+
+- **正本は [remotion/kit/theme.ts](remotion/kit/theme.ts) の `THEMES`**。`standard`(企業向け・白地×紺×青のゴシック)と `sumi`(モダンジャパニーズ・墨黒×金×明朝)。同じブリーフ・同じナレーション・同じシーン数・同じ尺で、**描き方だけが変わる**(検証: `npm run themes:compare` が両方の全シーンを静止画で書き出す)
+- **`standard` が正式版で、`sumi` は派生**。順序が逆に見えるのは、最初の実案件が和モダンのイベントだったから先に完成しただけ。モダンジャパニーズは具体的すぎて再利用の機会が少ない
+- **未設定は `sumi` に落ちる**(`LEGACY_THEME_ID`)。`brief.artDirection` より前に作られたTakeは全て墨で、**うち1本は承認済みの納品物**なので、未設定を新しい既定に倒すと承認された映像が勝手に塗り替わる。新規は `NEW_FILM_THEME_ID` = `standard`
+- **テーマを変えてもナレーションは古くならない**。読み上げない要素なので `isSpokenFact` は false(BGM・写真と同じ扱い)
+- **2つ目のテーマが語彙の穴を暴いた**。宣言だけあって誰も読んでいなかった値、および暗色前提のハードコードを塞いだ:
+
+  | 直したもの | 症状 |
+  | --- | --- |
+  | レターボックスの色(`chrome.color`) | コンポジションに `#040302` 直書き。明るいテーマにも黒帯が出た |
+  | 字幕プレートの色(`caption.plate`) | CaptionBandに `rgba(0,0,0,0.88)` 直書き |
+  | 方向性スクリムの色(`backdrop.directional.tint`) | Stageに `rgba(8,6,4,…)` 直書き。**明るいテーマでは減光ではなく増光が要る**(濃い文字が乗るため) |
+  | 地の層(`motion.background` / `palette.groundWash`) | `EventBackground`(墨の粒子)が無条件に描かれ、`background: "still"` が無視されていた。**素材ゼロでも完成品が出る**要件は地が担うので、平坦なテーマには wash が要る |
+  | 登壇者名の下余白 | `letterbox + 64` だけを見ていた。帯が無いテーマではプレートが画面内に入るので、**字幕が名前を貫いた**。`max(letterbox+64, captionSafeBottom)` で墨の196pxは不変 |
+
+- **不変条件は [lib/kit/themes.test.ts](lib/kit/themes.test.ts)**。未設定→墨、新規→standard、`backdrop:"bar"` はレターボックス必須、どのテーマも素材ゼロの地を持つ、**墨の承認済みジオメトリ(132 / 172 / 196)は動かない**
+- **残っていること**: ① `take_renders.theme` / `aspect_ratio` は今も[render.ts](lib/takes/render.ts)が**SELECTして使っていない**——テーマ切り替えのUIと配線 ② 9:16(`STAGE` の関数化と7配置の縦型版) ③ 印章numeral(`stat` の `variant:"seal"`)は和の装置で、ゴシックでは `一` が太い横棒に見える——企業向けには算用数字の選択肢が要る
+
 ### プロジェクトデータの書き出し(ロックインしない)
 
 ヘッダーの**「公開する」の左**に「プロジェクトデータを出力」。この動画を **Remotionのプロジェクトとして持ち出せる**([lib/export/](lib/export/)、API は `GET /api/brands/[id]/videos/[videoId]/project`)。ここで簡易に作って満足する人もいれば、実案件では必ずどこかを詰めたくなる人もいるので、**作ったものを資産として抱え込まない**ことをテンプレート側の要件にしている。
@@ -422,7 +451,7 @@ R2バケットはpublic access(`r2.dev`と公開custom domain)を無効にする
 
 ### Supabase
 
-スキーマの正本は [supabase/migrations/](supabase/migrations/) の連番migration。現行のリモートプロジェクトには`0054_rename_brief_scenario_to_narration`まで適用済み(既存47行の測定バックフィルも実行済み)。**`0055_material_mark_geometry`はリポジトリにあり、リモート未適用**。`0054`は event-cm の brief キー `scenario` を `narration` へ改名した——`0051` が直したのは名前の**向き**(派生物ではなく主を指す)で、**語そのもの**は残っていた。「シナリオ」は映画の企画に読めるが、実体は各シーンが**言う言葉**であり、ユーザーが絵コンテで打ち込んでいるものそのものなので、「シナリオが書き直されていません」という警告が誰の話か伝わらなかった。あわせて `lib/narration/`(TTS)を `lib/voice/` へ移し、**`narration` がこのリポジトリで1つの意味しか持たない**状態にした。`brief.narrator` は product-cm と共有のため据え置き。`0052`は`brand_materials`に`opaque` / `luminance`を足し、**素材が何であるかを取り込み時に1回測って行に残す**([docs/asset-normalization.md](docs/asset-normalization.md) §6・§14-1)。**バックフィルはしない**——測るには本体が要り、本体はR2にあるので、それはmigrationの仕事ではなくスクリプト(`npm run materials:measure`。既定dry-run・`--apply`で保存)の仕事。**既存47行は未測定のまま**で、`null`は「測っていない」であって「透過していない」ではない。`0053`は`category` / `category_source`を足し、**構造化LLMの分類を実行記録ではなく素材の行に残す**(§5)。`category_source='user'`の行は実行が二度と上書きしない。`0055`は`ink_ratio` / `trim_width` / `trim_height`を足し、**絵柄がフレームのどこまでで、その箱の中がどれだけインクか**を残す([docs/asset-normalization.md §11.1](docs/asset-normalization.md))。ここから**余白の割合**(提案を出すか)と**光学的な重さ**(マークを並べたときの大きさ)の両方が出る。**`aspect`は列にしない**——`trim_width / trim_height`そのものなので、計算元の隣に結果を置くと後で食い違う。バックフィルは`0052`と同じ`npm run materials:measure --apply`が担う(未測定の判定に`ink_ratio is null`を加えたので、0052で測った行も測り直す)。`0048`は読み上げ音声をどの動画テンプレートからでも固定できるようRPCを一般化し、`0049`は`take_runs.stage`に`map`を足してマッピング段が自分の実行を記録できるようにした。`0050`は`takes`に`baked_brief` / `baked_at`を足し、**編集が溜まる作業中のブリーフと、実行が固定した映像を分けた**(上記「絵コンテは作業場、プレイヤーは成果」。既存 event-cm Take は `baked_brief = brief` でバックフィル済みなので、適用しても今日の見え方は変わらない)。`0051`は event-cm の brief キー `script` を `scenario` へ改名した(その `scenario` は `0054` で `narration` になった)——**`brief` と `baked_brief` の両方に同じ式を当てる**(片方だけだと既存の動画が「ナレーション空」として想定尺へ落ち、0050 が終わらせたはずの不整合が戻る)。**読み取り側の両対応コードは書いていない**。顧客ゼロ・3行の今しか許されない形だが、両対応にすると旧名が型に残り続けるため(語彙の割り方は上記 event-cm 節)。`0023`〜`0045`でV2基盤・データ移行・旧契約削除・保全データ修復を完了し、`0046`で既存Brandへのロゴ追加とcanonicalロゴプレゼンTake生成を原子的に統一、`0047`で既存 event-promo Take からブリーフ+`take_inputs` を持ち運んで新規Takeを作るRPC `clone_event_promo_take` を追加した。新規URL生成は旧Profile/Generation Run/Assetへ二重書きせず、Knowledge claims + Take Run + Takeを正本にする。移行記録は [docs/old/schema-v2.md](docs/old/schema-v2.md)(アーカイブ)、現在の契約は [docs/data-model.md](docs/data-model.md)。新規環境のセットアップ手順:
+スキーマの正本は [supabase/migrations/](supabase/migrations/) の連番migration。現行のリモートプロジェクトには`0055_material_mark_geometry`まで適用済み(2026-08-19)。**適用済みかどうかは推測せず、Supabase MCP の `list_migrations` で確認する**——この行は一度、`0055`を「未適用」と書いたまま別の節が「適用済み」と書く状態になっていた。**各 migration がなぜ在るのかは [docs/old/migration-log.md](docs/old/migration-log.md)**(アーカイブ)。移行記録は [docs/old/schema-v2.md](docs/old/schema-v2.md)(アーカイブ)、現在の契約は [docs/data-model.md](docs/data-model.md)。新規環境のセットアップ手順:
 
 1. Supabase の SQL Editor で `supabase/migrations/` 内のSQLを番号順に実行(0001→0055)
 2. Authentication → Sign In / Providers で **Anonymous sign-ins を有効化**(公開ページ閲覧時のセッション初期化用。アップロードは本登録ユーザーのみ)
@@ -477,48 +506,32 @@ Vercelにデプロイする場合は同じ環境変数を Settings → Environme
 
 ## 残タスク・既知の課題
 
-### 次のセッションの出発点(2026-08-19 時点)
+### 現在地(2026-08-19)
 
-**2026-08-19: Phase A1「ロゴ正規化のプロダクト化」を実装した**([docs/asset-normalization.md §11.1](docs/asset-normalization.md) が正本・migration `0055`)。Freehand Lab の [normalize-marks.mjs](labs/freehand/scripts/normalize-marks.mjs) の3操作——白地プレート剥がし・αboxトリム・インク面積スケール——がプロダクトの経路に入った。
+**この節は「今どこにいて、次に何をするか」だけを持つ。** セッションごとの作業報告を足すと、毎回読む文書が日誌になって現在地が読めなくなる——実際にそうなっていたので、3セッション分の記録は [docs/old/event-cm-carryback-log.md](docs/old/event-cm-carryback-log.md) へ移した(2026-08-21)。**何をやったかは書かない。何が残っているかを書く。**
 
-- **測定は取り込み時に無条件、ファイルを書くのは承認制**。測るのは1回のデコードで済み間違っても害が無いが、書くのは取り消せる形にしないと offer できない。派生は `derived_from_material_id` を持ち、**原本は消えない**(§15)
-- **測定はkindで絞らない**。取り込み時の `kind` はメディアタイプから出るので、パートナーのロゴをwebpで受け取ると `photo` になる——実データ `Miss-sake_赤ロゴ-1536x542.webp` がまさにそれ。絞るのは**提案の側**で、引き金は2つ: **余白**(絵柄がフレームの70%未満)は測定だけで決まり、**白地**は`opaque`だけでは決まらない(それは全JPEGについて真)ので、マークだと分かっているか余白が既に証明したときだけ名乗る。**境界は実データで決めた**——緩い版では45件中9件に提案が出てうち7件が写真、締めた版では**2件だけで両方本物**(`Miss-sake_赤ロゴ`=白地+余白8%、`leopalace21.jpg`=`category='mark'`が付いたJPEGロゴ)。**分類を直すと提案が現れる**のは偶然ではなく、余白の無い白地マークは測定だけでは写真と区別できないため
-- **承認すると `brief` が派生を指し、`baked_brief` は据え置き**=動画は「未反映」になる。3層の鎖([docs/video-state-model.md](docs/video-state-model.md))が設計どおりに動いている姿で、琥珀は異常ではない
-- **再実行で承認は取り消されない**。マッピング段は原本のIDで読み取り結果を受け取るので、`normalizedId` を見ないと毎回余白だらけの原本へ戻す
-- **マークが2つ以上並ぶとインク量で大きさが揃う**(`logos[].scale`)。基準は行の中央値なので、パートナーが1つ増えると既にあるマークも正しく縮む。**1件だけの行には補正を出さない**(比べる相手がいないのに大きさを変える理由が無い)
-- **移植はラボの判定値を再現した**(`ink_ratio` 0.2230 / ラボ 0.2231、`scale` 0.716 / 0.725)。この5マークは [lib/materials/optical.test.ts](lib/materials/optical.test.ts) に基準線として固定してある——計算を変えて数字が動いたら、それは**依頼者が既に見て承認した判断**を変えたということ
-- **リモート適用済み**: migration `0055` を適用し、`npm run materials:measure --apply` で**45件を測定して保存**(読めなかったもの0件)。既存の素材にも提案が効く状態になっている
-- **残っていること**: ① 提案が出るのは**動画のインベントリだけ**——測定は全経路で走っているので、トップやブランド素材のアップロードUIにも offer を置く作業が残る ② MP4の見た目での確認(スケールが実際にどう効くか) ③ **Takeを削除して素材を `promote` すると正規化版だけ消える**(`delete_take` の昇格対象に `derived` が無い)。原本は残るので作り直せるが、昇格した原本が正規化版を失うのは正しくない
+直近で確定したのは2つ。**event-cm がテンプレート「イベント紹介動画 - モダンジャパニーズ」になり**(構成の固定・語彙を`ナレーション/ボイス/字幕`に統一・kitの語彙拡張)、**素材の測定と正規化がプロダクトの経路に入った**(migration `0055` 適用済み)。決まった中身はそれぞれの正本が持つ:
 
-**次は Phase A3(人物有無の測定)か Phase C**。実行計画の正本は [labs/freehand/README.md](labs/freehand/README.md) の「持ち帰り計画」。
+| 知りたいこと | 正本 |
+| --- | --- |
+| 構成・語彙・捏造の方針 | 上記 [event-cm 節](#イベント紹介動画---モダンジャパニーズevent-cmナレーション駆動) |
+| 素材の測定・正規化 | [docs/asset-normalization.md](docs/asset-normalization.md) §5・§7.0・§11.1 |
+| 未反映(琥珀)/一致(緑)/失敗(赤) | [docs/video-state-model.md](docs/video-state-model.md) |
+| そこへ至った議論の経緯 | [docs/old/event-cm-carryback-log.md](docs/old/event-cm-carryback-log.md)(アーカイブ) |
 
----
+**2026-08-21: アートディレクションを2軸目として切り出した**(上記「アートディレクションは交換できる」)。スタンダード(企業向け)が入り、モダンジャパニーズは派生として並んだ。
 
-以下は前セッション(2026-08-18)の記録:
+**次は ① テーマ切り替えのUIと配線**(`render.ts` が `theme` / `aspect_ratio` を読む)**か、② Phase A3(人物有無の測定)か Phase C**。実行計画の正本は [labs/freehand/README.md](labs/freehand/README.md) の「持ち帰り計画」。
 
-**2026-08-18: Freehand Lab の実験が完了し、Phase B(kitの語彙拡張)を持ち帰った。** 「世界が恋する日本酒」をテンプレートの制約なしで作り直した結果(v8)、依頼者が納品水準と評価。同日中に kit へ持ち帰り、event-cm は**「イベント紹介動画 - モダンジャパニーズ」**になった(シネスコ帯・帯内字幕・方向性スクリム・分割パネル・印章numeral・SFXキューシート・色だけ継ぐ。上記 event-cm 節を参照)。**実行計画の正本は [labs/freehand/README.md](labs/freehand/README.md) の「持ち帰り計画」**——このとき残っていた **Phase A1: ロゴ正規化のプロダクト化** は 2026-08-19 に実装済み(上記)。以降は A3: 人物有無の測定、Phase C: 連作スロット・Groundのvideo/collage化・不足素材の生成プロンプト・**配役の自動化**(第12項=唯一まだ人手のもの)。証拠と設計判断は [labs/freehand/sake-2026/FINDINGS.md](labs/freehand/sake-2026/FINDINGS.md)。
+**event-promo(ナレーションなしの旧イベント動画)は廃止が決定**(2026-08-21)。ナレーションはこのサービスの動画の作り方そのもので、**字幕とボイスをオフにすればビジュアルだけの表現になる**ので、読み上げを持たないテンプレートを別に持つ理由が無い。ただし削除は「エントリを消す」ではなく**共有基盤の引き剥がし**——`remotion/event/` の `types.ts`(`EventPhoto` / `LogoTreatment`)・`palette.ts`・`brief-schema.ts`・`EventBackground` は kit と event-cm が土台として使っている。実案件3本が乗っているので独立した作業として行う。
 
----
+#### ロゴ正規化(Phase A1)の残り
 
-以下は前セッション(2026-08-17)の記録:
+正規化そのものは実装済み・リモート適用済み([docs/asset-normalization.md §11.1](docs/asset-normalization.md) が正本)。残っているのはこの3つ:
 
-**このセッションでやったこと(2回目)**: **event-cm の構成をテンプレート固定にし、語彙を `ナレーション / ボイス / 字幕` に揃えた**。
-
-1. 9シーン(アジェンダ3枚+登壇者1枚)を定数にし、`eventCmScenePlan()` は「どれを消したか」だけを読むようにした
-2. **シードが全シーンにナレーションの下書きを置く**(事実を語らない汎用文)。登壇者は**役割名**で提案する
-3. **捏造の方針を全テンプレート共通の節として明文化**(上記「捏造の方針」)
-4. **改名**: `brief.scenario` → `brief.narration`(migration `0054`)、`lib/narration/`(TTS)→ `lib/voice/`、UIの「読み上げ」→「ボイス」
-5. **字幕をオフにできるようにした**(`provenance.captions` の suppression。ヘッダーに BGM・ボイスと並ぶ3つ目のボタン)
-
-実測: シードした直後の動画が **9シーン・45.3秒・字幕11枚**。実案件「世界が恋する日本酒」(`920d4cfe…`)を改名後に再生成し、**9シーン・60.90秒・字幕16枚・ボイス52.9秒**で通った(日付・会場・シリーズ名はブリーフの値と一致、捏造なし)。322テスト・ビルド通過。
-
-**この決定に至った議論の要点**(同じ話を繰り返さないために):
-
-- **ユーザーが絵コンテで入力しているものは、実質ナレーションだった**。入力したテキストは1文字も変わらずに字幕へ割られ、そのまま読み上げられ、その字数が尺を決める。字幕はどこにも保存されず、[film.ts](remotion/event-cm/film.ts) が毎回導出する。**「シナリオ」という語が上位概念を名乗っていたのが混乱の元**で、「シナリオが書き直されていません」という警告が、ユーザーには自分が今書いた言葉の話だと分からなかった。**改名は migration 0054 で完了**(`brief.scenario` → `brief.narration`、`lib/narration/` → `lib/voice/`)
-- **構成源が2つあることが `shape` ズレの唯一の原因だった**。事実がシーン数を決め、ナレーションがそれに追従する形だと、書いて録音まで済ませた後に映像の形が動く。**導出をやめて定数にすれば両方消える**
-- **既存Takeの移行はしない**と決めた(顧客ゼロ・4本)。プログラムが1つのTakeは3枚構成になり、警告が出たら作り直す
-
-**まず読むもの**: 上記の「捏造の方針」と「構成はテンプレートが持つ。事実では動かない」。素材まわりから入るなら [docs/asset-normalization.md](docs/asset-normalization.md) の §5(ファイルと情報の2軸)と §7.0(基盤はすべての営業アセットの手前にある)。
+1. **提案が出るのは動画のインベントリだけ**。測定は全経路で走っているので、トップやブランド素材のアップロードUIにも offer を置く作業が残る
+2. **MP4の見た目での確認**(インク面積スケールが実際にどう効くか)
+3. **Takeを削除して素材を `promote` すると正規化版だけ消える**(`delete_take` の昇格対象に `derived` が無い)。原本は残るので作り直せるが、昇格した原本が正規化版を失うのは正しくない
 
 #### event-cm でこの先やると自然なもの
 
@@ -553,7 +566,7 @@ Vercelにデプロイする場合は同じ環境変数を Settings → Environme
 3. **取り込み時の「基盤に登録しますか」**(段階5の残り)
 4. **余白トリミング**(段階7)。`derived_from_material_id` の最初の使い手を作る
 
-#### 触っていない既知の課題(前セッションから持ち越し)
+#### 未着手の既知の課題
 
 - **不正な `treatment` を持つ既存Take が1件**: `920d4cfe-3843-4a6c-b538-7238e79707d2` の `brief` / `baked_brief` 両方の **`logos[1]`(leopalace21)** が `knockout` のままで、**シーン8に白い長方形が出る**。ただし**バックフィルで測定値が入った**ので、マッピング段を再実行すれば `place-images.ts` が自己修復して `light` へ直す(`baked_brief` は「動画を作り直す」まで古いまま)。規則の側は確認済みで、`treatment` を書くのは `place-images.ts` の1箇所だけ、そこは必ず測ってから書く
 - **絵コンテのシーン1・シーン9が、描いていないロゴまで名乗る**: `markScene` は `logos[0]` だけを描くのに `fields: ["logos"]` を宣言するため、`FactList` が配列全体を並べる。絵は1つ、値は2つ。`FactList` が添字パス(`logos.0`)を持てないので、**台帳に添字を入れるか、部品が描いた値を渡すか**の設計判断が要る
@@ -571,7 +584,7 @@ Vercelにデプロイする場合は同じ環境変数を Settings → Environme
 - **ロゴ単位共有の付与UIが未実装**: `logo_access_grants`とメール招待用`logo_access_invites`はリモートDBへ適用済みだが、招待・付与・解除UIが未完
 - **raster画像ロゴのプレゼンが未実装**: トップでPNG/JPEG等をアップロードするとロゴ認識はするが「準備中」モーダルを出すのみ。専用アニメーション/データ経路(`LogoData`はSVG前提)を用意し、実プレゼンへ差し替える follow-up が残る
 - **素材追加UI(event-promo)**: 動画詳細の input ステージから画像・BGMをアップロードして `brand_materials` に登録 → `take_inputs` に pin → 再レンダリングする一連のUIは次回フェーズ。現状はブリーフ内 `material:UUID` を source take から clone する経路のみ
-- **CM Maker ↔ 動画詳細の resumeFor 配線**: 動画詳細(product-cm)の「CM Makerで再生成する →」が `/` に遷移するが、`?resumeFor=<videoId>` から該当TakeとbrandEntityを引継ぎ、Brand Kit+voiceを再生成する配線は次のセッション
+- **CM Maker ↔ 動画詳細の resumeFor 配線**: 動画詳細(product-cm)の「CM Makerで再生成する →」が `/` に遷移するが、`?resumeFor=<videoId>` から該当TakeとbrandEntityを引継ぎ、Brand Kit+voiceを再生成する配線は未実装
 - **video pipeline の extract ステージ**: 現状は常 `empty`。ブリーフから色/フォント/声を抽出するステージは将来拡張枠
 - **ロゴの複製が未実装**: サイドバーの行メニューはロゴに削除だけを出す。master SVGとcandidateを複製し、新しいLogo+プレゼンTakeを作る経路(`create_brand_logo_with_presentation`の再利用)は次段。Organization / Brandの複製は器のコピーになるため設けない
 - **削除の入口はサイドバーだけ**: `/brands/[id]/video` などのポータル一覧や各詳細ページには複製・削除を置いていない。同じ `lib/brand-tree-actions.ts` を使って広げる余地がある

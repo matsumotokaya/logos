@@ -8,6 +8,7 @@ import type {
   EventCmNarration,
   EventCmSceneRole,
 } from "@/remotion/event-cm/types";
+import { NEW_FILM_THEME_ID } from "@/remotion/kit/theme";
 
 // Hand someone a finished film before they have told us anything.
 //
@@ -175,6 +176,10 @@ export function seedEventCmBrief(
       closing: visual("visuals.closing"),
     },
     bgm: bgm?.src ?? null,
+    // A new film is corporate-neutral. 墨 is the derivative art direction and
+    // has to be asked for — it came first only because the first commission
+    // happened to be a 和モダン event.
+    artDirection: NEW_FILM_THEME_ID,
     theme: {
       palette: brand.palette,
       headingFont: brand.headingFont ?? null,

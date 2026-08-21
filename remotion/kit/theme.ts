@@ -43,6 +43,20 @@ export interface ThemePalette {
   accent: string;
   /** A brighter reading of the accent, for gradients and glints. */
   accentBright: string;
+  /**
+   * A CSS background laid over `ground` — the theme's own atmosphere.
+   *
+   * "素材ゼロでも完成した動画が出る" is a requirement of this template, and it
+   * is the GROUND that has to satisfy it: with no photograph, a scene is its
+   * type on whatever is behind it. 墨 does this with a drifting particle field
+   * (EventBackground), which is why it can leave the upper frame empty and
+   * still read as atmosphere. A flat light ground cannot — the same emptiness
+   * reads as an unfinished slide.
+   *
+   * `null` means the ground is the flat colour, or a theme-specific layer is
+   * doing the work instead.
+   */
+  groundWash: string | null;
 }
 
 /** How a component arrives and leaves. Named, not free-form, so a scene can
@@ -107,6 +121,14 @@ export interface ThemeCaption {
    * - `none`   nothing.
    */
   backdrop: "none" | "scrim" | "shadow" | "plate" | "bar";
+  /**
+   * The plate's fill, used when `backdrop` is `plate`.
+   *
+   * Was hardcoded to `rgba(0,0,0,0.88)` in CaptionBand, which is the right
+   * answer for exactly one theme: a dark one. A light art direction sets dark
+   * type on a light plate, and a black block there reads as a mistake.
+   */
+  plate: string;
 }
 
 /**
@@ -121,6 +143,15 @@ export interface ThemeCaption {
 export interface ThemeChrome {
   /** Bar height top and bottom, in composition pixels, or null for none. */
   letterbox: number | null;
+  /**
+   * What the bars are painted in.
+   *
+   * Was hardcoded to `#040302` in EventCmComposition, so any theme that asked
+   * for a letterbox got 墨's bars whatever else it had chosen. Unused when
+   * `letterbox` is null, but still declared: a theme that later wants bars
+   * should not have to go and find where they are painted.
+   */
+  color: string;
 }
 
 /**
@@ -148,7 +179,20 @@ export interface ThemeBackdrop {
    * nearly full presence. The layout says WHICH side (LayoutSpec.copySide);
    * the theme says how dark and how far. `null` falls back to `scrim`.
    */
-  directional: { strength: number; reach: number } | null;
+  directional: {
+    strength: number;
+    reach: number;
+    /**
+     * The colour the darkness is made of, as an RGB triple.
+     *
+     * A DARKENING scrim is only correct for a theme with light type. A light
+     * theme sets dark type over the photograph, so its scrim has to LIGHTEN —
+     * same gradient, opposite end of the range. Hardcoding `rgba(8,6,4,…)` in
+     * Stage made this the one part of the art direction a theme could not
+     * change.
+     */
+    tint: [number, number, number];
+  } | null;
   /** Ken Burns: scale at the start of the scene and at the end. */
   push: [number, number];
 }
@@ -184,6 +228,8 @@ export const SUMI_THEME: Theme = {
     faint: "rgba(244,239,228,0.34)",
     accent: "#c9a45c",
     accentBright: "#e6c98b",
+    // 墨's atmosphere is EventBackground, not a wash.
+    groundWash: null,
   },
   displayFont:
     '"Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Noto Serif JP", "Times New Roman", serif',
@@ -212,14 +258,154 @@ export const SUMI_THEME: Theme = {
     opacity: { hero: 1, support: 0.88 },
     scrim:
       "radial-gradient(85% 75% at 50% 50%, rgba(11,13,19,0.42) 0%, rgba(11,13,19,0.8) 100%)",
-    directional: { strength: 0.74, reach: 76 },
+    directional: { strength: 0.74, reach: 76, tint: [8, 6, 4] },
     push: [1.04, 1.13],
   },
   // Inside the letterbox bar: black that is already there, so the line never
   // fights the picture and never needs a plate.
-  caption: { size: 34, bottom: 0, color: "#f4efe4", backdrop: "bar" },
-  chrome: { letterbox: 132 },
+  caption: {
+    size: 34,
+    bottom: 0,
+    color: "#f4efe4",
+    backdrop: "bar",
+    plate: "rgba(0,0,0,0.88)",
+  },
+  chrome: { letterbox: 132, color: "#040302" },
 };
+
+/**
+ * The corporate art direction: a clean, neutral film for a webinar, a workshop
+ * or a seminar that a company hands to its own audience.
+ *
+ * THIS IS THE ONE MEANT TO BE ORDINARY. `sumi` came first only because the
+ * first real commission happened to be a 和モダン event, and a template named
+ * after that art direction can hardly be the default — 墨黒×金×明朝 is a
+ * specific enough decision that most events will never want it. So the film's
+ * structure (scenes, narration, BGM, captions) stays exactly what `sumi`
+ * proved, and only the painting changes. Same brief, same storyboard, same
+ * words, same length.
+ *
+ * The differences are deliberate, not softened versions of 墨:
+ *
+ * - **A light ground.** Corporate video is watched next to the company's own
+ *   site and deck, which are white. A dark film reads as a different brand.
+ * - **Gothic, not mincho.** The same judgment as `themeForBrand` in reverse:
+ *   the face IS the art direction, and a business webinar is set in the face
+ *   its slides are set in.
+ * - **No letterbox.** Bars are the cheapest way to make stills read as cinema,
+ *   which is precisely the wrong claim here — a workshop announcement should
+ *   not present itself as a film. Captions therefore need their own plate
+ *   (`bar` is not available without a letterbox).
+ * - **A lightening scrim.** Dark type over a photograph needs the photograph
+ *   to give way upward, not downward. Same gradient as 墨, opposite end.
+ * - **Still background, quieter motion.** Drifting particles are an atmosphere;
+ *   this art direction does not have one, on purpose.
+ */
+export const STANDARD_THEME: Theme = {
+  id: "standard",
+  name: "スタンダード（企業）",
+  palette: {
+    // Not #ffffff: a pure white ground makes the photographs look pasted on,
+    // and leaves nothing for a card or a plate to be lighter than.
+    ground: "#f7f9fc",
+    // Near-black with the blue in it, so type and accent belong to one family.
+    ink: "#0f172a",
+    muted: "rgba(15,23,42,0.64)",
+    faint: "rgba(15,23,42,0.36)",
+    // A trust blue rather than a bright one: this colour ends up on dates,
+    // rules and numerals, where saturation reads as a sales banner.
+    accent: "#1d5bd6",
+    accentBright: "#3f7ff0",
+    // Quiet enough to sit under dark type anywhere in the frame, present
+    // enough that an empty upper frame reads as light rather than as nothing.
+    // Corporate atmosphere is a gradient, not particles.
+    groundWash:
+      "linear-gradient(158deg, #ffffff 0%, #f7f9fc 44%, #e7edf7 100%)",
+  },
+  displayFont:
+    '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", YuGothic, "Noto Sans JP", system-ui, sans-serif',
+  textFont:
+    '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", YuGothic, "Noto Sans JP", system-ui, sans-serif',
+  // Gothic carries more ink per character than mincho, so the same sizes read
+  // heavier and the same tracking reads loose. Both come down a step.
+  scale: {
+    hero: { size: 118, lineHeight: 1.3, tracking: 0.02, charsPerLine: 12, maxLines: 2 },
+    primary: { size: 58, lineHeight: 1.55, tracking: 0.03, charsPerLine: 24, maxLines: 3 },
+    secondary: { size: 36, lineHeight: 1.75, tracking: 0.02, charsPerLine: 38, maxLines: 4 },
+    caption: { size: 24, lineHeight: 1.6, tracking: 0.1, charsPerLine: 54, maxLines: 2 },
+  },
+  motion: {
+    enter: { hero: "settle", primary: "fade", secondary: "fade", caption: "fade" },
+    exit: "fade",
+    enterFrames: 16,
+    exitFrames: 10,
+    background: "still",
+    transition: "fade",
+  },
+  ornament: { rules: true, markGlyph: "—", corner: "none" },
+  backdrop: {
+    opacity: { hero: 1, support: 0.92 },
+    scrim:
+      "radial-gradient(85% 75% at 50% 50%, rgba(247,249,252,0.5) 0%, rgba(247,249,252,0.86) 100%)",
+    // Stronger than 墨's 0.74: a light veil hides less at the same alpha, and
+    // the type over it is dark, so it needs more of the photograph gone.
+    directional: { strength: 0.84, reach: 78, tint: [247, 249, 252] },
+    // A shorter push. The slow drift is part of 墨's atmosphere; here it only
+    // has to stop the picture from looking frozen.
+    push: [1.02, 1.08],
+  },
+  // No letterbox, so the caption carries its own plate and sits inside the
+  // frame rather than in chrome.
+  caption: {
+    size: 32,
+    bottom: 64,
+    color: "#0f172a",
+    backdrop: "plate",
+    plate: "rgba(255,255,255,0.92)",
+  },
+  chrome: { letterbox: null, color: "#0f172a" },
+};
+
+/**
+ * The art directions a film can be painted in, by the id stored on the render.
+ *
+ * `take_renders.theme` has carried this value since migration 0027 (every
+ * event render says `sumi`), so switching art direction is choosing a different
+ * row here — not a different template, and not an edit to the brief.
+ */
+export const THEMES: Record<string, Theme> = {
+  [SUMI_THEME.id]: SUMI_THEME,
+  [STANDARD_THEME.id]: STANDARD_THEME,
+};
+
+/**
+ * What a NEW film is painted in.
+ *
+ * `standard` rather than `sumi`, because 墨 is the derivative: it came first
+ * only because the first commission was a 和モダン event.
+ */
+export const NEW_FILM_THEME_ID = STANDARD_THEME.id;
+
+/**
+ * What a film with NO art direction recorded is painted in.
+ *
+ * `sumi`, and it must stay `sumi`. Every take that exists today predates this
+ * field, and one of them is a delivered commission the client has approved —
+ * resolving "unset" to the new default would silently repaint an approved film.
+ * Unset means "made before there was a choice", and there was only 墨 then.
+ */
+export const LEGACY_THEME_ID = SUMI_THEME.id;
+
+/**
+ * Resolve a stored theme id.
+ *
+ * An unknown id falls back rather than throwing: the id comes from a database
+ * row that may have been written by a newer version of this code, and a film
+ * that renders in the wrong art direction is recoverable while one that
+ * refuses to render is not.
+ */
+export const themeById = (id: string | null | undefined): Theme =>
+  (id ? THEMES[id] : undefined) ?? THEMES[LEGACY_THEME_ID];
 
 /**
  * How much of the bottom of the frame belongs to the subtitle.

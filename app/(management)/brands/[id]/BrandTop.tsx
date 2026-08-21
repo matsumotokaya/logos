@@ -37,7 +37,7 @@ import type { BrandMaterial } from "@/components/pipeline/MaterialIntake";
 import BrandAssetSlots from "@/components/brand/BrandAssetSlots";
 import { materialFileName } from "@/lib/materials/naming";
 import type { PipelineStage } from "@/lib/pipeline/stages";
-import { ADDABLE_VIDEO_TEMPLATES } from "@/lib/video/templates";
+import { VIDEO_TEMPLATE_FAMILIES } from "@/lib/video/templates";
 
 type Tile = {
   href: string;
@@ -335,7 +335,8 @@ export default function BrandTop({ brandId }: { brandId: string }) {
       label: "動画",
       description: "テンプレートを選んで追加できます。",
       count: counts.videos,
-      hint: ADDABLE_VIDEO_TEMPLATES.find((t) => t.id === "event-promo")?.name ?? "",
+      // The categories on offer, not one template singled out by id.
+      hint: VIDEO_TEMPLATE_FAMILIES.map((family) => family.name).join(" / "),
     },
     {
       href: `/brands/${brandId}/lp`,

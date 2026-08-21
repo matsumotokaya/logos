@@ -75,7 +75,15 @@ export interface TemplateEntry {
   /** Identifies the renderer build. Recorded on the ledger row so "why does
    *  this look different" has an answer that is not "we think it changed". */
   rendererRevision: string;
-  name: string;
+  /**
+   * The display name, for templates that do NOT belong to a family.
+   *
+   * A template with a `family` must not set this: its name IS
+   * `family - variant`, derived by `templateName()`. Two places holding the
+   * name is how the picker and the list came to disagree — the dialog said
+   * イベント紹介動画/スタンダード while the badge said イベント動画.
+   */
+  name?: string;
   summary: string;
   /** What the template needs in order to render at all. */
   requires: string;
@@ -147,6 +155,25 @@ export interface TemplateEntry {
   publishSurfaces: PublishSurface[];
   costProfile: CostProfile;
   defaultRenders: RenderSpec[];
+  /**
+   * Video-specific: the kind of film this is, and the style it is made in.
+   *
+   * A FAMILY is a kind of film (a product introduction, an event
+   * introduction). A VARIANT is the art direction it is made in. The add
+   * dialog asks for the family first and the style second, because that is the
+   * order the decision is actually made in — "I need an event video" comes
+   * before "and I want the modern-Japanese look".
+   *
+   * The pair still resolves to ONE template id, and the id is what a take
+   * pins. So this is grouping for display, not a second axis in the data:
+   * adding a style means adding an entry here, exactly as before.
+   *
+   * Not part of `templateSpec()`. The ledger records what a version promised —
+   * scene structure, cost, surfaces — and how the picker groups it is not that.
+   * Regrouping the dialog must not look like the template changed.
+   */
+  family?: string;
+  variant?: string;
   /** Every brand is offered exactly one of these, unpublished. */
   isBrandDefault: boolean;
   /**
@@ -180,12 +207,40 @@ export const TEMPLATES: TemplateEntry[] = [
     rerenderable: true,
   },
   {
+    id: "product-cm",
+    version: 2,
+    toolKind: "video",
+    briefSchemaVersion: 2,
+    rendererRevision: "remotion/cm@2026-08-07-v2-materials",
+    summary:
+      "課題解決型の30秒CM。Service Brand Kitのコピーとナレーションから、ロゴ・配色をそのまま使って組み立てます。",
+    requires: "ソース（URL・PDF・テキスト）から生成したService Brand Kit",
+    duration: "30秒",
+    narration: true,
+    // Placeholder: a product film is not 和モダン, so it takes the other track.
+    defaultBgm: "bgm-bright-corporate",
+    // The brief is a Brand Kit plus narration timing: until the voice has been
+    // recorded and pinned, there is no length and nothing to play.
+    playableFromBrief: false,
+    family: "製品紹介動画",
+    variant: "スタンダード",
+    stages: ["collect", "extract", "structure", "render", "publish"],
+    publishSurfaces: ["canonical_url", "embed"],
+    costProfile: { llm: true, tts: true, render: "local" },
+    defaultRenders: [
+      { locale: "ja", aspectRatio: "16:9", theme: "", format: "mp4" },
+    ],
+    isBrandDefault: true,
+    // Kit, timing metadata and the pinned voice material all live with the
+    // Take, so a render no longer depends on the local campaign job store.
+    rerenderable: true,
+  },
+  {
     id: "event-promo",
     version: 1,
     toolKind: "video",
     briefSchemaVersion: 1,
     rendererRevision: "remotion/event@2026-08-04",
-    name: "イベント動画",
     summary:
       "イベント・セミナー告知の30秒PV。和モダンの固定タイムラインで、読み上げを持たずBGMとタイポグラフィで成立させます。素材が無いスロットは設計済みのフォールバックで描かれます。",
     requires: "イベントの文言・日時・登壇者（EventBrief）",
@@ -195,6 +250,8 @@ export const TEMPLATES: TemplateEntry[] = [
     // so the music carries it alone and deserves its own commissioned track.
     defaultBgm: "bgm-ink-cinematic",
     // No LLM anywhere: the brief is authored, and the renderer is deterministic.
+    family: "イベント紹介動画",
+    variant: "スタンダード",
     stages: ["collect", "render", "publish"],
     publishSurfaces: ["canonical_url", "embed", "social"],
     costProfile: { llm: false, tts: false, render: "local" },
@@ -212,7 +269,6 @@ export const TEMPLATES: TemplateEntry[] = [
     toolKind: "video",
     briefSchemaVersion: 1,
     rendererRevision: "remotion/event-cm@2026-08-18",
-    name: "イベント紹介動画 - モダンジャパニーズ",
     summary:
       "イベント告知のナレーション駆動CM。ナレーションを先に書き、そのボイスのタイミングが画面の尺と並びを決めます。絵はモダンジャパニーズ（墨黒×金×明朝・シネスコ帯・写真主役）で、章の転換や登壇者の登場は和の効果音が刻みます。素材が無いスロットは設計済みのフォールバックで描かれます。",
     requires: "イベントの事実（EventBrief）と、そこから書いたナレーション",
@@ -226,6 +282,8 @@ export const TEMPLATES: TemplateEntry[] = [
     bakesBrief: true,
     // The script is written by an LLM from the brief, then spoken. Both are
     // charged, and both re-run only when asked.
+    family: "イベント紹介動画",
+    variant: "モダンジャパニーズ",
     stages: ["collect", "structure", "render", "publish"],
     publishSurfaces: ["canonical_url", "embed", "social"],
     costProfile: { llm: true, tts: true, render: "local" },
@@ -235,34 +293,6 @@ export const TEMPLATES: TemplateEntry[] = [
     isBrandDefault: false,
     // Script, voice timing and the pinned WAV all live on the take, so an old
     // version renders again as long as its materials exist.
-    rerenderable: true,
-  },
-  {
-    id: "product-cm",
-    version: 2,
-    toolKind: "video",
-    briefSchemaVersion: 2,
-    rendererRevision: "remotion/cm@2026-08-07-v2-materials",
-    name: "製品紹介動画",
-    summary:
-      "課題解決型の30秒CM。Service Brand Kitのコピーとナレーションから、ロゴ・配色をそのまま使って組み立てます。",
-    requires: "ソース（URL・PDF・テキスト）から生成したService Brand Kit",
-    duration: "30秒",
-    narration: true,
-    // Placeholder: a product film is not 和モダン, so it takes the other track.
-    defaultBgm: "bgm-bright-corporate",
-    // The brief is a Brand Kit plus narration timing: until the voice has been
-    // recorded and pinned, there is no length and nothing to play.
-    playableFromBrief: false,
-    stages: ["collect", "extract", "structure", "render", "publish"],
-    publishSurfaces: ["canonical_url", "embed"],
-    costProfile: { llm: true, tts: true, render: "local" },
-    defaultRenders: [
-      { locale: "ja", aspectRatio: "16:9", theme: "", format: "mp4" },
-    ],
-    isBrandDefault: true,
-    // Kit, timing metadata and the pinned voice material all live with the
-    // Take, so a render no longer depends on the local campaign job store.
     rerenderable: true,
   },
   {
@@ -287,6 +317,17 @@ export const TEMPLATES: TemplateEntry[] = [
   },
 ];
 
+/**
+ * The one derivation of a template's display name.
+ *
+ * Grouped templates are named by their pair (`イベント紹介動画 - モダンジャパニーズ`);
+ * ungrouped ones carry an explicit `name`. Every screen reads this, so adding a
+ * style or renaming a family moves the picker, the list badge, the video detail
+ * header and the default take title together.
+ */
+export const templateName = (template: TemplateEntry): string =>
+  template.name ?? [template.family, template.variant].filter(Boolean).join(" - ");
+
 const BY_ID = new Map(TEMPLATES.map((template) => [template.id, template]));
 
 /** The current version of a template. Takes pin a version and must not use this
@@ -306,7 +347,7 @@ export const templatesForTool = (toolKind: ToolKind): TemplateEntry[] =>
  */
 export function templateSpec(template: TemplateEntry): Record<string, unknown> {
   return {
-    name: template.name,
+    name: templateName(template),
     summary: template.summary,
     requires: template.requires,
     duration: template.duration ?? null,
