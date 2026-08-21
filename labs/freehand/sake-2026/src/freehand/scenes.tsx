@@ -192,6 +192,11 @@ export const FhMarkScene: React.FC<{
 
 /* ------------------------------------------------------------ title scene */
 
+/** How far the two title columns break away from a shared centre line.
+ *  Kept modest on purpose: the client asked for ちょっと, and past ~60px the
+ *  subject's foot crowds the caption band. */
+const TITLE_STAGGER = 40;
+
 export const FhTitleScene: React.FC<{ brief: EventCmBrief; length: number }> = ({
   brief,
   length,
@@ -201,6 +206,7 @@ export const FhTitleScene: React.FC<{ brief: EventCmBrief; length: number }> = (
   // column rather than inheriting a break that belongs to these words.
   const titleLines =
     brief.title === "世界が恋する日本酒" ? ["世界が恋する", "日本酒"] : [brief.title];
+  const twoColumn = titleLines.length === 2;
   return (
     <AbsoluteFill style={{ background: FH.ink }}>
       {/* The pour, then the stillness after it (sources.ts). */}
@@ -220,7 +226,15 @@ export const FhTitleScene: React.FC<{ brief: EventCmBrief; length: number }> = (
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
-          gap: 36,
+          // Column spacing, measured rather than guessed. `gap` is not the
+          // whole distance: in vertical writing a column's width is its
+          // LINE HEIGHT, so normal (~1.45) padded each column with ~40px of
+          // half-leading and the two lines sat 97px apart — the client read
+          // that as 離れすぎ. lineHeight 1 makes the column exactly one em
+          // wide, so this number is the gap you actually see (plus the
+          // glyphs' own side-bearings, ~10px total).
+          gap: 38,
+          lineHeight: 1,
           writingMode: "vertical-rl",
           fontFamily: FH.font,
           fontWeight: 700,
@@ -234,7 +248,18 @@ export const FhTitleScene: React.FC<{ brief: EventCmBrief; length: number }> = (
           // through the whole title as one gesture.
           const before = titleLines.slice(0, li).join("").length;
           return (
-            <div key={li} style={{ fontSize: titleLines.length === 2 && li === 1 ? 148 : 66 }}>
+            <div
+              key={li}
+              style={{
+                fontSize: twoColumn && li === 1 ? 148 : 66,
+                // The stagger. Both columns were centred on the same line, so
+                // the pair read as a block rather than a title (client:
+                // タイポグラフィとしてバランスをとって). The qualifier rides
+                // high on the right, the subject sits low on the left — the
+                // hanging-scroll relation the vertical setting is borrowing.
+                transform: twoColumn ? `translateY(${li === 0 ? -TITLE_STAGGER : TITLE_STAGGER}px)` : undefined,
+              }}
+            >
               {Array.from(line).map((ch, i) => {
                 const at = before + i;
                 const p = interpolate(frame, [12 + at * 3, 12 + at * 3 + 16], [0, 1], clamp);
