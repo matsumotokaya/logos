@@ -447,31 +447,47 @@ function NarrationLine({
   role,
   index,
   text,
+  reading,
   busy,
   onSave,
 }: {
   role: EventCmSceneRole;
   index?: number;
   text: string;
+  reading?: string;
   busy?: boolean;
   onSave: (
     scene: { role: EventCmSceneRole; index?: number },
     text: string,
+    reading: string,
   ) => Promise<boolean>;
 }) {
   const [draft, setDraft] = useState(text);
+  const [readingDraft, setReadingDraft] = useState(reading ?? "");
   const [saved, setSaved] = useState(false);
-  const dirty = draft.trim() !== text.trim();
+  const dirty =
+    draft.trim() !== text.trim() || readingDraft.trim() !== (reading ?? "").trim();
   // The length is the scene's length: a picture holds for as long as its line
   // takes to read (remotion/event-cm/timeline.ts). So the budget is not style
   // advice — 300 characters here is a fifty-second scene, and 2,000 is a line
   // no voice will read at all.
-  const chars = draft.replace(/\s/g, "").length;
+  // Counted on what will be SAID, not what will be shown: the scene's length is
+  // measured from the spoken copy (remotion/event-cm/timeline.ts), so a line
+  // whose reading is longer than its subtitle holds its picture longer. The
+  // number here has to be the one the film is going to use.
+  const spoken = readingDraft.trim() || draft;
+  const chars = spoken.replace(/\s/g, "").length;
   const budget = eventCmSceneBudget({ role, index });
   const seconds = Math.round(chars / EVENT_CM_CHARS_PER_SECOND);
 
   return (
     <div className="mt-4">
+      {/* Which of these two is the subtitle is said on the label, because the
+          answer stopped being obvious the moment a second field appeared. */}
+      <div className="mb-1.5 text-[11px] font-semibold text-ink-faint">
+        ナレーション
+        <span className="ml-1.5 font-normal">この文がそのまま字幕になります</span>
+      </div>
       <textarea
         value={draft}
         onChange={(event) => {
@@ -479,15 +495,42 @@ function NarrationLine({
           setSaved(false);
         }}
         rows={Math.max(2, Math.ceil(draft.length / 34))}
-        aria-label="このシーンのナレーション"
+        aria-label="このシーンのナレーション（この文がそのまま字幕になります）"
         className="w-full rounded-xl border border-hairline px-3 py-2.5 text-[13px] leading-relaxed outline-none focus:border-ink"
       />
+      {/* The reading sits directly under the sentence it belongs to, and stays
+          empty on almost every line: a name like 「〆張鶴」 is the exception, not
+          the rule, and asking for two copies of every sentence would be asking
+          for the second one to rot. Whole line rather than per-word, so what is
+          typed here is exactly what the narrator will be handed. */}
+      <div className="mb-1.5 mt-3 text-[11px] font-semibold text-ink-faint">
+        読み方
+        <span className="ml-1.5 font-normal">
+          任意。入力すると、読み上げはこちらを優先します（字幕は上の文のまま）
+        </span>
+      </div>
+      <textarea
+        value={readingDraft}
+        onChange={(event) => {
+          setReadingDraft(event.target.value);
+          setSaved(false);
+        }}
+        rows={Math.max(1, Math.ceil(readingDraft.length / 34))}
+        aria-label="このシーンの読み方（任意。入力すると読み上げに使われます）"
+        placeholder="読めない固有名詞があるときだけ。行全体をかなで書き直してください（例: 〆張鶴 → しめはりつる）"
+        className="w-full rounded-xl border border-hairline px-3 py-2.5 text-[13px] leading-relaxed outline-none placeholder:text-ink-faint focus:border-ink"
+      />
+      {readingDraft.trim() ? (
+        <div className="mt-1.5 text-[11px] font-semibold text-accent">
+          この行は読み方のほうを発音します。字幕は上の文のままです
+        </div>
+      ) : null}
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={async () => {
             if (!draft.trim() || busy) return;
-            const ok = await onSave({ role, index }, draft.trim());
+            const ok = await onSave({ role, index }, draft.trim(), readingDraft.trim());
             if (ok) setSaved(true);
           }}
           disabled={busy || !dirty || !draft.trim()}
@@ -505,6 +548,7 @@ function NarrationLine({
                 : "text-ink-faint",
           )}
         >
+          {readingDraft.trim() ? "読み方 " : ""}
           {chars}字（目安{budget.min}〜{budget.max}字）・約{seconds}秒
         </span>
         {chars > TTS_MAX_SECTION_CHARS ? (
@@ -798,6 +842,9 @@ function PanelCard({
   onEditNarration?: (
     scene: { role: EventCmSceneRole; index?: number },
     text: string,
+    /** The reading, "" to clear it. Sent on every save, so the panel is the one
+     *  place that decides whether this line needs one (types.ts `reading`). */
+    reading: string,
   ) => Promise<boolean>;
   /** Remove this picture from the film. Absent = read only. */
   onDeletePanel?: (scene: {
@@ -952,10 +999,11 @@ function PanelCard({
                 // Remounted when the saved line changes — a draft belongs to the
                 // words it was started from, and must never be carried onto a
                 // different picture or over a line rewritten elsewhere.
-                key={`${eventCmSceneKey(panel)}:${panel.narration}`}
+                key={`${eventCmSceneKey(panel)}:${panel.narration}:${panel.reading ?? ""}`}
                 role={panel.role}
                 index={panel.index}
                 text={panel.narration}
+                reading={panel.reading}
                 busy={busy}
                 onSave={onEditNarration}
               />
@@ -1019,6 +1067,9 @@ export default function Storyboard({
   onEditNarration?: (
     scene: { role: EventCmSceneRole; index?: number },
     text: string,
+    /** The reading, "" to clear it. Sent on every save, so the panel is the one
+     *  place that decides whether this line needs one (types.ts `reading`). */
+    reading: string,
   ) => Promise<boolean>;
   onDeletePanel?: (scene: {
     role: EventCmSceneRole;

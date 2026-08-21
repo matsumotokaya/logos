@@ -177,6 +177,9 @@ export interface StoryboardPanel {
   captions: Caption[];
   /** The line read over this picture. Empty for the silent mark scenes. */
   narration: string;
+  /** The reading written for that line, when it needed one. The panel shows it
+   *  under the sentence, because that is where it is corrected. */
+  reading?: string;
   counts: PanelCounts;
 }
 
@@ -402,6 +405,7 @@ export function eventCmStoryboard(raw: EventCmBrief): Storyboard {
       dropped: scene.dropped.map((component) => component.kind),
       captions: scene.captions,
       narration: scene.narration,
+      ...(scene.reading ? { reading: scene.reading } : {}),
       counts: countBlocks(blocks),
     };
   });

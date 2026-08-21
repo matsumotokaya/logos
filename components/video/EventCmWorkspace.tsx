@@ -92,6 +92,9 @@ export default function EventCmWorkspace({
   onEditNarration?: (
     scene: { role: EventCmSceneRole; index?: number },
     text: string,
+    /** The reading, "" to clear it. Sent on every save, so the panel is the one
+     *  place that decides whether this line needs one (types.ts `reading`). */
+    reading: string,
   ) => Promise<boolean>;
   /** Remove one picture from the film, from the panel that shows it. */
   onDeletePanel?: (scene: {

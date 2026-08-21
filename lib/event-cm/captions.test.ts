@@ -65,6 +65,37 @@ test("ナレーションがあれば、音声を待たずに字幕が出る", ()
   assert.equal(captions[0].text, "ウェルスパークラボがおくる、パッションアセットの世界。");
 });
 
+test("読みは字幕に出ない。画に出るのは書かれた文のほう", () => {
+  // The reading exists so the voice can say しめはりつる while the screen keeps
+  // 〆張鶴 (types.ts `reading`). Cutting subtitles from the reading instead would
+  // spell a two-hundred-year-old brewery in kana — which is the exact damage the
+  // field was added to avoid.
+  const withReading: EventCmBrief = {
+    ...written,
+    narration: {
+      ...written.narration,
+      scenes: written.narration.scenes.map((scene) =>
+        scene.role === "guests"
+          ? {
+              ...scene,
+              text: "〆張鶴の当主が、知られざる舞台裏を語ります。",
+              reading: "しめはりつるの当主が、知られざる舞台裏を語ります。",
+            }
+          : scene,
+      ),
+    },
+  };
+  const texts = captionsFor(withReading).map((caption) => caption.text);
+  assert.ok(
+    texts.some((text) => text.includes("〆張鶴")),
+    "字幕に書かれた文が出ていない",
+  );
+  assert.ok(
+    !texts.some((text) => text.includes("しめはりつる")),
+    "読みが字幕に漏れている",
+  );
+});
+
 test("ナレーションが無ければ字幕も無い", () => {
   // Not the seeded brief any more: that arrives with a draft line per picture.
   const unwritten = { ...SEEDED, narration: { ...SEEDED.narration, scenes: [] } };

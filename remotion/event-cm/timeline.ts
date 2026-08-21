@@ -3,6 +3,7 @@ import {
   eventCmSceneBudget,
   eventCmSceneKey,
   eventCmScenePlan,
+  eventCmSpoken,
   type EventCmBrief,
   type EventCmSceneRole,
   type EventCmSceneStep,
@@ -98,8 +99,13 @@ export function eventCmTimeline(brief: EventCmBrief): EventCmTimeline {
   // Keyed by scene identity, not by role: three programme pictures are three
   // different lines, and looking them up by role would give all three the first
   // one's length.
+  // The SPOKEN copy, which is not always the written one: a line with a reading
+  // is read from the reading, so that is the text whose length this scene will
+  // take (types.ts `eventCmSpoken`). Estimating from 「〆張鶴」 while the voice
+  // says 「しめはりつる」 would make every such scene short before the recording
+  // lands and correct after it — the kind of drift that looks like a renderer bug.
   const spoken = new Map(
-    brief.narration.scenes.map((scene) => [eventCmSceneKey(scene), scene.text]),
+    brief.narration.scenes.map((scene) => [eventCmSceneKey(scene), eventCmSpoken(scene)]),
   );
   // Any line at all means the timing is being read from the narration; a scene with
   // nothing written falls back to its budget on its own (see `writtenMs`).

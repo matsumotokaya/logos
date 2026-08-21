@@ -36,6 +36,9 @@ export const EventCmSceneSchema = z.object({
   /** Which item, when the role repeats (one picture per programme). */
   index: z.number().int().min(0).optional(),
   text: z.string(),
+  /** How to say the line, when its spelling cannot be read aloud (types.ts).
+   *  Optional, and absent on every line that reads as it is written. */
+  reading: z.string().optional(),
 });
 
 export const EventCmNarrationSchema = z
@@ -140,6 +143,10 @@ export const EventCmBriefSchema = z.object({
   visuals: EventCmVisualsSchema,
   bgm: z.string().nullable(),
   provenance: EventCmProvenanceSchema.optional(),
+  // The id of an art direction (remotion/kit/theme.ts). Not an enum here: the
+  // schema validates saved briefs, and an unknown id resolves to the legacy
+  // theme rather than making the whole brief unreadable.
+  artDirection: z.string().optional(),
   theme: EventCmThemeSchema.optional(),
   factsUpdatedAt: z.string().optional(),
   titleDeclined: z.string().nullable().optional(),

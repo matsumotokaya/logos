@@ -82,6 +82,9 @@ export interface FilmScene {
   budget: { min: number; max: number } | null;
   /** The line read over this picture. Empty when silent or not yet written. */
   narration: string;
+  /** The reading given for that line, when its spelling needed one. Absent on
+   *  every line that is read as it is written (types.ts `reading`). */
+  reading?: string;
   /** The subtitles on screen while this picture is. Bounded by the scene. */
   captions: Caption[];
 }
@@ -237,8 +240,11 @@ export function eventCmFilm(raw: EventCmBrief): EventCmFilm {
 
   // By scene identity, never by role: three programme pictures share a role,
   // and only their index tells them apart.
+  // The whole scene, not just its text: the panel that edits a line has to show
+  // the reading next to it, and looking that up separately would be a second
+  // map keyed the same way.
   const narrationOf = new Map(
-    drawn.narration.scenes.map((scene) => [eventCmSceneKey(scene), scene.text] as const),
+    drawn.narration.scenes.map((scene) => [eventCmSceneKey(scene), scene] as const),
   );
   const narratedKeys = new Set(eventCmNarratedSteps(drawn).map(eventCmSceneKey));
 
@@ -283,7 +289,8 @@ export function eventCmFilm(raw: EventCmBrief): EventCmFilm {
       capacity: spec.capacity,
       regions,
       budget: narrated ? eventCmSceneBudget(beat) : null,
-      narration: narrationOf.get(key) ?? "",
+      narration: narrationOf.get(key)?.text ?? "",
+      ...(narrationOf.get(key)?.reading ? { reading: narrationOf.get(key)!.reading } : {}),
       captions: captions.filter(
         (caption) => caption.fromMs < fromMs + durationMs && caption.toMs > fromMs,
       ),

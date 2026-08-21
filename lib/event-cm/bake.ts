@@ -28,6 +28,7 @@ import { voicePresetByName } from "@/lib/voice/voices";
 import { EVENT_CM_GOAL } from "@/lib/pipeline/event-cm";
 import {
   eventCmSceneKey,
+  eventCmSpoken,
   narrationStaleness,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
@@ -256,6 +257,12 @@ export function bakeChanges(
  * timestamp: a narration that was rewritten to the same words is the same
  * narration, and a take whose clock moved is not a reason to spend a TTS call.
  *
+ * Against the SPOKEN copy of each line, which is the reading when one was given
+ * (types.ts `eventCmSpoken`). The recording stores what it said, so comparing it
+ * to the subtitle would report every line with a reading as stale forever — a
+ * permanent 「録音が古い」 on a take that is perfectly current, and one that no
+ * amount of re-recording could clear.
+ *
  * A recording is what fixes the film's length (§9.9), so this is also the
  * question "does the player know how long this film is".
  */
@@ -267,7 +274,7 @@ export function voiceReadsNarration(brief: EventCmBrief): boolean {
   const spoken = new Map(
     track.scenes.map((scene) => [eventCmSceneKey(scene), scene.text] as const),
   );
-  return lines.every((line) => spoken.get(eventCmSceneKey(line)) === line.text);
+  return lines.every((line) => spoken.get(eventCmSceneKey(line)) === eventCmSpoken(line));
 }
 
 /**

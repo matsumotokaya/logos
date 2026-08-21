@@ -123,13 +123,37 @@ export async function POST(
   // result. Now the result does not move at all until it is baked, and the
   // disagreement is SAID instead — `voiceReadsNarration` (lib/event-cm/bake.ts)
   // is what the screen reads to say it.
-  const next: EventCmBrief = { ...brief, narration: draft.narration };
+  // A reading survives a redraft when the sentence it belongs to comes back
+  // unchanged.
+  //
+  // The drafter never writes readings: how 「〆張鶴」 is pronounced is knowledge
+  // about a name, not about this event, and it is the one thing on this screen a
+  // human had to supply. Without this, pressing 「ナレーションを書き直す」 would
+  // silently discard every reading and the next recording would mispronounce
+  // lines that had already been fixed — once, quietly, with nothing on screen to
+  // say why. A line whose WORDS changed does lose its reading, because a reading
+  // of a sentence nobody says any more is not information about anything.
+  const readings = new Map(
+    brief.narration.scenes
+      .filter((scene) => scene.reading)
+      .map((scene) => [eventCmSceneKey(scene), scene] as const),
+  );
+  const narration = {
+    ...draft.narration,
+    scenes: draft.narration.scenes.map((scene) => {
+      const before = readings.get(eventCmSceneKey(scene));
+      return before && before.text === scene.text
+        ? { ...scene, reading: before.reading }
+        : scene;
+    }),
+  };
+  const next: EventCmBrief = { ...brief, narration };
 
   const saved = await saveBrief(supabase, loaded.take.id as string, next);
   if ("error" in saved) {
     return Response.json({ error: saved.error }, { status: saved.status });
   }
-  return Response.json({ narration: draft.narration });
+  return Response.json({ narration });
 }
 
 export async function PATCH(
@@ -166,15 +190,25 @@ export async function PATCH(
   // `{ role: "program", index: 1 }`, and keying by role alone would have written
   // that text over all three programme pictures.
   const texts = new Map<string, string>();
+  const readings = new Map<string, string>();
   for (const raw of body.scenes) {
     if (!raw || typeof raw !== "object") continue;
-    const scene = raw as { role?: unknown; index?: unknown; text?: unknown };
+    const scene = raw as {
+      role?: unknown;
+      index?: unknown;
+      text?: unknown;
+      reading?: unknown;
+    };
     if (typeof scene.role === "string" && typeof scene.text === "string") {
       const key = eventCmSceneKey({
         role: scene.role as EventCmSceneRole,
         index: typeof scene.index === "number" ? scene.index : undefined,
       });
       texts.set(key, scene.text.trim());
+      // Sent at all — including as "" — is how a reading is written and how it
+      // is cleared. Absent leaves whatever was there, so a caller that edits
+      // only the sentence does not silently throw the reading away.
+      if (typeof scene.reading === "string") readings.set(key, scene.reading.trim());
     }
   }
   const brief = loaded.take.brief as EventCmBrief;
@@ -190,9 +224,7 @@ export async function PATCH(
   // decision to hide it, never to delete it.
   const steps = eventCmFilm(brief).scenes.filter((scene) => scene.narrated);
   const previous = new Map(
-    brief.narration.scenes.map(
-      (scene) => [eventCmSceneKey(scene), scene.text] as const,
-    ),
+    brief.narration.scenes.map((scene) => [eventCmSceneKey(scene), scene] as const),
   );
   // A partial narration is a legal, ordinary state — not an error.
   //
@@ -205,11 +237,21 @@ export async function PATCH(
   // narration is not finished. So lines with no words are simply not stored, and
   // the order of the ones that are is the film's order.
   const scenes = steps
-    .map((step) => ({
-      role: step.role,
-      ...(step.index === undefined ? {} : { index: step.index }),
-      text: texts.get(step.key) ?? previous.get(step.key) ?? "",
-    }))
+    .map((step) => {
+      const before = previous.get(step.key);
+      const reading = readings.has(step.key)
+        ? (readings.get(step.key) as string)
+        : (before?.reading ?? "");
+      return {
+        role: step.role,
+        ...(step.index === undefined ? {} : { index: step.index }),
+        text: texts.get(step.key) ?? before?.text ?? "",
+        // Stored only when there is one. An empty reading is not a reading, and
+        // a "" left in the brief would say "somebody decided this line needs
+        // spelling out" for the rest of the take's life.
+        ...(reading ? { reading } : {}),
+      };
+    })
     .filter((scene) => scene.text.length > 0);
   if (scenes.length === 0) {
     return Response.json(

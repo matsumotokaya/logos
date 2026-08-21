@@ -478,13 +478,17 @@ export default function BrandVideoDetail({
   async function editNarration(
     scene: { role: EventCmSceneRole; index?: number },
     text: string,
+    reading: string,
   ): Promise<boolean> {
     busy("ナレーションを保存しています…");
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/narration`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scenes: [{ ...scene, text }] }),
+        // `reading` always goes, including as "": the field is on screen next to
+        // the sentence, so clearing it is an edit the user just made, and a save
+        // that dropped it would leave the voice reading kana nobody can see.
+        body: JSON.stringify({ scenes: [{ ...scene, text, reading }] }),
       });
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -1635,7 +1639,7 @@ export default function BrandVideoDetail({
           steps={filmSteps}
           materialUrls={video.materialUrls}
           onEditFact={(edit) => void editFact(edit)}
-          onEditNarration={(scene, text) => editNarration(scene, text)}
+          onEditNarration={(scene, text, reading) => editNarration(scene, text, reading)}
           onDeletePanel={(scene) => deletePanel(scene)}
           onRewriteNarration={(force) => void writeNarration(force)}
           // Photographs and marks alike: which slot a picture suits is the

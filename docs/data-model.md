@@ -119,10 +119,22 @@ Takeは以下を必須とする。
 | フィールド | 実体 | 型 |
 | --- | --- | --- |
 | `brief.narration` | 各シーンの**主文**。字幕・尺・シーン構成を規定する**主**(旧 `brief.script`) | `EventCmNarration`([../remotion/event-cm/types.ts](../remotion/event-cm/types.ts)) |
+| `…scenes[].reading` | **読み**(任意)。書かれていれば読み上げと尺はこちらを見る。字幕は常に`text` | `string \| undefined` |
 | — (導出) | 字幕。`narration`を28字カードへ割った表示単位で、DBには持たない | [../remotion/event-cm/captions.ts](../remotion/event-cm/captions.ts) |
 | `brief.voice` | **読み上げ**。`narration`を声にした派生物で、BGMと同じくオフにできる(オフは`provenance.voice`のsuppressionとして記録) | `{ track, audio: "material:<uuid>" }` |
 
 `brief.narration`は**必須**(zodスキーマ [../remotion/event-cm/brief-schema.ts](../remotion/event-cm/brief-schema.ts) で non-optional)。読み手が`narration?.`と防御しないのはこのため——例外は`eventCmFilm()`の1箇所だけで、そこは「常に答える導出」であることを守るために欠損を空ナレーションとして扱う。
+
+**`reading`は「目で読む文」と「耳で聞く文」を分けるためだけにある**(2026-08-21追加)。きっかけは実案件の「〆張鶴」——字幕は漢字のままでなければならないが、TTSはこの字を*しめはりつる*と読めない。かなを`text`に書けば声は直って字幕が壊れるので、**行まるごとの読みを別フィールドに置く**(単語単位の置換表にしない。TTSにそのまま渡せる文であることが、この機能の唯一の要件)。
+
+規則は4つで、**読み上げ対象を決める式は [types.ts](../remotion/event-cm/types.ts) の `eventCmSpoken()` 1箇所**に閉じている。
+
+1. **字幕は常に`text`**。`captionsFor()`は`reading`を見ない
+2. **TTSに渡すのは`eventCmSpoken()`**(読みがあれば読み、無ければ本文)。文字数上限の判定も同じ式
+3. **録音前の尺見積もりも`eventCmSpoken()`**。読みの長さがそのシーンの長さ——字面で見積もると、録音前だけ尺が違う映像になる
+4. **`voice.track`は「読んだ文」を持ち、`reading`は持たない**。`voiceReadsNarration()`(bake.ts)は track と `eventCmSpoken()`を比べる。ここを`text`と比べると、読みのある行が**永久に「録音が古い」**になり、録り直しても解消しない
+
+`reading`は人が入れる値なので、**下書きの再生成(`POST /narration`)は本文が変わらなかった行の読みを引き継ぐ**。LLMは読みを書かない(固有名詞の読みはイベントの事実ではなく名前の知識)ので、引き継がないと「ナレーションを書き直す」の一押しで手入力が黙って消える。
 
 **`EventCmBrief`は`EventBrief`(event-promo)を継承しない**。共有するのは値の型(`EventPhoto` / `EventLogo` / `EventGuest` / `EventProgram` / `EventSchedule`)だけで、フィールドの一覧は別。継承していた頃は`sideCopy` / `visuals.inkArt` / `visuals.texture`という**どのシーンも描かない3つ**を持ち、それが goal と fact list に並んでいた。以後の規則: **ブリーフに足したフィールドは、どこかのシーンが読むこと**。
 

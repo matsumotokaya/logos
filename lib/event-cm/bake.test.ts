@@ -18,6 +18,7 @@ import {
   EVENT_CM_CAPTIONS_PATH,
   EVENT_CM_SUPPRESSED_NOTE,
   eventCmSceneKey,
+  eventCmSpoken,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 
@@ -41,7 +42,9 @@ function written(brief: EventCmBrief, at: string): EventCmBrief {
   };
 }
 
-/** That narration, read aloud. */
+/** That narration, read aloud — recorded the way the endpoint records it: the
+ *  SPOKEN copy of each line, with no reading stored beside it
+ *  (app/api/brands/[id]/videos/[videoId]/voice/route.ts). */
 function spoken(brief: EventCmBrief, at: string): EventCmBrief {
   return {
     ...brief,
@@ -57,7 +60,9 @@ function spoken(brief: EventCmBrief, at: string): EventCmBrief {
         voice: "Zephyr",
         captions: [],
         scenes: brief.narration.scenes.map((scene, index) => ({
-          ...scene,
+          role: scene.role,
+          ...(scene.index === undefined ? {} : { index: scene.index }),
+          text: eventCmSpoken(scene),
           startMs: index * 5000,
           durationMs: 4000,
         })),
@@ -257,6 +262,73 @@ test("読み上げは、いま書かれている言葉と一致するときだ�
     },
   };
   assert.equal(voiceReadsNarration(edited), false);
+});
+
+test("読みのある行は、字幕ではなく読みと録音を比べる", () => {
+  // 「〆張鶴」 is the case this exists for: the subtitle keeps the kanji and the
+  // recording says しめはりつる. Comparing the recording to the SUBTITLE would
+  // report a perfectly current take as stale forever — and no amount of
+  // re-recording could ever clear it, because the voice is never going to say
+  // those characters.
+  const base = written(SEEDED, "2026-08-14T10:00:00Z");
+  const withReading: EventCmBrief = {
+    ...base,
+    narration: {
+      ...base.narration,
+      scenes: base.narration.scenes.map((scene, index) =>
+        index === 1 ? { ...scene, text: "〆張鶴の話", reading: "しめはりつるの話" } : scene,
+      ),
+    },
+  };
+  const recorded = spoken(withReading, "2026-08-14T10:05:00Z");
+  assert.equal(voiceReadsNarration(recorded), true, "読みどおりに録ったのに古いと言っている");
+
+  // Editing only the subtitle leaves the recording right: nothing that was said
+  // has changed. This is the whole point of splitting the two — otherwise every
+  // spelling fix would cost a TTS call.
+  const subtitleOnly: EventCmBrief = {
+    ...recorded,
+    narration: {
+      ...recorded.narration,
+      scenes: recorded.narration.scenes.map((scene, index) =>
+        index === 1 ? { ...scene, text: "〆張鶴（しめはりつる）の話" } : scene,
+      ),
+      source: "human",
+      updatedAt: "2026-08-14T11:00:00Z",
+    },
+  };
+  assert.equal(voiceReadsNarration(subtitleOnly), true, "字幕だけ直したのに録り直しを求めている");
+
+  // Editing the reading changes what will be said, so the recording is stale.
+  const readingChanged: EventCmBrief = {
+    ...recorded,
+    narration: {
+      ...recorded.narration,
+      scenes: recorded.narration.scenes.map((scene, index) =>
+        index === 1 ? { ...scene, reading: "しめはりづるの話" } : scene,
+      ),
+      source: "human",
+      updatedAt: "2026-08-14T11:00:00Z",
+    },
+  };
+  assert.equal(voiceReadsNarration(readingChanged), false);
+
+  // And clearing it means the narrator is back to reading the kanji, which the
+  // recording never did.
+  const cleared: EventCmBrief = {
+    ...recorded,
+    narration: {
+      ...recorded.narration,
+      scenes: recorded.narration.scenes.map((scene, index) => {
+        if (index !== 1) return scene;
+        const { reading: _dropped, ...rest } = scene;
+        return rest;
+      }),
+      source: "human",
+      updatedAt: "2026-08-14T11:00:00Z",
+    },
+  };
+  assert.equal(voiceReadsNarration(cleared), false, "読みを消したのに録音が最新だと言っている");
 });
 
 test("シードの下書きは書き直さない。読んで反映するの2手", () => {

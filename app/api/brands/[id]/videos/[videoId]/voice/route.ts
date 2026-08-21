@@ -18,6 +18,7 @@ import { attachTakeNarration } from "@/lib/takes/narration";
 import { eventCmFilm } from "@/remotion/event-cm/film";
 import { validateBrief } from "@/lib/templates/brief-schemas";
 import { EVENT_CM_SCENE_GAP_MS } from "@/remotion/event-cm/timeline";
+import { eventCmSpoken } from "@/remotion/event-cm/types";
 import { type EventCmBrief } from "@/remotion/event-cm/types";
 
 const unauthorized = () => Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -121,12 +122,24 @@ export async function POST(
   }
 
   try {
-    const { wav, track } = await generateVoice(scenes, {
-      persona: EVENT_CM_PERSONA,
-      voice: chosen.voice,
-      // The same pause the pre-recording timeline assumes (timeline.ts).
-      sceneGapMs: EVENT_CM_SCENE_GAP_MS,
-    });
+    const { wav, track } = await generateVoice(
+      // The narrator is handed the READING when a line has one, so the recording
+      // can say 「しめはりつる」 while the subtitle keeps 「〆張鶴」 (types.ts
+      // `eventCmSpoken`). The track therefore stores the spoken copy and not the
+      // reading beside it: what a recording needs to remember is what it said,
+      // and that is the string `voiceReadsNarration` compares against.
+      scenes.map((scene) => ({
+        role: scene.role,
+        ...(scene.index === undefined ? {} : { index: scene.index }),
+        text: eventCmSpoken(scene),
+      })),
+      {
+        persona: EVENT_CM_PERSONA,
+        voice: chosen.voice,
+        // The same pause the pre-recording timeline assumes (timeline.ts).
+        sceneGapMs: EVENT_CM_SCENE_GAP_MS,
+      },
+    );
     const attached = await attachTakeNarration(supabase, {
       takeId: take.id as string,
       brandId,

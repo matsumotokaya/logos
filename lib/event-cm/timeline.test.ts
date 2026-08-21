@@ -43,6 +43,46 @@ const withNarration = (brief: EventCmBrief, texts: string[]): EventCmBrief => ({
   },
 });
 
+test("録音前の尺は、読みが書かれていればその長さで見る", () => {
+  // A subtitle and its reading are not the same length — 「〆張鶴」 is three
+  // characters and しめはりつる is six — and the picture holds for as long as the
+  // VOICE takes. Estimating from the subtitle would make such a scene short
+  // before the recording lands and right afterwards, which on screen looks like
+  // the renderer changing its mind.
+  const plain = withNarration(SEEDED, ["あ".repeat(40)]);
+  const spelledOut: EventCmBrief = {
+    ...plain,
+    narration: {
+      ...plain.narration,
+      scenes: plain.narration.scenes.map((scene, index) =>
+        index === 0 ? { ...scene, reading: "あ".repeat(120) } : scene,
+      ),
+    },
+  };
+  const titleOf = (brief: EventCmBrief) =>
+    eventCmTimeline(brief).scenes.find((scene) => scene.role === "title")!;
+  assert.ok(
+    titleOf(spelledOut).durationMs > titleOf(plain).durationMs,
+    "読みが長いのに尺が伸びていない",
+  );
+
+  // And the other direction, so this is a rule and not a one-way nudge: a
+  // reading shorter than its subtitle shortens the scene.
+  const abbreviated: EventCmBrief = {
+    ...plain,
+    narration: {
+      ...plain.narration,
+      scenes: plain.narration.scenes.map((scene, index) =>
+        index === 0 ? { ...scene, reading: "あ".repeat(10) } : scene,
+      ),
+    },
+  };
+  assert.ok(
+    titleOf(abbreviated).durationMs < titleOf(plain).durationMs,
+    "読みが短いのに尺が縮んでいない",
+  );
+});
+
 test("ナレーションが無くても全シーンの尺が決まる", () => {
   // This is what makes "add a video" produce something that plays: no LLM
   // call, no render, and still a complete film. The seeded take now arrives

@@ -145,8 +145,27 @@ export interface EventCmScene {
    * single-programme take exactly as it was.
    */
   index?: number;
-  /** Exactly the words read aloud. No headings, no stage directions. */
+  /**
+   * The sentence itself: what the subtitles show, and what the narrator reads
+   * unless `reading` says otherwise. No headings, no stage directions.
+   */
   text: string;
+  /**
+   * How to SAY the sentence, when its spelling cannot be read aloud.
+   *
+   * 「〆張鶴」 is the case that asked for this — a brewery whose name is read
+   * しめはりつる, which no TTS voice can be trusted to guess. Writing the kana
+   * into `text` would fix the voice and break the subtitle: the screen would
+   * spell a two-hundred-year-old brand in kana. So the two are separated. The
+   * eye reads `text`, the ear reads this, and this one is optional because for
+   * almost every line they are the same sentence.
+   *
+   * The WHOLE line, not a per-word gloss. A reading is only useful if it can be
+   * handed to TTS as it stands; a substitution table would be a parser nobody
+   * asked for, and it would still have to decide what to do about 「〆」 at the
+   * start of a word versus inside one.
+   */
+  reading?: string;
 }
 
 /**
@@ -530,6 +549,19 @@ export function narrationStaleness(brief: EventCmBrief): NarrationStaleness {
 
 export const narrationIsStale = (brief: EventCmBrief): boolean =>
   narrationStaleness(brief) !== null;
+
+/**
+ * What the narrator says for one scene: the reading when there is one, the
+ * sentence otherwise.
+ *
+ * One expression, in one place, because four different consumers have to agree
+ * on it — the TTS call, its character-count guard, the pre-recording length
+ * estimate, and the record of what was actually read. Two spellings of this
+ * rule would mean a film whose voice says one thing while its 「録音は最新」
+ * badge is answering about another.
+ */
+export const eventCmSpoken = (scene: EventCmScene): string =>
+  scene.reading && scene.reading.trim().length > 0 ? scene.reading : scene.text;
 
 export const narrationText = (narration: EventCmNarration): string =>
   narration.scenes.map((scene) => scene.text).join("");
