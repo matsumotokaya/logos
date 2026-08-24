@@ -236,7 +236,16 @@ test("値のある部品は、どのフィールドを映しているか言え�
 });
 
 test("罫線は誰も埋める枠ではないので数に入らない", () => {
-  const storyboard = eventCmStoryboard(briefWith({ guests: GUESTS }));
+  // With artwork, so the opening plate draws its rule and credit. Without a
+  // logo file the mark IS the credit — the typographic fallback prints the
+  // presenter's name — and the scene drops both rather than printing that name
+  // twice with a rule between the copies.
+  const storyboard = eventCmStoryboard(
+    briefWith({
+      guests: GUESTS,
+      logos: [{ name: "レオパレス21", src: "material:mark" }],
+    }),
+  );
   const panel = storyboard.panels[0];
   const kinds = panel.regions.flatMap((region) =>
     region.blocks.map((block) => block.kind),
@@ -443,9 +452,11 @@ test("マークは絵コンテでも画像として描ける（枠と社名の�
 
   assert.equal(figure.src, "material:mark");
   assert.equal(figure.hasAsset, true);
-  // Knocked out by default, the same as the renderer: a dark mark on the ink
-  // ground is invisible drawn as supplied.
-  assert.equal(figure.treatment, "knockout");
+  // The panel carries what was measured and asks the theme how to paint it —
+  // the same rule the renderer follows, which is the panel's whole claim to
+  // honesty. It used to default to `knockout` here, which was right about ink
+  // and wrong about every other ground, exactly as the renderer was.
+  assert.equal(figure.treatment, undefined);
 
   const noArt = eventCmStoryboard(
     briefWith({ logos: [{ name: "レオパレス21", src: null }] }),

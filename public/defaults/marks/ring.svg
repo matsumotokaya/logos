@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="環を抽象化したダミーマーク">
+  <!-- PLACEHOLDER MARK, not anybody's identity. See docs/demo-assets.md §8.
+       One filled subpath tracing the outer arc and back along the inner one,
+       so the hole and the gap are transparency rather than white paint —
+       `knockout` turns white into white and would fill them both in. -->
+  <path
+    fill="#101418"
+    d="M84 18.4A48 48 0 1 1 36 18.4L44 32.3A32 32 0 1 0 76 32.3Z"
+  />
+</svg>

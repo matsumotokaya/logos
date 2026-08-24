@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="三層を抽象化したダミーマーク">
+  <!-- PLACEHOLDER MARK, not anybody's identity. See docs/demo-assets.md §8.
+       The frame is four filled bars rather than a stroked rect: a stroke needs
+       its own colour declared, and a mark that is one `fill` is the shape the
+       measurement (paint.ts) and every treatment can rely on. -->
+  <g fill="#101418">
+    <path d="M14 14h92v11H14Z"/>
+    <path d="M14 95h92v11H14Z"/>
+    <path d="M14 25h11v70H14Z"/>
+    <path d="M95 25h11v70H95Z"/>
+    <!-- Three strata, shortening upward. -->
+    <path d="M35 37h50v9H35Z"/>
+    <path d="M35 55h36v9H35Z"/>
+    <path d="M35 73h22v9H35Z"/>
+  </g>
+</svg>

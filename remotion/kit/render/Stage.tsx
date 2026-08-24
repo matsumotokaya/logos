@@ -104,7 +104,25 @@ export const Stage: React.FC<{
   const padY = Math.max(STAGE.padY, (theme.chrome.letterbox ?? 0) + 48);
 
   return (
-    <AbsoluteFill style={{ opacity: sceneFade(theme, frame, length) }}>
+    // `lang` and `wordBreak` sit HERE, on the one root, and nowhere else.
+    //
+    // Both are inherited, so one declaration reaches every component. Putting
+    // them in `typeStyle()` instead would mean every future text component has
+    // to remember them, and the one that forgets breaks Japanese lines in the
+    // middle of words again — 「金融教育を、じっくり考/える夜」 rather than
+    // 「金融教育を、/じっくり考える夜」.
+    //
+    // `auto-phrase` is not a style: a phrase broken mid-word is wrong in any
+    // art direction, so it is not on the theme's palette of choices. What the
+    // theme supplies is the LANGUAGE, without which the property does nothing
+    // at all (theme.ts `lang`).
+    <AbsoluteFill
+      lang={theme.lang}
+      style={{
+        opacity: sceneFade(theme, frame, length),
+        wordBreak: "auto-phrase",
+      }}
+    >
       {scene.backdrop ? (
         <Backdrop
           backdrop={scene.backdrop}

@@ -1,10 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { placeImagesIntoBrief, treatmentFor, type ImageMaterial } from "./place-images";
+import { placeImagesIntoBrief, type ImageMaterial } from "./place-images";
+import { treatmentOn } from "@/remotion/kit/mark";
+import { STANDARD_THEME, SUMI_THEME } from "@/remotion/kit/theme";
 import { markUserEdited, setSuppressed } from "./facts";
 import { seedEventCmBrief } from "./seed";
 import type { ImageReading } from "./structure";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
+
+/**
+ * Whether a slot was left alone by the reading.
+ *
+ * These tests used to say `=== null`, which meant the same thing only while an
+ * unfilled slot was an EMPTY one. The template now dresses all three from the
+ * default pool (lib/templates/catalog.ts `defaultVisuals`), so an untouched
+ * slot holds a stock photograph — and a stock photograph is exactly what a
+ * reading is allowed to replace. What the assertions were protecting is that
+ * the READING did not put its material here, so that is what they now say.
+ */
+const notTakenFromMaterial = (photo: { src: string } | null): boolean =>
+  !photo?.src.startsWith("material:");
 
 const SEEDED = seedEventCmBrief(
   { name: "WealthPark Lab", industry: "金融教育メディア" },
@@ -130,8 +145,8 @@ test("同じ画像を2つのスロットには入れない", () => {
   );
 
   assert.equal(result.brief.visuals.value?.src, "material:img-1");
-  assert.equal(result.brief.visuals.programs, null);
-  assert.equal(result.brief.visuals.closing, null);
+  assert.ok(notTakenFromMaterial(result.brief.visuals.programs));
+  assert.ok(notTakenFromMaterial(result.brief.visuals.closing));
 });
 
 test("確信の持てない画像は勝手に採用しない", () => {
@@ -142,7 +157,7 @@ test("確信の持てない画像は勝手に採用しない", () => {
     "フライヤー.pdf",
   );
 
-  assert.equal(result.brief.visuals.value, null);
+  assert.ok(notTakenFromMaterial(result.brief.visuals.value));
   assert.equal(result.placed.length, 0);
 });
 
@@ -167,7 +182,9 @@ test("利用者が決めた写真も、消した枠も上書きしない", () =>
   );
 
   assert.equal(result.brief.visuals.value?.src, "material:mine");
-  assert.equal(result.brief.visuals.programs, null);
+  // Suppressed, so the reading may not write here — the stock picture it was
+  // seeded with stays, and `applySuppression` is what takes it off screen.
+  assert.ok(notTakenFromMaterial(result.brief.visuals.programs));
   // The slots a person settled are untouched; the one still free may be filled.
   // Either way every picture is accounted for, placed or listed with a reason.
   assert.equal(result.placed.length + result.unused.length, 2);
@@ -187,21 +204,14 @@ test("資料そのものや質感は、映像のスロットに入れない", ()
 
   assert.equal(result.placed.length, 0);
   assert.equal(result.unused.length, 2);
-  assert.equal(result.brief.visuals.value, null);
+  assert.ok(notTakenFromMaterial(result.brief.visuals.value));
 });
 
-test("ロゴの描き方は、透過と輝度の両方で決まる", () => {
-  // Transparent artwork: brightness decides.
-  assert.equal(treatmentFor(0.1, false), "knockout");
-  assert.equal(treatmentFor(0.9, false), "light");
-  // Opaque artwork is drawn as supplied, whatever it measures. Knocking it out
-  // is what shipped wrong: the filter has no alpha to cut, so it painted the
-  // plate AND the mark white and a corporate logo rendered as a blank box.
-  assert.equal(treatmentFor(0.95, true), "light");
-  assert.equal(treatmentFor(0.1, true), "light");
-  // Unmeasurable falls to the treatment that cannot fail on an ink ground.
-  assert.equal(treatmentFor(null, false), "knockout");
-
+test("ロゴには描き方ではなく、測った値を記録する", () => {
+  // The pipeline READS the artwork; the theme decides how to paint it. A
+  // treatment written in here is a mark painted for exactly one ground, so a
+  // brief full of them cannot change art direction — which is the whole point
+  // of having two. See paint.ts `treatmentOn` for the decision itself.
   const result = placeImagesIntoBrief(
     SEEDED,
     [reading({ ref: "img-1", role: "logo", visibleText: ["宮尾酒造"] })],
@@ -212,18 +222,50 @@ test("ロゴの描き方は、透過と輝度の両方で決まる", () => {
   const added = result.brief.logos.at(-1);
   assert.equal(added?.src, "material:img-1");
   assert.equal(added?.name, "宮尾酒造");
-  assert.equal(added?.treatment, "knockout");
+  assert.equal(added?.treatment, undefined, "描き方を固めてはいけない");
+  assert.equal(added?.opaque, false);
+  assert.equal(added?.luminance, 0.12);
+
+  // The same row, painted both ways. This is what recording the measurement
+  // buys: one dark transparent mark, legible on ink AND on the light ground.
+  assert.equal(treatmentOn(SUMI_THEME.palette.ground, added!), "knockout");
+  assert.equal(treatmentOn(STANDARD_THEME.palette.ground, added!), "light");
 
   // The real case: a corporate mark supplied as a JPEG, dark artwork on a white
-  // plate. It is drawn as it came — plate and all — because the alternative on
-  // the screen was a blank white box with the mark destroyed.
+  // plate. It is drawn as it came — plate and all — on either ground, because a
+  // filter has no alpha to cut and the alternative was a blank box.
   const opaque = placeImagesIntoBrief(
     SEEDED,
     [reading({ ref: "img-2", role: "logo", visibleText: ["レオパレス21"] })],
     [material("img-2", { luminance: 0.93, opaque: true })],
     "フライヤー.pdf",
   );
-  assert.equal(opaque.brief.logos.at(-1)?.treatment, "light");
+  const plate = opaque.brief.logos.at(-1);
+  assert.equal(plate?.opaque, true);
+  assert.equal(treatmentOn(SUMI_THEME.palette.ground, plate!), "light");
+  assert.equal(treatmentOn(STANDARD_THEME.palette.ground, plate!), "light");
+});
+
+test("測っていない透過マークは、どちらの地でも必ず読める側へ倒す", () => {
+  // `null` is NOT MEASURED, not "dark". On ink every pixel goes white; on the
+  // light ground every pixel goes black. Both lose the brand's colour, which is
+  // the accepted cost of a mark that is legible at all.
+  const unmeasured = { opaque: false, luminance: null };
+  assert.equal(treatmentOn(SUMI_THEME.palette.ground, unmeasured), "knockout");
+  assert.equal(treatmentOn(STANDARD_THEME.palette.ground, unmeasured), "blackout");
+
+  // A pale mark is the mirror case: fine on ink, lost on white. Forced to the
+  // far side rather than inverted — `invert` would make two wrong tones of a
+  // two-tone mark, and a silhouette is how a mark is credited on a ground it
+  // cannot sit on. `invert` remains for a brief that names it.
+  const pale = { opaque: false, luminance: 0.9 };
+  assert.equal(treatmentOn(SUMI_THEME.palette.ground, pale), "light");
+  assert.equal(treatmentOn(STANDARD_THEME.palette.ground, pale), "blackout");
+
+  // A treatment already recorded wins on both grounds. Existing briefs carry
+  // one and no measurement, and one of them is a delivered commission.
+  const recorded = { opaque: false, luminance: 0.05, treatment: "light" as const };
+  assert.equal(treatmentOn(SUMI_THEME.palette.ground, recorded), "light");
 });
 
 test("判定が返らなかった画像も、消えずに理由が残る", () => {
@@ -274,8 +316,12 @@ test("すでに入っているロゴでも、描き方が違えば直す", () =>
     "フライヤー.pdf",
   );
 
-  assert.equal(result.brief.logos.at(-1)?.treatment, "light");
-  assert.match(result.placed[0]?.reason ?? "", /そのまま描くように直しました/);
+  // The frozen treatment is CLEARED, not corrected to another frozen value:
+  // that is what hands the decision back to the theme.
+  assert.equal(result.brief.logos.at(-1)?.treatment, undefined);
+  assert.equal(result.brief.logos.at(-1)?.opaque, true);
+  assert.equal(result.brief.logos.at(-1)?.luminance, 0.93);
+  assert.match(result.placed[0]?.reason ?? "", /測り直しました/);
   // Idempotent: run it again and there is nothing left to fix.
   const again = placeImagesIntoBrief(
     result.brief,
@@ -299,7 +345,7 @@ test("初めて置くマークも、なぜその描き方なのかを事実ど�
     [material("img-1", { luminance: 0.93, opaque: true })],
     "フライヤー.pdf",
   );
-  assert.equal(plated.brief.logos.at(-1)?.treatment, "light");
+  assert.equal(plated.brief.logos.at(-1)?.opaque, true);
   assert.match(plated.placed[0]?.reason ?? "", /地の付いた画像/);
 
   const darkOnAlpha = placeImagesIntoBrief(
@@ -308,8 +354,12 @@ test("初めて置くマークも、なぜその描き方なのかを事実ど�
     [material("img-1", { luminance: 0.1, opaque: false })],
     "フライヤー.pdf",
   );
-  assert.equal(darkOnAlpha.brief.logos.at(-1)?.treatment, "knockout");
+  const mark = darkOnAlpha.brief.logos.at(-1)!;
+  assert.equal(mark.opaque, false);
+  assert.equal(mark.luminance, 0.1);
   assert.match(darkOnAlpha.placed[0]?.reason ?? "", /透過した暗いマーク/);
+  // The log no longer names a filter, because the filter is not decided here.
+  assert.doesNotMatch(darkOnAlpha.placed[0]?.reason ?? "", /白抜き/);
 });
 
 test("正規化版があるマークは、正規化版が映像に載る（原本は読み取り側に残る）", () => {

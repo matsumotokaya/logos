@@ -22,7 +22,8 @@ import {
 import type { LogoTreatment } from "@/remotion/event/types";
 import { captionSafeBottom, type Theme } from "../theme";
 import { enterStyle } from "./motion";
-import { focusPosition, resolveSrc, TREATMENT_FILTER } from "../paint";
+import { focusPosition, markPainting, resolveSrc } from "../paint";
+import { phraseBlocks } from "../phrase";
 
 function typeStyle(theme: Theme, emphasis: Emphasis, display: boolean): React.CSSProperties {
   const step = theme.scale[emphasis];
@@ -35,37 +36,60 @@ function typeStyle(theme: Theme, emphasis: Emphasis, display: boolean): React.CS
   };
 }
 
-/** Per-character staggered reveal. Reserved for the loudest text on a stage:
- *  used everywhere it becomes a tic rather than an entrance. */
+/**
+ * Per-character staggered reveal. Reserved for the loudest text on a stage:
+ * used everywhere it becomes a tic rather than an entrance.
+ *
+ * Characters are grouped into phrase blocks (../phrase.ts) and the flex wraps
+ * between BLOCKS, never inside one. Animating per character makes every
+ * character its own flex item, and a wrapping flex breaks between any two items
+ * — which is why `word-break: auto-phrase` on the Stage root, correct for every
+ * plain run in the film, changed nothing at all here. The title kept breaking
+ * mid-word (「コンサルティングについ / て、話をします」) until this grouping
+ * existed.
+ *
+ * The cascade counts through the whole string rather than restarting per block,
+ * so the reveal still reads as one movement across the line.
+ */
 const CharReveal: React.FC<{
   text: string;
   delay: number;
+  lang: string;
   style: React.CSSProperties;
-}> = ({ text, delay, style }) => {
+}> = ({ text, delay, lang, style }) => {
   const frame = useCurrentFrame();
+  const charStyle = (index: number): React.CSSProperties => {
+    const start = delay + index * 4;
+    const t = interpolate(frame, [start, start + 20], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    const ease = 1 - Math.pow(1 - t, 3);
+    return {
+      display: "inline-block",
+      opacity: ease,
+      transform: `translateY(${(1 - ease) * 30}px)`,
+      filter: `blur(${(1 - ease) * 6}px)`,
+    };
+  };
+
+  let index = 0;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", ...style }}>
-      {Array.from(text).map((char, i) => {
-        const start = delay + i * 4;
-        const t = interpolate(frame, [start, start + 20], [0, 1], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        });
-        const ease = 1 - Math.pow(1 - t, 3);
-        return (
-          <span
-            key={`${char}-${i}`}
-            style={{
-              display: "inline-block",
-              opacity: ease,
-              transform: `translateY(${(1 - ease) * 30}px)`,
-              filter: `blur(${(1 - ease) * 6}px)`,
-            }}
-          >
-            {char === " " ? " " : char}
-          </span>
-        );
-      })}
+      {phraseBlocks(text, lang).map((block, blockIndex) => (
+        <span
+          key={`${block}-${blockIndex}`}
+          // The block is the unit a line may break between, so it must not
+          // break inside: `nowrap` is what actually holds the rule.
+          style={{ display: "inline-block", whiteSpace: "nowrap" }}
+        >
+          {Array.from(block).map((char, charIndex) => (
+            <span key={`${char}-${charIndex}`} style={charStyle(index++)}>
+              {char === " " ? "\u00a0" : char}
+            </span>
+          ))}
+        </span>
+      ))}
     </div>
   );
 };
@@ -186,8 +210,10 @@ const PersonBlock: React.FC<{ theme: Theme; person: PersonParams; size: number }
 );
 
 /** A logo image, or its name set as a credit — the designed substitute.
- *  The treatment filter itself lives in ../paint.ts, shared with the
- *  storyboard. */
+ *  How it is painted is derived from the theme's ground and what was measured
+ *  about the artwork; both rules live in ../paint.ts, shared with the
+ *  storyboard. This used to default to `knockout`, which is correct on ink and
+ *  paints an invisible white mark on the standard ground. */
 const LogoMark: React.FC<{
   theme: Theme;
   src: string | null;
@@ -195,15 +221,22 @@ const LogoMark: React.FC<{
   scale?: number;
   height: number;
   treatment?: LogoTreatment;
-}> = ({ theme, src, name, scale = 1, height, treatment = "knockout" }) =>
-  src ? (
+  opaque?: boolean | null;
+  luminance?: number | null;
+}> = ({ theme, src, name, scale = 1, height, treatment, opaque, luminance }) => {
+  // Two ways to end up with no artwork, and the same answer for both: there
+  // was none, or there was some that provably cannot be seen on this ground.
+  // Drawing an invisible mark is worse than drawing the name, because the frame
+  // looks finished and is missing the one thing it was there to say.
+  const painting = markPainting(theme.palette.ground, { treatment, opaque, luminance });
+  return src && painting.draw === "artwork" ? (
     <Img
       src={resolveSrc(src)}
       style={{
         height: height * scale,
         width: "auto",
         objectFit: "contain",
-        filter: TREATMENT_FILTER[treatment],
+        filter: painting.filter,
       }}
     />
   ) : (
@@ -218,6 +251,7 @@ const LogoMark: React.FC<{
       {name}
     </span>
   );
+};
 
 export const KitComponent: React.FC<{
   component: SceneComponent;
@@ -258,6 +292,7 @@ export const KitComponent: React.FC<{
         <CharReveal
           text={component.text}
           delay={delay}
+          lang={theme.lang}
           style={{
             ...typeStyle(theme, emphasis, true),
             fontWeight: 600,
@@ -492,6 +527,8 @@ export const KitComponent: React.FC<{
             name={component.name}
             scale={component.scale}
             treatment={component.treatment}
+            opaque={component.opaque}
+            luminance={component.luminance}
             height={step.size * 1.6}
           />
         </div>
@@ -517,6 +554,8 @@ export const KitComponent: React.FC<{
               name={logo.name}
               scale={logo.scale}
               treatment={logo.treatment}
+              opaque={logo.opaque}
+              luminance={logo.luminance}
               height={step.size * 1.5}
             />
           ))}

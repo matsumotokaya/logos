@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="組子を抽象化したダミーマーク">
+  <!-- PLACEHOLDER MARK, not anybody's identity. See docs/demo-assets.md §8.
+       Two squares in one path with `evenodd`, so where they overlap the
+       winding count is even and the intersection is a HOLE. Drawing that
+       square in white instead would look identical here and disappear under
+       `knockout`, which is the trap this whole set is written around. -->
+  <path
+    fill="#101418"
+    fill-rule="evenodd"
+    d="M16 16h56v56H16Z M48 48h56v56H48Z"
+  />
+</svg>

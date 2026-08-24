@@ -29,7 +29,7 @@ import {
   type StoryboardPanel,
 } from "@/lib/storyboard/event-cm";
 import { LAYOUTS, REGION_GEOMETRY, STAGE } from "@/remotion/kit/layout";
-import { focusPosition, TREATMENT_FILTER } from "@/remotion/kit/paint";
+import { focusPosition, markPainting } from "@/remotion/kit/paint";
 import { captionSafeBottom, type Theme } from "@/remotion/kit/theme";
 import {
   EVENT_CM_CHARS_PER_SECOND,
@@ -138,7 +138,13 @@ function Block({ block, theme }: { block: StoryboardBlock; theme: Theme }) {
   if (block.kind === "logo") {
     const figure = block.figures[0];
     const height = Math.round(step.size * 1.6);
-    if (figure?.src) {
+    // Asked the same question the renderer asks, so a mark the film will not
+    // draw is not drawn here either. A storyboard that shows artwork the film
+    // replaces with a credit is not a preview of anything.
+    const painting = figure
+      ? markPainting(theme.palette.ground, figure)
+      : ({ draw: "credit" } as const);
+    if (figure?.src && painting.draw === "artwork") {
       return (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -149,7 +155,7 @@ function Block({ block, theme }: { block: StoryboardBlock; theme: Theme }) {
             width: "auto",
             maxWidth: "100%",
             objectFit: "contain",
-            filter: TREATMENT_FILTER[figure.treatment ?? "knockout"],
+            filter: painting.filter,
           }}
         />
       );
@@ -162,8 +168,9 @@ function Block({ block, theme }: { block: StoryboardBlock; theme: Theme }) {
   if (block.kind === "logoRow") {
     return (
       <div style={{ display: "flex", gap: 40, alignItems: "center" }}>
-        {block.figures.map((figure, index) =>
-          figure.src ? (
+        {block.figures.map((figure, index) => {
+          const painting = markPainting(theme.palette.ground, figure);
+          return figure.src && painting.draw === "artwork" ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               key={`${figure.label}-${index}`}
@@ -173,13 +180,13 @@ function Block({ block, theme }: { block: StoryboardBlock; theme: Theme }) {
                 height: 56,
                 width: "auto",
                 objectFit: "contain",
-                filter: TREATMENT_FILTER[figure.treatment ?? "knockout"],
+                filter: painting.filter,
               }}
             />
           ) : (
             <LogoCredit key={`${figure.label}-${index}`} theme={theme} name={figure.label} />
-          ),
-        )}
+          );
+        })}
       </div>
     );
   }

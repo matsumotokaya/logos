@@ -12,7 +12,11 @@ const BRANDED = seedEventCmBrief(
     industry: "金融教育メディア",
     palette: { accent: "#c8a15a", primary: "#101010" },
     headingFont: "Shippori Mincho",
-    logoSrc: "material:11111111-1111-4111-8111-111111111111",
+    logo: {
+      src: "material:11111111-1111-4111-8111-111111111111",
+      opaque: false,
+      luminance: 0.003,
+    },
   },
   { now: new Date("2026-08-17T09:00:00+09:00"), seed: "take-1" },
 );

@@ -205,6 +205,24 @@ export interface Theme {
   displayFont: string;
   /** Text family — everything else. */
   textFont: string;
+  /**
+   * BCP 47 language of the type, e.g. `ja`.
+   *
+   * Declared because `word-break: auto-phrase` — which stops Japanese lines
+   * breaking mid-word — needs a language to segment. Without it the property is
+   * silently inert, and that silence cost a session: the effect was reported as
+   * "impossible in Remotion" and nearly replaced by a hand-written phrase
+   * dictionary (labs/freehand/sake-2026/FINDINGS.md, v10).
+   *
+   * The THEME owns it rather than the brief, because every other typographic
+   * decision here is the theme's — family, scale, tracking — and phrase
+   * breaking is one of those. The cost of that choice is an English event
+   * rendered in a Japanese art direction getting `lang="ja"`, which is
+   * harmless: `auto-phrase` has no dictionary to apply and spaces still govern.
+   * A non-Japanese art direction declares its own, the same way it declares its
+   * own fonts.
+   */
+  lang: string;
   scale: Record<Emphasis, TypeStep>;
   motion: ThemeMotion;
   ornament: ThemeOrnament;
@@ -220,6 +238,7 @@ export interface Theme {
  */
 export const SUMI_THEME: Theme = {
   id: "sumi",
+  lang: "ja",
   name: "墨（和モダン）",
   palette: {
     ground: "#0b0d13",
@@ -303,6 +322,7 @@ export const SUMI_THEME: Theme = {
  */
 export const STANDARD_THEME: Theme = {
   id: "standard",
+  lang: "ja",
   name: "スタンダード（企業）",
   palette: {
     // Not #ffffff: a pure white ground makes the photographs look pasted on,

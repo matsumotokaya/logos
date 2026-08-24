@@ -28,11 +28,45 @@ export interface SeededEventCm {
   logoNote: string | null;
 }
 
+/**
+ * A promoted mark, and what was measured about it.
+ *
+ * The measurement is part of the return value because it was already part of
+ * the work: this function measures the SVG, writes the result to
+ * `brand_materials`, and used to hand back only `{id, checksum}`. The seeder
+ * then had nothing to put in the brief, the renderer had nothing to read, and
+ * the mark was drawn as supplied — a 0.003-luminance SVG on the ink ground.
+ * Measuring something and not returning it is how that happened.
+ */
+interface PromotedLogo {
+  id: string;
+  checksum: string;
+  opaque: boolean | null;
+  luminance: number | null;
+}
+
+/**
+ * One row, read the same way on both paths.
+ *
+ * `luminance` is `numeric` in Postgres and arrives as a STRING through
+ * postgres-js. Handed straight to the renderer it compares as a string against
+ * 0.45 and the treatment comes out wrong for every mark — so the coercion
+ * happens here, once, where the column type is in view.
+ */
+const measuredLogo = (row: Record<string, unknown>): PromotedLogo => ({
+  id: row.id as string,
+  checksum: row.checksum as string,
+  opaque: typeof row.opaque === "boolean" ? row.opaque : null,
+  luminance: row.luminance === null || row.luminance === undefined
+    ? null
+    : Number(row.luminance),
+});
+
 async function promoteLogoToMaterial(
   supabase: SupabaseClient,
   brandId: string,
   userId: string,
-): Promise<{ material: { id: string; checksum: string } | null; note: string | null }> {
+): Promise<{ material: PromotedLogo | null; note: string | null }> {
   const { data: logos, error } = await supabase
     .from("logos")
     .select("id, title, logo_candidates(id, is_primary, svg, media_type)")
@@ -54,17 +88,14 @@ async function promoteLogoToMaterial(
 
   const existing = await supabase
     .from("brand_materials")
-    .select("id, checksum")
+    .select("id, checksum, opaque, luminance")
     .eq("brand_id", brandId)
     .eq("scope", "brand")
     .eq("logo_candidate_id", candidate.id)
     .limit(1)
     .maybeSingle();
   if (existing.data?.checksum) {
-    return {
-      material: { id: existing.data.id as string, checksum: existing.data.checksum as string },
-      note: null,
-    };
+    return { material: measuredLogo(existing.data), note: null };
   }
 
   if (!isR2Configured()) {
@@ -100,13 +131,13 @@ async function promoteLogoToMaterial(
       provenance: { source: "logo_master", logo_id: owner.id, promoted_by: userId },
       created_by: userId,
     })
-    .select("id, checksum")
+    .select("id, checksum, opaque, luminance")
     .maybeSingle();
   if (inserted.error || !inserted.data) {
     return { material: null, note: "ロゴを素材として登録できませんでした" };
   }
   return {
-    material: { id: inserted.data.id as string, checksum: inserted.data.checksum as string },
+    material: measuredLogo(inserted.data),
     note: null,
   };
 }
@@ -156,7 +187,13 @@ export async function seedEventCmFromBrand(
       palette,
       headingFont: typography.heading_font ?? null,
       bodyFont: typography.body_font ?? null,
-      logoSrc: material ? materialUri(material.id) : null,
+      logo: material
+        ? {
+            src: materialUri(material.id),
+            opaque: material.opaque,
+            luminance: material.luminance,
+          }
+        : null,
     },
     { now: input.now ?? new Date(), seed: input.brandId },
   );

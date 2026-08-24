@@ -3,7 +3,8 @@ import test from "node:test";
 import { sceneForRole } from "@/remotion/kit/scenes/event-cm";
 import { fitScene } from "@/remotion/kit/fit";
 import { LAYOUTS, overCapacity } from "@/remotion/kit/layout";
-import { SUMI_THEME, themeForBrand } from "@/remotion/kit/theme";
+import { STANDARD_THEME, SUMI_THEME, themeForBrand } from "@/remotion/kit/theme";
+import { treatmentOn } from "@/remotion/kit/mark";
 import {
   EVENT_CM_PROGRAM_SCENES,
   EVENT_CM_SUPPRESSED_NOTE as SUPPRESSED_NOTE,
@@ -70,34 +71,51 @@ test("日本酒のブリーフはすべてのシーンに中身がある", () =>
   }
 });
 
-test("墨の地に乗るロゴは白抜きになる", () => {
-  // The bug this exists to catch: the kit ignored `treatment` entirely, so a
-  // black brand SVG was drawn as a black mark on the ink ground.
-  const mark = sceneForRole("logoIn", SAKE).components.find(
+test("ロゴの描き方はシーンが決めず、地が決める", () => {
+  // The kit once ignored `treatment` entirely and drew a black brand SVG as a
+  // black mark on ink. The fix forced `knockout` here — right for the only
+  // ground that existed, and the reason a standard film opened on an invisible
+  // white mark. So the scene now CARRIES what was measured and the theme
+  // decides (paint.ts `treatmentOn`).
+  const measured = {
+    ...SAKE,
+    logos: [{ name: "宮尾酒造", src: "material:d", opaque: false, luminance: 0.05 }],
+  };
+  const mark = sceneForRole("logoIn", measured).components.find(
     (component) => component.kind === "logo",
   );
   assert.ok(mark && mark.kind === "logo");
-  assert.equal(mark.treatment, "knockout", "冒頭のロゴが白抜き指定になっていない");
+  assert.equal(mark.treatment, undefined, "シーンが描き方を固めている");
+  assert.equal(mark.opaque, false);
+  assert.equal(mark.luminance, 0.05);
+  // One mark, both grounds, no rewrite of the brief in between.
+  assert.equal(treatmentOn(SUMI_THEME.palette.ground, mark), "knockout");
+  assert.equal(treatmentOn(STANDARD_THEME.palette.ground, mark), "light");
 
-  // The brief's own instruction wins where it has one.
+  // The brief's own instruction still wins where it has one — existing briefs
+  // carry one, and one of those is a delivered commission.
   const stated = sceneForRole("logoIn", {
     ...SAKE,
     logos: [{ name: "レオパレス21", src: "material:d", treatment: "light" }],
   }).components.find((component) => component.kind === "logo");
   assert.ok(stated && stated.kind === "logo");
-  assert.equal(stated.treatment, "light");
+  assert.equal(treatmentOn(SUMI_THEME.palette.ground, stated), "light");
 
-  // The closing credits row sits on the same ground.
-  const row = sceneForRole("cta", SAKE).components.find(
+  // The closing credits row goes through the same rule, mark by mark.
+  const row = sceneForRole("cta", measured).components.find(
     (component) => component.kind === "logoRow",
   );
   assert.ok(row && row.kind === "logoRow");
   assert.equal(
-    row.logos.every((logo) => logo.treatment !== undefined),
+    row.logos.every(
+      (logo) => TREATMENTS.has(treatmentOn(SUMI_THEME.palette.ground, logo)),
+    ),
     true,
-    "クレジット列に扱いの指定が無いロゴがある",
+    "クレジット列に描き方の決まらないロゴがある",
   );
 });
+
+const TREATMENTS = new Set(["light", "invert", "knockout", "blackout"]);
 
 test("登壇者の絵はテンプレートが持ち、消したときだけ消える", () => {
   // The speaker picture is the template's, not the facts'. An empty guest list

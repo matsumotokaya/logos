@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { proposedDate, seedEventCmBrief } from "./seed";
 import { archetypeFor } from "./archetypes";
-import { templateBgm } from "@/lib/assets/defaults";
+import { templateBgm, templatePortrait, templateVisual } from "@/lib/assets/defaults";
 import { currentTemplate } from "@/lib/templates/catalog";
 import { eventCmGoalState } from "@/lib/pipeline/event-cm";
 import { validateBrief } from "@/lib/templates/brief-schemas";
+import { SUMI_THEME, themeById } from "@/remotion/kit/theme";
 import {
   eventCmNarratedSteps,
   eventCmSceneBudget,
@@ -215,14 +216,41 @@ test("登壇者は役割で提案し、氏名は発明しない", () => {
   // The picture is part of the template now, so the list cannot be empty: an
   // empty one would open the film's fifth picture with nothing on it.
   const guests = seedFor(WEALTHPARK_LAB).guests;
+  assert.ok(
+    guests.every((guest) => guest.name.includes("（見本）")),
+    "見本の顔写真に、見本だと分かる名前が付いていない",
+  );
+  // Still a role and not a person: strip the caveat and nothing name-like is
+  // left. This is the assertion that has to survive — a stock face beside an
+  // invented 「山田 太郎」 is the failure the whole rule exists to prevent.
   assert.deepEqual(
-    guests.map((guest) => guest.name),
+    guests.map((guest) => guest.name.replace("（見本）", "")),
     ["ゲストスピーカー", "モデレーター"],
   );
   assert.ok(
-    guests.every((guest) => guest.role === "" && guest.photo === null),
+    guests.every((guest) => guest.role === ""),
     "肩書きや所属は事実なので、提案しない",
   );
+});
+
+test("登壇者には、見た目の違う見本写真が付く", () => {
+  // Two grey-haired men in navy suits is what pool order would have given, and
+  // a speaker scene where both panels read as the same person is worse than one
+  // with no photographs at all. The template names them (catalog.ts), so this
+  // reads the declaration rather than the filenames.
+  const guests = seedFor(WEALTHPARK_LAB).guests;
+  const declared = currentTemplate("event-cm")?.defaultVisuals ?? {};
+
+  guests.forEach((guest, at) => {
+    const asset = templatePortrait(declared[`guests.${at}.photo`]);
+    assert.ok(asset, `guests.${at}.photo に見本写真が宣言されていない`);
+    assert.equal(guest.photo?.src, asset.src);
+  });
+  assert.notEqual(guests[0].photo?.src, guests[1].photo?.src, "同じ顔が2枚並んでいる");
+
+  // Named as this tool's guess, so the fact list says 「仮に入れた値」.
+  const brief = seedFor(WEALTHPARK_LAB);
+  assert.equal(brief.provenance?.["guests.0.photo"]?.origin, "inferred");
 });
 
 test("シードのナレーションは、喋る全シーンに1行ずつ入る", () => {
@@ -266,10 +294,30 @@ test("同じブランドからは毎回同じブリーフが出る", () => {
   assert.deepEqual(seedFor(WEALTHPARK_LAB), seedFor(WEALTHPARK_LAB));
 });
 
-test("素材プールが空でもブリーフは成立する", () => {
+test("新しい動画は、テンプレートの既定画像で3つの地が埋まる", () => {
+  // This used to assert the slots were NULL, and the pool being empty was the
+  // only reason that held. Now that it carries pictures, the seed takes tier 2
+  // of the ladder (brand → TEMPLATE → system → the composition's designed
+  // substitute), and the film opens on a photograph rather than bare ink.
+  //
+  // The tier-4 premise — a slot the pool cannot fill is still a finished frame
+  // — has not gone away and is not tested here; it belongs to the art
+  // direction, and lib/kit/themes.test.ts guards it ("どのテーマも素材ゼロの
+  // 地を持つ"). Asserting it from an accident of an empty pool is what stopped
+  // being possible.
   const brief = seedFor(WEALTHPARK_LAB);
-  // Null visual slots are carried by the composition's designed fallbacks.
-  assert.equal(brief.visuals.value, null);
+  const declared = currentTemplate("event-cm")?.defaultVisuals ?? {};
+
+  for (const path of ["visuals.value", "visuals.programs", "visuals.closing"]) {
+    const asset = templateVisual(declared[path]);
+    assert.ok(asset, `${path} に既定画像が宣言されていない`);
+    const key = path.split(".")[1] as "value" | "programs" | "closing";
+    assert.equal(brief.visuals[key]?.src, asset.src);
+    // Named as this tool's guess, not as the brand's own picture — a stock
+    // photograph must show up in the fact list as 「仮に入れた値」.
+    assert.equal(brief.provenance?.[path]?.origin, "inferred");
+  }
+
   assert.ok(brief.title.length > 0);
   assert.ok(brief.programs.length > 0);
 });
@@ -284,6 +332,21 @@ test("新しい動画には最初からBGMが入る", () => {
   assert.ok(declared, "event-cm が既定BGMを宣言していない");
   assert.equal(brief.bgm, declared?.src);
   assert.equal(brief.provenance?.bgm?.origin, "inferred");
+});
+
+test("モダンジャパニーズのテンプレートは墨で始まる", () => {
+  // The catalog calls this template's variant モダンジャパニーズ, and a variant IS
+  // the art direction (catalog.ts). So a take of it that opens on a white
+  // corporate ground contradicts the name the user chose in the add dialog —
+  // which is exactly what shipped: the seed stamped the global NEW_FILM_THEME_ID
+  // on every new film, and there is no switch anywhere to correct it.
+  //
+  // Reads the catalog rather than naming "sumi", for the same reason the BGM
+  // test does: the declaration is the source of truth, not this file.
+  const declared = currentTemplate("event-cm")?.defaultRenders[0]?.theme;
+  assert.ok(declared, "event-cm が既定のアートディレクションを宣言していない");
+  assert.equal(seedFor(WEALTHPARK_LAB).artDirection, declared);
+  assert.equal(themeById(declared).id, SUMI_THEME.id);
 });
 
 test("既定のBGMはブランドが違っても同じ", () => {

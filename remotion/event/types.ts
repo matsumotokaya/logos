@@ -45,13 +45,40 @@ export type LogoTreatment =
    * the accepted cost — a knocked-out mark is the standard way to credit a
    * presenter on black, and an unreadable one credits nobody.
    */
-  | "knockout";
+  | "knockout"
+  /**
+   * The mirror of `knockout`: every pixel forced to black (`brightness(0)`).
+   *
+   * What "cannot fail" means on a LIGHT ground. Without it a light art
+   * direction has no safe answer for an unmeasured transparent mark — `light`
+   * loses a pale one and `invert` ruins a dark one — so the default fell back
+   * to knockout and painted a white mark on white.
+   */
+  | "blackout";
 
 export interface EventLogo {
   name: string;
   /** staticFile name or URL; null = typographic fallback. */
   src: string | null;
+  /**
+   * A painting decision already committed to, which overrides the measurement.
+   *
+   * Prefer leaving this absent and recording the measurement below: a stored
+   * treatment is a mark painted for exactly one ground, so a brief full of them
+   * cannot change art direction. Kept because existing briefs carry one — one
+   * of them a delivered commission — and those must not be repainted.
+   */
   treatment?: LogoTreatment;
+  /**
+   * Measured: the artwork has no alpha channel to cut.
+   *
+   * Absent means NOT MEASURED, which is not the same as `false`. The theme
+   * decides how to paint from this (paint.ts `treatmentOn`), so the same mark
+   * comes out legible on ink and on white without the brief being rewritten.
+   */
+  opaque?: boolean | null;
+  /** Measured: 0–1 brightness of the artwork. Absent means not measured. */
+  luminance?: number | null;
   /** Per-logo optical size correction — logotypes and square seals never
    *  balance at one shared height. Multiplies the row's base height. */
   scale?: number;

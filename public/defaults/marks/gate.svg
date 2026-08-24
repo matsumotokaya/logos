@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="門を抽象化したダミーマーク">
+  <!-- PLACEHOLDER MARK, not anybody's identity. See docs/demo-assets.md §8.
+       Dark on transparency, single colour, no white fills: `knockout`
+       (brightness(0) invert(1)) paints every pixel white, so a counter drawn
+       in white would vanish into the mark. Every gap here is real
+       transparency. -->
+  <g fill="#101418">
+    <!-- Lintel, overhanging the posts: reads as a gateway rather than a frame. -->
+    <path d="M10 22h100v13H10Z"/>
+    <path d="M22 46h76v10H22Z"/>
+    <path d="M30 56h13v52H30Z"/>
+    <path d="M77 56h13v52H77Z"/>
+  </g>
+</svg>

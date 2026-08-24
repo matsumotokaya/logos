@@ -277,6 +277,31 @@ export const TEMPLATES: TemplateEntry[] = [
     // Placeholder: matches the 墨黒×金×明朝 art direction. Ducks under the
     // narration and returns for the closing mark.
     defaultBgm: "bgm-ink-cinematic",
+    // Subject "日本文化を学ぶ" (docs/demo-assets.md §5-6). Chosen per slot by
+    // what each layout needs, not by which picture is prettiest:
+    //
+    // - `programs` is drawn TWICE — full presence under the centred title, and
+    //   dimmed behind each agenda card. So it needs its subject centre-right:
+    //   far right leaves the title standing on empty floor. 茶碗と茶筅 sits
+    //   right of centre; 炉と光 (still-tearoom-hearth) does not, and is the
+    //   alternate rather than the default for that reason alone.
+    // - `value` is the hero behind the promise, so it takes the strongest
+    //   picture: 硯と筆 says "learning" without a single written character.
+    // - `closing` carries date, venue and the call in its lower left, which is
+    //   why the lecture room won over the entrance — its lower left is empty
+    //   tatami, the entrance's is textured wet paving.
+    //
+    // The two speaker portraits are here too, and they are chosen to look
+    // UNALIKE. Pool order would have given two grey-haired men in navy suits,
+    // and a speaker scene where both panels read as the same person is worse
+    // than one with no photographs at all.
+    defaultVisuals: {
+      "visuals.programs": "still-tearoom-bowl",
+      "visuals.value": "still-inkstone",
+      "visuals.closing": "still-venue-lanterns",
+      "guests.0.photo": "portrait-speaker-01",
+      "guests.1.photo": "portrait-speaker-03",
+    },
     // The storyboard is a workbench: edits collect there and reach the film
     // only when the user asks. The only template that works this way today.
     bakesBrief: true,

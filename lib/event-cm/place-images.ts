@@ -117,33 +117,6 @@ const photoOf = (reading: ImageReading, placedId: string): EventPhoto => ({
   focus: { x: FOCUS_X[reading.focusX], y: FOCUS_Y[reading.focusY] },
 });
 
-/**
- * How a mark must be drawn on the ink ground, from what was measured.
- *
- * Not asked of the model — the answer follows from two measurements
- * (deliverable-architecture §17.2), and it takes both:
- *
- *   - **Opaque artwork is drawn as supplied.** A CSS filter cannot remove a
- *     white plate: it has no alpha to cut. `knockout` is
- *     `brightness(0) invert(1)`, which on an opaque raster paints EVERY pixel
- *     white — the plate and the mark together. That is what shipped: a
- *     corporate logo delivered as a JPEG rendered as a blank white box with no
- *     mark in it, which is worse than the white rectangle the rule was written
- *     to avoid. Cutting a plate away is an image operation at ingest
- *     (labs/event/scripts/prepare-assets.mjs does it with sharp), never a
- *     filter at draw time. So the plate shows, and the mark is legible.
- *   - **On transparency, brightness decides.** A dark mark drawn as supplied is
- *     invisible on black; a mark that is already light must be left alone.
- *
- * Unmeasurable transparency falls to `knockout`: with an alpha channel to work
- * on, it is the treatment that cannot fail.
- */
-export function treatmentFor(luminance: number | null, opaque = true) {
-  if (opaque) return "light" as const;
-  if (luminance === null) return "knockout" as const;
-  return luminance < 0.45 ? ("knockout" as const) : ("light" as const);
-}
-
 /** Confidence high or medium. `low` never places itself; it waits to be chosen. */
 const confident = (reading: ImageReading) => reading.confidence !== "low";
 
@@ -206,7 +179,24 @@ export function placeImagesIntoBrief(
   const slotFree = (path: string, occupied: boolean): string | null => {
     if (isSuppressed(brief, path)) return "この項目は画面から外されています";
     if (provenance[path]?.origin === "user") return "利用者が決めた値があります";
-    if (occupied) return "すでに写真があります";
+    // A STOCK PICTURE YIELDS TO THE USER'S OWN MATERIAL.
+    //
+    // `occupied` used to be enough, because the only things that filled a slot
+    // were a person and a previous reading. Then the template began dressing
+    // its slots from the default pool (catalog.ts `defaultVisuals`), and an
+    // occupied slot stopped meaning "somebody decided this" — so a flyer's real
+    // key visual lost to a generic photograph of an inkstone. That is the
+    // default ladder upside down: the brand's own picture is tier 1 and the
+    // pool is tier 2.
+    //
+    // `inferred` is exactly the mark the seed leaves (`inferred(path,
+    // "テンプレートの既定画像")`), so the distinction was already recorded and
+    // simply not read. Unknown provenance still blocks: a hand-written brief
+    // predates provenance, and a value nobody can account for is treated as
+    // somebody's decision rather than overwritten.
+    if (occupied && provenance[path]?.origin !== "inferred") {
+      return "すでに写真があります";
+    }
     return null;
   };
 
@@ -277,19 +267,40 @@ export function placeImagesIntoBrief(
     }
     const uri = materialUri(placedId(reading));
     const material = materialFor(reading);
-    const treatment = treatmentFor(material?.luminance ?? null, material?.opaque ?? true);
+    // What was MEASURED, not how to paint it. The painting is the theme's
+    // answer (paint.ts `treatmentOn`), because a treatment written into the
+    // brief is a mark painted for exactly one ground — the film could then
+    // never change art direction without every mark going wrong. Recording the
+    // measurement instead means the same row is correct on ink and on white.
+    const measured = {
+      opaque: material?.opaque ?? null,
+      luminance: material?.luminance ?? null,
+    };
+    const transparentDark =
+      measured.opaque === false &&
+      measured.luminance !== null &&
+      measured.luminance < 0.45;
 
     if (knownLogoSrcs.has(uri)) {
-      // Already in the row — but the way it is drawn may be wrong, and a
-      // re-run has to be able to correct that. Refusing every mark it had seen
-      // before meant a logo that once landed as a white box on the ink stayed
-      // a white box no matter how many times the pipeline was run.
+      // Already in the row — but a re-run has to be able to correct what is
+      // recorded about it. Refusing every mark it had seen before meant a logo
+      // that once landed as a white box on the ink stayed a white box no matter
+      // how many times the pipeline was run. Now it also clears any treatment
+      // frozen in by an older build, so the theme regains the decision.
       const at = next.logos.findIndex((logo) => logo.src === uri);
-      if (at >= 0 && next.logos[at].treatment !== treatment) {
+      const current = at >= 0 ? next.logos[at] : null;
+      const stale =
+        current !== null &&
+        (current.opaque !== measured.opaque ||
+          current.luminance !== measured.luminance ||
+          current.treatment !== undefined);
+      if (stale) {
         next = {
           ...next,
           logos: next.logos.map((logo, index) =>
-            index === at ? { ...logo, treatment } : logo,
+            index === at
+              ? { ...logo, ...measured, treatment: undefined }
+              : logo,
           ),
         };
         claim(
@@ -297,9 +308,9 @@ export function placeImagesIntoBrief(
           "logos",
           SLOT_LABELS.logos,
           "inferred",
-          treatment === "knockout"
-            ? "透過した暗いマークだったので、白抜きに直しました"
-            : "地の付いた画像だったので、そのまま描くように直しました",
+          transparentDark
+            ? "透過した暗いマークだと測り直しました。地に応じて描き分けます"
+            : "画像を測り直しました。地に応じて描き分けます",
         );
       } else {
         drop(reading, "すでにロゴとして使われています");
@@ -313,7 +324,7 @@ export function placeImagesIntoBrief(
         {
           name: reading.visibleText[0] ?? material?.label ?? "",
           src: uri,
-          treatment,
+          ...measured,
         },
       ],
     };
@@ -324,15 +335,15 @@ export function placeImagesIntoBrief(
       SLOT_LABELS.logos,
       "inferred",
       // Mirrors the wording of the self-healing branch above, and for the same
-      // reason: this line is where someone reads *why* a mark is drawn as it
-      // is. `treatmentFor` returns "light" for every opaque image, so knockout
-      // here means transparency — the old "地の付いた画像なので白抜き" branch
-      // was both unreachable and a description of the rule that was removed.
-      treatment === "knockout"
-        ? "透過した暗いマークなので白抜きで置きました"
-        : material?.opaque
-          ? "地の付いた画像なので、そのまま描くように置きました"
-          : "透過の明るいマークなのでそのまま置きました",
+      // reason: this line is where someone reads *what was measured* about a
+      // mark. It no longer names a filter, because the filter is not decided
+      // here — 墨 knocks a dark transparent mark out, the standard ground draws
+      // the same mark as supplied, and both are right.
+      transparentDark
+        ? "透過した暗いマークとして置きました。地に応じて描き分けます"
+        : measured.opaque
+          ? "地の付いた画像なので、そのまま描きます"
+          : "透過の明るいマークとして置きました。地に応じて描き分けます",
     );
   }
 

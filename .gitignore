@@ -64,13 +64,27 @@ next-env.d.ts
 __pycache__/
 *.pyc
 
-# Default asset pool (lib/assets/defaults.ts). The tracks currently placed here
-# are client-supplied placeholders without redistribution rights, so the bytes
-# stay out of git the same way the event material does. The catalog entry that
-# names them IS committed, and marks them unlicensed so they cannot leave in an
-# exported MP4.
+# Default asset pool (lib/assets/defaults.ts). Two halves with OPPOSITE rules —
+# docs/demo-assets.md §2 is the canonical statement of which is which.
+#
+# GITIGNORED, because the bytes may not be redistributed. The committed catalog
+# entry naming them is what tells a fresh checkout what is missing.
+#
+# NOTE: the reason recorded here for bgm/ was corrected on 2026-08-15 and is no
+# longer "unlicensed placeholders" — both tracks were generated with Suno AI on
+# a commercial plan and ARE ours to publish (lib/assets/defaults.ts). So the
+# bytes COULD be committed like the generated images below; whether to move them
+# is an open decision, not a licensing constraint. Do not restore the old
+# comment: it kept them out of every export for the wrong reason.
 /public/defaults/bgm/*.mp3
-# Default SFX pool: 効果音ラボ forbids redistributing the files themselves, so
-# the bytes stay out and scripts/fetch-default-sfx.mjs restores them anywhere.
-# The committed catalog.json records what belongs here.
+# 効果音ラボ forbids redistributing the files themselves, so these genuinely
+# cannot be committed. scripts/fetch-default-sfx.mjs restores them anywhere and
+# the committed catalog.json records what belongs here.
 /public/defaults/sfx/*.mp3
+#
+# COMMITTED, deliberately: public/defaults/{stills,portraits,marks,devices}/.
+# Generated with Midjourney on a commercial plan (or authored as code), so they
+# are ours to redistribute — the whole point of replacing the licensed stock and
+# the real people's portraits under public/event/. They are NOT listed here.
+# A generation recipe cannot restore them (the same prompt yields a different
+# picture), so the repository has to hold the bytes rather than the recipe.

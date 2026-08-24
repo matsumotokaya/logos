@@ -7,7 +7,6 @@
 // nowhere else.
 
 import { staticFile } from "remotion";
-import type { LogoTreatment } from "@/remotion/event/types";
 
 /**
  * A src the browser can actually fetch.
@@ -26,18 +25,17 @@ import type { LogoTreatment } from "@/remotion/event/types";
 export const resolveSrc = (src: string): string =>
   /^(https?:)?\//.test(src) ? src : staticFile(src);
 
-/**
- * How a mark is made legible on the stage it lands on.
- *
- * `knockout` is the default wherever a default is needed, rather than `invert`,
- * because inverting a mark that was already light breaks it just as badly as
- * drawing a dark one raw on the ink ground.
- */
-export const TREATMENT_FILTER: Record<LogoTreatment, string | undefined> = {
-  light: undefined,
-  invert: "invert(1)",
-  knockout: "brightness(0) invert(1)",
-};
+// The treatment vocabulary lives in ./mark, which stays free of Remotion so the
+// test runner can reach it. Re-exported here because this file is the one door
+// the renderer and the storyboard both already knock on.
+export {
+  TREATMENT_FILTER,
+  groundIsDark,
+  markPainting,
+  treatmentOn,
+  type MarkPaint,
+  type MarkPainting,
+} from "./mark";
 
 /** Focus point of a photo as CSS object-position. Absent focus is the centre. */
 export const focusPosition = (photo: {

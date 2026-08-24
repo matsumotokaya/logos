@@ -96,12 +96,18 @@ export type SceneComponent = ComponentMeta &
      *  default) presents medallions. Panels only make sense in a bleed slot
      *  (full-bleed-overlay); the scene that asks for them puts them there. */
     | { kind: "people"; people: PersonParams[]; presentation?: "row" | "panels" }
+    /** `treatment` is a painting decision the theme derives from the ground and
+     *  the measurement (paint.ts `treatmentOn`); pass it only when a brief has
+     *  one recorded. `opaque` / `luminance` are what was measured about the
+     *  artwork — absent means NOT MEASURED, not `false`. */
     | {
         kind: "logo";
         src: string | null;
         name: string;
         scale?: number;
         treatment?: LogoTreatment;
+        opaque?: boolean | null;
+        luminance?: number | null;
       }
     | {
         kind: "logoRow";
@@ -110,6 +116,8 @@ export type SceneComponent = ComponentMeta &
           name: string;
           scale?: number;
           treatment?: LogoTreatment;
+          opaque?: boolean | null;
+          luminance?: number | null;
         }>;
       }
     /** `seal` draws the value inside a hairline accent square — a 印章. Made

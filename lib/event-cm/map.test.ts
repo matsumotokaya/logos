@@ -112,9 +112,17 @@ test("登壇者は資料に書いてあれば入る（シードが置くのは�
   // The seeder proposes roles so the speaker picture has something on it, and
   // never a name — a guessed name is a person who does not exist. Reading one
   // from a document replaces the placeholder outright.
+  //
+  // 「（見本）」 is the caveat that rides with the stock portrait the seed now
+  // attaches (lib/event-cm/seed.ts): a face is the one guessed value nobody
+  // can tell is guessed. It is a marked role, still not a person.
   assert.deepEqual(
     SEEDED.guests.map((guest) => guest.name),
-    ["ゲストスピーカー", "モデレーター"],
+    ["ゲストスピーカー（見本）", "モデレーター（見本）"],
+  );
+  assert.ok(
+    SEEDED.guests.every((guest) => guest.name.includes("見本")),
+    "見本の顔写真に、見本だと分かる名前が付いていない",
   );
   const result = mapFactsIntoBrief(
     SEEDED,

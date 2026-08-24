@@ -66,15 +66,30 @@ function markScene(brief: EventCmBrief, opening: boolean): Scene {
     src: mark?.src ?? null,
     name: mark?.name ?? brief.presenter,
     scale: mark?.scale,
-    // Knocked out unless the brief says otherwise. The stage is ink black and a
-    // brand SVG is usually dark, so drawing the artwork as supplied is how the
-    // opening plate came out as a black mark on a black ground.
-    treatment: mark?.treatment ?? "knockout",
+    // Painted by the theme, from its ground and what was measured about the
+    // artwork (paint.ts `treatmentOn`). This used to force `knockout` on the
+    // premise that "the stage is ink black" — true of every stage there was
+    // until `standard`, and the reason the opening plate of a standard film
+    // came out as a white mark on a white ground.
+    treatment: mark?.treatment,
+    opaque: mark?.opaque,
+    luminance: mark?.luminance,
     emphasis: "hero",
     fields: ["logos"],
   });
-  components.push({ kind: "rule", length: "short" });
-  if (brief.presenter) {
+  // The credit under the rule, unless the mark IS that credit.
+  //
+  // With no artwork the logo component draws its `name` as a typographic
+  // credit, and that name is the brand's — the same string the presenter line
+  // carries, since the seed fills both from `brand.name`. So every brand
+  // without a logo file opened on its own name printed twice, with a rule
+  // between the two copies. Guarded here rather than in the seed because the
+  // duplication is a property of what gets DRAWN: a brand that supplies
+  // artwork wants both, and it is this scene that knows which happened.
+  const markIsTheCredit =
+    !mark?.src && (mark?.name ?? brief.presenter) === brief.presenter;
+  if (brief.presenter && !markIsTheCredit) {
+    components.push({ kind: "rule", length: "short" });
     components.push({
       kind: "body",
       text: brief.presenter,
@@ -258,11 +273,11 @@ function ctaScene(brief: EventCmBrief): Scene {
   if (brief.logos.length > 0) {
     components.push({
       kind: "logoRow",
-      // Same reason as the mark scene: the credits row sits on the ink ground.
-      logos: brief.logos.map((logo) => ({
-        ...logo,
-        treatment: logo.treatment ?? "knockout",
-      })),
+      // Passed through as recorded. How each mark is painted is the theme's
+      // answer, derived from its ground and the measurement (paint.ts
+      // `treatmentOn`) — this used to force `knockout`, which assumed the
+      // credits row could only ever sit on ink.
+      logos: brief.logos.map((logo) => ({ ...logo })),
       fields: ["logos"],
     });
   }

@@ -1,5 +1,5 @@
 import { archetypeFor, subjectFor } from "./archetypes";
-import { templateBgm, templateVisual } from "@/lib/assets/defaults";
+import { templateBgm, templatePortrait, templateVisual } from "@/lib/assets/defaults";
 import { currentTemplate } from "@/lib/templates/catalog";
 import { eventCmNarratedSteps } from "@/remotion/event-cm/types";
 import type {
@@ -25,7 +25,10 @@ import { NEW_FILM_THEME_ID } from "@/remotion/kit/theme";
 //      screen can say which is which and publish can warn (§17.5).
 //   2. **No invented people.** A guessed date is a proposal a user corrects in
 //      five seconds. A guessed speaker is a fabricated person with a job
-//      title. Guests seed empty, and the template omits the scene.
+//      title, so guests get a ROLE and never a name. The scene itself is not
+//      optional (EVENT_CM_SCENES is fixed), and the role carries a stock
+//      portrait marked 「（見本）」 — see `portrait()` below for why a face is
+//      the one guess that needs saying out loud.
 
 export interface SeedBrandInput {
   name: string;
@@ -36,8 +39,25 @@ export interface SeedBrandInput {
   /** Adopted typography, if the brand has any. */
   headingFont?: string | null;
   bodyFont?: string | null;
-  /** Something the renderer can load for the brand's mark, when one is ready. */
-  logoSrc?: string | null;
+  /**
+   * The brand's mark, WITH what was measured about it.
+   *
+   * One field rather than a bare `logoSrc`, because the two were separable and
+   * got separated: the promoter measured the artwork, wrote the result to
+   * `brand_materials`, returned only the id, and the brief went out with no
+   * measurement at all. The renderer then had to guess, guessed "opaque", and
+   * drew a near-black SVG unchanged on the ink ground.
+   *
+   * Absent measurements are still legal — a caller may genuinely not know — and
+   * `markPainting` handles that safely. What is no longer possible is passing
+   * artwork while forgetting that a measurement exists.
+   */
+  logo?: {
+    src: string;
+    /** `null` = not measured. Never taken to mean opaque. */
+    opaque?: boolean | null;
+    luminance?: number | null;
+  } | null;
 }
 
 const WEEKDAY_LABEL = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
@@ -86,7 +106,7 @@ export function seedEventCmBrief(
   inferred("schedule.date", "今日から4週間後以降の最初の金曜日");
   inferred("schedule.time", `${archetype.kind}に多い開始時刻`);
   inferred("cta");
-  inferred("guests", "登壇者は役割だけを仮置き。氏名は提案しません");
+  inferred("guests", "登壇者は役割と見本写真を仮置き。氏名は提案しません");
   inferred("narration", "テンプレートの下書き。資料を読むと書き直されます");
 
   // The one slot the pool dresses. A null here is not a hole: the composition
@@ -122,7 +142,44 @@ export function seedEventCmBrief(
     return asset ? { src: asset.src } : null;
   };
 
-  if (brand.logoSrc) fromBrand("logos");
+  // A SAMPLE FACE, and the film says so in the name beside it.
+  //
+  // The rest of this seeder guesses freely because a wrong guess is corrected
+  // in five seconds. A face is the exception: nobody can tell by looking that
+  // it was guessed, so a stock portrait beside a plausible name is the one
+  // place this tool could be mistaken for a record of a real event.
+  //
+  // The answer is not to withhold the picture. A speaker scene carried by
+  // monograms undersells what the template can do, and 「ゲストスピーカー」's
+  // monogram is its first character — 「ゲ」, which reads as a truncated word
+  // rather than an initial. So: show the photograph, and mark it 「（見本）」
+  // where a viewer is already looking. Names are still never invented — this
+  // is a role with a caveat, not a person.
+  //
+  // Deliberately a weaker guard than it could be, at this stage. The point of
+  // the demo is that somebody sees their own event, rendered better than they
+  // expected, and nothing later happens if that does not land. If the label
+  // turns out to confuse more than it protects, it comes off — the decision
+  // lives here and in catalog.ts, nowhere else.
+  const portrait = (path: string) => {
+    const asset = templatePortrait(template?.defaultVisuals?.[path]);
+    if (asset) inferred(path, "テンプレートの見本写真");
+    return asset ? { src: asset.src } : null;
+  };
+
+  // NO DUMMY MARK HERE, even though the pool has four.
+  //
+  // This is where the seeder stops guessing, and the line is not arbitrary: a
+  // photograph of a tea room claims nothing about anybody, a sample face is
+  // labelled 「（見本）」 beside it, but a MARK shown next to a company's name
+  // reads as that company's identity — a trademark-shaped claim, and not one
+  // anybody corrects in five seconds.
+  //
+  // The typographic credit is the designed answer, not a hole: 「ロゴなし→
+  // 明朝のクレジット表記」 is the fallback this art direction was built with.
+  // The pool's marks are there for fixtures (scripts/compare-art-directions.ts)
+  // and for a user to choose, not for this function to assign.
+  if (brand.logo) fromBrand("logos");
   else inferred("logos", "ロゴ画像が未解決のため、明朝のクレジット表記で代替");
 
   // The brand's look, pinned. What it does not have keeps the theme's own —
@@ -156,8 +213,8 @@ export function seedEventCmBrief(
     // name wearing a real face. A role says the same structural thing ("two
     // people speak here") and names nobody.
     guests: [
-      { name: "ゲストスピーカー", role: "", photo: null },
-      { name: "モデレーター", role: "", photo: null },
+      { name: "ゲストスピーカー（見本）", role: "", photo: portrait("guests.0.photo") },
+      { name: "モデレーター（見本）", role: "", photo: portrait("guests.1.photo") },
     ],
     schedule: {
       date: formatDate(date),
@@ -169,17 +226,35 @@ export function seedEventCmBrief(
     },
     cta: archetype.cta,
     footnote: null,
-    logos: [{ name: brand.name, src: brand.logoSrc ?? null }],
+    logos: [
+      {
+        name: brand.name,
+        src: brand.logo?.src ?? null,
+        // Carried, not recomputed. The renderer derives the treatment from
+        // these (remotion/kit/mark.ts) and cannot read the database.
+        ...(brand.logo?.opaque === undefined ? {} : { opaque: brand.logo.opaque }),
+        ...(brand.logo?.luminance === undefined
+          ? {}
+          : { luminance: brand.logo.luminance }),
+      },
+    ],
     visuals: {
       value: visual("visuals.value"),
       programs: visual("visuals.programs"),
       closing: visual("visuals.closing"),
     },
     bgm: bgm?.src ?? null,
-    // A new film is corporate-neutral. 墨 is the derivative art direction and
-    // has to be asked for — it came first only because the first commission
-    // happened to be a 和モダン event.
-    artDirection: NEW_FILM_THEME_ID,
+    // The art direction belongs to the TEMPLATE, not to "a new film".
+    //
+    // `variant` in the catalog IS the art direction, and this template's is
+    // モダンジャパニーズ — the very thing the user picked in the add dialog.
+    // Seeding a global default instead meant asking for 和モダン and being handed
+    // a white corporate film, with no switch anywhere to correct it.
+    //
+    // `NEW_FILM_THEME_ID` answers a different question: what a template that has
+    // NOT declared a painting should fall to. event-cm has declared one
+    // (`defaultRenders`, `theme: "sumi"`), so the declaration wins.
+    artDirection: template?.defaultRenders[0]?.theme ?? NEW_FILM_THEME_ID,
     theme: {
       palette: brand.palette,
       headingFont: brand.headingFont ?? null,

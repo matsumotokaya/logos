@@ -103,8 +103,14 @@ export interface StoryboardFigure {
    * real decisions. Where there is a picture, the panel shows the picture.
    */
   src: string | null;
-  /** How the film treats a mark on the ink ground (knocked out, inverted). */
+  /** A painting decision the brief already recorded, if any. Absent is the
+   *  normal case: the theme derives it from its ground and the measurement
+   *  below (paint.ts `treatmentOn`), which is how the panel stays honest when
+   *  the art direction changes. */
   treatment?: LogoTreatment;
+  /** What was measured about the artwork. Absent means NOT MEASURED. */
+  opaque?: boolean | null;
+  luminance?: number | null;
   focus?: { x: number; y: number };
   zoom?: number;
 }
@@ -268,13 +274,19 @@ const logoFigure = (logo: {
   name: string;
   src: string | null;
   treatment?: LogoTreatment;
+  opaque?: boolean | null;
+  luminance?: number | null;
 }): StoryboardFigure => ({
   label: logo.name,
   hasAsset: Boolean(logo.src),
   src: logo.src,
-  // The same default the renderer uses: on an ink ground a mark is knocked out
-  // unless the brief says otherwise (remotion/kit/render/KitComponent.tsx).
-  treatment: logo.treatment ?? "knockout",
+  // Carried, not decided. The panel's claim to honesty is that a mark looks the
+  // way the film will draw it, and the film asks the THEME how to draw it — so
+  // defaulting to knockout here made the storyboard right about ink and wrong
+  // about every other ground, in exactly the same way the renderer was.
+  treatment: logo.treatment,
+  opaque: logo.opaque,
+  luminance: logo.luminance,
 });
 
 function figuresOf(component: SceneComponent): StoryboardFigure[] {
@@ -284,7 +296,15 @@ function figuresOf(component: SceneComponent): StoryboardFigure[] {
     case "people":
       return component.people.map(personFigure);
     case "logo":
-      return [logoFigure({ name: component.name, src: component.src, treatment: component.treatment })];
+      return [
+        logoFigure({
+          name: component.name,
+          src: component.src,
+          treatment: component.treatment,
+          opaque: component.opaque,
+          luminance: component.luminance,
+        }),
+      ];
     case "logoRow":
       return component.logos.map(logoFigure);
     case "image":
@@ -335,22 +355,42 @@ const emptyCounts = (): PanelCounts => ({
   provisional: 0,
 });
 
-function countBlocks(blocks: StoryboardBlock[]): PanelCounts {
+/**
+ * What one panel is made of, and how much of it this tool guessed.
+ *
+ * `backdropFields` is counted but NOT added to `blocks`: the full-frame
+ * photograph is the scene's ground rather than something placed in a slot
+ * (remotion/kit/layout.ts), so adding it would inflate every fill ratio
+ * against a capacity it was never measured against.
+ *
+ * It still has to be counted, though — and for a while it was not. A stock
+ * photograph filling the whole frame is the most visible guessed value in a
+ * scene, and the film-level count reported it while every panel stayed silent:
+ * the badge said three values needed checking and no panel offered anywhere to
+ * check them. The dedup set is shared with the blocks on purpose, so a picture
+ * that is also named by a component is one thing to check, not two.
+ */
+function countPanel(
+  blocks: StoryboardBlock[],
+  backdropFields: readonly StoryboardField[],
+): PanelCounts {
   const counts = emptyCounts();
   const seenPaths = new Set<string>();
+  const provisional = (field: StoryboardField) => {
+    if (field.origin === "inferred" && !seenPaths.has(field.path)) {
+      seenPaths.add(field.path);
+      counts.provisional += 1;
+    }
+  };
   for (const block of blocks) {
     // Decoration is not a slot anybody fills, so counting it would make every
     // panel look more complete than it is.
     if (block.kind === "rule" || block.kind === "mark") continue;
     counts.blocks += 1;
     counts[block.state] += 1;
-    for (const field of block.fields) {
-      if (field.origin === "inferred" && !seenPaths.has(field.path)) {
-        seenPaths.add(field.path);
-        counts.provisional += 1;
-      }
-    }
+    for (const field of block.fields) provisional(field);
   }
+  for (const field of backdropFields) provisional(field);
   return counts;
 }
 
@@ -381,6 +421,16 @@ export function eventCmStoryboard(raw: EventCmBrief): Storyboard {
       ),
     }));
     const blocks = regions.flatMap((region) => region.blocks);
+    const backdrop: StoryboardBackdrop | null = scene.scene.backdrop
+      ? {
+          src: scene.scene.backdrop.photo.src,
+          weight: scene.scene.backdrop.weight,
+          focus: scene.scene.backdrop.photo.focus ?? { x: 0.5, y: 0.5 },
+          fields: (scene.scene.backdrop.fields ?? []).map((path) =>
+            fieldOf(brief, path, origins),
+          ),
+        }
+      : null;
 
     return {
       no: String(at + 1),
@@ -392,21 +442,12 @@ export function eventCmStoryboard(raw: EventCmBrief): Storyboard {
       layout: scene.scene.layout,
       capacity: scene.capacity,
       regions,
-      backdrop: scene.scene.backdrop
-        ? {
-            src: scene.scene.backdrop.photo.src,
-            weight: scene.scene.backdrop.weight,
-            focus: scene.scene.backdrop.photo.focus ?? { x: 0.5, y: 0.5 },
-            fields: (scene.scene.backdrop.fields ?? []).map((path) =>
-              fieldOf(brief, path, origins),
-            ),
-          }
-        : null,
+      backdrop,
       dropped: scene.dropped.map((component) => component.kind),
       captions: scene.captions,
       narration: scene.narration,
       ...(scene.reading ? { reading: scene.reading } : {}),
-      counts: countBlocks(blocks),
+      counts: countPanel(blocks, backdrop?.fields ?? []),
     };
   });
 

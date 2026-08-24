@@ -24,7 +24,21 @@
 // where a photo would be), so an empty pool still produces a finished film.
 // That is why this can start nearly bare and grow.
 
-export const ASSET_KINDS = ["bgm", "sfx", "ink_art", "texture", "b_roll", "still"] as const;
+// `portrait` is a picture OF A PERSON, and it is deliberately not one of the
+// VISUAL_KINDS below: a face cannot stand in for a backdrop. Trying it is a
+// measured failure (freehand v1 reused a speaker photo as a ground — `cover`
+// cannot push a face out of frame), and it is the reason Phase A3 wants
+// "is there a person in this" as a measured property of every material.
+export const ASSET_KINDS = [
+  "bgm",
+  "sfx",
+  "ink_art",
+  "texture",
+  "b_roll",
+  "still",
+  "portrait",
+  "mark",
+] as const;
 export type DefaultAssetKind = (typeof ASSET_KINDS)[number];
 
 export interface DefaultAsset {
@@ -38,6 +52,17 @@ export interface DefaultAsset {
   label: string;
   /** Shown when a user asks where a default came from. */
   credit: string;
+  /**
+   * The prompt in docs/demo-assets.md that produced this, for generated assets.
+   *
+   * Not user-facing. A generated picture cannot be restored from its recipe
+   * (the same prompt yields a different image), so the bytes are committed —
+   * but WHICH slot's requirements it was made against is exactly what a later
+   * session needs in order to replace or extend it. The delivered filenames
+   * are renamed on the way in (they carry the generating account's name, which
+   * must never reach a viewer), so without this the link back is lost.
+   */
+  recipe?: string;
   /**
    * Whether this may be published.
    *
@@ -85,6 +110,202 @@ export const DEFAULT_ASSETS: DefaultAsset[] = [
     tone: "ink",
     label: "和モダン（重厚）",
     credit: "Suno AI（商用利用可プランで生成）",
+    licensed: true,
+  },
+
+  // Pictures, subject "日本文化を学ぶ" (docs/demo-assets.md §5).
+  //
+  // Generated with Midjourney on a commercial plan, so unlike the licensed
+  // stock and the real people's portraits under public/event/, these are ours
+  // to redistribute — THE BYTES ARE COMMITTED. That is the whole point: a
+  // fresh clone renders a complete film without running an asset script.
+  //
+  // Every one was measured before it was accepted: the copy side of each still
+  // is both darker and quieter than the subject side (the requirement all
+  // three slots share, because every event-cm layout puts its words on the
+  // left). Verify with `npm run themes:compare`.
+  {
+    id: "still-tearoom-bowl",
+    kind: "still",
+    src: "defaults/stills/tearoom-bowl.jpg",
+    tone: "ink",
+    label: "茶室（茶碗と茶筅）",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "still-tearoom-01",
+    licensed: true,
+  },
+  {
+    id: "still-tearoom-hearth",
+    kind: "still",
+    src: "defaults/stills/tearoom-hearth.jpg",
+    tone: "ink",
+    label: "茶室（炉と光）",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "still-tearoom-02",
+    licensed: true,
+  },
+  {
+    id: "still-inkstone",
+    kind: "still",
+    src: "defaults/stills/inkstone.jpg",
+    tone: "ink",
+    label: "硯と筆",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "still-inkstone-01",
+    licensed: true,
+  },
+  {
+    id: "still-shoji-vase",
+    kind: "still",
+    src: "defaults/stills/shoji-vase.jpg",
+    tone: "ink",
+    label: "障子の光と壺",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "still-shoji-light-01",
+    licensed: true,
+  },
+  {
+    id: "still-venue-lanterns",
+    kind: "still",
+    src: "defaults/stills/venue-lanterns.jpg",
+    tone: "ink",
+    label: "会場（座卓と提灯）",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "still-venue-evening-01",
+    licensed: true,
+  },
+  {
+    id: "still-entrance-dusk",
+    kind: "still",
+    src: "defaults/stills/entrance-dusk.jpg",
+    tone: "ink",
+    label: "夕暮れの玄関",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "still-entrance-evening-01",
+    licensed: true,
+  },
+
+  // Six DISTINCT fictional people, not variants of one.
+  //
+  // NO NAMES, here or anywhere. The seed proposes a ROLE (「ゲストスピーカー」)
+  // and never a person, and a stock face must not quietly turn that into a
+  // named individual — see docs/demo-assets.md §7. The labels below describe
+  // what a person picking from a list can see, which is not the same as
+  // inventing who they are.
+  //
+  // 960×1200 is deliberate, not a shortfall: the full-bleed speaker panel is
+  // 960×1080, so these are used at native size rather than enlarged.
+  {
+    id: "portrait-speaker-01",
+    kind: "portrait",
+    src: "defaults/portraits/speaker-01-suit-glasses.jpg",
+    tone: "ink",
+    label: "男性・60代・スーツ（眼鏡）",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "portrait-speaker-01",
+    licensed: true,
+  },
+  {
+    id: "portrait-speaker-02",
+    kind: "portrait",
+    src: "defaults/portraits/speaker-02-suit.jpg",
+    tone: "ink",
+    label: "男性・60代・スーツ",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "portrait-speaker-01",
+    licensed: true,
+  },
+  {
+    id: "portrait-speaker-03",
+    kind: "portrait",
+    src: "defaults/portraits/speaker-03-blazer.jpg",
+    tone: "ink",
+    label: "女性・50代・ジャケット",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "portrait-speaker-02",
+    licensed: true,
+  },
+  {
+    id: "portrait-speaker-04",
+    kind: "portrait",
+    src: "defaults/portraits/speaker-04-blazer-grey.jpg",
+    tone: "ink",
+    label: "女性・60代・ジャケット",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "portrait-speaker-02",
+    licensed: true,
+  },
+  {
+    id: "portrait-speaker-05",
+    kind: "portrait",
+    src: "defaults/portraits/speaker-05-open-shirt.jpg",
+    tone: "ink",
+    label: "男性・40代・開襟シャツ",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "portrait-speaker-03",
+    licensed: true,
+  },
+  {
+    id: "portrait-speaker-06",
+    kind: "portrait",
+    src: "defaults/portraits/speaker-06-indigo.jpg",
+    tone: "ink",
+    label: "女性・70代・藍の上着",
+    credit: "Midjourney（商用利用可プランで生成）",
+    recipe: "portrait-speaker-04",
+    licensed: true,
+  },
+
+  // Placeholder marks, authored as SVG rather than generated.
+  //
+  // Generative models cannot make these: a mark needs transparency, hard
+  // edges, one colour, and a MEASURABLE luminance — `treatmentOn` reads the
+  // artwork to decide whether to knock it out, and a raster approximation of a
+  // logo has nothing reliable to measure. Same reason the LP's client logo wall
+  // draws its own marks and ships no images.
+  //
+  // Every gap in them is real transparency, never a white fill. `knockout` is
+  // `brightness(0) invert(1)`, so it paints every pixel white — a counter drawn
+  // in white looks correct on any light mockup and then swallows the mark on
+  // ink. Verified on both grounds before these were committed.
+  //
+  // `tone: "neutral"` because they read on either ground, which is not true of
+  // anything else in the pool. NOT auto-attached to a brand: see the
+  // 「ロゴは提案しない」 note in lib/event-cm/seed.ts.
+  {
+    id: "mark-gate",
+    kind: "mark",
+    src: "defaults/marks/gate.svg",
+    tone: "neutral",
+    label: "門（ダミー）",
+    credit: "ダミーマーク（このリポジトリで作成）",
+    licensed: true,
+  },
+  {
+    id: "mark-ring",
+    kind: "mark",
+    src: "defaults/marks/ring.svg",
+    tone: "neutral",
+    label: "環（ダミー）",
+    credit: "ダミーマーク（このリポジトリで作成）",
+    licensed: true,
+  },
+  {
+    id: "mark-strata",
+    kind: "mark",
+    src: "defaults/marks/strata.svg",
+    tone: "neutral",
+    label: "三層（ダミー）",
+    credit: "ダミーマーク（このリポジトリで作成）",
+    licensed: true,
+  },
+  {
+    id: "mark-lattice",
+    kind: "mark",
+    src: "defaults/marks/lattice.svg",
+    tone: "neutral",
+    label: "組子（ダミー）",
+    credit: "ダミーマーク（このリポジトリで作成）",
     licensed: true,
   },
 ];
@@ -150,6 +371,25 @@ export const templateVisual = (assetId: string | undefined): DefaultAsset | null
   if (!assetId) return null;
   const asset = assetById(assetId);
   return asset && VISUAL_KINDS.has(asset.kind) ? asset : null;
+};
+
+/**
+ * The stock face a template puts in a speaker slot.
+ *
+ * Separate from `templateVisual` rather than a wider filter, because the two
+ * must not be able to trade places. A face in a backdrop cannot be cropped out
+ * of frame (`cover` has nowhere to push it), and a photograph of a room in a
+ * medallion is not a person. Both directions are wrong, and one shared
+ * accessor would let either happen from a single mistyped id.
+ *
+ * The picture is a sample and says so: the seed labels the guest it belongs to
+ * (lib/event-cm/seed.ts). A face is the one guessed value a viewer cannot tell
+ * is guessed by looking at it.
+ */
+export const templatePortrait = (assetId: string | undefined): DefaultAsset | null => {
+  if (!assetId) return null;
+  const asset = assetById(assetId);
+  return asset?.kind === "portrait" ? asset : null;
 };
 
 /** Defaults that may not be published — the publish warning lists these. */
