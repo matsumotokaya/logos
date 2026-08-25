@@ -152,9 +152,9 @@ export function seedEventCmBrief(
   // The answer is not to withhold the picture. A speaker scene carried by
   // monograms undersells what the template can do, and 「ゲストスピーカー」's
   // monogram is its first character — 「ゲ」, which reads as a truncated word
-  // rather than an initial. So: show the photograph, and mark it 「（見本）」
-  // where a viewer is already looking. Names are still never invented — this
-  // is a role with a caveat, not a person.
+  // rather than an initial. So: show the photograph, and tag the PICTURE
+  // 「見本」 where a viewer is already looking (EventPhoto.sample). Names stay
+  // clean roles — putting the caveat in the name made the voice say it.
   //
   // Deliberately a weaker guard than it could be, at this stage. The point of
   // the demo is that somebody sees their own event, rendered better than they
@@ -164,7 +164,9 @@ export function seedEventCmBrief(
   const portrait = (path: string) => {
     const asset = templatePortrait(template?.defaultVisuals?.[path]);
     if (asset) inferred(path, "テンプレートの見本写真");
-    return asset ? { src: asset.src } : null;
+    // The caveat rides on the PICTURE. It was on the name for a day, and the
+    // narration read it aloud — 「ゲストスピーカー見本と、モデレーター見本が」.
+    return asset ? { src: asset.src, sample: true } : null;
   };
 
   // NO DUMMY MARK HERE, even though the pool has four.
@@ -193,6 +195,10 @@ export function seedEventCmBrief(
     inferred("theme.accent", "このブランドはアクセントを持たないため、テーマの色を使う");
   }
 
+  // Titles AND what each one covers. The narration speaks the detail, so it is
+  // proposed here rather than invented while writing (types.ts EventProgram).
+  const proposedPrograms = archetype.programsFor(subject);
+
   const brief: EventCmBrief = {
     presenter: brand.name,
     seriesLabel: archetype.seriesLabel,
@@ -200,8 +206,8 @@ export function seedEventCmBrief(
     subtitle: archetype.subtitle,
     valueLines: [...archetype.valueLines],
     valueChip: archetype.valueChip,
-    programsHeading: `${archetype.programs.length}つのプログラム`,
-    programs: archetype.programs.map((title) => ({ title })),
+    programsHeading: `${proposedPrograms.length}つのプログラム`,
+    programs: proposedPrograms,
     guestsHeading: "登壇者",
     // Roles, never names.
     //
@@ -213,8 +219,8 @@ export function seedEventCmBrief(
     // name wearing a real face. A role says the same structural thing ("two
     // people speak here") and names nobody.
     guests: [
-      { name: "ゲストスピーカー（見本）", role: "", photo: portrait("guests.0.photo") },
-      { name: "モデレーター（見本）", role: "", photo: portrait("guests.1.photo") },
+      { name: "ゲストスピーカー", role: "", photo: portrait("guests.0.photo") },
+      { name: "モデレーター", role: "", photo: portrait("guests.1.photo") },
     ],
     schedule: {
       date: formatDate(date),
@@ -294,10 +300,16 @@ const DRAFT_LINES: Partial<Record<EventCmSceneRole, string>> = {
   cta: "開催日と会場、お申し込みの方法を、最後にここでお伝えします。",
 };
 
+// Longer than they were, because the programmes now carry what they cover and
+// the scene budget grew with them (eventCmSceneBudget). A draft is also the
+// film's FIRST length estimate — stage one of 「想定尺 → 文字数 → 実測」 — so a
+// draft much shorter than the line that replaces it makes the freshly seeded
+// video mistime itself. Still not one fact: 「この時間で扱う内容を、ここで一文
+// にします」 reads as a placeholder, which is the whole point.
 const DRAFT_PROGRAM_LINES = [
-  "当日の流れをご紹介します。ひとつめのプログラムについて、ここで話す場所です。",
-  "ふたつめのプログラムについて、ここで話す場所です。",
-  "みっつめのプログラムについて、ここで話す場所です。",
+  "当日の流れをご紹介します。ひとつめのプログラムでは何を扱うのか、その中身をここで一文にしてお伝えします。",
+  "ふたつめのプログラムについて、扱う内容をここで一文にしてお伝えする場所です。",
+  "みっつめのプログラムについて、扱う内容をここで一文にしてお伝えする場所です。",
 ];
 
 function draftNarration(brief: EventCmBrief, now: Date): EventCmNarration {

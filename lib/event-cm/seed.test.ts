@@ -216,16 +216,24 @@ test("登壇者は役割で提案し、氏名は発明しない", () => {
   // The picture is part of the template now, so the list cannot be empty: an
   // empty one would open the film's fifth picture with nothing on it.
   const guests = seedFor(WEALTHPARK_LAB).guests;
-  assert.ok(
-    guests.every((guest) => guest.name.includes("（見本）")),
-    "見本の顔写真に、見本だと分かる名前が付いていない",
-  );
-  // Still a role and not a person: strip the caveat and nothing name-like is
-  // left. This is the assertion that has to survive — a stock face beside an
-  // invented 「山田 太郎」 is the failure the whole rule exists to prevent.
+  // A role and not a person. This is the assertion that has to survive — a
+  // stock face beside an invented 「山田 太郎」 is the failure the whole rule
+  // exists to prevent.
   assert.deepEqual(
-    guests.map((guest) => guest.name.replace("（見本）", "")),
+    guests.map((guest) => guest.name),
     ["ゲストスピーカー", "モデレーター"],
+  );
+  // And the name carries NO caveat, because the narration reads names aloud.
+  // 「（見本）」 lived here for a day and the voice said it: 「ゲストスピーカー
+  // 見本と、モデレーター見本が、対話をつくります」. The caveat belongs to the
+  // photograph, which is not a spoken fact.
+  assert.ok(
+    guests.every((guest) => !guest.name.includes("見本")),
+    "読み上げられる名前に「見本」が入っている",
+  );
+  assert.ok(
+    guests.every((guest) => guest.photo?.sample === true),
+    "見本写真に見本の印が付いていない",
   );
   assert.ok(
     guests.every((guest) => guest.role === ""),

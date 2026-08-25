@@ -175,6 +175,9 @@ UIコピーは [lib/i18n/](lib/i18n/) の辞書で **en / ja / ko / zh-Hant / zh
 - **書き出したMP4の正本はR2**(`brands/<brandId>/takes/<takeId>/renders/<renderId>/...mp4`)。ローカルフォールバックを持たない。キー設計は [lib/video/storage.ts](lib/video/storage.ts)、共通レンダー採用処理は [lib/takes/render.ts](lib/takes/render.ts)
 - **CLIのbundleは `@/` を解決できるようにしてある**([remotion.config.ts](remotion.config.ts))。以前はコンポジションが `@/` を避けることで回避していたが、それはテンプレートが自己完結している間しか成り立たない規則だった——event-cm は `@/remotion/kit/*` から組まれるので**そもそもbundleできず**、`event/` が kit の関数を1つ借りた瞬間に event-promo も巻き添えになる。alias を1回宣言するのが正しい形で、書き出したプロジェクトも同じ override を自分の `src/` に向けて持つ
 - **event-cm のMP4は 2026-08-16 に接続した**(それまで `produce()` に arm が無く、`Root.tsx` にも未登録だった——壊れたのではなく最初から繋がっていなかった)。`renderEventMp4` は event-promo と共有し、違うのはコンポジションIDだけ。**尺は定数にしない**(`calculateMetadata` が `eventCmDurationInFrames` を読む)——固定値だと、ナレーションを長くした瞬間に動画が途中で切れる
+- **ブリーフのパスは2種類あり、レンダー時に両方を用意する**([lib/takes/render.ts](lib/takes/render.ts) の `stagePoolAssets`)。`material:<uuid>` はR2から一時ディレクトリへ降ろされるが、`defaults/bgm/...` のような**このリポジトリの静的ファイル**は降りてこない——レンダーは `--public-dir` を空の一時ディレクトリに向けるので、**既定プールが音楽と画像を持ち始めた日に404になった**。CLIから直接書き出すと通るのに画面から書き出すと落ちる、という形で出る
+- **レンダラーの標準出力を捨てない**([lib/video/remotion-cli.ts](lib/video/remotion-cli.ts))。**Remotionは致命的なエラーをstdoutに出す**(404はそこに来る)。stderrだけを拾っていたため、404で死んだレンダーが「zodのバージョン警告」として報告され、**エラーメッセージが実際の原因と無関係**になっていた。報告する行は末尾ではなく`Error`を含む行を優先する——致命的なエラーの後ろにはスタックとバージョン表が続くため
+- **`zod` は完全固定**(`4.3.6`)。Remotionは一致を要求し、`^`のままだと次の`npm install`で 4.4.x に戻って**MP4だけが黙って壊れ直す**。`npx remotion versions` が唯一の判定
 - 配信は `GET /api/brands/[id]/takes/[takeId]/renders/[renderId]/output`。`<video>` はAuthorizationヘッダーを送れないため、オブジェクトキーまで束縛した**署名付き同一オリジンURL**を発行し、Range要求にも対応する。本番では `LABS_OUTPUT_URL_SECRET` が必須
 - レンダーは `POST .../render` で非同期。進捗は`take_renders.status`、採用成果物は`latest_artifact_id`が指す不変`render_artifacts`行で追跡する
 
@@ -334,6 +337,18 @@ node labs/event/scripts/prepare-assets.mjs --src <dir> --slug sake-2026
 
 - **不変条件は [lib/kit/themes.test.ts](lib/kit/themes.test.ts)**。未設定→墨、新規→standard、`backdrop:"bar"` はレターボックス必須、どのテーマも素材ゼロの地を持つ、**墨の承認済みジオメトリ(132 / 172 / 196)は動かない**
 - **残っていること**: ① `take_renders.theme` / `aspect_ratio` は今も[render.ts](lib/takes/render.ts)が**SELECTして使っていない**——テーマ切り替えのUIと配線 ② 9:16(`STAGE` の関数化と7配置の縦型版) ③ 印章numeral(`stat` の `variant:"seal"`)は和の装置で、ゴシックでは `一` が太い横棒に見える——企業向けには算用数字の選択肢が要る
+
+### 1本を通しで確かめる(`npm run event-cm:walkthrough`)
+
+**シード → ナレーション(LLM) → 読み上げ(TTS) → MP4 を、この端末だけで通す検証ツール**([scripts/walkthrough-event-cm.ts](scripts/walkthrough-event-cm.ts))。判断はすべてプロダクト自身の関数(`seedEventCmBrief` / `draftEventCmNarration` / `generateVoice` / `eventCmFilm`)が行い、**違うのはバイトの置き場所だけ**——R2ではなくディスクに書く。アプリの出力と食い違ったら、疑うのはこのスクリプトの配線。
+
+**静止画では分からないものを見るために在る**: ナレーションがシーンの中に収まっているか、読み上げと尺が一致しているか、音楽が声の区間で下がるか。`themes:compare` と同じ category のツールで、**並行パイプラインではない**。
+
+- **2プロセスに割れているのは必然**。[narration.ts](lib/event-cm/narration.ts) は `server-only` を import するので `--conditions=react-server` が要るが、**Remotion の CJS は同じ条件下で読み込めない**。だからスクリプトは props ファイルまでで止まり、書き出しは npm script が Remotion CLI に渡す(`event:render` と同じ経路)
+- **課金される**(ナレーション1回 + シーン数ぶんのTTS)。実測: in 1878 / out 1079 tokens、7シーン、**46.5秒 / 19.5MB / 1920×1080 h264 + AAC**
+- 出力は `var/event-cm/`、録音は `public/walkthrough/`(どちらもgit管理外)
+
+**この経路が「（見本）」のバグを見つけた。** 見本ラベルを登壇者名に入れていたため、ナレーションが**声で「ゲストスピーカー見本と、モデレーター見本が」と読み上げた**。名前は読み上げられる事実なので、ラベルの置き場所を**写真**(`EventPhoto.sample`)へ移した——写真は読み上げない([lib/event-cm/facts.ts](lib/event-cm/facts.ts) の `isSpokenFact`)。**静止画だけを見ていた限り、この不具合は見えなかった。**
 
 ### プロジェクトデータの書き出し(ロックインしない)
 

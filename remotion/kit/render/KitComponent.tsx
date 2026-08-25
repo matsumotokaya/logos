@@ -119,6 +119,30 @@ const Rule: React.FC<{ theme: Theme; width: number; delay: number }> = ({
 };
 
 /**
+ * 「見本」 on a stock photograph.
+ *
+ * Muted, never accent. In this art direction gold means somebody decided —
+ * a sample marked in gold reads as a chosen design rather than a placeholder,
+ * which is the opposite of what it is for.
+ */
+const SampleTag: React.FC<{ theme: Theme }> = ({ theme }) => (
+  <span
+    style={{
+      display: "inline-block",
+      fontFamily: theme.textFont,
+      fontSize: Math.round(theme.scale.caption.size * 0.78),
+      letterSpacing: "0.18em",
+      lineHeight: 1,
+      padding: "5px 10px",
+      color: theme.palette.muted,
+      border: `1px solid ${theme.palette.muted}66`,
+    }}
+  >
+    見本
+  </span>
+);
+
+/**
  * A portrait, or the designed substitute for one.
  *
  * The monogram is not a placeholder: a gold-ringed medallion carrying the
@@ -203,6 +227,11 @@ const PersonBlock: React.FC<{ theme: Theme; person: PersonParams; size: number }
           }}
         >
           {person.role}
+        </div>
+      ) : null}
+      {person.photo?.sample ? (
+        <div style={{ marginTop: 12 }}>
+          <SampleTag theme={theme} />
         </div>
       ) : null}
     </div>
@@ -496,6 +525,11 @@ export const KitComponent: React.FC<{
                         }}
                       >
                         {person.role}
+                      </div>
+                    ) : null}
+                    {person.photo?.sample ? (
+                      <div style={{ marginTop: 14 }}>
+                        <SampleTag theme={theme} />
                       </div>
                     ) : null}
                   </div>

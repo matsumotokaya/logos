@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { stageActions } from "./stage-actions";
+import { bulkRunPlan, stageActions } from "./stage-actions";
 import type { PipelineStage, PipelineStageId, PipelineStageStatus } from "./stages";
 
 /**
@@ -149,4 +149,56 @@ test("最後の段自身はボタンを持たない", () => {
   });
   assert.equal(actions.own, null);
   assert.equal(actions.advance, null);
+});
+
+// ---------------------------------------------------------------------------
+// 「未処理2件」と言いながら押せないボタン
+//
+// Reported from the running app on 2026-08-25: a take was seeded, a voice was
+// chosen, the badge said 未処理2件, and the button showed a blocked cursor with
+// no explanation. Three separate mistakes met — the gate, the fall-through, and
+// where the reason was written — so all three are pinned here.
+
+const READY_STAGES: PipelineStage[] = [
+  { id: "input", status: "ready" } as PipelineStage,
+  { id: "structure", status: "ready" } as PipelineStage,
+  { id: "map", status: "ready" } as PipelineStage,
+];
+
+test("資料が無くても、映像側の未処理は実行できる", () => {
+  // The exact reported state: nothing to read, two things to apply.
+  const plan = bulkRunPlan({ stages: [], sourceCount: 0, filmStepCount: 2 });
+  assert.deepEqual(plan.read, [], "読む資料が無いのに読み取りを走らせようとしている");
+  assert.equal(plan.redo, false, "未処理があるのに全部やり直しになっている");
+});
+
+test("資料が無いときに、読み取りへ落ちない", () => {
+  // The fall-through that made the gate look necessary: an empty read-list was
+  // read as "nothing pending, so re-run everything" — including the reading it
+  // had just been told it could not do.
+  const plan = bulkRunPlan({ stages: [], sourceCount: 0, filmStepCount: 0 });
+  assert.deepEqual(plan.read, [], "資料ゼロで extract を走らせようとしている");
+  assert.equal(plan.redo, true, "やり直しとして扱われていない");
+});
+
+test("資料があって全段済みなら、頼み直しは全部を通す", () => {
+  const plan = bulkRunPlan({ stages: READY_STAGES, sourceCount: 2, filmStepCount: 0 });
+  assert.deepEqual(plan.read, ["extract", "structure", "map"]);
+  assert.equal(plan.redo, true);
+});
+
+test("読み取りの未処理は依存の順に積む", () => {
+  // structure cannot be ready before input is: the map stage has a seeded brief
+  // from creation, so its own status can look ready while it waits.
+  const plan = bulkRunPlan({
+    stages: [
+      { id: "input", status: "empty" } as PipelineStage,
+      { id: "structure", status: "ready" } as PipelineStage,
+      { id: "map", status: "ready" } as PipelineStage,
+    ],
+    sourceCount: 1,
+    filmStepCount: 0,
+  });
+  assert.deepEqual(plan.read, ["extract", "structure", "map"]);
+  assert.equal(plan.redo, false);
 });

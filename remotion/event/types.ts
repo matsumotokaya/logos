@@ -21,6 +21,18 @@ export interface EventPhoto {
   /** Extra magnification beyond "cover". Needed for portrait medallions cut
    *  from landscape frames, where cover alone leaves the face small and high. */
   zoom?: number;
+  /**
+   * A stock picture standing in for one nobody has supplied — drawn with a
+   * 「見本」 tag.
+   *
+   * ON THE PHOTOGRAPH, not on the person. The caveat started life inside the
+   * guest's name (「ゲストスピーカー（見本）」) and the narration read it out:
+   * the film literally said 「ゲストスピーカー見本と、モデレーター見本が」,
+   * because a name is a spoken fact and the label was never meant for the ear.
+   * A photograph is not spoken (`isSpokenFact`), so a flag here reaches the eye
+   * and nothing else.
+   */
+  sample?: boolean;
 }
 
 /**
@@ -94,6 +106,19 @@ export interface EventGuest {
 export interface EventProgram {
   /** Displayed next to a large serif numeral (01/02/03). */
   title: string;
+  /**
+   * One or two sentences on what this programme actually covers.
+   *
+   * **The narration speaks this, so it has to live in the brief.** With only a
+   * title to work from, an agenda scene could say no more than 「主催者が解説
+   * します」 — three thin lines where the sample most needs substance. The
+   * obvious shortcut is to let the narration prompt elaborate on the title, and
+   * that breaks the rule the whole 捏造の方針 rests on: a fact invented while
+   * WRITING the narration is not in the item list, so nobody can correct it
+   * (docs README, 「ナレーション執筆 / しない」). Proposed at seed time it is
+   * an editable field like every other guess.
+   */
+  detail?: string;
 }
 
 export interface EventSchedule {

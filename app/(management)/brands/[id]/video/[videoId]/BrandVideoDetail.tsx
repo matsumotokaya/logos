@@ -65,6 +65,7 @@ import VideoPipelinePanel, {
   type VideoPipelinePayload,
 } from "@/components/pipeline/VideoPipelinePanel";
 import type { PipelineStage } from "@/lib/pipeline/stages";
+import { bulkRunPlan, pendingReadStages } from "@/lib/pipeline/stage-actions";
 import { VIDEO_STATE_LABEL, type VideoState } from "@/lib/video/asset";
 import type { VideoTemplateId } from "@/lib/video/templates";
 import type { EventBrief } from "@/remotion/event/types";
@@ -119,36 +120,6 @@ function hasPinnedProductVoice(brief: VideoAsset["brief"]): boolean {
     typeof (voice as Record<string, unknown>).track === "object" &&
     typeof (voice as Record<string, unknown>).audio === "string"
   );
-}
-
-/**
- * Return the work that the unattended path can still do.
- *
- * The map stage has a seeded brief from the moment a Take is created, so its
- * raw status can look ready while it is still waiting for structure to finish.
- * Count that dependency here as well; the number must match what the button
- * will actually run, not just what the seeded brief happens to contain.
- */
-function pendingRunStages(
-  stages: PipelineStage[],
-  sourceCount: number,
-): RunnableStage[] {
-  if (sourceCount === 0) return [];
-
-  const input = stages.find((stage) => stage.id === "input");
-  const structure = stages.find((stage) => stage.id === "structure");
-  const map = stages.find((stage) => stage.id === "map");
-  if (!input || !structure || !map) return [];
-
-  const pending: RunnableStage[] = [];
-  const inputPending = input.status !== "ready";
-  const structurePending = inputPending || structure.status !== "ready";
-  const mapPending = structurePending || map.status !== "ready";
-
-  if (inputPending) pending.push("extract");
-  if (structurePending) pending.push("structure");
-  if (mapPending) pending.push("map");
-  return pending;
 }
 
 function ProductCmInputSection({
@@ -913,12 +884,16 @@ export default function BrandVideoDetail({
    * nothing is watched until the last step.
    */
   async function runAll() {
-    const stagesPending = pendingRunStages(pipeline?.stages ?? [], sources.length);
-    // Asked with nothing outstanding: do it all again, words and voice included.
-    const redo = stagesPending.length === 0 && filmSteps.length === 0;
-    const stages: RunnableStage[] =
-      stagesPending.length > 0 ? stagesPending : ["extract", "structure", "map"];
-    for (const stage of stages) {
+    // The plan comes from lib/pipeline/stage-actions.ts, not from here. With no
+    // documents `read` is empty and the film half still runs — this used to
+    // fall through to re-reading nothing, which is why the button was disabled
+    // in the first place.
+    const { read, redo } = bulkRunPlan({
+      stages: pipeline?.stages ?? [],
+      sourceCount: sources.length,
+      filmStepCount: filmSteps.length,
+    });
+    for (const stage of read) {
       const ok = await runStage(stage);
       if (!ok) return;
     }
@@ -1137,7 +1112,7 @@ export default function BrandVideoDetail({
 
   const video = resolved.video;
   const openStageDef = pipeline?.stages.find((stage) => stage.id === openStage);
-  const pendingStages = pendingRunStages(pipeline?.stages ?? [], sources.length);
+  const pendingStages = pendingReadStages(pipeline?.stages ?? [], sources.length);
   // One number for the whole chain. It used to count the three reading stages
   // only, so writing a narration — the change that matters most — left the badge
   // reading 0 while the film was a version behind (§9.7).
@@ -1202,11 +1177,15 @@ export default function BrandVideoDetail({
             <button
               type="button"
               onClick={() => void runAll()}
-              // Only two things stop it: a run already going, and no material
-              // to read. "Nothing is pending" is not one of them — the badge
-              // says whether there is new work, and the button stays available
-              // for the re-run that a model result often deserves.
-              disabled={saving || sources.length === 0}
+              // ONLY a run already in progress stops it.
+              //
+              // 「資料が無い」 used to disable it too, and that was wrong twice
+              // over: the film half runs from the brief (資料の有無が門になるの
+              // は読み取り側だけ), and the badge was meanwhile counting film work
+              // — so the button said 「未処理2件」 and refused to be pressed.
+              // The reason lived in `title`, which browsers do not show on a
+              // disabled element, so all the user got was a blocked cursor.
+              disabled={saving}
               // Named for what it produces, not for how it runs. 「まとめて実行」
               // said nothing about where it stops, and this one stops before the
               // MP4 on purpose (§9.6).
@@ -1216,10 +1195,10 @@ export default function BrandVideoDetail({
                   : "動画を作り直す（すべて実行し直す）"
               }
               title={
-                sources.length === 0
-                  ? "先に資料を追加してください"
-                  : pendingCount > 0
-                    ? `未処理の${pendingCount}件を順番に実行し、動画に反映します（MP4は書き出しません）`
+                pendingCount > 0
+                  ? `未処理の${pendingCount}件を順番に実行し、動画に反映します（MP4は書き出しません）`
+                  : sources.length === 0
+                    ? "ナレーションと読み上げを、もう一度すべて実行し直します（資料はまだありません）"
                     : "未処理はありません。資料の読み取りからナレーション・読み上げまで、もう一度すべて実行し直します"
               }
               className={cn(

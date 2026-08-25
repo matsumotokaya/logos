@@ -53,6 +53,22 @@ export interface DefaultAsset {
   /** Shown when a user asks where a default came from. */
   credit: string;
   /**
+   * Multiplier that brings this file to the BGM pool's −16 dB reference.
+   *
+   * **Levelling, not a mix decision.** The SFX pool has done this since it was
+   * built (scripts/fetch-default-sfx.mjs → catalog.json) and the BGM pool never
+   * did, so two tracks mastered 5.5 dB apart — bright-corporate at −11.1,
+   * ink-cinematic at −16.6 — were handed the same volume by the composition.
+   * That made the film's music level a property of whoever mastered the chosen
+   * track: swapping the BGM changed the mix, and the ink track sat about 10 dB
+   * under the narration where it was supposed to sit just under it.
+   *
+   * Measured with `node scripts/measure-default-bgm.mjs`, committed because the
+   * bytes are gitignored and a fresh clone cannot re-measure them. Absent means
+   * unmeasured, so callers treat it as 1 and nothing silently goes quiet.
+   */
+  gain?: number;
+  /**
    * The prompt in docs/demo-assets.md that produced this, for generated assets.
    *
    * Not user-facing. A generated picture cannot be restored from its recipe
@@ -101,6 +117,9 @@ export const DEFAULT_ASSETS: DefaultAsset[] = [
     tone: "ink",
     label: "明るい（コーポレート）",
     credit: "Suno AI（商用利用可プランで生成）",
+    // RMS −11.1 / peak 0.0 dB: the louder of the two by 5.5 dB, and already at
+    // full scale — it can only come down.
+    gain: 0.569,
     licensed: true,
   },
   {
@@ -110,6 +129,10 @@ export const DEFAULT_ASSETS: DefaultAsset[] = [
     tone: "ink",
     label: "和モダン（重厚）",
     credit: "Suno AI（商用利用可プランで生成）",
+    // RMS −16.6 / peak −1.4 dB. Peak-limited: the loudness target asks for more
+    // and the headroom will not give it, which is also why the reference is −16
+    // and not louder (scripts/measure-default-bgm.mjs).
+    gain: 1.072,
     licensed: true,
   },
 
@@ -395,3 +418,16 @@ export const templatePortrait = (assetId: string | undefined): DefaultAsset | nu
 /** Defaults that may not be published — the publish warning lists these. */
 export const unlicensedDefaults = (srcs: readonly string[]): DefaultAsset[] =>
   DEFAULT_ASSETS.filter((asset) => !asset.licensed && srcs.includes(asset.src));
+
+/**
+ * The levelling multiplier for a pool file, by the src a brief holds.
+ *
+ * A brief points at `defaults/bgm/x.mp3`, not at a pool id, so the lookup is by
+ * path. An unmeasured or unknown file returns 1: a missing measurement must not
+ * silence a track that was playing.
+ */
+export const poolGain = (src: string | null | undefined): number => {
+  if (!src) return 1;
+  const asset = DEFAULT_ASSETS.find((entry) => entry.src === src);
+  return asset?.gain ?? 1;
+};

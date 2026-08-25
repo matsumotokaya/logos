@@ -75,7 +75,7 @@ const ROLE_BRIEFS: Record<string, { seconds: number; instruction: string }> = {
 
 function systemFor(
   steps: readonly EventCmSceneStep[],
-  programs: readonly string[],
+  programs: readonly { title: string; detail?: string }[],
 ): string {
   const keys = steps.map(eventCmSceneKey);
   const specs = steps
@@ -87,13 +87,20 @@ function systemFor(
       // programme, so its line has to be about that programme and nothing else.
       // Without naming the item here the model writes three summaries of all
       // three, and the film says the same thing three times.
+      const item = step.role === "program" ? programs[step.index ?? 0] : null;
       const instruction =
-        step.role === "program" && step.index !== undefined
-          ? `${step.index + 1}つ目のプログラム「${programs[step.index]}」だけを話す。他のプログラムには触れない。${
+        step.role === "program" && step.index !== undefined && item
+          ? [
+              `${step.index + 1}つ目のプログラム「${item.title}」だけを話す。他のプログラムには触れない。`,
+              // The name alone is a label; the film has to say what is IN it.
+              // Two sentences: what it is, then what it covers.
+              item.detail?.trim()
+                ? `内容は「${item.detail.trim()}」。まず名前を言い、続けてその中身を一文で言う（合計2文程度）。この内容の範囲を超えたことは足さない。`
+                : "名前だけを短く言う。書かれていない中身を想像で足さない。",
               step.index === 0
-                ? `冒頭に「${programs.length}つのプログラムで何が身につくか」を一文だけ置いてから、1つ目に入る。`
-                : "前置きを置かず、この内容から入る。"
-            }`
+                ? `冒頭に「${programs.length}つのプログラムを通して何が身につくか」を一文だけ置いてから、1つ目に入る。`
+                : "前置きを置かず、この内容から入る。",
+            ].join("")
           : spec.instruction;
       const label =
         step.role === "program" && step.index !== undefined
@@ -189,7 +196,15 @@ export function describeEventFacts(brief: EventCmNarrationInput): string {
 
   if (brief.programs.length) {
     lines.push("プログラム:");
-    for (const program of brief.programs) lines.push(`  - ${program.title}`);
+    for (const program of brief.programs) {
+      // The detail is the only thing an agenda line can be ABOUT. Omitting it
+      // here is what left the model with 「専門家による解説」 and nothing else.
+      lines.push(
+        program.detail?.trim()
+          ? `  - ${program.title}: ${program.detail.trim()}`
+          : `  - ${program.title}`,
+      );
+    }
   }
   if (brief.guests.length) {
     lines.push("登壇者:");
@@ -263,10 +278,7 @@ export async function draftEventCmNarration(
     messages: [
       {
         role: "system",
-        content: systemFor(
-          steps,
-          brief.programs.map((program) => program.title),
-        ),
+        content: systemFor(steps, brief.programs),
       },
       {
         role: "user",

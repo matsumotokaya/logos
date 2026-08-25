@@ -24,6 +24,7 @@
     "brand:inspect-site": "NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/inspect-brand-site.ts",
     "event-cm:seed": "NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/seed-event-cm.ts",
     "event-cm:draft": "NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/draft-event-cm-narration.ts",
+    "event-cm:walkthrough": "NODE_OPTIONS=--conditions=react-server tsx --env-file-if-exists=.env.local scripts/walkthrough-event-cm.ts && remotion render remotion/index.ts event-cm var/event-cm/walkthrough.mp4 --props=var/event-cm/walkthrough.props.json",
     "event:render": "remotion render remotion/index.ts event var/event-lab/sake-2026.mp4",
     "event:studio": "remotion studio remotion/index.ts",
     "themes:compare": "tsx scripts/compare-art-directions.ts"
@@ -55,7 +56,7 @@
     "sharp": "^0.35.3",
     "tailwind-merge": "^3.6.0",
     "three": "^0.180.0",
-    "zod": "^4.4.3"
+    "zod": "4.3.6"
   },
   "devDependencies": {
     "@remotion/cli": "^4.0.472",

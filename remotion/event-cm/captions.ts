@@ -1,5 +1,6 @@
 import { eventCmTimeline } from "./timeline";
 import { eventCmSceneKey, type EventCmBrief } from "./types";
+import { phraseBlocks } from "@/remotion/kit/phrase";
 
 // Subtitles.
 //
@@ -52,12 +53,35 @@ export function splitSentences(text: string): string[] {
 const MAX_CARD_CHARS = 28;
 
 /**
+ * Below this, a card reads as a leftover rather than a line.
+ *
+ * The measured case: 「知られざる日本酒業界の舞台裏と世界への広がりについて
+ * 語ります。」 is 31 characters, and filling to the 28 limit left a card
+ * containing 「ます。」 — three characters on screen for a beat. The requester
+ * flagged it in review; the fix at the time was to add a 、 to the sentence,
+ * which is the author working around the splitter.
+ */
+const MIN_CARD_CHARS = 8;
+
+/**
  * One sentence as one or more cards.
  *
- * Breaks at 、 first, because that is where a reader would pause anyway, and
- * only slices mid-phrase when a run has no punctuation at all to break on.
+ * Three rules, in order of how much a reader notices them:
+ *
+ *   1. **Break at 、 first** — that is where a reader would pause anyway.
+ *   2. **Otherwise break between 文節** (../kit/phrase.ts). Filling to the
+ *      limit and slicing whatever is left over cuts words in half, which is
+ *      the same defect as a mid-word line break and was fixed in the same
+ *      week; the two工程 simply had the hole in different places.
+ *   3. **Aim for cards of equal length, not full cards.** Packing greedily to
+ *      28 is what produces the 28+3 split. Deciding how MANY cards first and
+ *      then filling toward that average gives 16+15 for the same sentence.
+ *
+ * `lang` is defaulted rather than threaded: every caption in this template is
+ * Japanese today. When a non-Japanese art direction arrives, this is the second
+ * place that needs the language and `theme.lang` is where it lives.
  */
-export function splitCards(sentence: string): string[] {
+export function splitCards(sentence: string, lang = "ja"): string[] {
   if (weightOf(sentence) <= MAX_CARD_CHARS) return [sentence];
 
   const clauses = sentence
@@ -65,28 +89,59 @@ export function splitCards(sentence: string): string[] {
     .map((clause) => clause.trim())
     .filter(Boolean);
 
+  // The smallest pieces a card boundary may fall between. A clause that already
+  // fits stays whole — its 、 is a better break than anything inside it.
+  const atoms = clauses.flatMap((clause) =>
+    weightOf(clause) <= MAX_CARD_CHARS ? [clause] : phraseBlocks(clause, lang),
+  );
+
+  const total = atoms.reduce((sum, atom) => sum + weightOf(atom), 0);
+  const cardCount = Math.max(1, Math.ceil(total / MAX_CARD_CHARS));
+  const target = Math.ceil(total / cardCount);
+
   const cards: string[] = [];
   let current = "";
-  const flush = () => {
-    if (current) cards.push(current);
-    current = "";
-  };
-
-  for (const clause of clauses) {
-    if (weightOf(clause) > MAX_CARD_CHARS) {
-      flush();
-      // Nothing to break on: cut it into card-sized runs rather than let one
-      // card grow past the frame.
-      for (let at = 0; at < clause.length; at += MAX_CARD_CHARS) {
-        cards.push(clause.slice(at, at + MAX_CARD_CHARS));
-      }
+  for (const atom of atoms) {
+    if (!current) {
+      current = atom;
       continue;
     }
-    if (weightOf(current) + weightOf(clause) > MAX_CARD_CHARS) flush();
-    current += clause;
+    const combined = weightOf(current) + weightOf(atom);
+    // Past the average is allowed while it keeps the card legal; past the limit
+    // never is. Aiming at the average is rule 3.
+    if (combined > MAX_CARD_CHARS || weightOf(current) >= target) {
+      cards.push(current);
+      current = atom;
+      continue;
+    }
+    current += atom;
   }
-  flush();
-  return cards.length > 0 ? cards : [sentence];
+  if (current) cards.push(current);
+
+  // A single atom longer than a card has nothing left to break on — one word,
+  // typically a name or a long katakana run. Sliced only here, as a last resort.
+  const sized = cards.flatMap((card) => {
+    if (weightOf(card) <= MAX_CARD_CHARS) return [card];
+    const runs: string[] = [];
+    for (let at = 0; at < card.length; at += MAX_CARD_CHARS) {
+      runs.push(card.slice(at, at + MAX_CARD_CHARS));
+    }
+    return runs;
+  });
+
+  // Last tidy: a trailing fragment joins the card before it when it fits. The
+  // balancing above usually prevents one, but an unsplittable atom at the end
+  // can still leave a stub.
+  const last = sized[sized.length - 1];
+  if (
+    sized.length > 1 &&
+    weightOf(last) < MIN_CARD_CHARS &&
+    weightOf(sized[sized.length - 2]) + weightOf(last) <= MAX_CARD_CHARS
+  ) {
+    sized.splice(sized.length - 2, 2, sized[sized.length - 2] + last);
+  }
+
+  return sized.length > 0 ? sized : [sentence];
 }
 
 const weightOf = (text: string): number => Math.max(1, text.replace(/\s/g, "").length);
@@ -111,7 +166,7 @@ export function captionsFor(brief: EventCmBrief): Caption[] {
     const endMs = timing.fromMs + timing.durationMs;
     const available = Math.max(1, endMs - startMs);
 
-    const sentences = splitSentences(scene.text).flatMap(splitCards);
+    const sentences = splitSentences(scene.text).flatMap((line) => splitCards(line));
     if (sentences.length === 0) continue;
 
     const total = sentences.reduce((sum, sentence) => sum + weightOf(sentence), 0);

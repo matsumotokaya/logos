@@ -299,8 +299,12 @@ export const TEMPLATES: TemplateEntry[] = [
       "visuals.programs": "still-tearoom-bowl",
       "visuals.value": "still-inkstone",
       "visuals.closing": "still-venue-lanterns",
-      "guests.0.photo": "portrait-speaker-01",
-      "guests.1.photo": "portrait-speaker-03",
+      // Swapped away from the two suited 60-somethings on the requester's first
+      // watch (2026-08-25). Which two is not a rule — that they look unalike
+      // is. An open-collar shirt and an indigo jacket also read closer to
+      // 「学ぶ」 than two boardroom portraits do.
+      "guests.0.photo": "portrait-speaker-05",
+      "guests.1.photo": "portrait-speaker-06",
     },
     // The storyboard is a workbench: edits collect there and reach the film
     // only when the user asks. The only template that works this way today.

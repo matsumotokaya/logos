@@ -136,3 +136,76 @@ function advanceButton(
           : null,
   };
 }
+
+/**
+ * What the one button can still do — the reading half of the chain.
+ *
+ * Lived inside BrandVideoDetail until 2026-08-25, which put a second authority
+ * on "what is runnable" outside the file the README names as the canonical one.
+ * It moved here the day its answer was wrong and there was no test to catch it.
+ *
+ * The map stage has a seeded brief from the moment a Take is created, so its raw
+ * status can look ready while it is still waiting for structure to finish. That
+ * dependency is counted here, because the number has to match what the button
+ * will actually run rather than what the seeded brief happens to contain.
+ */
+export function pendingReadStages(
+  stages: readonly PipelineStage[],
+  sourceCount: number,
+): RunnableStage[] {
+  // Nothing to read is not the same as nothing to do. Returning [] here is
+  // correct — the caller must not read it as "re-run everything".
+  if (sourceCount === 0) return [];
+
+  const input = stages.find((stage) => stage.id === "input");
+  const structure = stages.find((stage) => stage.id === "structure");
+  const map = stages.find((stage) => stage.id === "map");
+  if (!input || !structure || !map) return [];
+
+  const pending: RunnableStage[] = [];
+  const inputPending = input.status !== "ready";
+  const structurePending = inputPending || structure.status !== "ready";
+  const mapPending = structurePending || map.status !== "ready";
+
+  if (inputPending) pending.push("extract");
+  if (structurePending) pending.push("structure");
+  if (mapPending) pending.push("map");
+  return pending;
+}
+
+/**
+ * Everything the one button will run, given documents and outstanding film work.
+ *
+ * **The bug this exists to prevent.** The button was disabled whenever there
+ * were no documents, and `runAll` treated an empty read-list as "nothing is
+ * pending, so do it all again" — including the reading it had just been told it
+ * could not do. A take seeded and then given a voice therefore showed 「未処理
+ * 2件」 on a button that refused to be pressed, with the reason only in a
+ * `title` on a disabled element, where browsers do not show it.
+ *
+ * The rule that was already written down and not applied here: **資料の有無が
+ * 門になるのは読み取り側だけ.** A seeded take has a brief, so the film half —
+ * narration, voice, bake — can always run. Which is also the whole point of
+ * the badge: it counts work, and work that cannot be started is not work.
+ */
+export function bulkRunPlan(input: {
+  stages: readonly PipelineStage[];
+  sourceCount: number;
+  /** Outstanding film work, from `pendingFilmSteps`. */
+  filmStepCount: number;
+}): { read: RunnableStage[]; redo: boolean } {
+  const canRead = input.sourceCount > 0;
+  const pending = pendingReadStages(input.stages, input.sourceCount);
+
+  // "Asked with nothing outstanding" — re-read, re-write, re-record. Only
+  // meaningful where there is something to re-read from.
+  const redo = pending.length === 0 && input.filmStepCount === 0;
+  const read = !canRead ? [] : pending.length > 0 ? pending : ALL_READ_STAGES;
+
+  // No `runnable` flag: the film half can always run from a seeded brief, so
+  // the answer would be a constant `true`. A field that cannot be false is a
+  // gate somebody will later believe in.
+  return { read, redo };
+}
+
+const ALL_READ_STAGES: RunnableStage[] = ["extract", "structure", "map"];

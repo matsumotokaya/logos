@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -284,6 +284,35 @@ async function renderProductCmMp4(
   }
 }
 
+/**
+ * Put the repository's own static assets where a render can reach them.
+ *
+ * A brief holds two kinds of path. `material:<uuid>` is staged out of R2 by
+ * `stageBriefMaterials`; `defaults/bgm/ink-cinematic.mp3` and its neighbours are
+ * files that live in this repository and are served by Next from `public/`.
+ * The renderer runs with `--public-dir` pointed at a fresh temp directory, so
+ * only the first kind was ever there — and the second kind became a 404 the day
+ * the default pool started carrying music, pictures and marks.
+ *
+ * Copied rather than symlinked: the child process is a separate Remotion CLI
+ * with its own cwd, and a link into a repository that may be mid-edit is a
+ * subtler thing to debug than a copy. Twelve megabytes per render is worth one
+ * fewer mystery; if the pool grows enough to matter, copy only what the brief
+ * names.
+ */
+async function stagePoolAssets(publicDir: string): Promise<void> {
+  const from = path.join(process.cwd(), "public", "defaults");
+  const to = path.join(publicDir, "defaults");
+  try {
+    await cp(from, to, { recursive: true });
+  } catch (error) {
+    // A pool that is not there is a legitimate state — the audio bytes are
+    // gitignored, so a fresh clone has none. The composition's designed
+    // fallbacks cover it, and a render must not fail for a track nobody chose.
+    if ((error as { code?: string }).code !== "ENOENT") throw error;
+  }
+}
+
 async function renderEventMp4(
   supabase: SupabaseClient,
   takeId: string,
@@ -295,6 +324,7 @@ async function renderEventMp4(
   const outPath = path.join(dir, "out.mp4");
   const publicDir = path.join(dir, "public");
   try {
+    await stagePoolAssets(publicDir);
     const stagedBrief = await stageBriefMaterials(supabase, takeId, brief, publicDir);
     await writeFile(propsPath, JSON.stringify({ brief: stagedBrief }));
     await renderRemotionComposition(composition, propsPath, outPath, publicDir);

@@ -88,3 +88,8 @@ __pycache__/
 # the real people's portraits under public/event/. They are NOT listed here.
 # A generation recipe cannot restore them (the same prompt yields a different
 # picture), so the repository has to hold the bytes rather than the recipe.
+
+# Walkthrough output: a real recording of a sample narration, regenerated on
+# demand by `npm run event-cm:walkthrough`. Costs an LLM call and a TTS pass to
+# make, and is a verification artefact rather than a default asset.
+/public/walkthrough/

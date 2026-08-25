@@ -113,16 +113,17 @@ test("登壇者は資料に書いてあれば入る（シードが置くのは�
   // never a name — a guessed name is a person who does not exist. Reading one
   // from a document replaces the placeholder outright.
   //
-  // 「（見本）」 is the caveat that rides with the stock portrait the seed now
-  // attaches (lib/event-cm/seed.ts): a face is the one guessed value nobody
-  // can tell is guessed. It is a marked role, still not a person.
+  // The name is CLEAN. The stock portrait's caveat lives on the photograph
+  // (`EventPhoto.sample`) because a name is a spoken fact: with 「（見本）」 in
+  // here the narration came out as 「ゲストスピーカー見本と、モデレーター見本
+  // が、対話をつくります」 — the film saying the word "sample" out loud.
   assert.deepEqual(
     SEEDED.guests.map((guest) => guest.name),
-    ["ゲストスピーカー（見本）", "モデレーター（見本）"],
+    ["ゲストスピーカー", "モデレーター"],
   );
   assert.ok(
-    SEEDED.guests.every((guest) => guest.name.includes("見本")),
-    "見本の顔写真に、見本だと分かる名前が付いていない",
+    SEEDED.guests.every((guest) => !guest.name.includes("見本")),
+    "読み上げられる名前に「見本」が入っている",
   );
   const result = mapFactsIntoBrief(
     SEEDED,

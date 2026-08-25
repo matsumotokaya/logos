@@ -245,3 +245,52 @@ test("字幕を切ってもナレーションは古くならない", () => {
   // warning people learn to ignore.
   assert.equal(isSpokenFact(EVENT_CM_CAPTIONS_PATH), false);
 });
+
+test("端数だけのカードを作らない", () => {
+  // The v9 review case. 31 characters filled greedily to the 28 limit left a
+  // card holding 「ます。」 — three characters on screen for a beat. The fix at
+  // the time was to add a 、 to the sentence, i.e. the author working around
+  // the splitter. Deciding how MANY cards first and filling toward that
+  // average is what removes the stub.
+  const cards = splitCards("知られざる日本酒業界の舞台裏と世界への広がりについて語ります。");
+  assert.equal(cards.join(""), "知られざる日本酒業界の舞台裏と世界への広がりについて語ります。");
+  assert.equal(cards.length, 2);
+  for (const card of cards) {
+    assert.ok(card.length <= 28, `28字を超えたカードがある: ${card}`);
+    assert.ok(card.length >= 8, `端数だけのカードがある: ${card}`);
+  }
+});
+
+test("カードの割れ目は語の途中に来ない", () => {
+  // The same hole as the mid-word line break (remotion/kit/phrase.ts), in the
+  // other 工程: mechanical slicing cut 文節 in half. Cards are packed out of
+  // phrase blocks now, so a card may only begin where a phrase does.
+  const closesBlock = (text: string) => /[、。，．！？]$/u.test(text);
+  for (const sentence of [
+    "知られざる日本酒業界の舞台裏と世界への広がりについて語ります。",
+    "百貨店には並ばない蔵出しの日本酒を、五種類、じっくり味わいながら、その楽しみ方を学びます",
+    "文化資本という考え方を、投資の視点からあらためて見直していく時間になります。",
+  ]) {
+    const cards = splitCards(sentence);
+    assert.equal(cards.join(""), sentence, `文字が落ちている: ${sentence}`);
+    for (const [at, card] of cards.entries()) {
+      if (at === 0) continue;
+      if (!/^[ぁ-ゟ]/u.test(card)) continue;
+      assert.ok(
+        closesBlock(cards[at - 1]),
+        `語の途中で割れている: 「${cards[at - 1]}|${card}」`,
+      );
+    }
+  }
+});
+
+test("読点があるときは、まず読点で割る", () => {
+  // A reader pauses there anyway, so it beats any boundary inside the clause.
+  const cards = splitCards(
+    "百貨店には並ばない蔵出しの日本酒を、五種類、じっくり味わいながら、その楽しみ方を学びます",
+  );
+  assert.ok(cards.length > 1);
+  for (const card of cards.slice(0, -1)) {
+    assert.ok(/[、]$/u.test(card), `読点で終わっていないカードがある: ${card}`);
+  }
+});

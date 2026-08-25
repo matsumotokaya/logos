@@ -239,7 +239,16 @@ export function eventCmSceneBudget(scene: {
   index?: number;
 }): { min: number; max: number } {
   if (scene.role === "program" && scene.index !== undefined) {
-    return scene.index === 0 ? { min: 30, max: 58 } : { min: 18, max: 40 };
+    // Raised on 2026-08-25, when the programmes started carrying what they
+    // cover (EventProgram.detail) instead of only a format label. The old
+    // 58/40 fitted 「主催者が解説します」 and cut off the sentence that makes an
+    // agenda picture worth watching — 「一つ目は金融の歴史です。貨幣の歴史から
+    // 資本主義へ、そして投資の発明に迫ります」 is 65 characters.
+    //
+    // The film gets longer, and that is the correct trade: 「30秒は要件ではなく、
+    // 正しい尺が要件」. The first picture still gets more room because it also
+    // says what the three add up to.
+    return scene.index === 0 ? { min: 45, max: 84 } : { min: 30, max: 62 };
   }
   return SCENE_BUDGET[scene.role];
 }

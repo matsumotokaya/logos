@@ -174,12 +174,21 @@ test("章のあいだに間がある", () => {
 });
 
 test("30秒を超えてよい——正しい尺が要件", () => {
-  // The brief asked for "about 30 seconds" and the structure now costs more
-  // than that: eight seconds of marks plus a pause per chapter. Forty-five is
-  // fine; a breathless thirty is not.
+  // The brief asked for "about 30 seconds" and the structure costs more than
+  // that: eight seconds of marks plus a pause per chapter. A breathless thirty
+  // is the failure, not the length.
+  //
+  // The ceiling is a RUNAWAY GUARD, not a spec — it catches 「2900字書いたら7分
+  // になった」, which the design allows on purpose. It moved from 50s to 70s on
+  // 2026-08-25 when the programmes began carrying what they cover
+  // (EventProgram.detail) and their budgets grew with them: three agenda
+  // pictures that each say something cost about six seconds more than three
+  // that say 「主催者が解説します」. Written by the model at the top of its
+  // budget the film lands around 55s, so 70 leaves the guard useful. If this
+  // has to move again, check that the reason is a decision and not a drift.
   const timeline = eventCmTimeline(SEEDED);
   assert.ok(timeline.totalMs > 30_000, `${timeline.totalMs}ms — 駆け足に戻っている`);
-  assert.ok(timeline.totalMs < 50_000, `${timeline.totalMs}ms — 長すぎる`);
+  assert.ok(timeline.totalMs < 70_000, `${timeline.totalMs}ms — 長すぎる`);
 });
 
 test("ナレーションを書くと尺がその文字数に従う", () => {

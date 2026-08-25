@@ -48,6 +48,19 @@ const PRESENCE = {
   closing: 0.35,
 } as const;
 
+/**
+ * One trim over the whole cue sheet — a listening judgment, not a measurement.
+ *
+ * The requester's note on the first watch with SFX in place: 「サウンド
+ * エフェクトがちょっと大きいので今より70%ぐらいの音量でいい」. Applied here
+ * rather than by scaling the five numbers above, because those say how far each
+ * moment steps forward RELATIVE TO THE OTHERS and that ranking did not change —
+ * only how loudly the whole layer sits under the music and the voice. Rewriting
+ * them to 0.35 / 0.28 / 0.315 … would encode one global decision five times and
+ * lose the record of why 鈴 outranks its role.
+ */
+const SFX_TRIM = 0.7;
+
 const cue = (file: string, presence: number, atMs: number): SfxCue | null => {
   const entry = SOUNDS[file];
   // A file missing from the catalog is a pool problem, not a film problem:
@@ -56,7 +69,7 @@ const cue = (file: string, presence: number, atMs: number): SfxCue | null => {
   return {
     src: entry.src,
     atMs,
-    volume: Number(Math.min(1, entry.gain * presence).toFixed(3)),
+    volume: Number(Math.min(1, entry.gain * presence * SFX_TRIM).toFixed(3)),
   };
 };
 

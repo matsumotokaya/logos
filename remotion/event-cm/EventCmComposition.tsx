@@ -25,6 +25,7 @@ import { CaptionBand } from "@/remotion/kit/render/CaptionBand";
 import { eventCmFilm } from "./film";
 import { msToFrame, msToFrames } from "./timeline";
 import { eventCmSfxCue } from "@/lib/event-cm/sfx-cues";
+import { poolGain } from "@/lib/assets/defaults";
 import type { EventCmBrief } from "./types";
 
 export { EVENT_FPS, EVENT_WIDTH, EVENT_HEIGHT };
@@ -53,8 +54,21 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
   // the film at full level. The same composition therefore works at every
   // stage of the take's life, which is the point (timeline.ts).
   const hasVoice = film.hasVoice;
-  const FULL = 0.62;
-  const UNDER_VOICE = 0.16;
+  // ON A LEVELLED FLOOR, so these two numbers are a mix decision rather than
+  // one file's mastering.
+  //
+  // They used to be 0.62 / 0.16 applied to the raw file, and the pool's two
+  // tracks are mastered 5.5 dB apart — so the ink track played about 10 dB
+  // under the narration when it was meant to sit just under it, and choosing
+  // the other track would have changed the whole film's balance. Measured in
+  // the walkthrough: the opening mark read −26 dB against a −16 dB voice.
+  //
+  // `poolGain` brings any pool track to the BGM reference (−16 dB, set by the
+  // quieter track's headroom), so FULL means "music carrying the frame on its
+  // own" and the duck means "far enough down to stay out of the words".
+  const bgmGain = poolGain(brief.bgm);
+  const FULL = bgmGain;
+  const UNDER_VOICE = 0.32 * bgmGain;
   const startFrame = msToFrame(film.voiceStartMs, fps);
   const endFrame = msToFrame(film.voiceEndMs, fps);
   const duckIn = Math.round(fps * 0.5);
