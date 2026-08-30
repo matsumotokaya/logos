@@ -120,7 +120,7 @@ export const EventCmComposition: React.FC<EventCmVideoProps> = ({ brief: raw }) 
    * −10.9 dB below `FULL`. It was −9.9 dB (a plain 0.32) until 2026-08-30, when
    * the owner judged it a decibel loud — **in the exported MP4**, which is the
    * only surface either of us can measure. The browser preview is not settled
-   * enough to level a mix by (see README「効果音だけが大きくBGMが小さい」), so
+   * enough to level a mix by (see README「プレビューは音のバランスを保証しない」), so
    * a number decided there would be a number decided on nothing.
    */
   const UNDER_VOICE = 0.285 * bgmGain;

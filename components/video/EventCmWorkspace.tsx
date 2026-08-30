@@ -183,6 +183,17 @@ export default function EventCmWorkspace({
           <EventCmPlayer brief={playing} />
         </div>
 
+        {/* The preview does not promise the mix. The browser player and the
+            MP4 renderer are two unrelated audio implementations (realtime
+            WebAudio vs offline per-frame multiplication) and nothing makes
+            them agree — the owner heard the BGM uniformly quiet in preview
+            while the exported MP4 measured correct (2026-08-30). Decided:
+            don't chase it; say it under the picture instead, so nobody
+            levels a mix — or rejects one — by ear against this player. */}
+        <p className="mt-2 text-[11px] text-ink-faint">
+          ※ プレビューでは音声のバランスが崩れます。実際の音量バランスは、MP4に書き出すことで確認できます。
+        </p>
+
         {/* Which version this is, as a STATUS LINE rather than a message.
 
             It used to be a bordered, tinted paragraph in a sentence — which is
