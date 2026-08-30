@@ -35,6 +35,7 @@
     "@google/genai": "^2.12.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
+    "@remotion/google-fonts": "^4.0.472",
     "@remotion/media": "^4.0.472",
     "@remotion/media-utils": "^4.0.472",
     "@remotion/player": "^4.0.472",

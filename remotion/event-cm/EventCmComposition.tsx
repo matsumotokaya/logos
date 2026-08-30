@@ -30,6 +30,9 @@ import { Stage } from "@/remotion/kit/render/Stage";
 import { CaptionBand } from "@/remotion/kit/render/CaptionBand";
 import { eventCmFilm } from "./film";
 import { msToFrame, msToFrames } from "./timeline";
+// Side effect: delivers the Japanese faces the theme stacks name, so a
+// renderer without the system families does not draw tofu.
+import "@/remotion/kit/fonts";
 import { eventCmSfxCue } from "@/lib/event-cm/sfx-cues";
 import { poolGain, poolPlayback, unlicensedDefaults } from "@/lib/assets/defaults";
 import type { EventCmBrief } from "./types";

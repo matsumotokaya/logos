@@ -39,7 +39,16 @@ const ENTRY = "remotion/event-cm/EventCmComposition.tsx";
 const COMPOSITION_ID = "event-cm";
 
 /** Package versions come from ours, so the recipient installs what we tested. */
-const RUNTIME_PACKAGES = ["remotion", "@remotion/media", "react", "react-dom", "zod"] as const;
+const RUNTIME_PACKAGES = [
+  "remotion",
+  "@remotion/media",
+  // The composition imports this for the Japanese faces (remotion/kit/fonts.ts).
+  // Without it the exported project builds and then renders tofu.
+  "@remotion/google-fonts",
+  "react",
+  "react-dom",
+  "zod",
+] as const;
 const DEV_PACKAGES = ["@remotion/cli", "typescript", "@types/react"] as const;
 
 export interface ProjectExport {
