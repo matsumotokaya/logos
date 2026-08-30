@@ -547,20 +547,20 @@ export default function CampaignsTop() {
           {/* Left: title + pitch */}
           <header>
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/60">
-              CAMPAIGN ITEMS | BANNER, LP, CM VIDEOS
+              BRAND SYSTEM OF RECORD | LP, VIDEO, BRAND ASSETS
             </p>
             <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight text-white md:text-4xl lg:text-[2.75rem] lg:leading-[1.2]">
               {/* inline-block per phrase: wrap between phrases, never mid-word */}
-              <span className="inline-block">
-                あなたのためのセールスページと製品動画を、
-              </span>
-              <span className="inline-block">URLから瞬時に生成。</span>
+              <span className="inline-block">セールスページと紹介動画を、</span>
+              <span className="inline-block">URLひとつから。</span>
             </h1>
             <p className="mt-5 max-w-xl text-sm leading-relaxed text-pretty text-white/70 md:text-base">
-              URL・PDF・スクリーンショット・テキスト。サービスの内容がわかるものを渡すと、
-              ブランドを理解した Service Brand Kit
-              を生成し、セールスページ・紹介動画などの
-              マーケティングアセットが一式で出てきます。
+              {/* Joined explicitly: a newline between JSX text becomes a space,
+                  which reads as a stray gap mid-sentence in Japanese. */}
+              {"URL・PDF・スクリーンショット・テキスト。内容がわかるものを渡すと、" +
+                "ブランドを理解したうえで、セールスページ・紹介動画などのマーケティングアセットが" +
+                "一式で出てきます。確定した内容はブランドの正本として貯まり、" +
+                "次の成果物が速く正確になります。"}
             </p>
           </header>
 

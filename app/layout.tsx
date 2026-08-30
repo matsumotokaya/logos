@@ -26,7 +26,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: `${SERVICE_NAME} — ${SERVICE_TAGLINE}`,
   description:
-    "Upload a single SVG logo and get a full set of brand guidelines: construction grid, color system, app icons, favicons and mockups. Zero touch.",
+    "Keep what is true about your business — logo, color, type, voice, proof — in one place, with sources and confidence, and let your landing pages, videos and AI agents read from it.",
 };
 
 export default function RootLayout({

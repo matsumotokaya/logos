@@ -1,4 +1,6 @@
-# logos(仮称) — プロダクト概要とビジネスプラン
+# logos(仮称) — プロダクト概要とビジネスプラン(2026-07-19版・アーカイブ)
+
+> **これは役目を終えた文書。** ロゴマネジメントを起点に据えていた頃の事業構想で、2026-08-04 のピボット(マーケティングツール生成)以前のもの。**現在の正本は [../product.md](../product.md)。** ここを読むのは「なぜこの形になったのか」を遡るときだけ。
 
 最終更新: 2026-07-19
 
@@ -26,7 +28,7 @@
 
 フェーズ1〜3の先では、ロゴと利用者が整えた世界観(採用モックアップ・カラー・コピー)から、LP・コーポレートサイト・動画・Figmaファイルをワンプッシュで出力する。FigmaやPhotoshopは制作の入口ではなく、すぐ編集できる納品物として扱う。
 
-当面の最優先はプレゼンテーションセクションの品質。マーケティング最終出力はCampaign Labで、ソースからService Brand KitとLPまでの縦貫通を実装済み。動画・SNS素材への展開は [labs/campaign/README.md](labs/campaign/README.md) を正本とする。Figmaプラグインは獲得チャネルと書き戻し納品の候補として [labs/workflow/README.md](labs/workflow/README.md) に置く。
+当面の最優先はプレゼンテーションセクションの品質。マーケティング最終出力はCampaign Labで、ソースからService Brand KitとLPまでの縦貫通を実装済み。動画・SNS素材への展開は [labs/campaign/README.md](../../labs/campaign/README.md) を正本とする。Figmaプラグインは獲得チャネルと書き戻し納品の候補として [labs/workflow/README.md](../../labs/workflow/README.md) に置く。
 
 ## 3. 収益モデル(想定)
 
@@ -68,7 +70,7 @@
 - ロゴファイルの正規参照URLは`/l/[id]/[variant]`を予定する。所有者をURLに含めず、移管後も壊れない設計とする
 - 一般利用にはPNG/AI入力も必要だが、現行PoCはSVGに限定する
 
-技術詳細は [README.md](README.md)、権限は [docs/account-design.md](docs/account-design.md)、ロゴ正本は [docs/data-model.md](docs/data-model.md) を参照。
+技術詳細は [README.md](../../README.md)、権限は [docs/account-design.md](../account-design.md)、ロゴ正本は [docs/data-model.md](../data-model.md) を参照。
 
 ## 7. 未決定・未実装
 
@@ -79,4 +81,4 @@
 - ロゴ図鑑の検索・カテゴリ・ブックマーク体験
 - サービス名とドメイン
 
-ベータ公開の具体的な残作業は [docs/launch-plan.md](docs/launch-plan.md) を正本とする。
+ベータ公開の具体的な残作業は [docs/launch-plan.md](../launch-plan.md) を正本とする。

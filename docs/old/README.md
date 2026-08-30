@@ -10,6 +10,7 @@
 
 | ドキュメント | 何だったか | 完了 |
 | --- | --- | --- |
+| [product-logo-management.md](product-logo-management.md) | プロダクト概要とビジネスプラン(2026-07-19)。**ロゴマネジメントを起点に据えていた頃の事業構想**——SVGを1つ上げるとガイドラインが出る、3層構想(ガイドライン生成→ロゴ正本/CDN→ノベルティ発注)、ロゴ図鑑、Figma/Photoshopは納品物。2026-08-04 のピボット(マーケティングツール生成)が反映されないまま正本マップに残っていた。**現在の正本は [../product.md](../product.md)** | 2026-08-30 |
 | [event-cm-carryback-log.md](event-cm-carryback-log.md) | Freehand Lab からの持ち帰りとロゴ正規化のセッション記録(2026-08-17〜19)。event-cm の構成固定・語彙統一(`ナレーション`/`ボイス`/`字幕`)・kitの語彙拡張(モダンジャパニーズ化)・素材の測定と正規化(migration `0055`)。**そこへ至った議論の経緯**を残したもので、決まった中身の正本はルートREADMEの event-cm 節と [../asset-normalization.md](../asset-normalization.md) | 2026-08-19 |
 | [event-cm-refactor-plan.md](event-cm-refactor-plan.md) | Event CM リファクタリング計画。1セッションで出た11件のバグの分析、`eventCmFilm()` への導出一本化、`brief`/`baked_brief` の分離(絵コンテ=作業場・プレイヤー=成果)、`script`→`scenario` 改名、`EventCmBrief` の自立、負債の完済(§12)。**確立した規則8つは §10** — これだけは現役の価値があるが、要点は [../../README.md](../../README.md) の event-cm 節と [../data-model.md](../data-model.md) に転記済み | 2026-08-15 |
 | [event-cm-image-screening-plan.md](event-cm-image-screening-plan.md) | Event CM 画像の自動選定と背景写真の計画。意味判定を構造化の1回に統合、配置は決定論、由来4値、`Scene.backdrop`。実装A〜E完了 | 2026-08-14 |
