@@ -64,30 +64,46 @@ next-env.d.ts
 __pycache__/
 *.pyc
 
-# Default asset pool (lib/assets/defaults.ts). Two halves with OPPOSITE rules —
-# docs/demo-assets.md §2 is the canonical statement of which is which.
+# The default asset pool (lib/assets/defaults.ts) IS PART OF THE SYSTEM.
 #
-# GITIGNORED, because the bytes may not be redistributed. The committed catalog
-# entry naming them is what tells a fresh checkout what is missing.
+# Music, sound effects, stock pictures and marks ship with the code and deploy
+# with it (owner, 2026-08-30). They are not content somebody uploaded and not a
+# dataset kept somewhere else: a build that does not carry them is a build whose
+# films have no sound, which is what 「サーバーで動かない」 means. A user's own
+# uploads are the separate thing, and they live in R2 against a take.
 #
-# NOTE: the reason recorded here for bgm/ was corrected on 2026-08-15 and is no
-# longer "unlicensed placeholders" — both tracks were generated with Suno AI on
-# a commercial plan and ARE ours to publish (lib/assets/defaults.ts). So the
-# bytes COULD be committed like the generated images below; whether to move them
-# is an open decision, not a licensing constraint. Do not restore the old
-# comment: it kept them out of every export for the wrong reason.
-/public/defaults/bgm/*.mp3
-# 効果音ラボ forbids redistributing the files themselves, so these genuinely
-# cannot be committed. scripts/fetch-default-sfx.mjs restores them anywhere and
-# the committed catalog.json records what belongs here.
+# So the default here is COMMITTED, and every line below is an exception that
+# has to state why it cannot be. Whenever an exception is resolved, delete the
+# line — do not leave it as "we never got round to it".
+#
+# 効果音ラボ forbids redistributing the files themselves, and this repository is
+# PUBLIC, so committing these would be the redistribution they forbid. This is
+# the one exception that is a licence and not a decision. It ends when the
+# repository stops being public, or when these are replaced by sounds that are
+# ours (the same move that replaced the licensed stock photography).
+# scripts/fetch-default-sfx.mjs restores them anywhere and the committed
+# catalog.json records what belongs here; R2 `defaults/sfx/` is what the
+# deployed app reads (`npm run sfx:sync`).
 /public/defaults/sfx/*.mp3
+# The footage the closing plate stands on, one clip per art direction. Supplied
+# by the owner (the same two files the freehand lab used: Fuji above the clouds
+# and a city at dusk), and their LICENCE HAS NOT BEEN CONFIRMED — a default
+# asset's whole job is to be safe to burn into anybody's MP4, and git history
+# cannot be taken back. Committed the day their source is known; until then the
+# catalog says `licensed: false` and the renderer leaves them out
+# (lib/assets/defaults.ts).
+/public/defaults/video/*.mp4
 #
-# COMMITTED, deliberately: public/defaults/{stills,portraits,marks,devices}/.
-# Generated with Midjourney on a commercial plan (or authored as code), so they
-# are ours to redistribute — the whole point of replacing the licensed stock and
-# the real people's portraits under public/event/. They are NOT listed here.
-# A generation recipe cannot restore them (the same prompt yields a different
-# picture), so the repository has to hold the bytes rather than the recipe.
+# COMMITTED: public/defaults/{bgm,stills,portraits,marks,devices}/. Generated
+# with Suno or Midjourney on commercial plans (or authored as code), so they are
+# ours to redistribute — the whole point of replacing the licensed stock and the
+# real people's portraits under public/event/. A generation recipe cannot
+# restore them (the same prompt yields a different picture, and a different
+# take), so the repository has to hold the bytes rather than the recipe.
+#
+# bgm/ was ignored until 2026-08-30 for a reason that had already been corrected
+# once: it was called "unlicensed placeholders" and is not. Nothing then read
+# the tracks on a deployed build, because Vercel builds from git.
 
 # Walkthrough output: a real recording of a sample narration, regenerated on
 # demand by `npm run event-cm:walkthrough`. Costs an LLM call and a TTS pass to

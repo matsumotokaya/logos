@@ -91,6 +91,41 @@ export interface ThemeOrnament {
   markGlyph: string;
   /** Corner presence: a persistent avatar, a logo bug, nothing. */
   corner: "none" | "logo" | "avatar";
+  /**
+   * How the speakers are presented.
+   *
+   * `panels` fills the stage with full-height portraits split by a hairline
+   * seam — the Freehand Lab's replacement for a medallion row it measured and
+   * rejected ("small circles floating in empty space"). That verdict is about
+   * a cinematic 和モダン film, where the speakers ARE the picture.
+   *
+   * `row` is the corporate convention and the owner's call for standard
+   * (2026-08-30): a ring-bounded avatar with the name, the title and the
+   * company set under it. A company announcing its own seminar is not making a
+   * film about two faces; it is publishing a speaker list, and blowing two
+   * portraits up to full frame reads as a different kind of event than the one
+   * being announced.
+   *
+   * Here rather than in the scene for the same reason as `numerals`: the scene
+   * knows WHO speaks, and how they are shown is painting.
+   */
+  people: "row" | "panels";
+  /**
+   * How an ordinal — "the second of three programmes" — is set.
+   *
+   * `kanji-seal` is 一二三 in a hairline box: the register a Japanese
+   * invitation uses, measured in the Freehand Lab against bare kanji (bars)
+   * and the formal 壱弐参 (overdressed). It is also a 和 device. In a gothic
+   * face 「一」 is a thick blue bar and 「二」 is two of them, which is what the
+   * first standard render showed. A corporate art direction sets `arabic` —
+   * 01 02 03, large and light, no box — because that is how its own slides
+   * number an agenda.
+   *
+   * Here rather than in the scene for the usual reason: the scene knows WHICH
+   * of how many, and how a numeral looks is painting. The scene builder reads
+   * this and emits the matching `stat` variant (scenes/event-cm.ts).
+   */
+  numerals: "kanji-seal" | "arabic";
 }
 
 /**
@@ -197,8 +232,64 @@ export interface ThemeBackdrop {
   push: [number, number];
 }
 
+/**
+ * What the closing mark stands on.
+ *
+ * The film's last four seconds are a plate with one mark on it, and in the
+ * approved 和モダン film that plate stands on FOOTAGE — Fuji above a sea of
+ * clouds, darkened until the mark owns the frame (labs/freehand/sake-2026,
+ * `sources.ts` logoOut). The carry-back brought the vocabulary over and left
+ * this behind (Phase B5, 「video / collage / sequence の Ground はまだ」), so the
+ * product's end card was a flat plate in both art directions and the owner
+ * noticed the missing one first (2026-08-27).
+ *
+ * THE RECIPE IS THE APPROVED ONE, not a new invention: grade the footage, lay a
+ * flat wash of the theme's own ground over it, then the theme's radial scrim.
+ * Three layers, and the middle one is what makes the mark legible — the mark's
+ * treatment is derived from `palette.ground` (remotion/kit/mark.ts), so the
+ * ground has to still BE that colour once the footage is behind it. A clip is
+ * therefore never drawn at full presence; the wash is not a matter of taste.
+ *
+ * Only the closing plate. The opening announces whose film this is before
+ * anything has been said, and the approved film stands it on the client's own
+ * wall — a brand's material, not a theme's, so nothing is declared here for it.
+ */
+export interface ThemeEndCard {
+  /** Path under public/, or a `material:` uri. */
+  video: string;
+  /** CSS filter on the footage itself, before anything is laid over it. */
+  grade?: string;
+  /**
+   * A flat wash of this theme's ground over the footage, as a CSS colour.
+   *
+   * Written out in full rather than as an alpha, the same way `caption.plate`
+   * and `backdrop.scrim` are: the colour and how much of it are one decision,
+   * and splitting them invites a theme to wash its light ground in ink.
+   */
+  wash: string;
+}
+
+/**
+ * How the film's structure RINGS — which family of sound marks its moments.
+ *
+ * The cue sheet (lib/event-cm/sfx-cues.ts) decides WHICH moments ring and how
+ * far forward each steps; that is the template's structure and does not change
+ * with the painting. What changes is the instrument: 拍子木 and 和太鼓 open a
+ * 和モダン film and would open a corporate webinar as a costume. So the theme
+ * names the palette and the cue sheet picks its files from it.
+ */
+export interface ThemeSound {
+  /** `wa`: acoustic Japanese instruments. `corporate`: neutral motion-graphics cues. */
+  cues: "wa" | "corporate";
+}
+
 export interface Theme {
   id: string;
+  /**
+   * What a person choosing between art directions reads — the add dialog's
+   * style picker and the badge on the video list. So this is the product's
+   * name for the painting (「モダンジャパニーズ」), not the engineer's (墨).
+   */
   name: string;
   palette: ThemePalette;
   /** Display family — headings, numerals, anything set large. */
@@ -226,6 +317,9 @@ export interface Theme {
   scale: Record<Emphasis, TypeStep>;
   motion: ThemeMotion;
   ornament: ThemeOrnament;
+  sound: ThemeSound;
+  /** The clip the closing mark stands on. Absent = the plate is the ground. */
+  endCard?: ThemeEndCard;
   backdrop: ThemeBackdrop;
   caption: ThemeCaption;
   chrome: ThemeChrome;
@@ -239,7 +333,7 @@ export interface Theme {
 export const SUMI_THEME: Theme = {
   id: "sumi",
   lang: "ja",
-  name: "墨（和モダン）",
+  name: "モダンジャパニーズ",
   palette: {
     ground: "#0b0d13",
     ink: "#f4efe4",
@@ -268,7 +362,23 @@ export const SUMI_THEME: Theme = {
     background: "drift",
     transition: "fade",
   },
-  ornament: { rules: true, markGlyph: "—", corner: "none" },
+  ornament: {
+    rules: true,
+    markGlyph: "—",
+    corner: "none",
+    numerals: "kanji-seal",
+    // The approved film's. Unchanged by the 2026-08-30 corporate decision.
+    people: "panels",
+  },
+  sound: { cues: "wa" },
+  // Fuji above a sea of clouds. Every number here is the approved film's
+  // (labs/freehand/sake-2026/src/freehand/scenes.tsx): grade, then 0.58 of ink,
+  // then the radial scrim below.
+  endCard: {
+    video: "defaults/video/end-card-sumi.mp4",
+    grade: "saturate(0.85) brightness(0.85)",
+    wash: "rgba(8,6,4,0.58)",
+  },
   // Photography at nearly full presence, darkened only on the copy's side.
   // The old values (hero 0.5, support 0.22 under a full radial scrim) are the
   // measured reason the agenda scenes read as black screens — the client's
@@ -323,7 +433,7 @@ export const SUMI_THEME: Theme = {
 export const STANDARD_THEME: Theme = {
   id: "standard",
   lang: "ja",
-  name: "スタンダード（企業）",
+  name: "スタンダード",
   palette: {
     // Not #ffffff: a pure white ground makes the photographs look pasted on,
     // and leaves nothing for a card or a plate to be lighter than.
@@ -362,7 +472,25 @@ export const STANDARD_THEME: Theme = {
     background: "still",
     transition: "fade",
   },
-  ornament: { rules: true, markGlyph: "—", corner: "none" },
+  // Arabic ordinals: the seal is a 和 device, and in this face 「一」 is a bar.
+  ornament: {
+    rules: true,
+    markGlyph: "—",
+    corner: "none",
+    numerals: "arabic",
+    people: "row",
+  },
+  sound: { cues: "corporate" },
+  // A city at dusk — the clip the owner handed over as this art direction's
+  // stand-in for Fuji (2026-08-27). Same three layers as 墨 and the opposite
+  // direction: the wash LIGHTENS, because the mark on this ground is dark.
+  // 0.62 rather than 墨's 0.58 for the same reason the directional scrim is
+  // stronger here — a light veil hides less at the same alpha.
+  endCard: {
+    video: "defaults/video/end-card-light.mp4",
+    grade: "saturate(0.9) brightness(1.04)",
+    wash: "rgba(247,249,252,0.62)",
+  },
   backdrop: {
     opacity: { hero: 1, support: 0.92 },
     scrim:

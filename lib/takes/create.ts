@@ -29,6 +29,13 @@ export interface CreateTakeInput {
   title?: string;
   workId?: string | null;
   variantId?: string | null;
+  /**
+   * The painting the take's renders are made in (a theme id), when the
+   * template offers more than one. Written to every default render's `theme`
+   * so `take_renders` records what was chosen rather than the catalog's first
+   * choice. Absent keeps the template's own `defaultRenders`.
+   */
+  artDirection?: string | null;
   createdBy: string;
   /** Stable key for one logical external request. Omit when the caller really
    * wants another independent Take with identical content. */
@@ -66,6 +73,9 @@ export async function createTake(
   }
 
   const title = input.title?.trim() || templateName(template);
+  const renders = input.artDirection
+    ? template.defaultRenders.map((render) => ({ ...render, theme: input.artDirection as string }))
+    : template.defaultRenders;
   const request = {
     brandId: input.brandId,
     variantId: input.variantId ?? null,
@@ -76,7 +86,7 @@ export async function createTake(
     briefSchemaVersion: template.briefSchemaVersion,
     brief: validated.brief,
     title,
-    renders: template.defaultRenders,
+    renders,
   };
   const idempotencyKey = input.idempotencyKey?.trim() || null;
   const requestHash = idempotencyKey
@@ -96,7 +106,7 @@ export async function createTake(
     p_created_by: input.createdBy,
     p_idempotency_key: idempotencyKey,
     p_request_hash: requestHash,
-    p_renders: template.defaultRenders.map((render) => ({
+    p_renders: renders.map((render) => ({
       locale: render.locale,
       aspect_ratio: render.aspectRatio,
       theme: render.theme,

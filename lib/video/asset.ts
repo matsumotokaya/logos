@@ -8,6 +8,12 @@ export interface VideoSummary {
   id: string;
   brandId: string;
   template: VideoTemplateId;
+  /**
+   * The painting this take carries (`brief.artDirection`), for templates that
+   * can be painted more than one way. Null when the brief does not say — which
+   * the list labels as the legacy painting, the same way the renderer does.
+   */
+  artDirection: string | null;
   title: string;
   published: boolean;
   /** How far along this video is, for the list's status line. */

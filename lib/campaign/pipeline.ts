@@ -13,14 +13,12 @@ import {
   adjudicatePalette,
   judgeBrandMatch,
   formatUsage,
-  LLM_ENGINE,
-  LLM_MODEL,
-  LLM_PROVIDER,
   type SourceFile,
   type AdjudicatedPalette,
   type BrandMatchJudgment,
   type LlmUsage,
 } from "./creative";
+import { LLM_ENGINE, LLM_MODEL, LLM_PROVIDER } from "@/lib/llm";
 import { renderLandingPage } from "./render-lp";
 import { narrationTextFromScript, type BrandAssets, type CampaignBrandKit } from "./schema";
 

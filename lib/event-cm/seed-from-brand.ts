@@ -144,7 +144,13 @@ async function promoteLogoToMaterial(
 
 export async function seedEventCmFromBrand(
   supabase: SupabaseClient,
-  input: { brandId: string; userId: string; now?: Date },
+  input: {
+    brandId: string;
+    userId: string;
+    now?: Date;
+    /** The painting chosen in the add dialog. Absent = the template's first. */
+    artDirection?: string;
+  },
 ): Promise<{ ok: true; seeded: SeededEventCm } | { ok: false; error: string }> {
   const [brandResult, knowledgeResult] = await Promise.all([
     supabase
@@ -195,7 +201,11 @@ export async function seedEventCmFromBrand(
           }
         : null,
     },
-    { now: input.now ?? new Date(), seed: input.brandId },
+    {
+      now: input.now ?? new Date(),
+      seed: input.brandId,
+      ...(input.artDirection ? { artDirection: input.artDirection } : {}),
+    },
   );
 
   return { ok: true, seeded: { brief, logoMaterial: material, logoNote: note } };

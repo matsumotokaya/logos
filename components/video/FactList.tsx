@@ -22,6 +22,7 @@ import {
   photoOf,
   previewOf,
 } from "@/lib/event-cm/facts";
+import { resolveSrc } from "@/remotion/kit/paint";
 import type { BriefSource } from "./BriefSourceIntake";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 
@@ -157,7 +158,10 @@ export default function FactList({
                   {currentPhoto ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={currentPhoto}
+                      // The renderer's rule (remotion/kit/paint.ts): a pool
+                      // asset's path is bare (`defaults/…`) and an <img> would
+                      // resolve it against this page's URL, not the site root.
+                      src={resolveSrc(currentPhoto)}
                       alt=""
                       className="h-9 w-14 shrink-0 rounded border border-hairline object-cover"
                     />

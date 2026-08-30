@@ -9,7 +9,7 @@ import type { RawServiceInfo } from "./ingest";
 import type { SiteCapture } from "./capture";
 import { describeCandidates, type PaletteCandidate } from "./palette";
 import { luminance } from "../color";
-import { LLM_BUDGET, parseOrExplain } from "@/lib/llm";
+import { LLM_BUDGET, LLM_MODEL, parseOrExplain } from "@/lib/llm";
 
 // Campaign creative — turn any mix of sources (scraped URL, pasted text,
 // uploaded PDFs / images) into a validated Service Brand Kit via OpenAI
@@ -26,10 +26,6 @@ import { LLM_BUDGET, parseOrExplain } from "@/lib/llm";
 // - judgeBrandMatch (Stage 4): compare the rendered LP against the original
 //   site screenshot and flag mismatches before shipping.
 
-const MODEL = "gpt-5.6-luna";
-export const LLM_MODEL = MODEL;
-export const LLM_PROVIDER = "OpenAI API";
-export const LLM_ENGINE = `OpenAI API（Chat Completions + structured outputs / ${MODEL}）`;
 
 // Bound every LLM call so a stalled connection fails fast instead of hanging
 // the (detached) generation job forever. The SDK default is 10 min × retries;
@@ -64,9 +60,9 @@ function usageOf(
 ): LlmUsage {
   const inputTokens = response.usage?.prompt_tokens ?? 0;
   const outputTokens = response.usage?.completion_tokens ?? 0;
-  const price = PRICE_PER_MTOK[MODEL] ?? { input: 0, output: 0 };
+  const price = PRICE_PER_MTOK[LLM_MODEL] ?? { input: 0, output: 0 };
   return {
-    model: MODEL,
+    model: LLM_MODEL,
     purpose,
     inputTokens,
     outputTokens,
@@ -164,7 +160,7 @@ export async function generateBrandKit(
 
   const response = await parseOrExplain(() =>
     client.chat.completions.parse({
-    model: MODEL,
+    model: LLM_MODEL,
     max_completion_tokens: LLM_BUDGET.long,
     reasoning_effort: "medium",
     messages: [
@@ -348,7 +344,7 @@ export async function adjudicatePalette(input: {
   });
 
   const response = await client.chat.completions.parse({
-    model: MODEL,
+    model: LLM_MODEL,
     max_completion_tokens: LLM_BUDGET.short,
     reasoning_effort: "low",
     messages: [
@@ -409,7 +405,7 @@ export async function judgeBrandMatch(input: {
 
   const client = openai();
   const response = await client.chat.completions.parse({
-    model: MODEL,
+    model: LLM_MODEL,
     max_completion_tokens: LLM_BUDGET.short,
     reasoning_effort: "low",
     messages: [

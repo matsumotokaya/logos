@@ -1,5 +1,6 @@
 import type { Scene, SceneBackdrop } from "../layout";
 import type { SceneComponent } from "../components";
+import { themeById, type Theme } from "../theme";
 
 /** Plain kanji numerals for the agenda trio (stat variant "seal"). */
 const KANJI_NUMERALS = ["一", "二", "三"] as const;
@@ -154,7 +155,7 @@ function valueScene(brief: EventCmBrief): Scene {
  * and a line of narration that says what it actually is. With a single
  * programme (or none) the scene is the list it always was.
  */
-function programScene(brief: EventCmBrief, index?: number): Scene {
+function programScene(brief: EventCmBrief, index: number | undefined, theme: Theme): Scene {
   const components: SceneComponent[] = [];
   const at = index ?? 0;
   const one = brief.programs[at] ?? null;
@@ -179,16 +180,30 @@ function programScene(brief: EventCmBrief, index?: number): Scene {
   // event has put in them — the earlier fallback borrowed the WHOLE list for an
   // unfilled slot, which said the same thing three times.
   //
-  // Plain kanji in a seal box. The digits read as pagination, the formal 壱弐参
-  // as overdressed (client call) — 一二三 in a hairline square is the register
-  // an invitation actually uses. The latin micro-label carries the "of three".
-  components.push({
-    kind: "stat",
-    value: KANJI_NUMERALS[at % KANJI_NUMERALS.length],
-    unit: `PROGRAM ${at + 1} / ${total}`,
-    variant: "seal",
-    fields: ["programs"],
-  });
+  // Which register the numeral is set in is the art direction's decision, not
+  // this scene's (theme.ts `ornament.numerals`). 墨: plain kanji in a seal box
+  // — the digits read as pagination, the formal 壱弐参 as overdressed (client
+  // call), and 一二三 in a hairline square is the register an invitation
+  // actually uses. Standard: 01 02 03, because in a gothic face 「一」 is a
+  // bar. The latin micro-label carries the "of three" in both.
+  const unit = `PROGRAM ${at + 1} / ${total}`;
+  components.push(
+    theme.ornament.numerals === "kanji-seal"
+      ? {
+          kind: "stat",
+          value: KANJI_NUMERALS[at % KANJI_NUMERALS.length],
+          unit,
+          variant: "seal",
+          fields: ["programs"],
+        }
+      : {
+          kind: "stat",
+          value: String(at + 1).padStart(2, "0"),
+          unit,
+          variant: "ordinal",
+          fields: ["programs"],
+        },
+  );
   if (one) {
     components.push({
       kind: "lines",
@@ -207,15 +222,54 @@ function programScene(brief: EventCmBrief, index?: number): Scene {
 }
 
 /**
- * Who speaks — as full-height panels, not medallions in space.
+ * Who speaks — as the art direction presents speakers (theme.ts
+ * `ornament.people`).
  *
- * The speakers are the scene, so they fill it: portrait panels split by a
- * hairline seam, names set into each panel's own shadow. `full-bleed-overlay`
- * because its full slot is where distribute() already sends people, and its
- * bottom-left slot takes the heading. The medallion row this replaces was the
- * Freehand Lab's plainest verdict: "small circles floating in empty space".
+ * `panels`: the speakers ARE the scene, so they fill it — portrait panels split
+ * by a hairline seam, names set into each panel's own shadow. No heading, since
+ * the overlay slot sits exactly where the panels set their names and two faces
+ * filling the frame do not need to be captioned 「登壇者」.
+ *
+ * `row`: the corporate speaker list — ring-bounded avatars abreast under the
+ * heading, each with its name and, under that, the title and company. The
+ * heading comes back because a row of medallions does not announce what it is.
+ *
+ * The list and each portrait are offered as separate fields either way:
+ * correcting who is announced and choosing the picture of one of them are
+ * different decisions, and the storyboard panel has to be able to offer both.
  */
-function guestsScene(brief: EventCmBrief): Scene {
+function guestsScene(brief: EventCmBrief, theme: Theme): Scene {
+  const fields = [
+    "guests",
+    ...brief.guests.map((_, index) => `guests[${index}].photo`),
+  ];
+
+  if (theme.ornament.people === "row") {
+    const components: SceneComponent[] = [];
+    if (brief.guestsHeading) {
+      components.push({
+        kind: "kicker",
+        text: brief.guestsHeading,
+        fields: ["guestsHeading"],
+      });
+    }
+    components.push({
+      kind: "people",
+      people: brief.guests,
+      presentation: "row",
+      // `primary`, not `hero`: in this arrangement the speakers are a list the
+      // scene presents, not the picture itself. Hero here would set the names
+      // at title size and leave no room for the titles under them.
+      emphasis: "primary",
+      fields,
+    });
+    // Standing on the theme's own ground on purpose. The lab's verdict on a
+    // medallion row was "small circles floating in empty space" — true of a
+    // cinematic film with an empty upper frame, and the reason `standard` has
+    // a `groundWash` instead (theme.ts `palette.groundWash`).
+    return { layout: "row", components };
+  }
+
   return {
     layout: "full-bleed-overlay",
     components: [
@@ -224,15 +278,8 @@ function guestsScene(brief: EventCmBrief): Scene {
         people: brief.guests,
         presentation: "panels",
         emphasis: "hero",
-        // The list and each portrait separately: correcting who is announced
-        // and choosing the picture of one of them are different decisions, and
-        // the panel has to be able to offer both.
-        fields: ["guests", ...brief.guests.map((_, index) => `guests[${index}].photo`)],
+        fields,
       },
-      // No heading over the panels — the overlay slot sits exactly where the
-      // panels set their names, and two speakers filling the frame do not need
-      // to be captioned "登壇者" (the heading still edits in the mapping
-      // drawer; it just has no seat in this picture).
     ],
   };
 }
@@ -311,6 +358,13 @@ export function sceneForRole(
   brief: EventCmBrief,
   /** Which item, for roles that repeat (programmes). */
   index?: number,
+  /**
+   * The art direction the scene will be painted in. film.ts passes the one it
+   * resolved (the brand-dressed theme); a caller without one gets the brief's
+   * own answer, which is what the film would resolve to anyway. Only the
+   * programme scene reads it today — for the numeral register.
+   */
+  theme: Theme = themeById(brief.artDirection),
 ): Scene {
   switch (role) {
     case "logoIn":
@@ -320,9 +374,9 @@ export function sceneForRole(
     case "value":
       return valueScene(brief);
     case "program":
-      return programScene(brief, index);
+      return programScene(brief, index, theme);
     case "guests":
-      return guestsScene(brief);
+      return guestsScene(brief, theme);
     case "cta":
       return ctaScene(brief);
     case "logoOut":

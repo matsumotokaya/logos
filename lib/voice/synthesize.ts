@@ -28,6 +28,7 @@ import {
   encodeWav16,
 } from "../../labs/campaign/audio/tts-lib/audio.mjs";
 import { TTS_MAX_SECTION_CHARS } from "./limits";
+import { explainTtsError } from "./errors";
 import type { CmVoiceTrackOf } from "@/lib/campaign/cm-types";
 
 export const TTS_PROVIDER = "gemini";
@@ -97,14 +98,25 @@ export async function generateVoice<Scene extends { text: string }>(
   const sections: { f32: Float32Array; sampleRate: number }[] = [];
   for (const [i, scene] of scenes.entries()) {
     progress(`シーン${i + 1}/${scenes.length}の読み上げを作成中…`);
-    const { pcm, sampleRate } = await synthesizeSection({
-      text: speechText(scene.text),
-      voice,
-      persona: options.persona,
-      model: TTS_MODEL,
-      provider: TTS_PROVIDER,
-      apiKey: process.env.GEMINI_API_KEY,
-    });
+    // Translated here rather than at the route, because this is the module that
+    // already says why a recording could not be made (an empty script, a line
+    // over the limit) in the language it was written in. The provider's own
+    // sentence is English, names no fix, and reports a daily quota and a
+    // per-minute one identically -- see ./errors.ts.
+    let pcm: Int16Array;
+    let sampleRate: number;
+    try {
+      ({ pcm, sampleRate } = await synthesizeSection({
+        text: speechText(scene.text),
+        voice,
+        persona: options.persona,
+        model: TTS_MODEL,
+        provider: TTS_PROVIDER,
+        apiKey: process.env.GEMINI_API_KEY,
+      }));
+    } catch (error) {
+      throw new Error(explainTtsError(error), { cause: error });
+    }
     const f32 = injectIntervals(
       int16ToF32(pcm),
       sampleRate,

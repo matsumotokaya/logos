@@ -3,14 +3,17 @@
 // Every listed video is a V2 Take. POST chooses the immutable template and
 // creates that Take; there are no synthetic rows or legacy asset fallbacks.
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { guardLabsRequest } from "@/lib/labs-access";
 import { campaignCmMp4Exists, getCampaignJob } from "@/lib/campaign/jobs";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import {
   isVideoTemplateId,
+  type VideoTemplateId,
   videoFamilyIndex,
   VIDEO_TEMPLATES,
 } from "@/lib/video/templates";
+import { artDirectionIds, currentTemplate } from "@/lib/templates/catalog";
 import { videoState, type VideoState, type VideoSummary } from "@/lib/video/asset";
 import { emptyEventBrief } from "@/remotion/event/briefs";
 import { createTake } from "@/lib/takes/create";
@@ -104,6 +107,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       id: take.id,
       brandId: take.brand_id,
       template: take.template_id,
+      // The painting, for the list's style badge. Only event-cm briefs carry
+      // one; everything else is labelled by its template.
+      artDirection: typeof brief?.artDirection === "string" ? brief.artDirection : null,
       title: take.title,
       published,
       // The same derivation the detail screen uses (lib/video/asset.ts). The
@@ -133,6 +139,28 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   return Response.json({ brand: { id: brand.id, name: brand.name }, videos });
 }
 
+/**
+ * One line of the creation log.
+ *
+ * Creating an event video is three to four steps and most of a minute, and it
+ * used to go out as one opaque request: a thin bar reading 「動画を作成して
+ * います…」 for forty seconds, which is indistinguishable from a page that has
+ * frozen. What was missing was not a percentage — an LLM call cannot honestly
+ * report one (BusyBar says so) — but the ACCOUNT: which of the steps is running
+ * now, and how many are left.
+ *
+ * So the response streams. Each line is a real event emitted where the work
+ * actually happens, never a timer advancing a fake list.
+ */
+type CreateEvent =
+  | { type: "step"; label: string; index: number; total: number }
+  | { type: "done"; id: string; createdAt: string }
+  | { type: "error"; message: string };
+
+/** Thrown to end creation with a message the client shows. Streaming has
+ *  already begun by then, so the status code can no longer carry it. */
+class CreateFailure extends Error {}
+
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const denied = await guardLabsRequest(req);
   if (denied) return denied;
@@ -145,7 +173,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { id: brandId } = await ctx.params;
   const supabase = createServerSupabaseForToken(user.token);
 
-  let body: { template?: unknown; title?: unknown };
+  let body: { template?: unknown; title?: unknown; artDirection?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -156,7 +184,103 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!isVideoTemplateId(template)) {
     return Response.json({ error: "テンプレートが不正です" }, { status: 400 });
   }
+  // A retired template still lists and renders its takes; it just stops
+  // getting new ones. The dialog no longer offers it, and the API agrees.
+  if (!VIDEO_TEMPLATES[template].addable) {
+    return Response.json(
+      { error: "このテンプレートは新規作成を受け付けていません" },
+      { status: 400 },
+    );
+  }
+  // The painting, when the template offers more than one. Validated against
+  // the template's own list: an id it has not declared has no dressing and no
+  // place in the dialog, so it is a bad request rather than a quiet fallback.
+  const entry = currentTemplate(template);
+  const artDirection =
+    typeof body.artDirection === "string" && body.artDirection ? body.artDirection : undefined;
+  if (artDirection && entry && !artDirectionIds(entry).includes(artDirection)) {
+    return Response.json({ error: "アートディレクションが不正です" }, { status: 400 });
+  }
   const requestedTitle = typeof body.title === "string" ? body.title.trim() : "";
+
+  // Everything above answers with a status code, because nothing has been sent
+  // yet: a bad template is a bad request and says so. Everything below is the
+  // work, and it streams.
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const send = (event: CreateEvent) =>
+        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      try {
+        const result = await createVideoTake({
+          supabase,
+          brandId,
+          userId: user.id,
+          template,
+          artDirection,
+          requestedTitle,
+          send,
+        });
+        send({ type: "done", ...result });
+      } catch (error) {
+        // In-band, because the 200 went out with the first line. The client
+        // reads the last event, not the status.
+        send({
+          type: "error",
+          message:
+            error instanceof CreateFailure
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : "動画を追加できませんでした",
+        });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    status: 201,
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      // Nothing may sit on this and hand it over complete: a buffered progress
+      // log is the same forty seconds of silence it replaced.
+      "Cache-Control": "no-store, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+
+/**
+ * The work, reporting each step as it starts.
+ *
+ * Split out of the handler so the steps are readable in order and so the log
+ * lines sit exactly where the work does — a list assembled anywhere else drifts
+ * from what actually runs, and a progress log that lies is worse than none.
+ */
+async function createVideoTake({
+  supabase,
+  brandId,
+  userId,
+  template,
+  artDirection,
+  requestedTitle,
+  send,
+}: {
+  supabase: SupabaseClient;
+  brandId: string;
+  userId: string;
+  template: VideoTemplateId;
+  artDirection: string | undefined;
+  requestedTitle: string;
+  send: (event: CreateEvent) => void;
+}): Promise<{ id: string; createdAt: string }> {
+  // How many lines this creation will have. Said up front so the log reads as
+  // a list being worked through rather than as an unbounded stream.
+  const total = template === "event-cm" ? 3 : 2;
+  let at = 0;
+  const step = (label: string) => send({ type: "step", label, index: ++at, total });
 
   let title = requestedTitle;
   let brief: unknown;
@@ -167,13 +291,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     // palette and mark, an event archetype inferred from its industry, and a
     // plausible date — every guess labelled in the brief's provenance so the
     // screen can say which parts are proposals (§17.5).
+    step("ブランドの色・マーク・素材を読んでいます");
     const seeded = await seedEventCmFromBrand(supabase, {
       brandId,
-      userId: user.id,
+      userId,
+      ...(artDirection ? { artDirection } : {}),
     });
-    if (!seeded.ok) {
-      return Response.json({ error: seeded.error }, { status: 500 });
-    }
+    if (!seeded.ok) throw new CreateFailure(seeded.error);
     let seededBrief = seeded.seeded.brief;
     if (title.trim()) seededBrief = { ...seededBrief, title: title.trim() };
 
@@ -186,6 +310,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     // a narration — the timeline falls back to the scene budget — and the
     // narration can be written from the pipeline afterwards.
     if (eventCmNarrationAvailable()) {
+      step("ナレーションを書いています（数十秒かかります）");
       try {
         const draft = await draftEventCmNarration(seededBrief, {
           now: new Date().toISOString(),
@@ -221,10 +346,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       .limit(1)
       .maybeSingle();
     if (lpTakeError) {
-      return Response.json(
-        { error: "製品紹介動画のBrand Kitを確認できませんでした" },
-        { status: 500 },
-      );
+      throw new CreateFailure("製品紹介動画のBrand Kitを確認できませんでした");
     }
     const lpTakeBrief = lpTake?.brief as Record<string, unknown> | null;
     const jobId =
@@ -245,19 +367,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     if (!title) title = VIDEO_TEMPLATES["product-cm"].name;
   }
 
+  step("動画を保存しています");
   const created = await createTake(supabase, {
     brandId,
     templateId: template,
     title,
     brief,
-    createdBy: user.id,
+    // The render row records the painting too, so `take_renders.theme` says
+    // what was chosen and not the catalog's first entry.
+    artDirection: artDirection ?? null,
+    createdBy: userId,
   });
-  if (!created.ok) {
-    return Response.json(
-      { error: created.error },
-      { status: 500 },
-    );
-  }
+  if (!created.ok) throw new CreateFailure(created.error);
 
   if (pinMaterial) {
     // The brief points at material:<uuid>; the pin is what lets both the
@@ -270,15 +391,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       checksum: pinMaterial.checksum,
     });
     if (pinError) {
-      return Response.json(
-        { error: `ロゴを入力として固定できませんでした: ${pinError.message}` },
-        { status: 500 },
-      );
+      throw new CreateFailure(`ロゴを入力として固定できませんでした: ${pinError.message}`);
     }
   }
 
-  return Response.json(
-    { id: created.takeId, createdAt: new Date().toISOString() },
-    { status: 201 },
-  );
+  return { id: created.takeId, createdAt: new Date().toISOString() };
 }

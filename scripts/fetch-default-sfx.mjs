@@ -142,14 +142,41 @@ export const UNSOURCED = ["スポッ.mp3", "歓声と拍手.mp3"];
 const REFERENCE_DB = -20;
 const MAX_GAIN = 3;
 
-const headDb = (file) => {
+const meanDb = (file, args) => {
   const { stderr } = spawnSync(
     "ffmpeg",
-    ["-hide_banner", "-t", "1", "-i", file, "-af", "volumedetect", "-f", "null", "-"],
+    ["-hide_banner", ...args, "-i", file, "-af", "volumedetect", "-f", "null", "-"],
     { encoding: "utf8" },
   );
   const match = /mean_volume:\s*(-?\d+(?:\.\d+)?) dB/.exec(stderr ?? "");
   return match ? Number(match[1]) : null;
+};
+
+const headDb = (file) => meanDb(file, ["-t", "1"]);
+
+/**
+ * Mean level AFTER the first second — how loudly the file is still ringing
+ * once its moment has passed. Null for a file no longer than a second, which
+ * has no tail at all (the best possible answer).
+ *
+ * Added 2026-08-26, because the head alone approved sounds the ear rejects:
+ * the first corporate cue column matched the 和 column's first-second level
+ * exactly and still played as noise — two of its files were 2–3s jingles
+ * holding −25…−34 dB long after the moment they marked (「効果音が異常に
+ * 大きい」). Every approved 和 cue's tail dies to −44 dB or below before the
+ * template's own volume even applies. That envelope is the best practice, and
+ * lib/event-cm/sfx-cues.test.ts holds every column to it using this number.
+ */
+const tailDb = (file) => meanDb(file, ["-ss", "1"]);
+
+const durationSec = (file) => {
+  const { stdout } = spawnSync(
+    "ffprobe",
+    ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file],
+    { encoding: "utf8" },
+  );
+  const value = Number.parseFloat(stdout ?? "");
+  return Number.isFinite(value) ? Number(value.toFixed(2)) : null;
 };
 
 mkdirSync(OUT_DIR, { recursive: true });
@@ -185,6 +212,8 @@ for (const [file, label, role] of SELECTION) {
     src: `defaults/sfx/${file}`,
     sourceUrl: BASE + file,
     headDb: db,
+    tailDb: tailDb(dest),
+    durationSec: durationSec(dest),
     gain: db === null ? 1 : Number(Math.min(MAX_GAIN, Math.pow(10, (REFERENCE_DB - db) / 20)).toFixed(3)),
   };
   console.log(`${file.padEnd(26)} ${label}`);

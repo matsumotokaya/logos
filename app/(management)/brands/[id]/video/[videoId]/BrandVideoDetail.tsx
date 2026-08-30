@@ -27,6 +27,7 @@ import BgmDialog from "@/components/video/BgmDialog";
 import CaptionsDialog from "@/components/video/CaptionsDialog";
 import ProjectExportDialog from "@/components/video/ProjectExportDialog";
 import { DEFAULT_ASSETS, unlicensedDefaults } from "@/lib/assets/defaults";
+import { themeById } from "@/remotion/kit/theme";
 import { voicePresetByName } from "@/lib/voice/voices";
 import {
   describeChanges,
@@ -102,7 +103,14 @@ type VideoAsset = {
   pending?: FilmPending | null;
   state: VideoState;
   createdAt: string;
-  render: { status: "running" | "done" | "error"; error: string | null; renderedAt: string | null } | null;
+  render: {
+    status: "running" | "done" | "error";
+    error: string | null;
+    renderedAt: string | null;
+    /** The drawing changed after this file was made. Decided on the server —
+     *  only it knows which build this deployment ships. */
+    rendererBehind: boolean;
+  } | null;
   /** Signed same-origin URL of the MP4 in R2, when one has been rendered. */
   mp4Url: string | null;
 };
@@ -320,6 +328,7 @@ export default function BrandVideoDetail({
   }, [resolved, brandId, videoId, rendering]);
 
   async function startRender() {
+    const card = openRunCard("MP4の書き出し");
     busy("MP4を書き出しています…");
     try {
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/render`, {
@@ -329,9 +338,19 @@ export default function BrandVideoDetail({
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(json?.error ?? "MP4の作成を開始できませんでした");
       }
+      // The card closes when the REQUEST is accepted, not when the file exists:
+      // rendering runs on the server and the button below it already reports
+      // 「MP4を作成中…」 from `video.render.status`. A card that sat spinning
+      // next to that would be a second, less accurate answer to the same
+      // question.
+      card.log("書き出しを開始しました。完了はボタンの表示で分かります");
+      card.settle("succeeded");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "MP4の作成を開始できませんでした");
+      const message = e instanceof Error ? e.message : "MP4の作成を開始できませんでした";
+      card.log(message);
+      card.settle("failed", message);
+      setError(message);
     } finally {
       idle();
     }
@@ -390,21 +409,34 @@ export default function BrandVideoDetail({
    * way back to a complete narration. The caller is the one that warns.
    */
   async function writeNarration(force = false): Promise<boolean> {
+    const card = openRunCard("ナレーション");
     busy("ナレーションを書いています…");
     try {
+      card.log("ブリーフの事実から書き起こしています（LLM）");
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/narration`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(force ? { force: true } : {}),
       });
+      const json = (await res.json().catch(() => null)) as {
+        error?: string;
+        narration?: { scenes?: unknown[]; angle?: string };
+      } | null;
       if (!res.ok) {
-        const json = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(json?.error ?? "ナレーションを作成できませんでした");
       }
+      const lines = json?.narration?.scenes?.length ?? 0;
+      card.log(`${lines}行を書きました`);
+      if (json?.narration?.angle) card.log(`切り口: ${json.narration.angle}`);
+      card.log("読み上げは作り直しが必要です");
+      card.settle("succeeded");
       await load();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "ナレーションを作成できませんでした");
+      const message = e instanceof Error ? e.message : "ナレーションを作成できませんでした";
+      card.log(message);
+      card.settle("failed", message);
+      setError(message);
       return false;
     } finally {
       idle();
@@ -420,19 +452,31 @@ export default function BrandVideoDetail({
    * (§9.5).
    */
   async function bakeFilm(): Promise<boolean> {
+    const card = openRunCard("動画への反映");
     busy("動画に反映しています…");
     try {
+      // What is about to change, named before the request: this is the one step
+      // that moves what a viewer sees, and the pending list is already on screen.
+      if (bake?.changes.length) card.log(`未反映 ${bake.changes.length}件を反映します`);
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/bake`, {
         method: "POST",
       });
+      const json = (await res.json().catch(() => null)) as {
+        error?: string;
+        bakedAt?: string;
+      } | null;
       if (!res.ok) {
-        const json = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(json?.error ?? "動画に反映できませんでした");
       }
+      card.log("反映しました。プレイヤーがこの版を再生します");
+      card.settle("succeeded");
       await load();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "動画に反映できませんでした");
+      const message = e instanceof Error ? e.message : "動画に反映できませんでした";
+      card.log(message);
+      card.settle("failed", message);
+      setError(message);
       return false;
     } finally {
       idle();
@@ -754,6 +798,33 @@ export default function BrandVideoDetail({
    * clears itself after ten seconds; failure stays until dismissed. Either way
    * the run is in take_runs and shows up in the log at the bottom of the stage.
    */
+  /**
+   * Open a run card and hand back the two things a step needs to narrate itself.
+   *
+   * EVERY long step gets one, not just the document stages. The card was wired
+   * to `runStage` only, and the three film steps (narration → voice → fix) had
+   * nothing but the thin BusyBar — so on a take with no documents, which is
+   * every seeded demo, 「動画を作り直す」 ran three LLM-and-TTS-length steps and
+   * put no card on screen at all. The requester read that as the toast having
+   * broken (2026-08-26); it had never been there on this path.
+   */
+  function openRunCard(label: string) {
+    const id = `${label}-${Date.now()}`;
+    setRunCards((cards) => [
+      ...cards,
+      { id, label, status: "running", lines: [], startedAt: Date.now(), endedAt: null },
+    ]);
+    return {
+      log: (line: string) => appendLine(id, line),
+      settle: (status: "succeeded" | "failed", error?: string) =>
+        setRunCards((cards) =>
+          cards.map((card) =>
+            card.id === id ? { ...card, status, endedAt: Date.now(), error } : card,
+          ),
+        ),
+    };
+  }
+
   async function runStage(stage: RunnableStage): Promise<boolean> {
     const id = `${stage}-${Date.now()}`;
     const label = STAGE_RUN_LABEL[stage];
@@ -990,21 +1061,39 @@ export default function BrandVideoDetail({
   // Speaking replaces the estimated timeline with the measured one. Returns
   // whether it worked, so the dialog that asked can say so and close itself.
   async function speakNarration(voiceId?: string): Promise<boolean> {
+    const card = openRunCard("読み上げ");
     busy("読み上げを作成しています…");
     try {
+      card.log("シーンごとに合成しています（TTS）");
       const res = await videoFetch(`/api/brands/${brandId}/videos/${videoId}/voice`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(voiceId ? { voiceId } : {}),
       });
+      const json = (await res.json().catch(() => null)) as {
+        error?: string;
+        totalMs?: number;
+        voiceLabel?: string;
+        mock?: boolean;
+      } | null;
       if (!res.ok) {
-        const json = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(json?.error ?? "読み上げを作成できませんでした");
       }
+      if (json?.voiceLabel) card.log(`声: ${json.voiceLabel}`);
+      if (typeof json?.totalMs === "number") {
+        card.log(`録音 ${(json.totalMs / 1000).toFixed(1)}秒 — 尺はこれで確定します`);
+      }
+      // Said out loud: a mock recording is the right length and the wrong voice,
+      // and a screen that does not mention it looks like the real thing.
+      if (json?.mock) card.log("※ ダミー音声（CAMPAIGN_TTS_MOCK）");
+      card.settle("succeeded");
       await load();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "読み上げを作成できませんでした");
+      const message = e instanceof Error ? e.message : "読み上げを作成できませんでした";
+      card.log(message);
+      card.settle("failed", message);
+      setError(message);
       return false;
     } finally {
       idle();
@@ -1117,8 +1206,13 @@ export default function BrandVideoDetail({
   // only, so writing a narration — the change that matters most — left the badge
   // reading 0 while the film was a version behind (§9.7).
   const pendingCount = pendingStages.length + filmSteps.length;
-  // The exported file predates the film it claims to be of.
-  const mp4Behind = renderIsBehind(video.render?.renderedAt ?? null, video.bakedAt);
+  // The exported file predates the film it claims to be of — for either of two
+  // reasons, with the same remedy and the same sentence: the film was re-baked
+  // after the export, or the composition that draws it was changed since. The
+  // second one used to be invisible.
+  const mp4Behind =
+    renderIsBehind(video.render?.renderedAt ?? null, video.bakedAt) ||
+    Boolean(video.render?.rendererBehind);
 
   // Aspect, pixels, length. Computed here because the timeline is the film's
   // own (a narration shortens or lengthens it), and shown with the other metadata
@@ -1428,7 +1522,6 @@ export default function BrandVideoDetail({
                     current={current}
                     pool={DEFAULT_ASSETS.filter((asset) => asset.kind === "bgm")}
                     uploads={sources.filter((source) => source.kind === "audio")}
-                    ducks={Boolean(brief?.voice)}
                     unreflected={isUnreflected("bgm")}
                     busy={saving}
                     onChoose={(src) => editFact({ path: "bgm", src })}
@@ -1512,7 +1605,13 @@ export default function BrandVideoDetail({
                     Object.entries(video.materialUrls ?? {}).map(([uri, url]) => [url, uri]),
                   );
                   const bgm = brief?.bgm ? (uriByUrl.get(brief.bgm) ?? brief.bgm) : null;
-                  return bgm ? [bgm] : [];
+                  // The art direction's own assets belong in this list too: the
+                  // closing plate's footage is declared by the THEME rather than
+                  // by a brief field, so a list built from the brief alone would
+                  // leave the one asset that is actually withheld unnamed
+                  // (lib/export/project-zip.ts makes the same addition).
+                  const endCard = themeById(brief?.artDirection).endCard?.video;
+                  return [bgm, endCard].filter((src): src is string => Boolean(src));
                 })(),
               )}
               ready={Boolean(video.bakedAt)}

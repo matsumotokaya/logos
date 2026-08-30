@@ -8,7 +8,7 @@ import { campaignCmMp4Exists, getCampaignJob } from "@/lib/campaign/jobs";
 import { signedLabsUrl } from "@/lib/labs-output-sign";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 import { videoState, type VideoState } from "@/lib/video/asset";
-import { VIDEO_TEMPLATES } from "@/lib/video/templates";
+import { VIDEO_TEMPLATES, videoDisplayName } from "@/lib/video/templates";
 import { renderOutputSignatureToken } from "../../takes/[takeId]/renders/[renderId]/output/route";
 import { resolveBriefMaterialUrls } from "@/lib/takes/materials";
 import { deleteTake, parseMaterialDisposition } from "@/lib/takes/delete";
@@ -16,6 +16,7 @@ import { titleOffer } from "@/lib/event-cm/title";
 import { filmPending } from "@/lib/event-cm/bake";
 import type { EventCmBrief } from "@/remotion/event-cm/types";
 import { validateBrief } from "@/lib/templates/brief-schemas";
+import { rendererChangedSince } from "@/lib/templates/catalog";
 import {
   ensureCanonicalVideoPublication,
   retireCanonicalPublications,
@@ -62,7 +63,7 @@ export async function GET(
   if (take) {
     const { data: render, error: renderError } = await supabase
       .from("take_renders")
-      .select("id, status, latest_artifact_id, updated_at")
+      .select("id, status, latest_artifact_id, updated_at, params")
       .eq("take_id", take.id)
       .order("created_at", { ascending: true })
       .limit(1)
@@ -149,20 +150,37 @@ export async function GET(
         : null;
     const hasPinnedVoice =
       briefRecord?.voice != null && typeof briefRecord.voice === "object";
+    // Whether the drawing itself has moved on since this file was made.
+    //
+    // Only the server can answer it: the comparison is against the catalog this
+    // deployment ships, and the client has no way to know which build drew an
+    // MP4 that was exported weeks ago. Unknown reads as false — an export made
+    // before the revision was recorded is not evidence of anything.
+    const rendererBehind = rendererChangedSince(
+      (render.params as Record<string, unknown> | null)?.rendererRevision,
+      take.template_id as string,
+    );
     const renderState =
       render.status === "running"
-        ? { status: "running" as const, error: null, renderedAt: null }
+        ? {
+            status: "running" as const,
+            error: null,
+            renderedAt: null,
+            rendererBehind: false,
+          }
         : render.status === "ready"
           ? {
               status: "done" as const,
               error: null,
               renderedAt: artifact?.created_at ?? render.updated_at,
+              rendererBehind,
             }
           : render.status === "failed"
             ? {
                 status: "error" as const,
                 error: "前回のレンダーに失敗しました",
                 renderedAt: null,
+                rendererBehind: false,
               }
             : null;
 
@@ -180,7 +198,14 @@ export async function GET(
               : (take.brand_entities as { name?: string } | null)?.name) ?? null,
           title: take.title,
           template: take.template_id,
-          templateName: VIDEO_TEMPLATES[take.template_id]?.name ?? take.template_id,
+          // Family and painting (`イベント紹介動画 - スタンダード`): the name of
+          // THIS take, not of its template, since one template paints two ways.
+          templateName: videoDisplayName(
+            take.template_id,
+            typeof (take.brief as { artDirection?: unknown } | null)?.artDirection === "string"
+              ? ((take.brief as { artDirection: string }).artDirection)
+              : null,
+          ),
           published: (publicationResult.data?.length ?? 0) > 0,
           publicUrl: publicationResult.data?.[0]?.url_path ?? null,
           briefSlug: null,

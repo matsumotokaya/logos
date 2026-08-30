@@ -42,6 +42,9 @@ interface RenderRow {
   locale: string;
   aspect_ratio: string;
   theme: string;
+  /** Whatever this render already recorded about itself. Merged, not replaced:
+   *  this column is a bag, and a later writer must not drop an earlier one. */
+  params: Record<string, unknown> | null;
   takes: {
     brand_id: string;
     template_id: string;
@@ -59,7 +62,7 @@ export async function renderTake(
   const { data, error } = await supabase
     .from("take_renders")
     .select(
-      "id, take_id, format, locale, aspect_ratio, theme, takes(brand_id, template_id, template_version, brief, baked_brief)",
+      "id, take_id, format, locale, aspect_ratio, theme, params, takes(brand_id, template_id, template_version, brief, baked_brief)",
     )
     .eq("id", renderId)
     .maybeSingle();
@@ -148,12 +151,24 @@ export async function renderTake(
       throw new Error(artifactError?.message ?? "成果物を登録できませんでした");
     }
 
+    // Which renderer drew this file.
+    //
+    // Written here rather than left to the ledger, because the ledger records
+    // what a TEMPLATE VERSION promised while this records what one FILE was
+    // made by. Without it, fixing the drawing leaves every existing export
+    // silently old: the player runs today's composition, the MP4 does not, and
+    // the only staleness anything could see was a newer bake
+    // (lib/templates/catalog.ts `rendererChangedSince`).
     const { error: readyError } = await supabase
       .from("take_renders")
       .update({
         status: "ready",
         latest_artifact_id: artifact.id,
         updated_at: renderedAt,
+        params: {
+          ...(render.params ?? {}),
+          rendererRevision: template.rendererRevision,
+        },
       })
       .eq("id", renderId);
     if (readyError) {

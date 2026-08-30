@@ -2,6 +2,16 @@
 
 // The storyboard, under the player.
 //
+// EVERY `src` here goes through `resolveSrc`, the renderer's own rule
+// (remotion/kit/paint.ts). A brief holds two kinds of path — an absolute signed
+// URL for a pinned material, and a bare `defaults/...` for a pool asset — and
+// only the first works when handed straight to an <img>. The second is
+// relative, so the browser resolved it against the PAGE: opening a video at
+// /brands/<id>/video/<takeId> fetched /brands/<id>/video/defaults/stills/… and
+//404'd on every pool picture (measured in the dev log, 2026-08-28). The player
+// was never affected, which is why this survived so long — Remotion resolves
+// its own srcs, and these hand-written <img> tags are the only ones that do not.
+//
 // A panel is a wireframe on a 1920×1080 artboard, scaled down to whatever width
 // it is given — the same technique the deck panels in slide-factory use, and the
 // reason a small card and its enlargement are one implementation rather than two.
@@ -29,7 +39,7 @@ import {
   type StoryboardPanel,
 } from "@/lib/storyboard/event-cm";
 import { LAYOUTS, REGION_GEOMETRY, STAGE } from "@/remotion/kit/layout";
-import { focusPosition, markPainting } from "@/remotion/kit/paint";
+import { focusPosition, markPainting, resolveSrc } from "@/remotion/kit/paint";
 import { captionSafeBottom, type Theme } from "@/remotion/kit/theme";
 import {
   EVENT_CM_CHARS_PER_SECOND,
@@ -148,7 +158,7 @@ function Block({ block, theme }: { block: StoryboardBlock; theme: Theme }) {
       return (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={figure.src}
+          src={resolveSrc(figure.src)}
           alt={figure.label}
           style={{
             height,
@@ -174,7 +184,7 @@ function Block({ block, theme }: { block: StoryboardBlock; theme: Theme }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img
               key={`${figure.label}-${index}`}
-              src={figure.src}
+              src={resolveSrc(figure.src)}
               alt={figure.label}
               style={{
                 height: 56,
@@ -215,7 +225,7 @@ function Block({ block, theme }: { block: StoryboardBlock; theme: Theme }) {
               {figure.src ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={figure.src}
+                  src={resolveSrc(figure.src)}
                   alt={figure.label}
                   style={{
                     width: "100%",
@@ -320,7 +330,7 @@ function Artboard({ panel, theme }: { panel: StoryboardPanel; theme: Theme }) {
       {panel.backdrop ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={panel.backdrop.src}
+          src={resolveSrc(panel.backdrop.src)}
           alt=""
           style={{
             position: "absolute",

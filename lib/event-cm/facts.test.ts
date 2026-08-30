@@ -41,7 +41,11 @@ test("消した項目は「不足」ではなく「決めたこと」として�
 
   assert.equal(isSuppressed(off, "schedule.fee"), true);
   assert.ok(!state.fields.some((field) => field.path === "schedule.fee"));
-  assert.deepEqual(state.suppressed, ["schedule.fee"]);
+  // 「voice」 is in here because a take is created with the reading switched off
+  // (seed.ts, 2026-08-30). It is a SETTING recorded through the same mechanism,
+  // not a fact somebody deleted — the list is every suppressed path, and the
+  // two kinds have always shared it (`captions` is the other).
+  assert.deepEqual(state.suppressed, ["voice", "schedule.fee"]);
 });
 
 test("消した項目は描画前に空にされる", () => {

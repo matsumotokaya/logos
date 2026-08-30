@@ -2,7 +2,7 @@ import "server-only";
 
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { LLM_BUDGET, parseOrExplain } from "@/lib/llm";
+import { LLM_BUDGET, LLM_MODEL, parseOrExplain } from "@/lib/llm";
 import { z } from "zod";
 import {
   EVENT_CM_MAX_CHARS,
@@ -30,7 +30,6 @@ import {
 // own agenda is not a reason to attend. Deciding what the evening actually
 // offers, and saying it in the first four seconds, is a judgment.
 
-const MODEL = "gpt-5.6-luna";
 const LLM_TIMEOUT_MS = 120_000;
 
 const openai = (): OpenAI => new OpenAI({ timeout: LLM_TIMEOUT_MS, maxRetries: 2 });
@@ -272,7 +271,7 @@ export async function draftEventCmNarration(
 
   const response = await parseOrExplain(() =>
     openai().chat.completions.parse({
-    model: MODEL,
+    model: LLM_MODEL,
     max_completion_tokens: LLM_BUDGET.long,
     reasoning_effort: "medium",
     messages: [

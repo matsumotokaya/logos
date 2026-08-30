@@ -20,7 +20,7 @@ import type { EventBrief } from "@/remotion/event/types";
 const EventVideoPlayer = dynamic(() => import("./EventVideoPlayerClient"), {
   ssr: false,
   loading: () => (
-    <div className="flex aspect-video items-center justify-center text-[12px] text-white/50">
+    <div className="flex aspect-video items-center justify-center bg-ink/[0.03] text-[12px] text-ink-muted">
       プレビューを読み込み中…
     </div>
   ),
@@ -52,9 +52,10 @@ export default function EventVideoWorkspace({ brief }: { brief: EventBrief }) {
         </p>
       </div>
 
-      {/* The goal. Dark surround because the video itself is ink-black — a
-          white frame around it would fight the art direction. */}
-      <div className="overflow-hidden rounded-2xl bg-[#0b0d13] p-2 shadow-sm">
+      {/* The goal, bare. The black rounded shell that used to sit here read as
+          a frame that might be part of the video (requester, 2026-08-26, on the
+          event-cm player — same shell). The frame is the film's own edge. */}
+      <div>
         <EventVideoPlayer brief={brief} />
       </div>
 

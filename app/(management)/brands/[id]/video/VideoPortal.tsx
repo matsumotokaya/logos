@@ -20,13 +20,23 @@ import { cn } from "@/lib/cn";
 import { videoFetch } from "@/lib/video/client";
 import { refreshBrandTree } from "@/lib/brand-events";
 import {
-  DEFAULT_ADDABLE_VIDEO_TEMPLATE,
+  DEFAULT_ADDABLE_VIDEO_STYLE,
+  parseVideoStyle,
+  styleLabel,
   VIDEO_TEMPLATE_FAMILIES,
   VIDEO_TEMPLATES,
-  type VideoTemplateId,
 } from "@/lib/video/templates";
 import { VIDEO_STATE_LABEL, type VideoSummary } from "@/lib/video/asset";
+import BusyBar from "@/components/pipeline/BusyBar";
+import RunOverlay, { type RunCard } from "@/components/pipeline/RunOverlay";
 
+
+/** One line of the creation log. Mirrors the server's `CreateEvent`
+ *  (app/api/brands/[id]/videos/route.ts). */
+type CreateEvent =
+  | { type: "step"; label: string; index: number; total: number }
+  | { type: "done"; id: string; createdAt: string }
+  | { type: "error"; message: string };
 
 export default function VideoPortal({ brandId }: { brandId: string }) {
   const router = useRouter();
@@ -35,7 +45,12 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [template, setTemplate] = useState<VideoTemplateId>(DEFAULT_ADDABLE_VIDEO_TEMPLATE);
+  /** The creation log, in the same card every stage run uses. */
+  const [runs, setRuns] = useState<RunCard[]>([]);
+  // One value for the pair the dialog asks about — the template and, where the
+  // template paints more than one way, the art direction (lib/video/templates.ts
+  // `VideoStyle`). Parsed back into the two fields the API takes on submit.
+  const [style, setStyle] = useState<string>(DEFAULT_ADDABLE_VIDEO_STYLE.key);
   const [title, setTitle] = useState("");
 
   const load = useCallback(async () => {
@@ -71,11 +86,54 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
     };
   }, [load]);
 
+  /**
+   * Create the video, showing the account of it as it happens.
+   *
+   * The request streams (POST /api/brands/[id]/videos): one NDJSON line per
+   * step, emitted where the work is. Creating an event video is most of a
+   * minute — a seed read, a narration written by a model, a row saved — and it
+   * used to go out as one opaque call behind a bar reading 「動画を作成して
+   * います…」, which after thirty seconds is indistinguishable from a page that
+   * has frozen. The card is the same one every stage run uses.
+   *
+   * No percentage, deliberately: 3/3 counts steps, which is a fact, while a
+   * percentage over an LLM call is a guess that stalls (BusyBar says the same).
+   */
   async function submit() {
     setSubmitting(true);
+    const runId = `create-${Date.now()}`;
+    const startedAt = Date.now();
+    setRuns((prev) => [
+      ...prev,
+      {
+        id: runId,
+        label: "動画を作成しています",
+        status: "running",
+        lines: [],
+        startedAt,
+        endedAt: null,
+      },
+    ]);
+    const push = (line: string) =>
+      setRuns((prev) =>
+        prev.map((run) =>
+          run.id === runId ? { ...run, lines: [...run.lines, line] } : run,
+        ),
+      );
+    const finish = (status: "succeeded" | "failed", error?: string) =>
+      setRuns((prev) =>
+        prev.map((run) =>
+          run.id === runId
+            ? { ...run, status, endedAt: Date.now(), error: error ?? null }
+            : run,
+        ),
+      );
+
     try {
+      const { templateId, artDirection } = parseVideoStyle(style);
       const body: Record<string, unknown> = {
-        template,
+        template: templateId,
+        artDirection: artDirection ?? undefined,
         title: title.trim() || undefined,
       };
       const res = await videoFetch(`/api/brands/${brandId}/videos`, {
@@ -83,19 +141,57 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const json = (await res.json().catch(() => null)) as
-        | { id?: string; error?: string }
-        | null;
-      if (!res.ok || !json?.id) {
+      // A refusal answered before the work began is still an ordinary JSON
+      // error with a status: a bad template never reaches the stream.
+      if (!res.ok || !res.body) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(json?.error ?? "動画を追加できませんでした");
       }
+
+      let created: string | null = null;
+      let failed: string | null = null;
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buffer = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += value;
+        // Split on the newline the server writes after every event; the tail is
+        // whatever arrived mid-line and is kept for the next chunk.
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let event;
+          try {
+            event = JSON.parse(line) as CreateEvent;
+          } catch {
+            continue;
+          }
+          if (event.type === "step") {
+            push(`${event.index}/${event.total} ${event.label}`);
+          } else if (event.type === "done") {
+            created = event.id;
+          } else if (event.type === "error") {
+            failed = event.message;
+          }
+        }
+      }
+      if (failed || !created) {
+        throw new Error(failed ?? "動画を追加できませんでした");
+      }
+
+      push("できました");
+      finish("succeeded");
       setAdding(false);
       setTitle("");
       // The left tree lists videos too, so it has to pick the new one up.
       refreshBrandTree();
-      router.push(`/brands/${brandId}/video/${json.id}`);
+      router.push(`/brands/${brandId}/video/${created}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "動画を追加できませんでした");
+      const message = e instanceof Error ? e.message : "動画を追加できませんでした";
+      finish("failed", message);
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -103,6 +199,17 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8 md:px-10">
+      {/* The same bar the video detail screen uses for every long step. The
+          dialog says what is happening; this says it is still happening after
+          the dialog has been left behind — creation continues through the
+          redirect to the new video. */}
+      <BusyBar label={submitting ? "動画を作成しています…" : null} />
+      {/* Survives the redirect: the card is rendered by this page, so it goes
+          when the new video opens. The bar above is what carries over. */}
+      <RunOverlay
+        runs={runs}
+        onDismiss={(id) => setRuns((prev) => prev.filter((run) => run.id !== id))}
+      />
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-hairline pb-6">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-ink-muted">VIDEO</p>
@@ -133,34 +240,41 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
         <p className="text-sm text-ink-muted">読み込み中…</p>
       ) : (
         <div className="space-y-8">
-          {VIDEO_TEMPLATE_FAMILIES.map((family) => {
-            const ids = new Set(family.variants.map((variant) => variant.id));
-            const rows = videos.filter((video) => ids.has(video.template));
-            // A category with nothing in it is not shown: the page lists what
-            // this brand has, and the way to start a new kind is the add button.
-            if (rows.length === 0) return null;
-            return (
-              <section key={family.name}>
+          {/* Grouped by the FAMILY OF WHAT EXISTS, not by what the add dialog
+              offers: a retired template's takes (event-promo) still belong to
+              their family and still have to be reachable from here. The API
+              already sorts videos by family order, so the sections fall out in
+              catalog order without a second list. A category with nothing in it
+              is not shown — the way to start a new kind is the add button. */}
+          {videos
+            .reduce<Array<{ name: string; rows: VideoSummary[] }>>((sections, video) => {
+              const name = VIDEO_TEMPLATES[video.template]?.family ?? video.template;
+              const found = sections.find((section) => section.name === name);
+              if (found) found.rows.push(video);
+              else sections.push({ name, rows: [video] });
+              return sections;
+            }, [])
+            .map((section) => (
+              <section key={section.name}>
                 <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-                  {family.name}
+                  {section.name}
                 </h2>
                 <ul className="mt-3 space-y-3">
-                  {rows.map((video) => (
+                  {section.rows.map((video) => (
                     <li key={`${video.template}-${video.id}`}>
                       <VideoRow brandId={brandId} video={video} />
                     </li>
                   ))}
                 </ul>
               </section>
-            );
-          })}
+            ))}
         </div>
       )}
 
       {adding ? (
         <AddVideoOverlay
-          template={template}
-          onTemplate={setTemplate}
+          style={style}
+          onStyle={setStyle}
           title={title}
           onTitle={setTitle}
           submitting={submitting}
@@ -173,7 +287,6 @@ export default function VideoPortal({ brandId }: { brandId: string }) {
 }
 
 function VideoRow({ brandId, video }: { brandId: string; video: VideoSummary }) {
-  const template = VIDEO_TEMPLATES[video.template];
   return (
     <Link
       href={`/brands/${brandId}/video/${video.id}`}
@@ -182,8 +295,11 @@ function VideoRow({ brandId, video }: { brandId: string; video: VideoSummary }) 
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className="truncate text-sm font-semibold">{video.title}</span>
+          {/* The style: the painting for a template that has several, the
+              template's own name otherwise. An old take with no painting
+              recorded is labelled the way the renderer paints it. */}
           <span className="rounded-full border border-hairline px-2 py-0.5 text-[10px] text-ink-muted">
-            {template?.variant ?? video.template}
+            {styleLabel(video.template, video.artDirection)}
           </span>
           {video.isPlaceholder ? (
             <span className="rounded-full border border-dashed border-ink-faint px-2 py-0.5 text-[10px] text-ink-muted">
@@ -202,16 +318,17 @@ function VideoRow({ brandId, video }: { brandId: string; video: VideoSummary }) 
 }
 
 function AddVideoOverlay({
-  template,
-  onTemplate,
+  style,
+  onStyle,
   title,
   onTitle,
   submitting,
   onCancel,
   onSubmit,
 }: {
-  template: VideoTemplateId;
-  onTemplate: (id: VideoTemplateId) => void;
+  /** A `VideoStyle.key`: the template, and the painting where there is a choice. */
+  style: string;
+  onStyle: (key: string) => void;
   title: string;
   onTitle: (value: string) => void;
   submitting: boolean;
@@ -229,7 +346,8 @@ function AddVideoOverlay({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onCancel]);
 
-  const selected = VIDEO_TEMPLATES[template];
+  const { templateId } = parseVideoStyle(style);
+  const selected = VIDEO_TEMPLATES[templateId];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -253,7 +371,7 @@ function AddVideoOverlay({
           </legend>
           <div className="mt-2.5 space-y-2">
             {VIDEO_TEMPLATE_FAMILIES.map((family) => {
-              const active = family.variants.some((item) => item.id === template);
+              const active = family.styles.some((item) => item.key === style);
               return (
                 <div
                   key={family.name}
@@ -269,8 +387,8 @@ function AddVideoOverlay({
                       value={family.name}
                       checked={active}
                       // Picking a family lands on its first style, so the pair
-                      // is always a resolvable template id.
-                      onChange={() => onTemplate(family.variants[0].id)}
+                      // is always a resolvable template and painting.
+                      onChange={() => onStyle(family.styles[0].key)}
                     />
                     <span className="text-[13px] font-semibold">{family.name}</span>
                   </label>
@@ -279,13 +397,13 @@ function AddVideoOverlay({
                     <label className="mt-2.5 block pl-7">
                       <span className="text-[11px] text-ink-muted">スタイル</span>
                       <select
-                        value={template}
-                        onChange={(e) => onTemplate(e.target.value)}
+                        value={style}
+                        onChange={(e) => onStyle(e.target.value)}
                         className="mt-1 w-full rounded-lg border border-hairline bg-white px-2.5 py-2 text-[12px]"
                       >
-                        {family.variants.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.variant}
+                        {family.styles.map((item) => (
+                          <option key={item.key} value={item.key}>
+                            {item.label}
                           </option>
                         ))}
                       </select>
@@ -301,7 +419,7 @@ function AddVideoOverlay({
             name before it has anything else, and asking for it at the bottom
             of the dialog — under a heading reading 任意 — buried the one
             field this template actually wants. */}
-        {template === "event-cm" || template === "event-promo" ? (
+        {templateId === "event-cm" || templateId === "event-promo" ? (
           <label className="mt-5 block">
             <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
               イベント名
@@ -324,11 +442,35 @@ function AddVideoOverlay({
           </p>
         )}
 
+        {/* What the wait is for, while it is happening.
+            「追加」 sounds instant and is not: the take is seeded from the brand,
+            its mark is promoted to a material and measured, and an LLM writes
+            the draft narration — twenty seconds or so in which the dialog
+            previously did nothing but grey out its button, which reads as a
+            frozen screen (requester, 2026-08-26).
+
+            NAMED, NOT METERED. The steps are known but not observable from
+            here — the API answers once, at the end — so a step-by-step log
+            would be invented. Same rule as BusyBar: say what is being waited
+            for, never a percentage that stalls. */}
+        {submitting ? (
+          <p className="mt-5 flex items-start gap-2.5 rounded-xl border border-hairline bg-ink/[0.03] px-4 py-3 text-[11px] leading-relaxed text-ink-muted">
+            <span
+              aria-hidden
+              className="mt-0.5 inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-ink-faint border-t-ink"
+            />
+            <span>
+              ブランドの情報から動画を組み立てています。ロゴと配色を読み、下書きのナレーションまで書くので、20秒ほどかかります。
+            </span>
+          </p>
+        ) : null}
+
         <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-hairline px-5 py-2.5 text-xs font-semibold transition hover:border-ink"
+            disabled={submitting}
+            className="rounded-full border border-hairline px-5 py-2.5 text-xs font-semibold transition hover:border-ink disabled:opacity-50"
           >
             キャンセル
           </button>
@@ -336,9 +478,15 @@ function AddVideoOverlay({
             type="button"
             onClick={onSubmit}
             disabled={submitting}
-            className="rounded-full bg-ink px-5 py-2.5 text-xs font-semibold text-paper transition hover:bg-accent disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-xs font-semibold text-paper transition hover:bg-accent disabled:opacity-50"
           >
-            {submitting ? "追加中…" : "追加"}
+            {submitting ? (
+              <span
+                aria-hidden
+                className="inline-block size-3 animate-spin rounded-full border-2 border-paper/40 border-t-paper"
+              />
+            ) : null}
+            {submitting ? "作成しています…" : "追加"}
           </button>
         </div>
       </div>

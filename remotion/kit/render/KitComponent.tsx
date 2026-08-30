@@ -597,6 +597,41 @@ export const KitComponent: React.FC<{
       );
 
     case "stat":
+      // The ordinal: a large, light numeral with the unit on its baseline and
+      // nothing around it — how a corporate deck numbers an agenda. The seal
+      // below is the same statement in the 和 register; the theme picks
+      // (theme.ts `ornament.numerals`).
+      if (component.variant === "ordinal") {
+        return (
+          <div style={{ ...enter, display: "flex", alignItems: "baseline", gap: 26 }}>
+            <span
+              style={{
+                fontFamily: theme.displayFont,
+                fontWeight: 300,
+                fontSize: step.size * 2.4,
+                lineHeight: 1,
+                letterSpacing: "-0.02em",
+                color: theme.palette.accent,
+                fontVariantNumeric: "tabular-nums lining-nums",
+              }}
+            >
+              {component.value}
+            </span>
+            {component.unit ? (
+              <span
+                style={{
+                  fontFamily: theme.textFont,
+                  fontSize: theme.scale.caption.size * 0.92,
+                  letterSpacing: "0.5em",
+                  color: theme.palette.accent,
+                }}
+              >
+                {component.unit}
+              </span>
+            ) : null}
+          </div>
+        );
+      }
       // The seal: a hairline box carrying the numeral, the unit riding beside
       // it small. Made for 一二三 — bare at 250px they read as bars, and the
       // formal 壱弐参 read as overdressed (both measured in the Freehand Lab).

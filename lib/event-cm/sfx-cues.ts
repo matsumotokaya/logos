@@ -24,6 +24,7 @@
 // a third of every other cue's energy).
 
 import type { EventCmSceneRole } from "@/remotion/event-cm/types";
+import type { ThemeSound } from "@/remotion/kit/theme";
 import catalog from "@/public/defaults/sfx/catalog.json";
 
 export interface SfxCue {
@@ -74,32 +75,89 @@ const cue = (file: string, presence: number, atMs: number): SfxCue | null => {
 };
 
 /**
+ * Which file rings each moment, per sound palette (theme.ts `ThemeSound`).
+ *
+ * The MOMENTS and their presence are the template's and are the same in both
+ * columns; only the instrument changes. Two scenes stay silent in both — the
+ * promise and the end card — for the reason in the file header.
+ */
+const INSTRUMENTS: Record<ThemeSound["cues"], Record<"opening" | "title" | "chapter" | "arrival" | "closing", string>> = {
+  // The 和モダン palette, approved on the delivered commission.
+  wa: {
+    // 拍子木: the two wooden blocks that open a performance — the one moment
+    // with no voice and no picture to compete with.
+    opening: "hyoushigi1.mp3",
+    // A single taiko as the title draws in, before the first narrated line.
+    title: "drum-japanese1.mp3",
+    // The chapter turn rings the 鈴 (client call, 2026-08-18 — the synthetic
+    // woosh sat wrong against an acoustic palette).
+    chapter: "bell1.mp3",
+    // The same bell announces the speakers: people arriving and chapters
+    // turning are the same kind of moment, and one instrument says so.
+    arrival: "bell1.mp3",
+    // 和太鼓のドドン under the date landing — the film's one two-beat hit,
+    // saved for its biggest fact (client call; the koto glissando didn't sit).
+    closing: "drum-japanese2.mp3",
+  },
+  // The corporate palette. Selected to MATCH THE APPROVED COLUMN'S MEASURED
+  // ENVELOPE, not by ear (2026-08-26): every 和 cue is a one-shot that has died
+  // within a second — played tails measure −48…−60 dB — which is why seven
+  // hits in fifty seconds read as 演出 and not as noise. The first corporate
+  // draft was picked by label alone and two of its four files were multi-second
+  // jingles still at −25…−34 dB a second in (logo-animation1, text-impact2):
+  // categorically different sounds, and the requester heard exactly that
+  // (「効果音が異常に大きい」— it was not their first-second level, which
+  // matches 和 by construction; it was the ringing). Current picks, measured:
+  //
+  //             dur    played tail (1s+)     和の対応
+  //   piano     1.67s  −49 dB                拍子木(→ n/a, dies at once)
+  //   title1    1.73s  −46 dB                和太鼓ドン −48 dB
+  //   switch2   1.90s  −62 dB                鈴 −60 dB
+  //   spotlight 1.77s  −54 dB                和太鼓ドドン −60 dB
+  //
+  // Still unheard — the register (does a piano note suit this film) is an ear
+  // question for the first watch. What is no longer possible is a cue that
+  // rings past its moment: `npm run sfx:envelope` checks every column against
+  // the approved envelope, and the numbers above come from it.
+  corporate: {
+    // A single acoustic piano note over the intro — the one moment with no
+    // voice; acoustic like the 和 column, corporate in register.
+    opening: "piano-single1.mp3",
+    // タイトル表示 — made for exactly this moment.
+    title: "title1.mp3",
+    // The scene-turn woosh: the corporate chapter idiom. Chapters and
+    // speakers ring the same cue (the 和 column's pairing rule, kept).
+    chapter: "sceneswitch2.mp3",
+    arrival: "sceneswitch2.mp3",
+    // The date landing: a reveal hit, over in under two seconds.
+    closing: "spotlight1.mp3",
+  },
+};
+
+/**
  * The cue for one scene role, by identity — three programme pictures ring the
  * same bell on purpose (three different transitions read as three unrelated
  * films), and `index` stays a parameter so a template that wants to vary them
- * can.
+ * can. `cues` is the theme's sound palette; absent means the 和 column, which
+ * is what every take painted before the field existed was scored with.
  */
-export function eventCmSfxCue(role: EventCmSceneRole, _index = 0): SfxCue | null {
+export function eventCmSfxCue(
+  role: EventCmSceneRole,
+  _index = 0,
+  cues: ThemeSound["cues"] = "wa",
+): SfxCue | null {
+  const files = INSTRUMENTS[cues] ?? INSTRUMENTS.wa;
   switch (role) {
-    // 拍子木: the two wooden blocks that open a performance — the one moment
-    // with no voice and no picture to compete with.
     case "logoIn":
-      return cue("hyoushigi1.mp3", PRESENCE.opening, 450);
-    // A single taiko as the title draws in, before the first narrated line.
+      return cue(files.opening, PRESENCE.opening, 450);
     case "title":
-      return cue("drum-japanese1.mp3", PRESENCE.title, 120);
-    // The chapter turn rings the 鈴 (client call, 2026-08-18 — the synthetic
-    // woosh sat wrong against an acoustic palette).
+      return cue(files.title, PRESENCE.title, 120);
     case "program":
-      return cue("bell1.mp3", PRESENCE.chapter, 0);
-    // The same bell announces the speakers: people arriving and chapters
-    // turning are the same kind of moment, and one instrument says so.
+      return cue(files.chapter, PRESENCE.chapter, 0);
     case "guests":
-      return cue("bell1.mp3", PRESENCE.arrival, 60);
-    // 和太鼓のドドン under the date landing — the film's one two-beat hit,
-    // saved for its biggest fact (client call; the koto glissando didn't sit).
+      return cue(files.arrival, PRESENCE.arrival, 60);
     case "cta":
-      return cue("drum-japanese2.mp3", PRESENCE.closing, 0);
+      return cue(files.closing, PRESENCE.closing, 0);
     // value: watched, not punctuated. logoOut: music alone.
     default:
       return null;

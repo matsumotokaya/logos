@@ -1,7 +1,15 @@
 import { archetypeFor, subjectFor } from "./archetypes";
 import { templateBgm, templatePortrait, templateVisual } from "@/lib/assets/defaults";
-import { currentTemplate } from "@/lib/templates/catalog";
-import { eventCmNarratedSteps } from "@/remotion/event-cm/types";
+import {
+  currentTemplate,
+  defaultArtDirection,
+  templateDressing,
+} from "@/lib/templates/catalog";
+import {
+  EVENT_CM_SUPPRESSED_NOTE,
+  EVENT_CM_VOICE_PATH,
+  eventCmNarratedSteps,
+} from "@/remotion/event-cm/types";
 import type {
   EventCmBrief,
   EventCmProvenance,
@@ -23,12 +31,23 @@ import { NEW_FILM_THEME_ID } from "@/remotion/kit/theme";
 //   1. **Every proposal is labelled.** provenance records `brand` for what the
 //      brand actually has and `inferred` for what this file guessed, so the
 //      screen can say which is which and publish can warn (§17.5).
-//   2. **No invented people.** A guessed date is a proposal a user corrects in
-//      five seconds. A guessed speaker is a fabricated person with a job
-//      title, so guests get a ROLE and never a name. The scene itself is not
-//      optional (EVENT_CM_SCENES is fixed), and the role carries a stock
-//      portrait marked 「（見本）」 — see `portrait()` below for why a face is
-//      the one guess that needs saying out loud.
+//   2. **Obviously-fictional people, not plausible ones.** This rule was "no
+//      invented people" until 2026-08-30, when the guests were 「ゲストスピー
+//      カー」 and 「モデレーター」 — roles, never names. The reasoning was that
+//      a guessed name is a person who does not exist wearing a real stock face.
+//
+//      The owner's call reversed it, and the reason is what the seeded film IS:
+//      a sample somebody is deciding from. A speaker picture captioned with two
+//      job categories does not show what the template does with a speaker
+//      picture. 山田太郎 / 山田花子 are the Japanese equivalent of John Doe —
+//      nobody reads them as a real booking — so they buy the realism without
+//      buying the fabrication. The line moved from "never a name" to "never a
+//      name that could be mistaken for a real one".
+//
+//      What did NOT move: the photograph still carries 「（見本）」
+//      (`EventPhoto.sample`), the caveat stays OFF the name because names are
+//      spoken aloud, and every one of these is `inferred` provenance — the fact
+//      list says the tool guessed them.
 
 export interface SeedBrandInput {
   name: string;
@@ -82,7 +101,17 @@ const formatDate = (date: Date): string =>
 
 export function seedEventCmBrief(
   brand: SeedBrandInput,
-  options: { now: Date; seed: string },
+  options: {
+    now: Date;
+    seed: string;
+    /**
+     * The painting the user chose in the add dialog (a theme id). Absent means
+     * nobody chose, and the template's first declared painting is used — the
+     * one `defaultRenders` also names, so a take made with no opinion and its
+     * render row agree.
+     */
+    artDirection?: string;
+  },
 ): EventCmBrief {
   const archetype = archetypeFor(brand);
   const subject = subjectFor(brand);
@@ -106,7 +135,27 @@ export function seedEventCmBrief(
   inferred("schedule.date", "今日から4週間後以降の最初の金曜日");
   inferred("schedule.time", `${archetype.kind}に多い開始時刻`);
   inferred("cta");
-  inferred("guests", "登壇者は役割と見本写真を仮置き。氏名は提案しません");
+  inferred("guests", "登壇者は見本の氏名・所属・見本写真を仮置き。実在しません");
+
+  // The voice starts OFF, and that is a finished state rather than a missing
+  // one (owner's call, 2026-08-30).
+  //
+  // It used to start on — meaning "unrecorded" — so a take that had just been
+  // created opened with two outstanding steps against a film nobody had
+  // touched. A recording is one of the narration's two outputs, like the
+  // subtitles are (types.ts `EVENT_CM_CAPTIONS_PATH`); declining an output is a
+  // decision, not an incomplete job. A film with words on screen and music
+  // under them is complete. Switching the voice ON is what creates the work,
+  // and that is when the count appears — because until somebody asks for a
+  // reading, there is nothing owing.
+  //
+  // Recorded as a suppression for the same reason narration-off is one: there
+  // is nothing to null out, so "off" has to be stored as a decision or the next
+  // read would treat it as never-set.
+  provenance[EVENT_CM_VOICE_PATH] = {
+    origin: "inferred",
+    note: EVENT_CM_SUPPRESSED_NOTE,
+  };
   inferred("narration", "テンプレートの下書き。資料を読むと書き直されます");
 
   // The one slot the pool dresses. A null here is not a hole: the composition
@@ -116,28 +165,38 @@ export function seedEventCmBrief(
   // event-cm scene — they were event-promo's, inherited by an `extends` that has
   // since been removed (remotion/event-cm/types.ts).
   //
-  // THE TEMPLATE'S TRACK, not the brand's industry's. This used to read
-  // `defaultAsset("bgm", archetype.tone)`, which made the music a consequence
-  // of what business the customer is in — two event videos could open
-  // differently for a reason nobody chose, and the brand had no say either.
-  // Every new take of this template now starts with the same one
-  // (lib/templates/catalog.ts, `defaultBgm`).
+  // THE TEMPLATE'S TRACK FOR THIS PAINTING, not the brand's industry's. This
+  // used to read `defaultAsset("bgm", archetype.tone)`, which made the music a
+  // consequence of what business the customer is in — two event videos could
+  // open differently for a reason nobody chose, and the brand had no say
+  // either. The music now follows the one thing the user DID choose: the art
+  // direction (lib/templates/catalog.ts `artDirections`). Two takes of the
+  // same painting always open on the same track.
   const template = currentTemplate("event-cm");
-  const bgm = templateBgm(template?.defaultBgm);
+  const artDirection =
+    options.artDirection ??
+    (template ? defaultArtDirection(template) : undefined) ??
+    NEW_FILM_THEME_ID;
+  const dressing = template
+    ? templateDressing(template, artDirection)
+    : { bgm: undefined, visuals: {} as Record<string, string> };
+  const bgm = templateBgm(dressing.bgm);
   if (bgm) inferred("bgm", "テンプレートの既定BGM");
 
   // The visual slots, one tier further down the same ladder.
   //
   //   1. the brand's own picture — brands arrive with a logo and a palette,
   //      almost never with photography, so this is usually empty
-  //   2. the template's stock picture — here, and empty until the artwork lands
+  //   2. the template's stock picture for this painting — here. 墨 has a set;
+  //      standard has none yet (its pictures are being made, docs/demo-assets.md
+  //      §6), so a standard film stands on tier 3 until they land
   //   3. the composition's designed substitute — an ink ground and gold
-  //      particles, which is a finished frame, not a hole
+  //      particles, or the corporate wash, which is a finished frame, not a hole
   //
   // Tier 3 is why this can be empty and the film still complete. That premise
   // is what lets the pool grow later without touching a template.
   const visual = (path: string) => {
-    const asset = templateVisual(template?.defaultVisuals?.[path]);
+    const asset = templateVisual(dressing.visuals[path]);
     if (asset) inferred(path, "テンプレートの既定画像");
     return asset ? { src: asset.src } : null;
   };
@@ -162,7 +221,7 @@ export function seedEventCmBrief(
   // turns out to confuse more than it protects, it comes off — the decision
   // lives here and in catalog.ts, nowhere else.
   const portrait = (path: string) => {
-    const asset = templatePortrait(template?.defaultVisuals?.[path]);
+    const asset = templatePortrait(dressing.visuals[path]);
     if (asset) inferred(path, "テンプレートの見本写真");
     // The caveat rides on the PICTURE. It was on the name for a day, and the
     // narration read it aloud — 「ゲストスピーカー見本と、モデレーター見本が」.
@@ -209,18 +268,29 @@ export function seedEventCmBrief(
     programsHeading: `${proposedPrograms.length}つのプログラム`,
     programs: proposedPrograms,
     guestsHeading: "登壇者",
-    // Roles, never names.
+    // Two speakers, in the shape an event actually has them (owner's call,
+    // 2026-08-30 — rule 2 at the top of this file).
     //
-    // The speaker picture is part of the template now (EVENT_CM_SCENES), so an
-    // empty list would open the film's fifth picture with nothing on it. A
-    // guessed DATE is a proposal somebody corrects in five seconds; a guessed
-    // NAME is a person who does not exist, and place-images.ts will attach a
-    // real photograph to it the moment the caption seems to match — a made-up
-    // name wearing a real face. A role says the same structural thing ("two
-    // people speak here") and names nobody.
+    // The guest is from OUTSIDE and the moderator is the host: that is the
+    // usual arrangement, and it is why only one of these carries a made-up
+    // company. The moderator's is the brand's own name, which is not a guess at
+    // all — the one real fact in the pair.
+    //
+    // `role` carries the company on its own line above the title. Both
+    // presentations set it with `white-space: pre-line`
+    // (render/KitComponent.tsx), so the newline is the layout: 名前 / 会社 /
+    // 肩書き, which is how a speaker is credited.
     guests: [
-      { name: "ゲストスピーカー", role: "", photo: portrait("guests.0.photo") },
-      { name: "モデレーター", role: "", photo: portrait("guests.1.photo") },
+      {
+        name: "山田太郎",
+        role: "株式会社サンプル\n代表取締役CEO",
+        photo: portrait("guests.0.photo"),
+      },
+      {
+        name: "山田花子",
+        role: `${brand.name}\n広報`,
+        photo: portrait("guests.1.photo"),
+      },
     ],
     schedule: {
       date: formatDate(date),
@@ -250,24 +320,23 @@ export function seedEventCmBrief(
       closing: visual("visuals.closing"),
     },
     bgm: bgm?.src ?? null,
-    // The art direction belongs to the TEMPLATE, not to "a new film".
+    // The painting the user picked in the add dialog, or the template's first
+    // when nobody picked. It used to be stamped from a global default, which
+    // meant asking for モダンジャパニーズ and being handed a white corporate
+    // film with no switch anywhere to correct it; then from the template's one
+    // declared painting, which meant no way to ask for the other. Now the
+    // dialog asks, and this records the answer.
     //
-    // `variant` in the catalog IS the art direction, and this template's is
-    // モダンジャパニーズ — the very thing the user picked in the add dialog.
-    // Seeding a global default instead meant asking for 和モダン and being handed
-    // a white corporate film, with no switch anywhere to correct it.
-    //
-    // `NEW_FILM_THEME_ID` answers a different question: what a template that has
-    // NOT declared a painting should fall to. event-cm has declared one
-    // (`defaultRenders`, `theme: "sumi"`), so the declaration wins.
-    artDirection: template?.defaultRenders[0]?.theme ?? NEW_FILM_THEME_ID,
+    // `NEW_FILM_THEME_ID` is the last resort for a template that has declared
+    // nothing at all, and event-cm never reaches it.
+    artDirection,
     theme: {
       palette: brand.palette,
       headingFont: brand.headingFont ?? null,
       bodyFont: brand.bodyFont ?? null,
     },
     provenance,
-    narration: { version: 1, scenes: [], source: "llm", updatedAt: "", angle: "" },
+    narration: { version: 1, scenes: [], source: "seed", updatedAt: "", angle: "" },
   };
   // Filled last, because which lines a film needs is a question about the film.
   return { ...brief, narration: draftNarration(brief, options.now) };
@@ -289,8 +358,10 @@ export function seedEventCmBrief(
  * 「捏造の方針」). Lengths sit inside each scene's budget, so the seeded film
  * runs at roughly the length the written one will.
  *
- * `source: "llm"`, not `"human"`: this is a draft, and the mapping stage must
- * replace it without being asked twice.
+ * `source: "seed"`: this is a draft, and the mapping stage must replace it
+ * without being asked twice — the same as `"llm"`, since every decision asks
+ * whether the source is `"human"`. It was recorded as `"llm"` until 2026-08-29,
+ * which got the behaviour right and the record wrong: no model wrote these.
  */
 const DRAFT_LINES: Partial<Record<EventCmSceneRole, string>> = {
   title: "はじめに、このイベントの名前と主旨をお伝えします。",
@@ -324,7 +395,7 @@ function draftNarration(brief: EventCmBrief, now: Date): EventCmNarration {
             DRAFT_PROGRAM_LINES[DRAFT_PROGRAM_LINES.length - 1])
           : (DRAFT_LINES[step.role] ?? ""),
     })),
-    source: "llm",
+    source: "seed",
     updatedAt: now.toISOString(),
     angle: "テンプレートの下書き。資料を読むと書き直されます",
   };

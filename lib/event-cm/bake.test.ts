@@ -17,15 +17,28 @@ import { eventCmFilm } from "@/remotion/event-cm/film";
 import {
   EVENT_CM_CAPTIONS_PATH,
   EVENT_CM_SUPPRESSED_NOTE,
+  EVENT_CM_VOICE_PATH,
   eventCmSceneKey,
   eventCmSpoken,
   type EventCmBrief,
 } from "@/remotion/event-cm/types";
 
-const SEEDED = seedEventCmBrief(
+/** A take exactly as it is created: the reading switched off (seed.ts). */
+const SEEDED_TAKE = seedEventCmBrief(
   { name: "WealthPark Lab", industry: "金融教育メディア" },
   { now: new Date("2026-08-14T09:00:00+09:00"), seed: "take-1" },
 );
+
+/**
+ * The same take with the reading switched ON.
+ *
+ * Most of this file is about the recording — what makes it stale, what it owes,
+ * when it stops being pending — and none of that is reachable with the voice
+ * off. Switching it on is what a user does the moment they want one, so it is
+ * the honest base for those tests. The two tests about the OTHER state name
+ * `SEEDED_TAKE` explicitly.
+ */
+const SEEDED = setSuppressed(SEEDED_TAKE, EVENT_CM_VOICE_PATH, false);
 
 /** A brief whose narration covers every narrated picture of its own film. */
 function written(brief: EventCmBrief, at: string): EventCmBrief {
@@ -331,10 +344,20 @@ test("読みのある行は、字幕ではなく読みと録音を比べる", ()
   assert.equal(voiceReadsNarration(cleared), false, "読みを消したのに録音が最新だと言っている");
 });
 
-test("シードの下書きは書き直さない。読んで反映するの2手", () => {
-  // A new take arrives with a draft line on every picture that speaks, so the
-  // words are not the missing thing — the recording is. Listing 「ナレーション」
-  // here would offer to rewrite a draft that is not stale.
+test("作ったばかりの動画は、何も owing していない", () => {
+  // The state the owner objected to (2026-08-30): a take opened seconds after
+  // it was created showed two outstanding steps against a film nobody had
+  // touched. Neither was real. The words are written (a draft line on every
+  // picture that speaks), the reading is switched OFF — which is a decision,
+  // not a gap — and an unbaked take plays and exports exactly what it holds,
+  // because both the player and the renderer read `baked ?? working`.
+  assert.deepEqual(pendingFilmSteps(SEEDED_TAKE, null), []);
+});
+
+test("ボイスをつけた瞬間に、読み上げと反映が要る", () => {
+  // And this is when the count is correct: asking for a reading is what makes
+  // one owed. The words are not the missing thing — the draft is not stale —
+  // so 「ナレーション」 is not offered.
   assert.deepEqual(pendingFilmSteps(SEEDED, null), ["voice", "bake"]);
 });
 
@@ -427,7 +450,8 @@ test("読む言葉が無いのに読み上げを予告しない", () => {
     ...SEEDED,
     narration: { version: 1, scenes: [], source: "human", updatedAt: "", angle: "" },
   };
-  assert.deepEqual(pendingFilmSteps(empty, null), ["bake"]);
+  // Never baked is not owed work either — the film plays what it holds.
+  assert.deepEqual(pendingFilmSteps(empty, null), []);
   assert.deepEqual(pendingFilmSteps(empty, empty), []);
   assert.deepEqual(pendingFilmSteps(empty, empty, { redo: true }), ["bake"]);
 });

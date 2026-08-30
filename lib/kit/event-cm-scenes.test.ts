@@ -327,6 +327,39 @@ test("プログラムが複数あれば、1つずつ1シーンで紹介する", 
   }
 });
 
+test("数字の様式はアートディレクションが決める", () => {
+  // The seal is a 和 device: in a gothic face 「一」 is a thick blue bar, which
+  // is what the first standard render showed. So the theme owns the register
+  // (theme.ts `ornament.numerals`) and the scene emits the matching variant —
+  // 一二三 in a seal for 墨, 01 02 03 as a bare ordinal for standard.
+  const seal = sceneForRole("program", SAKE, 1, SUMI_THEME).components.find(
+    (component) => component.kind === "stat",
+  );
+  assert.equal(seal?.kind === "stat" ? seal.value : null, "二");
+  assert.equal(seal?.kind === "stat" ? seal.variant : null, "seal");
+
+  const ordinal = sceneForRole("program", SAKE, 1, STANDARD_THEME).components.find(
+    (component) => component.kind === "stat",
+  );
+  assert.equal(ordinal?.kind === "stat" ? ordinal.value : null, "02");
+  assert.equal(ordinal?.kind === "stat" ? ordinal.unit : null, "PROGRAM 2 / 3");
+  assert.equal(ordinal?.kind === "stat" ? ordinal.variant : null, "ordinal");
+
+  // Without an explicit theme the scene reads the brief's own art direction,
+  // which is what the film would resolve to — so a caller cannot get 墨's
+  // numerals on a standard brief by forgetting the argument.
+  const fromBrief = sceneForRole("program", { ...SAKE, artDirection: "standard" }, 2).components.find(
+    (component) => component.kind === "stat",
+  );
+  assert.equal(fromBrief?.kind === "stat" ? fromBrief.value : null, "03");
+
+  // And nothing falls off the stage in either register.
+  for (const theme of [SUMI_THEME, STANDARD_THEME]) {
+    const fit = fitScene(sceneForRole("program", SAKE, 0, theme).components, theme);
+    assert.deepEqual(fit.dropped, [], `${theme.id}: プログラムのシーンで部品が落ちている`);
+  }
+});
+
 test("プログラムが1つでも、アジェンダは3枚のまま", () => {
   // The picture count is the TEMPLATE's (EVENT_CM_PROGRAM_SCENES), not the
   // item count. An evening with one programme deletes the two it does not use

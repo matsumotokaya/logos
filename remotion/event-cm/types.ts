@@ -283,6 +283,20 @@ export const EVENT_CM_SUPPRESSED_NOTE = "__suppressed__";
  */
 export const EVENT_CM_CAPTIONS_PATH = "captions";
 
+/**
+ * Switching the READING off — the narration's other output.
+ *
+ * A constant rather than a literal because three places now write or read it:
+ * the seeder (which starts it off), the editor, and `voiceIsOff`
+ * (lib/event-cm/bake.ts). Named beside the subtitles on purpose — 「オフにでき
+ * るのは言葉ではなく、言葉の出力先2つ」 — so the pair stays visible as a pair.
+ *
+ * The default here is OFF, unlike the subtitles. Words on screen with music
+ * under them is a complete film; a reading is something somebody asks for, and
+ * asking is what makes it owed (owner's call, 2026-08-30).
+ */
+export const EVENT_CM_VOICE_PATH = "voice";
+
 export const captionsAreOff = (brief: {
   provenance?: EventCmProvenance;
 }): boolean =>
@@ -356,23 +370,49 @@ export function eventCmScenePlan(brief: PlanInput): EventCmSceneStep[] {
 export const eventCmNarratedSteps = (brief: PlanInput): EventCmSceneStep[] =>
   eventCmScenePlan(brief).filter((scene) => scene.narrated);
 
-/** Beats outside their budget, with the direction they went. Empty = on spec. */
+/**
+ * Beats outside their budget, with the direction they went. Empty = on spec.
+ *
+ * `index` travels with the role because a role that repeats does not share one
+ * budget: the first programme picture is allowed 45–84 characters and the rest
+ * 30–62 (`eventCmSceneBudget`). A caller handed only the role would look the
+ * budget up again against the wrong picture and report 「アジェンダ 70字（予算
+ * 30〜62字）」 for a line that was inside its budget.
+ */
 export function narrationBudgetIssues(
   narration: EventCmNarration,
-): Array<{ role: EventCmSceneRole; chars: number; over: boolean }> {
+): Array<{ role: EventCmSceneRole; index?: number; chars: number; over: boolean }> {
   return narration.scenes.flatMap((scene) => {
     const budget = eventCmSceneBudget(scene);
     const chars = sceneChars(scene);
     if (chars >= budget.min && chars <= budget.max) return [];
-    return [{ role: scene.role, chars, over: chars > budget.max }];
+    return [
+      {
+        role: scene.role,
+        ...(scene.index === undefined ? {} : { index: scene.index }),
+        chars,
+        over: chars > budget.max,
+      },
+    ];
   });
 }
 
 export interface EventCmNarration {
   version: 1;
   scenes: EventCmScene[];
-  /** Who last wrote this text. A human edit is never silently regenerated. */
-  source: "llm" | "human";
+  /**
+   * Who last wrote this text. A human edit is never silently regenerated.
+   *
+   * Three values, not two, because the template writes lines of its own: a
+   * seeded film has a placeholder for every picture that speaks, so it plays
+   * before a model has been asked anything (README「捏造の方針」). Those lines
+   * used to be recorded as `"llm"` — overwritable, which was the intent, but
+   * the record then said a model had written them. Anything that reads
+   * provenance (a cost report, a reviewer asking what was generated) was being
+   * told something untrue. `"seed"` is overwritten exactly as `"llm"` is; every
+   * decision in this repo asks whether the source is `"human"`.
+   */
+  source: "seed" | "llm" | "human";
   updatedAt: string;
   /** The angle the writer committed to, in one line. Shown next to the narration
    *  so a reader can tell whether the take is arguing the right thing before

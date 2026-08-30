@@ -215,7 +215,9 @@ function applySuppression(brief: EventCmBrief): EventCmBrief {
 const EMPTY_NARRATION: EventCmNarration = {
   version: 1,
   scenes: [],
-  source: "llm",
+  // Nothing wrote this. `"seed"` is the honest end of the scale — no model was
+  // ever asked — and the film reads no further than `scenes` anyway.
+  source: "seed",
   updatedAt: "",
   angle: "",
 };
@@ -250,7 +252,7 @@ export function eventCmFilm(raw: EventCmBrief): EventCmFilm {
 
   const scenes: FilmScene[] = timeline.scenes.map((beat) => {
     const key = eventCmSceneKey(beat);
-    const scene = sceneForRole(beat.role, drawn, beat.index);
+    const scene = sceneForRole(beat.role, drawn, beat.index, theme);
     const spec = LAYOUTS[scene.layout];
 
     // The same fit the Stage runs at draw time, on the same theme. `placed`

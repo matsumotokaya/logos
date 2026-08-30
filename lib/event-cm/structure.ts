@@ -2,7 +2,7 @@ import "server-only";
 
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { LLM_BUDGET, parseOrExplain } from "@/lib/llm";
+import { LLM_BUDGET, LLM_MODEL, parseOrExplain } from "@/lib/llm";
 import { MATERIAL_CATEGORIES } from "@/lib/materials/category";
 import { z } from "zod";
 import type { ExtractedSource } from "./extract";
@@ -30,7 +30,6 @@ import { sanitizeFacts, type SanitizeReport } from "./sanitize";
 // at when it answers; before that, images arrived anonymously and could not be
 // referred to at all.
 
-const MODEL = "gpt-5.6-luna";
 const LLM_TIMEOUT_MS = 180_000;
 
 const openai = (): OpenAI => new OpenAI({ timeout: LLM_TIMEOUT_MS, maxRetries: 2 });
@@ -234,7 +233,7 @@ export async function structureEventFacts(
 
   const response = await parseOrExplain(() =>
     openai().chat.completions.parse({
-    model: MODEL,
+    model: LLM_MODEL,
     max_completion_tokens: LLM_BUDGET.long,
     reasoning_effort: "medium",
     messages: [

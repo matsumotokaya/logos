@@ -108,10 +108,12 @@ test("消すと決めた項目は資料でも復活しない", () => {
   assert.notEqual(result.brief.seriesLabel, "第3弾");
 });
 
-test("登壇者は資料に書いてあれば入る（シードが置くのは役割だけ）", () => {
-  // The seeder proposes roles so the speaker picture has something on it, and
-  // never a name — a guessed name is a person who does not exist. Reading one
-  // from a document replaces the placeholder outright.
+test("登壇者は資料に書いてあれば入る（シードが置くのは見本の氏名）", () => {
+  // The seeder proposes an unmistakably fictional pair so the speaker picture
+  // shows what it does with a speaker (seed.ts rule 2, revised 2026-08-30).
+  // Reading real people from a document replaces them outright — that is the
+  // half of this that never changed, and it is what makes the placeholder
+  // safe: it never survives contact with a fact.
   //
   // The name is CLEAN. The stock portrait's caveat lives on the photograph
   // (`EventPhoto.sample`) because a name is a spoken fact: with 「（見本）」 in
@@ -119,7 +121,7 @@ test("登壇者は資料に書いてあれば入る（シードが置くのは�
   // が、対話をつくります」 — the film saying the word "sample" out loud.
   assert.deepEqual(
     SEEDED.guests.map((guest) => guest.name),
-    ["ゲストスピーカー", "モデレーター"],
+    ["山田太郎", "山田花子"],
   );
   assert.ok(
     SEEDED.guests.every((guest) => !guest.name.includes("見本")),

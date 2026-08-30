@@ -31,14 +31,11 @@ async function main() {
   // The measurement goes in WITH the artwork now. This used to patch it onto
   // the seeded brief afterwards, which worked here and hid the actual defect:
   // nothing in the product was carrying a measurement into a brief at all.
-  const base: EventCmBrief = seedEventCmBrief(
-    {
-      name: "みらい経営研究所",
-      industry: "コンサルティング",
-      logo: { src: "defaults/marks/gate.svg", opaque: false, luminance: 0.05 },
-    },
-    { now: new Date("2026-08-21T00:00:00Z"), seed: "compare" },
-  );
+  const brand = {
+    name: "みらい経営研究所",
+    industry: "コンサルティング",
+    logo: { src: "defaults/marks/gate.svg", opaque: false, luminance: 0.05 },
+  };
 
   // The same alias override remotion.config.ts declares for the CLI. A direct
   // bundle() call does not read that file, and without it the kit's `@/`
@@ -55,7 +52,16 @@ async function main() {
   });
 
   for (const themeId of Object.keys(THEMES)) {
-    const brief: EventCmBrief = { ...base, artDirection: themeId };
+    // Seeded PER PAINTING, not seeded once and re-stamped. The dressing —
+    // music, stock pictures — follows the art direction (catalog.ts
+    // `artDirections`), so a brief seeded as 墨 and then relabelled standard
+    // would show standard wearing 墨's tea room, which is exactly the frame
+    // this tool exists to catch and not the one anybody would ship.
+    const brief: EventCmBrief = seedEventCmBrief(brand, {
+      now: new Date("2026-08-21T00:00:00Z"),
+      seed: "compare",
+      artDirection: themeId,
+    });
     const film = eventCmFilm(brief);
     const composition = await selectComposition({
       serveUrl,

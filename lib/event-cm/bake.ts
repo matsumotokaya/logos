@@ -27,6 +27,7 @@ import { isSuppressed, isSpokenFact } from "./facts";
 import { voicePresetByName } from "@/lib/voice/voices";
 import { EVENT_CM_GOAL } from "@/lib/pipeline/event-cm";
 import {
+  EVENT_CM_VOICE_PATH,
   eventCmSceneKey,
   eventCmSpoken,
   narrationStaleness,
@@ -287,7 +288,7 @@ export function voiceReadsNarration(brief: EventCmBrief): boolean {
  * (§9.3). The first would silently undo the second on the next run.
  */
 export const voiceIsOff = (brief: EventCmBrief): boolean =>
-  isSuppressed(brief, "voice");
+  isSuppressed(brief, EVENT_CM_VOICE_PATH);
 
 /**
  * Whether the recording is in the voice that was asked for.
@@ -389,7 +390,22 @@ export function pendingFilmSteps(
     for (const step of change.needs) steps.add(step);
   }
 
-  if (options.redo || !baked || steps.size > 0) steps.add("bake");
+  // Never run is NOT owed work.
+  //
+  // `!baked` used to add the fixing step on its own, which contradicted the
+  // rule `bakeChanges` states two hundred lines up — 「there is no played film
+  // to be ahead of; the screen answers this state with guidance rather than a
+  // count」 (§9.9). The two disagreed and the badge won: a take opened seconds
+  // after it was created showed outstanding work against a film nobody had
+  // touched. Nothing was actually owed — the player reads `baked ?? working`
+  // and so does the renderer, so an unbaked take plays and exports exactly what
+  // it holds.
+  //
+  // The fixing step is owed when something above produced words or a recording
+  // that the played film does not have yet, or when a field was edited. Asking
+  // for everything again (`redo`) still reaches it, because that is a person
+  // pressing the button on purpose.
+  if (options.redo || steps.size > 0) steps.add("bake");
   return FILM_STEP_ORDER.filter((step) => steps.has(step));
 }
 

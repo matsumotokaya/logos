@@ -23,14 +23,20 @@ import StatusDot from "./StatusDot";
 import type { DefaultAsset } from "@/lib/assets/defaults";
 import type { BriefSource } from "./BriefSourceIntake";
 
+/** 「3分00秒」. A length nobody measured is simply not shown. */
+function trackLength(seconds: number | undefined): string | null {
+  if (!seconds || seconds <= 0) return null;
+  const whole = Math.round(seconds);
+  const minutes = Math.floor(whole / 60);
+  const rest = whole % 60;
+  return minutes > 0 ? `${minutes}分${String(rest).padStart(2, "0")}秒` : `${rest}秒`;
+}
+
 export default function BgmDialog({
   /** The brief's own pointer: a pool path, or `material:<uuid>`. */
   current,
   pool,
   uploads,
-  /** Whether a narration exists — it decides how the music behaves, not
-   *  whether it plays. */
-  ducks,
   /** The chosen track is not the one the played film has (§5). */
   unreflected,
   busy,
@@ -40,7 +46,6 @@ export default function BgmDialog({
   current: string | null;
   pool: readonly DefaultAsset[];
   uploads: readonly BriefSource[];
-  ducks: boolean;
   unreflected: boolean;
   busy: boolean;
   onChoose: (src: string) => Promise<boolean>;
@@ -54,22 +59,24 @@ export default function BgmDialog({
     ...pool.map((asset) => ({
       src: asset.src,
       label: asset.label,
+      // The length, because it decides whether the track repeats in this film
+      // and a person choosing music wants to know that before they choose.
+      length: trackLength(asset.durationSec),
+      // Genre and character. It used to be the credit — 「Suno AI（商用利用可
+      // プランで生成）」 — which answers a licensing question nobody reading a
+      // music picker is asking (owner, 2026-08-30).
+      note: (asset.keywords ?? []).join("・"),
       // Said in a sentence, not only in a chip: a hover title is invisible on a
       // touch screen, and the consequence (a silent MP4) is not guessable.
-      note: asset.licensed
-        ? asset.credit
-        : `${asset.credit}・書き出したMP4では無音になります`,
-      // Not about the bake — about the licence. These two tracks were cleared
-      // for one production and cannot be redistributed, so the export leaves
-      // them out (lib/assets/defaults.ts). 「書き出しには乗りません」 said that
-      // in our words and was read as "your change has not been applied yet",
-      // which is a different sentence the screen says elsewhere.
+      warnNote: asset.licensed ? null : "書き出したMP4では無音になります",
       warn: asset.licensed ? null : "試聴用",
     })),
     ...uploads.map((source) => ({
       src: `material:${source.id}`,
       label: source.label,
+      length: null,
       note: "この動画にアップロードした音声",
+      warnNote: null,
       warn: null,
     })),
   ];
@@ -117,12 +124,15 @@ export default function BgmDialog({
                 <Dialog.Title className="font-display text-base font-semibold">
                   BGM
                 </Dialog.Title>
+                {/* The state, and nothing else. It used to end with 「読み上げ
+                    中は音量が下がります」 — a description of our mixing, put in
+                    front of somebody who came here to change the music (owner,
+                    2026-08-30). Ducking is something the film does correctly on
+                    its own; being told about it answers no question. */}
                 <Dialog.Description className="mt-1 text-[12px] text-ink-muted">
                   {current
-                    ? `オン ・ ${currentLabel ?? "この動画の音源"} ・ ${
-                        ducks ? "読み上げ中は音量が下がります" : "冒頭から最後まで一定"
-                      }`
-                    : "オフ（無音の映像になります）"}
+                    ? `オン ・ ${currentLabel ?? "この動画の音源"}`
+                    : "オフ（音楽なしで再生します）"}
                 </Dialog.Description>
                 {/* Said here only when it is true, and phrased as the state of
                     this video rather than as a rule about the product. A
@@ -143,10 +153,7 @@ export default function BgmDialog({
             </div>
 
             <fieldset className="mt-4">
-              <legend className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-                流す曲
-              </legend>
-              <div className="mt-2 flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5">
                 {options.map((option) => (
                   <label
                     key={option.src}
@@ -167,7 +174,19 @@ export default function BgmDialog({
                     />
                     <span className="min-w-0 flex-1">
                       <span className="font-medium">{option.label}</span>
-                      <span className="block text-[11px] text-ink-faint">{option.note}</span>
+                      {option.length ? (
+                        <span className="ml-2 text-[11px] text-ink-muted">
+                          {option.length}
+                        </span>
+                      ) : null}
+                      {option.note ? (
+                        <span className="block text-[11px] text-ink-faint">{option.note}</span>
+                      ) : null}
+                      {option.warnNote ? (
+                        <span className="block text-[11px] text-ink-faint">
+                          {option.warnNote}
+                        </span>
+                      ) : null}
                     </span>
                     {option.warn ? (
                       <span
@@ -185,10 +204,14 @@ export default function BgmDialog({
                   </label>
                 ))}
               </div>
-              <p className="mt-2 text-[11px] text-ink-faint">
-                {uploads.length > 0
-                  ? "入力ステージにアップロードした音声も選べます。BGMかどうかはこちらでは判定できないので、ここで選んだものが流れます。"
-                  : "入力ステージに音声をアップロードすると、ここに並びます。"}
+              {/* One practical line. It used to explain where uploaded audio
+                  comes from — 「入力ステージに音声をアップロードすると、ここに
+                  並びます」 — which names a part of our screen and answers
+                  nothing about the music (owner, 2026-08-30). What a person
+                  choosing a track actually needs to know is what happens when
+                  the film outlasts it. */}
+              <p className="mt-2.5 text-[11px] text-ink-faint">
+                動画が曲より長いときは、曲の頭から繰り返します。
               </p>
             </fieldset>
 

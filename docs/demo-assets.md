@@ -2,313 +2,192 @@
 
 **このサービスのデモに出る素材は、すべて「誰が使っても権利上問題がないもの」でなければならない。**
 
-**この文書が持つのは、権利・置き場所・そして既定プールのプロンプト**(題材=「日本文化を学ぶ」)。
+この文書が持つのは、**権利・置き場所・塗りごとの要件**、そして**いま依頼中のプロンプトだけ**。
 
-> **映像としての要件の正本は [labs/freehand/sake-2026/ASSET-PROMPTS.md](../labs/freehand/sake-2026/ASSET-PROMPTS.md)** ——実案件で納品水準に達した映像から逆算した仕様で、[labs/freehand/README.md](../labs/freehand/README.md) の持ち帰り計画 **C10**(「不足素材の生成プロンプトをテンプレートが吐く」)がそこを指している。
+> **プロンプトは使い捨て。要件は残す**(2026-08-26 決定)。
 >
-> **分担: あちらが「どう撮るか」、こちらが「何を撮るか」。** あちらの要件を書き写さず、§2「要件は継ぐ。題材は継がない」で継ぐものだけを名指しする。2箇所に同じことを書くと必ず片方が古くなる。
+> 素材が届いたらそのプロンプトは**この文書から削除する**。残すのは「どんな絵が要るか」(スロット・照明族・禁止事項・受け入れ条件)で、それは次の1枚を頼むときにも同じことを言うから。プロンプトの全文は**一度使えば済む使い捨ての道具**で、置いておくと「これは依頼中か、もう届いたのか」が読めなくなる——**この文書の§は「いま何を待っているか」の一覧でなければならない**。
+>
+> 消えたものが必要になったら `git log -p docs/demo-assets.md` にある。だから削除は情報の破棄ではなく、**入口を現在形に保つ操作**。
 
-## 1. なぜ作り直すのか
+## 1. なぜ自分で作るのか
 
-現在デモに出ている素材は、**このリポジトリに置けないものに依存している**。
+デモに出ていた素材は、**このリポジトリに置けないものに依存していた**——ライセンスストックフォト(AdobeStock)、**実在人物**のポートレート(許諾はその案件限り)、支給BGM、**実在企業のマーク**。だから新しい環境では整形スクリプトを実行しないとレンダーが失敗する。**素材が無いのではなく、配れない素材を指している**のがその状態の正体(実案件 `public/event/sake-2026/` は今もこれ。既定プールとは別物として扱う)。
 
-| 場所 | 中身 | 置けない理由 |
+解き方は既にBGMで1つ通っている: **商用利用可の契約下にある生成AI(Suno / Midjourney)で作れば、生成物なので再配布できる**。
+
+## 2. アートディレクションごとに別のプールを持つ
+
+**素材は塗り(アートディレクション)ごとに作る。1枚の写真を両方で使おうとしない。**
+
+理由は測定で出ている。`sumi` は `rgba(8,6,4)` を strength 0.74 でかぶせて写真を**落とし**、`standard` は `rgba(247,249,252)` を 0.84 でかぶせて**持ち上げる**。だから暗部前提の写真はスタンダードで**灰色の霧**になり(2026-08-26 `npm run themes:compare` で確認——タイトル・アジェンダ・CTAが全部曇った)、明るい写真は墨で平坦になる。写真の側で妥協して中間トーンにすると**両方で悪くなる**(2026-08-23 に一度その方向へ行きかけた)。
+
+| | `sumi`(モダンジャパニーズ) | `standard`(スタンダード) |
 | --- | --- | --- |
-| `public/event/sake-2026/photos/*.jpg` | 京都の紅葉・枡・蔵人・提灯 | ライセンスストックフォト(AdobeStock) |
-| 同上 `miyao / onishi / kato` | 登壇者のポートレート | **実在人物**。本人の許諾はこの案件限り |
-| `public/event/sake-2026/art/*.png` | 筆致・漢字アート | 支給素材 |
-| `public/event/sake-2026/bgm.mp3` | BGM | 支給素材 |
-| `public/event/sake-2026/logos/*` | leopalace21 / miss-sake / 〆張鶴 / wealthpark-lab | **実在企業のマーク**。クライアントがこの案件について許諾したもので、既定素材にはできない |
+| 状態 | **納品水準・検証済み**(freehand v8 で合格、依頼主フィードバック3巡) | 作れるようになった(2026-08-26)。**写真待ち** |
+| 題材 | 日本文化を学ぶ | ビジネスセミナー |
+| 照明族 | 右上からの暖色キー・炭黒の地・**左3割が暗部** | 画面外左の大窓からの拡散昼光・白い壁・**左3割が明るく平坦** |
+| カタログの `tone` | `ink` | `light` |
+| 素材 | **6枚+6名 納品済み**(§4) | **§6 で依頼中** |
 
-だから新しい環境では `prepare-assets.mjs` を実行しないと `event:render` が失敗する。**素材が無いのではなく、配れない素材を指している**のがこの状態の正体。
+READMEの「`standard` が正式版で `sumi` は派生」は**将来の位置づけ**の宣言であって、成熟度の話ではない。
 
-**解き方は既に1つ通っている。** 既定BGM2曲は Suno AI(商用利用可プラン)で生成したもので、プレビューでもMP4でもそのまま鳴り、公開できる([lib/assets/defaults.ts](../lib/assets/defaults.ts))。同じことを画像でやる——**商用利用可の契約下にある Midjourney で新規生成し、生成物なので再配布できる**。
+**題材は塗りに従い、実案件には従わない。** モダンジャパニーズ=日本酒ではない。日本酒はニッチすぎて同種のイベントは二度と作られないので、既定プールの題材は普遍的なもの(文化・学び・仕事)にする。**題材が具体的であることは問題ではなく、後で差し替えられることが要件**。
 
-これは持ち帰り計画の答えとも一致する。sake-2026 v8 の評価は「**動画素材が無くても十分な画像があれば**(動かす・タイルに並べる・連作でカットする)リッチな映像体験が作れる——つまり画像をどんどん用意することが解になる」だった。
+## 3. 既定素材はシステムの一部。バイトはコミットする
 
-## 2. どのアートディレクションに合わせるか — `sumi` に合わせる
+**BGM・効果音・写真・マークはコードと一緒に配布され、コードと一緒にデプロイされる**(2026-08-30 依頼主判断)。どこか別に置いてある「データセット」ではない。**利用者がアップロードしたものだけが別管理**(R2・Takeに紐づく)で、そこが唯一の境界。
 
-**素材は `sumi`(モダンジャパニーズ)の要件に従って作る。`standard` に合わせて薄めない。**
-
-| | `sumi` | `standard` |
-| --- | --- | --- |
-| 成立 | freehand v8 で納品水準の評価、v11 まで依頼主フィードバック3巡 | 2026-08-21 追加 |
-| 役目 | **実案件の納品物** | 1つ目がハードコードだったことを暴く診断役(commit `e3a185f`) |
-| 状態 | **検証済み・先行** | **未完成** |
-
-READMEの「`standard` が正式版で `sumi` は派生」は**将来の位置づけ**の宣言であって、成熟度の話ではない。再利用の機会は standard の方が多いが、**映像として成立することが確かめられているのは sumi だけ**。
-
-だから素材の仕様は ASSET-PROMPTS.md の**暗部前提**(`dark charcoal background` / `near-black background` / 片側3〜4割の暗部)をそのまま使う。
-
-### 要件は継ぐ。題材は継がない(2026-08-23 決定)
-
-**モダンジャパニーズ = 日本酒ではない。** アートディレクション(墨黒×金×明朝)と題材は別物で、ASSET-PROMPTS.md はその2つを1つの文書に持っている——**実案件のために書かれたのだから当然**だが、既定プールへ持ち込むときは分ける。
-
-| ASSET-PROMPTS.md の中身 | 継ぐか |
-| --- | --- |
-| 16:9・最低2560px・片側3〜4割の暗部・文字なし・顔なし・セット内で照明句を固定・カメラを止める(動画)・連作はループではなくカット | **継ぐ**(art direction と映像の要件) |
-| 徳利・枡・蛇の目の利き猪口・「日本酒は無色透明」・紅葉・酒蔵 | **継がない**(日本酒という題材の語彙) |
-
-**日本酒はニッチすぎて同種のイベントは二度と作られない。** 既定プールの題材は**普遍的なもの**にする——日本文化・和食・茶・日本史あたりの「学ぶイベント」。題材が具体的であることは問題ではなく、**後で差し替えられることが要件**。
-
-やることは「テンプレートを1本、完成と言える水準まで作りきる」であって、日本酒の映像を再現することではない。
-
-**この判断を一度間違えた(2026-08-23)。** 両テーマで生き残るように「中間トーンの写真」を要求しかけた——`sumi` は `rgba(8,6,4)` を strength 0.74 でかぶせて落とし、`standard` は `rgba(247,249,252)` を 0.84 でかぶせて持ち上げるので、暗い写真は標準で、明るい写真は墨で平坦になる、という理屈だった。**理屈は合っているが、優先順位が逆。** 検証済みの art direction のための素材を、未完成の art direction に合わせて捨てることになる。
-
-**`standard` が素材を持てないのは、素材の問題ではなくテーマの問題。** 暗部前提の写真が白地のテーマで平坦に見えるなら、直すのは写真ではなく `standard` の側(明るい地に写真をどう置くかがまだ設計されていない)。`standard` 用の素材を別に作るのは、そのテーマが納品水準になってから。
-
-## 3. バイトはコミットする(BGM・SFXとは逆)
-
-`public/defaults/` の既存2つとは扱いが**逆**になる。混ぜないこと。
+> **なぜこれが規則なのか**: Vercelはgitからビルドする。gitに入っていない素材は、デプロイ先に存在しない。「開発機では鳴るが本番では鳴らない」は仕様ではなく**バグ**で、素材ごとに置き場所が違う状態がそれを量産していた。
 
 | プール | バイト | 理由 |
 | --- | --- | --- |
-| `bgm/` `sfx/` | **gitに入れない** | 効果音ラボは音素材そのものの再配布を禁じている。復元は [scripts/fetch-default-sfx.mjs](../scripts/fetch-default-sfx.mjs) =レシピが担う |
-| `stills/` `portraits/` `marks/` `devices/` | **gitに入れる** | 自分が生成した、再配布できる素材 |
+| `bgm/` `stills/` `portraits/` `marks/` | **gitに入れる** | 自分が生成した、再配布できる素材(Suno / Midjourney の商用プラン、またはコード) |
+| `sfx/` | **入れられない** | 効果音ラボが音素材そのものの再配布を禁じており、**このリポジトリは公開**。復元は [scripts/fetch-default-sfx.mjs](../scripts/fetch-default-sfx.mjs) =レシピが担う。**ただし現状は本番で鳴らない**(下記) |
+| `video/` | **いまは入れない** | 支給されたストック素材で、**再配布の可否が未確認**(ロイヤリティフリー=使ってよい、であって配ってよい、ではない)。git履歴は取り消せないので、生成物に差し替えるまで入れない(下の注) |
 
-**生成物はレシピでは復元できない**(同じプロンプトでも同じ絵にならない)。だからバイトを持つ方が正しい。SFX と逆の結論になるのは、禁じられているのが「再配布」なのか「復元不能」なのかが違うから。
+**効果音は本番で鳴らない。** `npm run sfx:sync` はR2の `defaults/sfx/` へアップロードするが、**それを読む実装が無い**——srcは `defaults/sfx/*.mp3` のまま `staticFile()` を通るので、デプロイ先では404になる。**この例外が消える道は2つしかない**:
 
-## 4. 置き場所
+1. **リポジトリを非公開にする** — 再配布に当たらなくなるので、他の素材と同じくコミットできる。1操作で終わる
+2. **効果音を自社生成のものに置き換える** — ストック写真を置き換えたのと同じ手。63音ぶんの作業
+
+どちらも取らないなら、**効果音は開発機だけの機能**であることを製品の仕様として認める必要がある。
+
+**出典が確認できるまで、地の動画は書き出しに乗らない。** カタログの `licensed: false` を[コンポジション](../remotion/event-cm/EventCmComposition.tsx)が読み、レンダー時だけ layer を外す(プレビューでは見える)。**この経路は 2026-08-27 に初めて実装した**——`unlicensedDefaults()` は宣言だけあって誰も呼んでいなかったので、清算されていない素材を足すなら先に除外を書く、という README の条件をここで満たしている。
+
+**生成物はレシピでは復元できない**(同じプロンプトでも同じ絵にならない。曲も同じで、同じプロンプトから同じテイクは出てこない)。だからバイトを持つ方が正しい。SFX だけが逆になるのは、そこだけ禁じられているのが**再配布**だから——復元できるかどうかとは別の話。**そして復元できないからこそ、プロンプトを取っておく意味も薄い**(上の使い捨て規則)。
+
+## 4. 置き場所と現在の在庫
 
 ```
 public/defaults/
-  stills/      背景写真(シーンの地)          .jpg  ← §6 プロンプト
-  portraits/   架空の人物                     .jpg  ← §7 プロンプト
-  marks/       ダミーロゴ                     .svg  ← §8 生成AIでは作らない(コード)
-  devices/     デバイス・画面が写った実景写真  .jpg  ← §8
+  stills/      背景写真(シーンの地)   .jpg  ← 塗りごと(light-* がスタンダード)
+  portraits/   架空の人物              .jpg  ← 同上
+  marks/       ダミーロゴ              .svg  ← 生成AIでは作らない(§7)
+  video/       地の動画                .mp4  ← gitignore(出典未確認のため)
+  devices/     デバイス実景写真        .jpg  ← 空。要求が出たら§5の要件で書く
 ```
 
-カタログは [lib/assets/defaults.ts](../lib/assets/defaults.ts) の `DEFAULT_ASSETS`。`ASSET_KINDS` は既に `still` を宣言していて、**エントリがまだ1件も無い**。ここを埋めるとテンプレートが `defaultVisuals` で名指しできる([lib/templates/catalog.ts](../lib/templates/catalog.ts))——これも宣言済みで誰も使っていない。
+カタログは [lib/assets/defaults.ts](../lib/assets/defaults.ts) の `DEFAULT_ASSETS`。**両方の塗りの素材が同じディレクトリに入る**——分けるのは `tone`(`ink` / `light`)で、テンプレートは塗りごとに asset id を名指しする([lib/templates/catalog.ts](../lib/templates/catalog.ts) の `artDirections[].visuals`)。
 
-**既定値の梯子は4段**(ブランド → テンプレート → システム → 設計代替)なので、このプールは3段目。埋めなくても完成した動画は出る(墨の地・金縁モノグラム)。埋めると全テンプレートの既定が一斉に良くなる。
+| 在庫 | 中身 | `tone` |
+| --- | --- | --- |
+| `stills/` 6枚 | 茶室2・硯と筆・障子の光と壺・会場(座卓と提灯)・夕暮れの玄関 | `ink` |
+| `stills/light-*` 6枚 | 会議室・研修室・机の上・ガラスの廊下2・会場のロビー | `light` |
+| `portraits/` 6名 | 40〜70代・スーツ/ジャケット/開襟/藍 | `ink` |
+| `portraits/light-*` 6名 | 20〜60代・Tシャツ/ニット/カーディガン/ジャケット/スーツ | `light` |
+| `marks/` 4種 | 門・環・三層・組子(コードで作成) | `neutral` |
+| `video/end-card-sumi.mp4` | 富士と雲海(エンドカードの地・**仮・差し替え予定**) | `ink` |
+| `video/end-card-light.mp4` | 夕暮れの都市(エンドカードの地・**仮・差し替え予定**) | `light` |
 
-| ファイル | カタログ id |
+**既定値の梯子は4段**(ブランド → テンプレート×塗り → システム → 設計代替)なので、このプールは3段目。埋めなくても完成した動画は出る(墨の地・金縁モノグラム、スタンダードはウォッシュの地)。埋めると全テンプレートの既定が一斉に良くなる。
+
+## 5. 塗りに関係なく守る要件(**ここが残る部分**)
+
+**プロンプトが消えてもこの節は消えない。** 次の1枚を頼むときも同じことを言う。
+
+1. **16:9・横位置・Upscaleして長辺2560px以上。** 生成サイトの素の16:9は約1456pxで、Ken Burns(墨1.04→1.13 / 標準1.02→1.08)で寄ると甘くなる。人物だけ `--ar 4:5`(円形メダリオンと縦長パネルの両方に切れる)
+2. **コピーが乗る側を空ける。** どのレイアウトも文字は左(タイトルだけ中央)。だから被写体は中央〜右、CTAの地は左下を空ける。**`negative space on the left` を削らない**
+3. **文字・ロゴ・看板・画面の中身を入れない。** 架空の銘柄や社名が写ると「事実」になる。生成AIの文字は崩れ、崩れた文字は「デザインが荒い」ではなく**「読めない偽物」**に見える
+4. **背景に顔を入れない。** 人物が写った写真は背景スロットに使えない(v1で実証: `cover` では顔を画角外に追い出せない)。顔が入るのは `guests[n].photo` だけ
+5. **セット内で照明句を1文字も変えない。** 揃っていないとカットした瞬間に「別の日に撮った写真」になる。照明句は**塗りごとに1つ**(§2の表)で、そこにコピー側の空きも畳み込んである——光源をコピー側に置けば、そちら側が自然に飛ぶ(標準)/落ちる(墨)
+6. **動画化するならカメラを止める。** こちらが寄り引きを掛けるので、素材側でも動かすと**二重に動いて酔う**。動くのは被写体だけ(光・湯気・埃・布)、5〜10秒、**音声は捨てる**(BGM・ナレーション・SFXで設計済み)、ループ前提
+7. **人物に氏名を付けない。** [seed.ts](../lib/event-cm/seed.ts) の方針(「人名は発明しない・役割を提案する」)がデモでも効く。架空の顔に架空の氏名を添えると「存在しない人物のプロフィール」になる
+8. **エンドカードの地は、洗われる前提で作る。** 締めの1枚は**テーマ自身の地の色で0.6ほど平坦に洗ってから**マークを載せる([remotion/kit/theme.ts](../remotion/kit/theme.ts) の `ThemeEndCard`。承認済みの和モダンの数字は `rgba(8,6,4,0.58)`)。理由は好みではなく、マークの描き方が `palette.ground` から導かれるため——映像を全面のまま出すとその導出が嘘になる。つまり**細部で勝負する絵は無駄になる**: 大きな形・広い階調・中央が静かなもの(マークが中央に立つ)。**実在の場所・看板が写るものは避ける**(今の仮素材が都市の実景で、看板が写っている)
+9. **再配布できるかで選ぶ。無料であることとは別。** 「ロイヤリティフリー」は使用許諾であって再配布許諾ではない。既定プールの素材は**他人のMP4に焼かれて配られる**ので、そこが確認できないものは `licensed: false` のまま(プレビュー限定・書き出しから除外)。**迷ったら生成物にする**——自分で生成したものは最初からこの問題を持たない(§1と同じ結論)
+
+**受け入れは目視ではなく実物で確認する。** `npm run themes:compare` → `var/theme-compare/<塗り>-<シーン>.png`。合格条件は**その塗りで**判定する(互いの塗りでの見え方は合否に使わない・§2)。
+
+1. コピー側が被写体側より**暗く静か**(墨)/**明るく平坦**(標準)。取り込み時に測る
+2. スクリム越しに写真が写真に見える(黒板/灰色の霧になっていない)
+3. 文字が写真の細部を横切っていない
+4. Ken Burns の終端で重要なものが切れていない
+5. 文字・看板・画面の中身が写っていない
+6. 背景写真に顔が入っていない
+7. ポートレートが円形メダリオンと縦長パネルの両方で成立し、セット内で地の色が揃っている
+
+## 6. 依頼中: エンドカードの地(2本・仮素材の差し替え)
+
+**いま入っている2本は仮。** 支給されたストック素材(富士と雲海 / 夕暮れの都市)で、ロイヤリティフリーではあるが**再配布の可否が未確認**なので `licensed: false` ——プレビューでは見えるが書き出しMP4とZIPからは外れる。**生成物に差し替える**(依頼主判断・2026-08-28)。差し替えれば §5-9 の問題が消え、`licensed: true` にしてバイトをコミットできる。
+
+**まず静止画で見る。** エンドカードは4秒で、こちらが寄り引きを掛けられるので、**静止画でも成立する**——実際いま使っている都市の映像も、洗った後に残るのは大きな階調だけ。良ければ動画化に進む(§6.3)。静止画で採用する場合は `theme.endCard` が動画前提なので**1行の変更**が要る(Ken Burns はキットに在る)。
+
+**要件は §5、特に 8番。** 洗われるので細部は残らない。中央はマークが立つので静かに。文字・看板・実在の場所は入れない。
+
+### 6.1 墨(モダンジャパニーズ)— 承認済みの「富士と雲海」の置き換え
+
+**`end-card-sumi-01`**
+
+```
+A distant mountain silhouette rising above a vast sea of clouds at dawn, seen from far above, the clouds filling the lower two thirds in long soft layers, deep indigo and near-black sky above with one faint band of warm light at the horizon, no foreground objects, the centre of the frame calm and uncluttered, atmospheric haze, extremely wide vista, cinematic still, photorealistic --ar 16:9 --style raw --stylize 150 --no text, letters, signage, buildings, roads, towers, people, birds, watermark, logo, caption, sun disc, lens flare, cartoon, illustration, 3d render, oversaturated
+```
+
+**`end-card-sumi-02`**(別案・より抽象)
+
+```
+Black sumi ink diffusing slowly through clear water in soft wide tendrils, faint gold particles suspended in it, pure black background, no objects and no hands, the centre of the frame open, high contrast, minimal, macro, cinematic still, photorealistic --ar 16:9 --style raw --stylize 150 --no text, letters, calligraphy characters, kanji, watermark, logo, caption, hands, faces, cartoon, illustration, 3d render, oversaturated
+```
+
+### 6.2 スタンダード — 「夕暮れの都市」の置き換え
+
+都市の実景は看板が写るので生成でも避ける。**空と光**にすると、墨(雲海)と対になり、明るく洗っても大きな階調が残る。
+
+**`end-card-light-01`**
+
+```
+Sunlit clouds seen from high above, wide soft layers of white and pale blue filling the frame, clean bright daylight, a calm open area through the middle of the frame, no ground and no horizon line, no objects, high-key and airy, cool neutral colour balance, cinematic aerial still, photorealistic --ar 16:9 --style raw --stylize 150 --no text, letters, signage, buildings, aircraft, people, birds, watermark, logo, caption, sun disc, lens flare, dark moody shadows, warm orange cast, cartoon, illustration, 3d render, oversaturated
+```
+
+**`end-card-light-02`**(別案・建築)
+
+```
+Looking up at a bright glass and pale stone facade of a modern building against an overcast white sky, clean geometric lines receding upward, soft even daylight with no hard shadows, no signage of any kind, the centre of the frame open sky, high-key and airy, cool neutral colour balance, cinematic architectural still, photorealistic --ar 16:9 --style raw --stylize 150 --no text, letters, signage, logos, windows with visible interiors, people, watermark, caption, dark moody shadows, warm orange cast, cartoon, illustration, 3d render, oversaturated
+```
+
+### 6.3 動画にする場合(静止画が良ければ・元画像を添付して投げる)
+
+**カメラは止める。動くのは雲だけ。** 8秒以上あれば足りる(締めの板は4秒、ループしない)。
+
+**`end-card-sumi-01` を元に**
+
+```
+The sea of clouds drifts very slowly across the frame while the mountain silhouette stays completely still, the light at the horizon shifting almost imperceptibly, locked-off camera, no camera movement, slow motion, photorealistic, no text, letters, watermark, logo, subtitles, camera shake, handheld, zoom, pan, whip pan, morphing shapes, people, birds, aircraft, cartoon, 3d render, oversaturated, strobing, flickering, sudden brightness change
+```
+
+**`end-card-light-01` を元に**
+
+```
+The cloud layers drift slowly and evenly across the frame, the light staying constant throughout, nothing else moves, locked-off camera, no camera movement, slow motion, photorealistic, no text, letters, watermark, logo, subtitles, camera shake, handheld, zoom, pan, whip pan, morphing shapes, people, birds, aircraft, cartoon, 3d render, oversaturated, strobing, flickering, sudden brightness change
+```
+
+### 6.4 受け渡し
+
+| 名前 | 置き場所 |
 | --- | --- |
-| `stills/tearoom-01.jpg` | `still-tearoom-01` |
-| `portraits/speaker-01.jpg` | `portrait-speaker-01` |
-| `marks/geometric-01.svg` | `mark-geometric-01` |
+| `end-card-sumi-*` | `public/defaults/video/end-card-sumi.mp4`(または `.jpg`) |
+| `end-card-light-*` | `public/defaults/video/end-card-light.mp4`(または `.jpg`) |
 
-## 5. 題材と共通仕様 — 「日本文化を学ぶ」
+**無加工で。** grade と洗いはテーマの層がやる。届いたら `npm run themes:compare` の `*-logoOut.png` で、**マークとクレジットが地に勝っているか**を測って採用する(墨の基準値: 全体の明度0.098・クレジット背後のばらつき0.139)。
 
-**既定プールの題材はこれで確定**(2026-08-24)。特定の流派・地域・銘柄を名指ししない「学ぶイベント」なので、和食・茶・歴史・工芸のどれに差し替えても土台が使える。
+## 7. 生成AIで作らないもの
 
-### スロットは3つ。コピーは全部左側にある
-
-| スロット | 使うシーン | コピーの位置 | 被写体を置く場所 |
-| --- | --- | --- | --- |
-| `visuals.programs` | シーン2 タイトル(中央)+ シーン4-6 アジェンダ(左) | 中央と左 | **中央〜右。左1/3を空ける** |
-| `visuals.value` | シーン3 テーマ(左) | 左 | **右。左1/3を空ける** |
-| `visuals.closing` | シーン8 CTA(左下) | 左下 | **上〜右。左下を空ける** |
-
-`visuals.programs` は**1枚を2通りに使う**(タイトルで全presence、アジェンダで減光)ので最も要求が厳しく、**中央〜右**が唯一両立する置き場所。
-
-### 照明句は全カット同一(変えない)
-
-```
-single warm key light from the upper right, dark charcoal background,
-deep shadow filling the left third
-```
-
-**この3行はどのプロンプトからも省略・言い換えしない。** 揃っていないとカットした瞬間に「別の日に撮った写真」になる(ASSET-PROMPTS.md 連作ルール1)。右上から当てるのは、**被写体側が光り、コピー側が自然に落ちる**ため——照明族と必要な暗部が同じ一句で成立する。
-
-### 共通末尾
-
-```
---ar 16:9 --style raw --stylize 150 --no text, letters, calligraphy characters,
-kanji, watermark, logo, signage, label, caption, faces, people looking at camera,
-cartoon, illustration, 3d render, oversaturated
-```
-
-**`calligraphy characters` / `kanji` を外さないこと。** 書や掛軸は「日本文化を学ぶ」の題材として真ん中を突いているが、**書かれた文字は文字**で、生成AIでは崩れる。道具(硯・筆・墨)は撮ってよく、書かれたものは撮らない。
-
-**最低2560px(Upscale必須)。** Midjourney の素の16:9は約1456pxで、Ken Burnsが寄ると甘くなる。
-
-以下 `[共通]` はこの末尾、`[照明]` は上の照明句を指す。**各スロット2枚**——今のテンプレートは1スロット1枚なので今日使うのは片方だが、照明族が揃っているので**連作(Phase C9)が入ったらそのままカットで繋がる**。
-
-## 6. 背景写真(`stills/`)
-
-### 6.1 `visuals.programs` — 茶室(最重要・2シーンで使われる)
-
-```
-still-tearoom-01
-A quiet tea room interior, a black raku chawan bowl and a bamboo chasen whisk
-set on a tatami mat slightly right of centre, faint steam rising from an iron
-kettle behind them, worn wooden pillar and paper shoji beyond, [照明],
-shallow depth of field, no people, photorealistic, cinematic still life,
-negative space on the left [共通]
-```
-
-```
-still-tearoom-02
-The same tea room a step further back, the tatami floor receding to the right
-toward an iron kettle on a sunken hearth, a low lacquer tray with a bamboo
-ladle beside it, paper shoji glowing softly behind, [照明], shallow depth of
-field, no people, photorealistic, cinematic interior, negative space on the
-left [共通]
-```
-
-### 6.2 `visuals.value` — 光と道具(hero)
-
-```
-still-shoji-light-01
-Morning light passing through a paper shoji screen on the right of the frame,
-casting a soft lattice of shadows across a tatami mat, a single ceramic vessel
-standing in the light, the left third of the frame quiet and empty, [照明],
-macro detail on the paper grain and the woven tatami, no people, photorealistic,
-negative space on the left [共通]
-```
-
-```
-still-inkstone-01
-A stone suzuri inkstone with a pool of black ink, a bamboo-handled brush
-resting across it and a stick of sumi ink beside, arranged on the right of the
-frame on dark washi paper, nothing written anywhere, [照明], extreme close-up,
-shallow depth of field, photorealistic still life, negative space on the left
-[共通]
-```
-
-### 6.3 `visuals.closing` — 会場(左下を空ける)
-
-```
-still-venue-evening-01
-A traditional Japanese room prepared for a small evening lecture, low lacquer
-tables and flat cushions arranged in rows receding to the upper right, warm
-paper lanterns glowing above, the lower left of the frame open tatami floor in
-even shadow, [照明], no people, calm and composed, photorealistic, cinematic
-interior, negative space in the lower left [共通]
-```
-
-```
-still-entrance-evening-01
-The entrance of a traditional Japanese building at dusk, a dark tiled roof and
-a warm-lit lattice door in the upper right, wet stone paving stretching across
-the lower left in even shadow, one stone lantern faintly lit, no curtains or
-banners of any kind, [照明], no people, photorealistic, cinematic architectural
-photography, negative space in the lower left [共通]
-```
-
-## 7. 架空の人物(`portraits/`)
-
-**ASSET-PROMPTS.md が「顔は入れない(登壇者2名の実写があるため)」と書いているその実写が、いま置き換える対象。** だから顔だけはここで扱う。**背景に顔を入れない規則はそのまま生きている**(人物が写った写真は背景スロットに使えない)——顔が入るのは `guests[n].photo` だけ。
-
-同じ1枚が2通りに使われる:
-
-- **円形メダリオン** — `focus` 点が円の中心。顔は中央〜やや上
-- **全画面分割パネル**(`presentation: "panels"`)— 2人なら **960×1080** の縦長。上半身のみ
-
-だから **`--ar 4:5`**(両方にクロップできる)。**照明句は背景と同じ**——分割パネルで隣同士に並ぶので揃えないと2枚が喧嘩する。
-
-```
-共通末尾:
---ar 4:5 --style raw --stylize 120 --no text, letters, logos, watermark,
-name tags, lanyards, cartoon, illustration, 3d render
-```
-
-```
-portrait-speaker-01
-Editorial headshot of a Japanese man in his fifties in a dark navy suit without
-a tie, calm confident expression, looking directly at the camera, upper body,
-single warm key light from the upper right, dark charcoal background falling
-into shadow, shallow depth of field, natural skin texture, photorealistic [共通]
-```
-
-```
-portrait-speaker-02
-Editorial headshot of a Japanese woman in her forties in a charcoal blazer,
-composed warm expression, looking directly at the camera, upper body, single
-warm key light from the upper right, dark charcoal background falling into
-shadow, shallow depth of field, natural skin texture, photorealistic [共通]
-```
-
-```
-portrait-speaker-03
-Editorial headshot of a Japanese man in his thirties in a white open-collar
-shirt, relaxed attentive expression, looking directly at the camera, upper
-body, single warm key light from the upper right, dark charcoal background
-falling into shadow, shallow depth of field, natural skin texture,
-photorealistic [共通]
-```
-
-```
-portrait-speaker-04
-Editorial headshot of a Japanese woman in her sixties in a deep indigo jacket,
-dignified calm expression, looking directly at the camera, upper body, single
-warm key light from the upper right, dark charcoal background falling into
-shadow, shallow depth of field, natural skin texture, photorealistic [共通]
-```
-
-**同じ人物の別カットが必要になったら `--cref <画像URL> --cw 100`。** 年齢・性別・服装をばらすのは意図的——4枚が同じ見た目だと、登壇者一覧が「同じ人が4回出ている」ように見える。
-
-### 名前は付けない
-
-生成した顔に**氏名を付けてはいけない。** [seed.ts](../lib/event-cm/seed.ts) の方針(「人名は発明しない・役割を提案する」)がここでも効く。デモでも**役割ラベル**(「ゲストスピーカー」「モデレーター」)のままにする。架空の顔に架空の氏名を添えると「存在しない人物のプロフィール」になり、[place-images.ts](../lib/event-cm/place-images.ts) が氏名の根拠で写真を割り当てる規則の意味も消える。
-
-> **観測(2026-08-23)**: 役割ラベルのままだと、写真が無いときのモノグラムが `ゲストスピーカー` の頭一文字で **「ゲ」** になる。設計は「姓一文字の金縁モノグラム」なので、役割が入ると単語の切れ端に見える。実写真が入れば隠れるが、**素材ゼロの状態は残る**ので別途の判断が要る(残タスク)。
-
-### 受け渡し
-
-| プロンプト名 | 置き場所 |
-| --- | --- |
-| `still-*` | `public/defaults/stills/<name>.jpg` |
-| `portrait-*` | `public/defaults/portraits/<name>.jpg` |
-
-**無加工で置いてほしい。** トリミング・色調整・減光はテンプレート側の層(`ThemeBackdrop`)がやるので、二重にかかると戻せない。
-
-## 8. 生成AIで作らないもの
-
-**文字が要るものは生成AIで作らない。** Midjourney の文字は崩れ、崩れた文字は「デザインが荒い」ではなく**「読めない偽物」**に見える。
+**文字が要るものは生成AIで作らない。** 崩れた文字は「デザインが荒い」ではなく**「読めない偽物」**に見える。
 
 | 欲しいもの | 作り方 | 理由 |
 | --- | --- | --- |
-| **ダミーロゴ・マーク** | **コードでSVG** | 透過・鋭いエッジ・単色が要る。`treatment`(knockout/invert)は**測った輝度**で決まるのでラスタでは測れない。前例が2つある——LPのクライアントロゴウォール(8種のマーク+6種のワードマーク書体を名前ごとに割り当て、**画像を1枚も持たない**)と [public/defaults/marks/](../public/defaults/marks/gate.svg)（4種・2026-08-24 追加）。**インク面積スケール**([docs/asset-normalization.md §11.1](asset-normalization.md))も揃える必要がある |
+| **ダミーロゴ・マーク** | **コードでSVG** | 透過・鋭いエッジ・単色が要る。`treatment`(knockout/invert)は**測った輝度**で決まるのでラスタでは測れない。前例2つ——LPのクライアントロゴウォール(画像を1枚も持たない)と [public/defaults/marks/](../public/defaults/marks/gate.svg)(4種) |
 | **架空のダッシュボード** | **コードでHTML/SVG** | 数値・ラベル・凡例が読めないと「ダッシュボード」に見えない |
 | **架空の銀行口座画面** | **コードでHTML** | 金額と日付が読めることが全て。崩れた数字は不気味に見える |
-| **デバイスモックアップ(サービスを映したもの)** | **既存の `deviceMockupHtml()`** | 「このサービスをPCとスマホに映したものを描く実装は1つだけ」という既存の規則([docs/device-mockup-fixes.md](device-mockup-fixes.md))。ここに写真を足すと2つ目の実装になる |
+| **デバイスモックアップ** | **既存の `deviceMockupHtml()`** | 「このサービスをPCとスマホに映したものを描く実装は1つだけ」という既存の規則([docs/device-mockup-fixes.md](device-mockup-fixes.md))。ここに写真を足すと2つ目の実装になる |
 
-**Midjourney で作れるのは「デバイスが写っている実景写真」**。画面の中身は写さない(消灯・反射・角度で見せない)。b-roll としては有効で、要件は §5 の共通仕様に従う。
+生成AIで作れるのは**デバイスが写っている実景写真**だけ(画面の中身は消灯・反射・角度で見せない)。`devices/` はまだ空で、**要求が出たときに §5 の要件でプロンプトを書く**——使わないスロットのプロンプトを置いておくのは、この文書が捨てようとしている種類の在庫。
 
-```
-device-desk-laptop-01
-An open laptop on a dark wooden desk seen from a low three-quarter angle, the
-screen switched off and reflecting a warm window, a notebook and a ceramic cup
-beside it, single warm key light from the left, dark charcoal background, deep
-shadow filling the right third, shallow depth of field, no people, no visible
-screen content, photorealistic, 16:9, negative space on the right
-```
+## 8. 残っていること
 
-```
-device-handheld-phone-01
-A hand holding a smartphone at chest height, the screen switched off and
-catching one warm reflection, a blurred dark interior behind, face out of
-frame, single warm key light from the left, dark charcoal background, deep
-shadow filling the left third, shallow depth of field, no visible screen
-content, photorealistic, 16:9, negative space on the left
-```
-
-## 9. 受け入れ確認
-
-**目視ではなく実物で確認する。**
-
-```bash
-npm run themes:compare   # → var/theme-compare/<themeId>-<scene>.png
-```
-
-合格の条件(`sumi` で判定する。§2):
-
-1. **`sumi` で写真が写真に見える**(平坦な黒板になっていない)
-2. **文字が写真の細部を横切っていない**(コピー側の暗部が効いている)
-3. **Ken Burns の終端で重要なものが切れていない**
-4. **生成物に文字・看板・ロゴが写っていない**(架空の銘柄が写ると事実になる)
-5. **背景写真に顔が入っていない**
-6. **ポートレートが円形メダリオンと縦長パネルの両方で成立する**
-7. **セット内で照明が揃っている**(連作にする場合)
-
-`standard` の見え方は**この段階では合否に使わない**——テーマ側が未完成なので、素材で埋め合わせるとどちらが原因か分からなくなる。
-
-## 10. 残っていること
-
-- **カタログへの登録**。ファイルが揃ってから `DEFAULT_ASSETS` に `still` / `portrait` エントリを足し、`defaultVisuals` で event-cm が名指しする。**先に登録すると、実体の無いファイルを指した瞬間に Remotion がレンダーを止める**(これは正しい挙動)
-- **`portrait` / `mark` / `device` は `ASSET_KINDS` にまだ無い**。`still` は既にある
-- **`marks/` と `devices/`(UI)のコード実装**(§6)。ディレクトリだけ作ってある
-- **`standard` を納品水準にする**。素材を作っても standard は埋まらない(§2)。テーマ側の作業
+- **スタンダードの素材**(§6)。届いたら `DEFAULT_ASSETS` に `tone: "light"` で足し、[catalog.ts](../lib/templates/catalog.ts) の `artDirections` の `standard.visuals` に3スロット+見本写真2枚を書く。**先に登録すると、実体の無いファイルを指した瞬間に Remotion がレンダーを止める**(これは正しい挙動)
+- **エンドカードの地を生成物に差し替える**(§6)。差し替え後に `licensed: true` + バイトをコミット + `.gitignore` の1行を外す。**静止画で来る場合は `theme.endCard` に1行**(いまは動画前提)
+- **`device` は `ASSET_KINDS` にまだ無い**(`still` / `portrait` / `mark` / `b_roll` は在る)
+- **スタンダードの背景6枚がUpscaleされていない**(1456×816)。墨の3枚と同じ残タスク
+- **`standard` の既定を先頭にするか**は、§6 の素材で通しを見てから。切り替えは catalog.ts の `artDirections` の順序と `defaultRenders[0].theme` の2箇所(テストが一致を要求する)
+- **墨の背景3枚がUpscaleされていない**(素の1456×816)。Ken Burnsで約1.5倍になり眠い
 - **sake-2026 のブリーフをデモ素材に向け替えるか**は別判断。実案件3本が乗っているので、既定プールを埋めることと実案件のブリーフを書き換えることは分けて考える

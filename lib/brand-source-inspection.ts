@@ -4,9 +4,8 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import type { RawServiceInfo } from "@/lib/campaign/ingest";
-import { LLM_BUDGET } from "@/lib/llm";
+import { LLM_BUDGET, LLM_MODEL } from "@/lib/llm";
 
-const MODEL = "gpt-5.6-luna";
 const TIMEOUT_MS = 60_000;
 
 const OrganizationFactsSchema = z.object({
@@ -33,7 +32,7 @@ export async function inferOrganizationFacts(
   try {
     const client = new OpenAI({ timeout: TIMEOUT_MS, maxRetries: 1 });
     const response = await client.chat.completions.parse({
-      model: MODEL,
+      model: LLM_MODEL,
       max_completion_tokens: LLM_BUDGET.short,
       reasoning_effort: "low",
       messages: [

@@ -32,6 +32,7 @@ import Storyboard from "./Storyboard";
 import BrandAssetSlots from "@/components/brand/BrandAssetSlots";
 import { eventCmFilm } from "@/remotion/event-cm/film";
 import { eventCmStoryboard } from "@/lib/storyboard/event-cm";
+import { eventCmContract } from "@/lib/event-cm/contract";
 import {
   eventCmSceneKey,
   narrationChars,
@@ -55,7 +56,8 @@ const STATUS_DOT: Record<FilmStatus, string> = {
 const EventCmPlayer = dynamic(() => import("./EventCmPlayerClient"), {
   ssr: false,
   loading: () => (
-    <div className="flex aspect-video items-center justify-center text-[12px] text-white/50">
+    // On the page's own paper: the black shell this used to sit in is gone.
+    <div className="flex aspect-video items-center justify-center bg-ink/[0.03] text-[12px] text-ink-muted">
       プレビューを読み込み中…
     </div>
   ),
@@ -123,6 +125,10 @@ export default function EventCmWorkspace({
   const chars = narrationChars(brief.narration);
   const stale = narrationStaleness(brief);
   const storyboard = eventCmStoryboard(brief);
+  // The workbench, not the film: this reports on what is being written, so a
+  // budget overrun is visible while it is still being edited rather than after
+  // the next run.
+  const contract = eventCmContract(brief);
   // The sanctioned door to the drawn values (remotion/event-cm/film.ts): the
   // slots must show what the film actually carries, so a suppressed mark or a
   // declined brand base is reflected here rather than contradicted.
@@ -163,19 +169,17 @@ export default function EventCmWorkspace({
           entirely off screen. Centred, because a column with one wide object in
           it that hugs the left edge looks like a layout that failed. */}
       <div className="mx-auto flex w-full max-w-5xl flex-col">
-        {/* Dark surround because the film itself is ink-black.
+        {/* The player, bare. It used to sit in a black rounded shell ("dark
+            surround because the film itself is ink-black") — a rationale that
+            died the day a second art direction arrived: around the white
+            standard film the shell read as a black frame that might be part of
+            the video (requester, 2026-08-26). Decoration around the picture is
+            gone entirely; the frame IS the film's edge.
 
-            Ringed in amber while the workbench is ahead of it: the picture is
-            what the user is looking at, and the whole misunderstanding this
-            model exists to fix ("I changed the music and nothing happened") is
-            a misunderstanding about THIS rectangle. A ring is enough — it
-            frames without covering, and the line underneath says why. */}
-        <div
-          className={cn(
-            "overflow-hidden rounded-2xl bg-[#0b0d13] p-2 shadow-sm",
-            unreflected && "ring-2 ring-amber-400",
-          )}
-        >
+            The amber ring stays because it is not decoration: it marks the
+            picture while the workbench is ahead of it, and the line underneath
+            says why. */}
+        <div className={cn(unreflected && "ring-2 ring-amber-400")}>
           <EventCmPlayer brief={playing} />
         </div>
 
@@ -196,12 +200,32 @@ export default function EventCmWorkspace({
             className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[status])}
           />
           {status === "unrun" ? (
-            <span>
-              下書きのまま再生中
-              <span className="text-ink-faint">
-                　「動画を作り直す」でボイスが付き、尺が確定します
+            // Never run, and that is usually a finished state now: a take is
+            // created with the reading switched off, so the film it opens with
+            // is the whole film — words on screen, music under them. Saying
+            // 「下書きのまま」 over a complete video was the same mistake the
+            // badge was making (seed.ts, 2026-08-30).
+            //
+            // It still has to be able to say the other thing, because a person
+            // who switched the voice on and has not run it yet IS looking at a
+            // draft.
+            steps.length === 0 ? (
+              <span>
+                このまま完成しています
+                <span className="text-ink-faint">
+                  　ボイスを付けると、ナレーションが読まれて尺が実測に変わります
+                </span>
               </span>
-            </span>
+            ) : (
+              <span>
+                下書きのまま再生中
+                <span className="text-ink-faint">
+                  　「動画を作り直す」で
+                  {steps.map((step) => FILM_STEP_LABEL[step]).join("・")}
+                  が済みます
+                </span>
+              </span>
+            )
           ) : (
             <>
               <span>更新 {playedAt}</span>
@@ -282,6 +306,34 @@ export default function EventCmWorkspace({
             </p>
           ) : null}
         </div>
+      ) : null}
+
+      {/* The contract, checked.
+          The budgets were stated to the writer and then never looked at again
+          (lib/event-cm/contract.ts). Placed above the storyboard because it is
+          about the writing as a whole, and shown even when everything passes:
+          the numbers are what let somebody decide the film is right, rather
+          than merely un-complained-about. */}
+      {brief.narration.scenes.length > 0 ? (
+        <ul className="flex flex-col gap-1 rounded-xl border border-hairline px-4 py-3 text-[11px]">
+          {contract.map((check) => (
+            <li key={check.id} className="flex flex-wrap items-baseline gap-x-2">
+              <span
+                aria-hidden
+                className={cn(
+                  "font-semibold",
+                  check.ok ? "text-emerald-600" : "text-amber-700",
+                )}
+              >
+                {check.ok ? "✓" : "✗"}
+              </span>
+              <span className="font-medium">{check.label}</span>
+              <span className={check.ok ? "text-ink-muted" : "text-amber-800"}>
+                {check.detail}
+              </span>
+            </li>
+          ))}
+        </ul>
       ) : null}
 
       <Storyboard

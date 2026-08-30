@@ -45,7 +45,7 @@ export const EventCmNarrationSchema = z
   .object({
     version: z.literal(1),
     scenes: z.array(EventCmSceneSchema),
-    source: z.enum(["llm", "human"]),
+    source: z.enum(["seed", "llm", "human"]),
     updatedAt: z.string(),
     angle: z.string(),
   })

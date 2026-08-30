@@ -3,10 +3,14 @@ import test from "node:test";
 import { proposedDate, seedEventCmBrief } from "./seed";
 import { archetypeFor } from "./archetypes";
 import { templateBgm, templatePortrait, templateVisual } from "@/lib/assets/defaults";
-import { currentTemplate } from "@/lib/templates/catalog";
+import {
+  currentTemplate,
+  defaultArtDirection,
+  templateDressing,
+} from "@/lib/templates/catalog";
 import { eventCmGoalState } from "@/lib/pipeline/event-cm";
 import { validateBrief } from "@/lib/templates/brief-schemas";
-import { SUMI_THEME, themeById } from "@/remotion/kit/theme";
+import { STANDARD_THEME, SUMI_THEME, themeById } from "@/remotion/kit/theme";
 import {
   eventCmNarratedSteps,
   eventCmSceneBudget,
@@ -208,20 +212,20 @@ test("推定した値だけが暫定として報告される", () => {
   assert.ok(!provisional.includes("presenter"));
 });
 
-test("登壇者は役割で提案し、氏名は発明しない", () => {
-  // A guessed date is a proposal somebody corrects in five seconds. A guessed
-  // NAME is a person who does not exist — and place-images.ts will attach a
-  // real photograph to it the moment a caption seems to match.
+test("登壇者は、いかにも見本の氏名と所属で提案する", () => {
+  // Until 2026-08-30 this said 「氏名は発明しない」 and the seeded guests were
+  // 「ゲストスピーカー」 and 「モデレーター」. The owner reversed it: the seeded
+  // film is a sample somebody decides from, and a speaker picture captioned
+  // with two job categories does not show what the template does with a
+  // speaker picture.
   //
-  // The picture is part of the template now, so the list cannot be empty: an
-  // empty one would open the film's fifth picture with nothing on it.
+  // What replaced the old rule is a narrower one, and it is what this test
+  // guards: the name must be UNMISTAKABLY fictional. 山田太郎 is the Japanese
+  // John Doe. A plausible name beside a real stock face is still the failure.
   const guests = seedFor(WEALTHPARK_LAB).guests;
-  // A role and not a person. This is the assertion that has to survive — a
-  // stock face beside an invented 「山田 太郎」 is the failure the whole rule
-  // exists to prevent.
   assert.deepEqual(
     guests.map((guest) => guest.name),
-    ["ゲストスピーカー", "モデレーター"],
+    ["山田太郎", "山田花子"],
   );
   // And the name carries NO caveat, because the narration reads names aloud.
   // 「（見本）」 lived here for a day and the voice said it: 「ゲストスピーカー
@@ -235,9 +239,17 @@ test("登壇者は役割で提案し、氏名は発明しない", () => {
     guests.every((guest) => guest.photo?.sample === true),
     "見本写真に見本の印が付いていない",
   );
+  // 会社 / 肩書き, on two lines, because that is how a speaker is credited and
+  // because both presentations set `role` with white-space: pre-line.
+  assert.deepEqual(
+    guests.map((guest) => guest.role),
+    ["株式会社サンプル\n代表取締役CEO", `${WEALTHPARK_LAB.name}\n広報`],
+  );
+  // The guest comes from outside and the moderator hosts: only one of them
+  // carries an invented company, and the other carries the brand's own name.
   assert.ok(
-    guests.every((guest) => guest.role === ""),
-    "肩書きや所属は事実なので、提案しない",
+    guests[1].role.startsWith(WEALTHPARK_LAB.name),
+    "モデレーターの所属が自社になっていない",
   );
 });
 
@@ -246,15 +258,24 @@ test("登壇者には、見た目の違う見本写真が付く", () => {
   // a speaker scene where both panels read as the same person is worse than one
   // with no photographs at all. The template names them (catalog.ts), so this
   // reads the declaration rather than the filenames.
-  const guests = seedFor(WEALTHPARK_LAB).guests;
-  const declared = currentTemplate("event-cm")?.defaultVisuals ?? {};
-
-  guests.forEach((guest, at) => {
-    const asset = templatePortrait(declared[`guests.${at}.photo`]);
-    assert.ok(asset, `guests.${at}.photo に見本写真が宣言されていない`);
-    assert.equal(guest.photo?.src, asset.src);
-  });
-  assert.notEqual(guests[0].photo?.src, guests[1].photo?.src, "同じ顔が2枚並んでいる");
+  const template = currentTemplate("event-cm");
+  assert.ok(template);
+  // In EVERY painting: the standard film has no stills yet, but it does not
+  // open its speaker scene on two monograms either.
+  for (const artDirection of [SUMI_THEME.id, STANDARD_THEME.id]) {
+    const guests = seedEventCmBrief(WEALTHPARK_LAB, { now: NOW, seed: "take-1", artDirection }).guests;
+    const declared = templateDressing(template, artDirection).visuals;
+    guests.forEach((guest, at) => {
+      const asset = templatePortrait(declared[`guests.${at}.photo`]);
+      assert.ok(asset, `${artDirection}: guests.${at}.photo に見本写真が宣言されていない`);
+      assert.equal(guest.photo?.src, asset.src);
+    });
+    assert.notEqual(
+      guests[0].photo?.src,
+      guests[1].photo?.src,
+      `${artDirection}: 同じ顔が2枚並んでいる`,
+    );
+  }
 
   // Named as this tool's guess, so the fact list says 「仮に入れた値」.
   const brief = seedFor(WEALTHPARK_LAB);
@@ -267,7 +288,7 @@ test("シードのナレーションは、喋る全シーンに1行ずつ入る"
     brief.narration.scenes.map((scene) => eventCmSceneKey(scene)),
     eventCmNarratedSteps(brief).map((step) => eventCmSceneKey(step)),
   );
-  assert.equal(brief.narration.source, "llm", "下書きなので上書きできる");
+  assert.equal(brief.narration.source, "seed", "テンプレートが書いた下書き。上書きできる");
   assert.equal(narrationIsStale(brief), false);
 });
 
@@ -314,7 +335,10 @@ test("新しい動画は、テンプレートの既定画像で3つの地が埋�
   // 地を持つ"). Asserting it from an accident of an empty pool is what stopped
   // being possible.
   const brief = seedFor(WEALTHPARK_LAB);
-  const declared = currentTemplate("event-cm")?.defaultVisuals ?? {};
+  // The dressing of the painting the seed chose — the template's first
+  // (catalog.ts `artDirections`). Both paintings carry a full set of stills,
+  // so this does not depend on which one leads.
+  const declared = templateDressing(currentTemplate("event-cm")!, brief.artDirection).visuals;
 
   for (const path of ["visuals.value", "visuals.programs", "visuals.closing"]) {
     const asset = templateVisual(declared[path]);
@@ -336,25 +360,72 @@ test("新しい動画には最初からBGMが入る", () => {
   // catalog rather than naming a file — swapping the placeholder for a
   // commissioned track must not break this.
   const brief = seedFor(WEALTHPARK_LAB);
-  const declared = templateBgm(currentTemplate("event-cm")?.defaultBgm);
+  const declared = templateBgm(
+    templateDressing(currentTemplate("event-cm")!, brief.artDirection).bgm,
+  );
   assert.ok(declared, "event-cm が既定BGMを宣言していない");
   assert.equal(brief.bgm, declared?.src);
   assert.equal(brief.provenance?.bgm?.origin, "inferred");
 });
 
-test("モダンジャパニーズのテンプレートは墨で始まる", () => {
-  // The catalog calls this template's variant モダンジャパニーズ, and a variant IS
-  // the art direction (catalog.ts). So a take of it that opens on a white
-  // corporate ground contradicts the name the user chose in the add dialog —
-  // which is exactly what shipped: the seed stamped the global NEW_FILM_THEME_ID
-  // on every new film, and there is no switch anywhere to correct it.
+test("誰も選ばなければ、テンプレートの先頭のアートディレクションで始まる", () => {
+  // The add dialog asks which painting; a caller with no opinion (a script)
+  // gets the template's first declared one, and that has to be the same id
+  // `defaultRenders` writes to the render row — otherwise the brief and
+  // `take_renders.theme` disagree about what the film is painted in.
   //
-  // Reads the catalog rather than naming "sumi", for the same reason the BGM
-  // test does: the declaration is the source of truth, not this file.
-  const declared = currentTemplate("event-cm")?.defaultRenders[0]?.theme;
+  // Reads the catalog rather than naming a painting, for the same reason the
+  // BGM test does: the declaration is the source of truth, not this file.
+  // Today that first entry is standard (owner's call, 2026-08-30). 墨 remains
+  // what a film with NO art direction recorded is painted in — a different
+  // question, guarded by `LEGACY_THEME_ID` in lib/kit/themes.test.ts.
+  const template = currentTemplate("event-cm");
+  assert.ok(template);
+  const declared = defaultArtDirection(template);
   assert.ok(declared, "event-cm が既定のアートディレクションを宣言していない");
   assert.equal(seedFor(WEALTHPARK_LAB).artDirection, declared);
-  assert.equal(themeById(declared).id, SUMI_THEME.id);
+  assert.equal(template.defaultRenders[0]?.theme, declared);
+  assert.equal(themeById(declared).id, STANDARD_THEME.id);
+});
+
+test("スタンダードを選ぶと、その塗りの服を着て事実は同じ", () => {
+  // Same brand, same date, same programmes — the art direction changes how the
+  // film is painted and what it is dressed in (music, stock pictures), never
+  // what it says. The dressing is read from the catalog, not named here.
+  const template = currentTemplate("event-cm");
+  assert.ok(template);
+  // Both named on purpose. `seedFor` follows the catalog's first entry, which
+  // is now standard — reading one of these off the default would compare a
+  // painting with itself the next time the order changes.
+  const sumi = seedEventCmBrief(WEALTHPARK_LAB, {
+    now: NOW,
+    seed: "take-1",
+    artDirection: SUMI_THEME.id,
+  });
+  const standard = seedEventCmBrief(WEALTHPARK_LAB, {
+    now: NOW,
+    seed: "take-1",
+    artDirection: STANDARD_THEME.id,
+  });
+  assert.equal(standard.artDirection, STANDARD_THEME.id);
+
+  const dressing = templateDressing(template, STANDARD_THEME.id);
+  assert.equal(standard.bgm, templateBgm(dressing.bgm)?.src);
+  assert.notEqual(standard.bgm, sumi.bgm, "塗りが違うのに同じ曲で始まっている");
+  for (const path of ["visuals.value", "visuals.programs", "visuals.closing"] as const) {
+    const key = path.split(".")[1] as "value" | "programs" | "closing";
+    const asset = templateVisual(dressing.visuals[path]);
+    assert.equal(standard.visuals[key]?.src ?? null, asset?.src ?? null, `${path} が宣言と違う`);
+  }
+
+  // The facts are the facts.
+  assert.equal(standard.title, sumi.title);
+  assert.deepEqual(standard.programs, sumi.programs);
+  assert.deepEqual(standard.schedule, sumi.schedule);
+  assert.deepEqual(
+    standard.guests.map((guest) => guest.name),
+    sumi.guests.map((guest) => guest.name),
+  );
 });
 
 test("既定のBGMはブランドが違っても同じ", () => {

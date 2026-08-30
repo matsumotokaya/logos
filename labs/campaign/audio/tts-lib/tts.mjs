@@ -36,6 +36,37 @@ function mockPcm(text) {
   return { pcm, sampleRate: rate };
 }
 
+/**
+ * How long to wait before retrying, or null when retrying cannot help.
+ *
+ * The provider states the wait it wants: a 429 body carries
+ * `"retryDelay": "57s"`. The fixed 1.5s/3.0s backoff this replaced was two
+ * orders of magnitude short of that, so both retries were spent inside the
+ * same quota window and the whole recording failed on a limit that would have
+ * cleared by itself. Honouring the stated delay is right on any tier: it is the
+ * one number that is actually known. (It was found on the free tier, where 3
+ * calls a minute against a seven-scene film made this the ordinary path rather
+ * than an edge, but a paid key states its own delay the same way.)
+ *
+ * A PER-DAY quota is the null case. Its RetryInfo still says ~60s, because
+ * that is when the per-MINUTE window reopens -- but the daily allowance is
+ * gone until tomorrow, so obeying it spends two minutes to fail anyway.
+ *
+ * Capped so a malformed or hostile value cannot hang a render, and floored at
+ * the old backoff so non-quota failures (a blocked response, a dropped
+ * socket) still retry promptly.
+ */
+const MAX_RETRY_WAIT_MS = 90_000;
+export function retryDelayMs(err, attempt) {
+  const message = String(err?.message ?? "");
+  if (/PerDay/i.test(message)) return null;
+  const backoff = 1500 * (attempt + 1);
+  const stated = message.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
+  if (!stated) return backoff;
+  const asked = Math.ceil(Number(stated[1]) * 1000) + 500; // a beat past the window
+  return Math.min(MAX_RETRY_WAIT_MS, Math.max(backoff, asked));
+}
+
 async function geminiSynthesize({ text, voice, persona, model, apiKey }) {
   const ai = new GoogleGenAI({ apiKey });
   const prompt = buildPrompt(text, persona);
@@ -65,8 +96,10 @@ async function geminiSynthesize({ text, voice, persona, model, apiKey }) {
       return { pcm, sampleRate };
     } catch (err) {
       lastError = err;
+      const wait = retryDelayMs(err, attempt);
+      if (wait === null) throw err;
       if (attempt < MAX_RETRIES) {
-        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, wait));
       }
     }
   }

@@ -65,6 +65,21 @@ export interface CostProfile {
   render: "none" | "local" | "cloud";
 }
 
+/**
+ * One painting a template can be made in, and what a new take of it opens with.
+ *
+ * `id` is a theme id (remotion/kit/theme.ts `THEMES`). The pool ids follow the
+ * same rules as `defaultBgm` / `defaultVisuals` on the template — they are the
+ * per-painting reading of those two fields, which stay as the fallback.
+ */
+export interface ArtDirectionEntry {
+  id: string;
+  /** Pool track a new take of this painting opens with. */
+  bgm?: string;
+  /** Pool pictures for the visual slots, keyed by brief path. */
+  visuals?: Record<string, string>;
+}
+
 export interface TemplateEntry {
   id: string;
   /** Bumped whenever the rendered result or the brief shape can change. Takes
@@ -151,6 +166,34 @@ export interface TemplateEntry {
    * the BGM already has.
    */
   defaultVisuals?: Record<string, string>;
+  /**
+   * Video-specific: the paintings this template can be made in, in the order
+   * the add dialog offers them.
+   *
+   * A template is a CATEGORY (the shape of the brief); an art direction is how
+   * that brief is painted, and the same film can be painted more than one way
+   * (README 「アートディレクションは交換できる」). So the dialog's second
+   * question — the style — is answered from here, not by a second template id.
+   * Each entry also carries what a new take of that painting is dressed with,
+   * because the dressing follows the painting: 和モダン opens on the ink track
+   * and a tea room, the corporate film on the bright track and — once the pool
+   * has them — bright photographs (docs/demo-assets.md §6).
+   *
+   * The first entry is what a take gets when nobody chooses, and it must agree
+   * with `defaultRenders[0].theme` (lib/kit/themes.test.ts). Absent means one
+   * painting, the one `defaultRenders` names, dressed from `defaultBgm` /
+   * `defaultVisuals`.
+   */
+  artDirections?: ArtDirectionEntry[];
+  /**
+   * Whether the add dialog offers this template. Default true.
+   *
+   * False keeps a template in the catalog for the takes that already exist —
+   * they still render, still list, still open — while no new ones are made.
+   * The first step of retiring a template, taken before its code is pulled
+   * apart from whatever shares it.
+   */
+  addable?: boolean;
   stages: PipelineStage[];
   publishSurfaces: PublishSurface[];
   costProfile: CostProfile;
@@ -217,8 +260,17 @@ export const TEMPLATES: TemplateEntry[] = [
     requires: "ソース（URL・PDF・テキスト）から生成したService Brand Kit",
     duration: "30秒",
     narration: true,
-    // Placeholder: a product film is not 和モダン, so it takes the other track.
-    defaultBgm: "bgm-bright-corporate",
+    // The standard bed (owner's call, 2026-08-30). A product film is not
+    // 和モダン, and everything that is not takes this one now — the corporate
+    // template and the corporate painting of the event template both — so the
+    // product film and the standard event film open on the same music by
+    // decision rather than by the pool having only two tracks.
+    //
+    // `bgm-bright-corporate` stays in the pool as the second choice. It is a
+    // 40-second track, which is why it is no longer first: a bed shorter than
+    // the film has to loop, and there was nowhere good to put the seam
+    // (lib/assets/defaults.ts `startFromSec`).
+    defaultBgm: "bgm-shine-through-tokyo",
     // The brief is a Brand Kit plus narration timing: until the voice has been
     // recorded and pinned, there is no length and nothing to play.
     playableFromBrief: false,
@@ -251,7 +303,12 @@ export const TEMPLATES: TemplateEntry[] = [
     defaultBgm: "bgm-ink-cinematic",
     // No LLM anywhere: the brief is authored, and the renderer is deterministic.
     family: "イベント紹介動画",
-    variant: "スタンダード",
+    // Not 「スタンダード」 any more: that word now names event-cm's corporate
+    // painting, and this is the older, voiceless PV that 廃止 was decided for
+    // (2026-08-21). The label says what it is so the two cannot be confused in
+    // a list; the flag below keeps it out of the add dialog altogether.
+    variant: "PV（読み上げなし）",
+    addable: false,
     stages: ["collect", "render", "publish"],
     publishSurfaces: ["canonical_url", "embed", "social"],
     costProfile: { llm: false, tts: false, render: "local" },
@@ -268,56 +325,119 @@ export const TEMPLATES: TemplateEntry[] = [
     version: 1,
     toolKind: "video",
     briefSchemaVersion: 1,
-    rendererRevision: "remotion/event-cm@2026-08-18",
+    // Bumped for the end card standing on footage, the second painting, and the
+    // corporate cue sheet (2026-08-27/28). Now that renders record what drew
+    // them (lib/takes/render.ts), a revision left behind would tell an export
+    // it was made by a build it was not.
+    rendererRevision: "remotion/event-cm@2026-08-28",
     summary:
-      "イベント告知のナレーション駆動CM。ナレーションを先に書き、そのボイスのタイミングが画面の尺と並びを決めます。絵はモダンジャパニーズ（墨黒×金×明朝・シネスコ帯・写真主役）で、章の転換や登壇者の登場は和の効果音が刻みます。素材が無いスロットは設計済みのフォールバックで描かれます。",
+      "イベント告知のナレーション駆動CM。ナレーションを先に書き、そのボイスのタイミングが画面の尺と並びを決めます。絵はアートディレクションで選びます——モダンジャパニーズ（墨黒×金×明朝・シネスコ帯・写真主役）か、スタンダード（白地×紺×ゴシック）。章の転換や登壇者の登場は効果音が刻みます。素材が無いスロットは設計済みのフォールバックで描かれます。",
     requires: "イベントの事実（EventBrief）と、そこから書いたナレーション",
     duration: "30秒前後（ナレーションとボイスの長さで決まる）",
     narration: true,
-    // Placeholder: matches the 墨黒×金×明朝 art direction. Ducks under the
-    // narration and returns for the closing mark.
-    defaultBgm: "bgm-ink-cinematic",
-    // Subject "日本文化を学ぶ" (docs/demo-assets.md §5-6). Chosen per slot by
-    // what each layout needs, not by which picture is prettiest:
+    // Two paintings of the same film. Each carries its own music and its own
+    // stock pictures, because a tea room under a corporate title is as wrong
+    // as 和太鼓 under one — the dressing follows the art direction, not the
+    // template (README 「アートディレクションは交換できる」).
     //
-    // - `programs` is drawn TWICE — full presence under the centred title, and
-    //   dimmed behind each agenda card. So it needs its subject centre-right:
-    //   far right leaves the title standing on empty floor. 茶碗と茶筅 sits
-    //   right of centre; 炉と光 (still-tearoom-hearth) does not, and is the
-    //   alternate rather than the default for that reason alone.
-    // - `value` is the hero behind the promise, so it takes the strongest
-    //   picture: 硯と筆 says "learning" without a single written character.
-    // - `closing` carries date, venue and the call in its lower left, which is
-    //   why the lecture room won over the entrance — its lower left is empty
-    //   tatami, the entrance's is textured wet paving.
+    // STANDARD FIRST (owner's call, 2026-08-30). The first entry is what a take
+    // gets when nobody chooses, and `defaultRenders` below has to say the same
+    // id — lib/kit/themes.test.ts requires the two to agree, so flipping the
+    // default is editing both, once.
     //
-    // The two speaker portraits are here too, and they are chosen to look
-    // UNALIKE. Pool order would have given two grey-haired men in navy suits,
-    // and a speaker scene where both panels read as the same person is worse
-    // than one with no photographs at all.
-    defaultVisuals: {
-      "visuals.programs": "still-tearoom-bowl",
-      "visuals.value": "still-inkstone",
-      "visuals.closing": "still-venue-lanterns",
-      // Swapped away from the two suited 60-somethings on the requester's first
-      // watch (2026-08-25). Which two is not a rule — that they look unalike
-      // is. An open-collar shirt and an indigo jacket also read closer to
-      // 「学ぶ」 than two boardroom portraits do.
-      "guests.0.photo": "portrait-speaker-05",
-      "guests.1.photo": "portrait-speaker-06",
-    },
+    // 墨 led while it was the only painting anyone had watched at delivery
+    // quality. It is still the proven one, and it is still what a film with NO
+    // art direction recorded is painted in (`LEGACY_THEME_ID` — that is a
+    // different question and it protects the approved takes). What changed is
+    // which painting a NEW film opens in: standard is the corporate default,
+    // 和モダン is the one you choose on purpose.
+    artDirections: [
+      {
+        id: "standard",
+        // Three minutes, so a 51-second film never reaches its end and there is
+        // no loop seam at all (owner's call, 2026-08-30). The same bed the
+        // product film takes — see `defaultBgm` on product-cm for why that is
+        // now a decision rather than a coincidence.
+        bgm: "bgm-shine-through-tokyo",
+        // The bright set, delivered 2026-08-27 and measured at ingest
+        // (`node scripts/check-pool-images.mjs … --tone light`). Chosen by what
+        // each layout needs, exactly as the 墨 set above:
+        //
+        // - `programs` is drawn TWICE — full presence under the centred title,
+        //   dimmed behind each agenda card — so its subject has to sit
+        //   centre-right. The long white table recedes to the right and leaves
+        //   a plain sunlit wall on the left: the flattest copy side of the six.
+        // - `value` is the hero behind the promise. The desk with paper, pen and
+        //   water says 「学ぶ」 in a way an empty corridor cannot, and its busy
+        //   left third (measured sd 0.258, the highest here) is tamed by the
+        //   lightening scrim at 0.84 rather than fought.
+        // - `closing` carries date, venue and the call in its LOWER left, which
+        //   is why the lobby won: its lower left is polished sunlit floor, while
+        //   the corridor's is a wall that runs the full height.
+        //
+        // The two portraits are chosen to look UNALIKE, the same rule the 墨
+        // pair follows — and the pale studio ground is why they are separate
+        // entries at all rather than reused from 墨.
+        visuals: {
+          "visuals.programs": "still-light-seminar-table",
+          "visuals.value": "still-light-desk-notebook",
+          "visuals.closing": "still-light-venue-lobby",
+          "guests.0.photo": "portrait-light-02",
+          "guests.1.photo": "portrait-light-03",
+        },
+      },
+      {
+        id: "sumi",
+        // Placeholder: matches the 墨黒×金×明朝 art direction. Ducks under the
+        // narration and returns for the closing mark.
+        bgm: "bgm-ink-cinematic",
+        // Subject "日本文化を学ぶ" (docs/demo-assets.md §2). Chosen per slot
+        // by what each layout needs, not by which picture is prettiest:
+        //
+        // - `programs` is drawn TWICE — full presence under the centred title,
+        //   and dimmed behind each agenda card. So it needs its subject
+        //   centre-right: far right leaves the title standing on empty floor.
+        //   茶碗と茶筅 sits right of centre; 炉と光 (still-tearoom-hearth) does
+        //   not, and is the alternate rather than the default for that reason
+        //   alone.
+        // - `value` is the hero behind the promise, so it takes the strongest
+        //   picture: 硯と筆 says "learning" without a single written character.
+        // - `closing` carries date, venue and the call in its lower left, which
+        //   is why the lecture room won over the entrance — its lower left is
+        //   empty tatami, the entrance's is textured wet paving.
+        //
+        // The two speaker portraits are here too, and they are chosen to look
+        // UNALIKE. Pool order would have given two grey-haired men in navy
+        // suits, and a speaker scene where both panels read as the same person
+        // is worse than one with no photographs at all.
+        visuals: {
+          "visuals.programs": "still-tearoom-bowl",
+          "visuals.value": "still-inkstone",
+          "visuals.closing": "still-venue-lanterns",
+          // Swapped away from the two suited 60-somethings on the requester's
+          // first watch (2026-08-25). Which two is not a rule — that they look
+          // unalike is. An open-collar shirt and an indigo jacket also read
+          // closer to 「学ぶ」 than two boardroom portraits do.
+          "guests.0.photo": "portrait-speaker-05",
+          "guests.1.photo": "portrait-speaker-06",
+        },
+      },
+    ],
     // The storyboard is a workbench: edits collect there and reach the film
     // only when the user asks. The only template that works this way today.
     bakesBrief: true,
     // The script is written by an LLM from the brief, then spoken. Both are
     // charged, and both re-run only when asked.
+    //
+    // No `variant`: the family has two styles and they are art directions,
+    // not templates. The name the user sees is composed from the family and
+    // the painting a take carries (lib/video/templates.ts `videoDisplayName`).
     family: "イベント紹介動画",
-    variant: "モダンジャパニーズ",
     stages: ["collect", "structure", "render", "publish"],
     publishSurfaces: ["canonical_url", "embed", "social"],
     costProfile: { llm: true, tts: true, render: "local" },
     defaultRenders: [
-      { locale: "ja", aspectRatio: "16:9", theme: "sumi", format: "mp4" },
+      { locale: "ja", aspectRatio: "16:9", theme: "standard", format: "mp4" },
     ],
     isBrandDefault: false,
     // Script, voice timing and the pinned WAV all live on the take, so an old
@@ -349,13 +469,54 @@ export const TEMPLATES: TemplateEntry[] = [
 /**
  * The one derivation of a template's display name.
  *
- * Grouped templates are named by their pair (`イベント紹介動画 - モダンジャパニーズ`);
- * ungrouped ones carry an explicit `name`. Every screen reads this, so adding a
- * style or renaming a family moves the picker, the list badge, the video detail
+ * Grouped templates are named by their pair (`製品紹介動画 - スタンダード`);
+ * ungrouped ones carry an explicit `name`; a family whose styles are art
+ * directions rather than templates (event-cm) is named by the family alone,
+ * and the painting is added per take (lib/video/templates.ts
+ * `videoDisplayName`). Every screen reads one of those two, so adding a style
+ * or renaming a family moves the picker, the list badge, the video detail
  * header and the default take title together.
  */
 export const templateName = (template: TemplateEntry): string =>
   template.name ?? [template.family, template.variant].filter(Boolean).join(" - ");
+
+/**
+ * The paintings a template can be made in, in dialog order.
+ *
+ * A template that declares none has exactly one: whatever `defaultRenders`
+ * paints (empty for the tools that do not paint — an LP's theme is its own
+ * business). Never empty for a video template that renders.
+ */
+export const artDirectionIds = (template: TemplateEntry): string[] =>
+  template.artDirections?.map((entry) => entry.id) ??
+  template.defaultRenders
+    .map((render) => render.theme)
+    .filter((theme, index, all) => theme.length > 0 && all.indexOf(theme) === index);
+
+/** The painting a take of this template gets when nobody chooses. */
+export const defaultArtDirection = (template: TemplateEntry): string | undefined =>
+  artDirectionIds(template)[0];
+
+/**
+ * What a new take is dressed with, for one painting.
+ *
+ * Per-painting entries win; the template-level `defaultBgm` / `defaultVisuals`
+ * are the answer for a template with one painting, and the fallback for an id
+ * the template has not declared — which yields nothing rather than the wrong
+ * painting's pictures, so a film that asked for a painting this template does
+ * not know stands on its designed ground instead of on a tea room.
+ */
+export function templateDressing(
+  template: TemplateEntry,
+  artDirection: string | undefined = defaultArtDirection(template),
+): { bgm?: string; visuals: Record<string, string> } {
+  const entry = template.artDirections?.find((item) => item.id === artDirection);
+  if (template.artDirections && !entry) return { visuals: {} };
+  return {
+    bgm: entry?.bgm ?? template.defaultBgm,
+    visuals: entry?.visuals ?? template.defaultVisuals ?? {},
+  };
+}
 
 const BY_ID = new Map(TEMPLATES.map((template) => [template.id, template]));
 
@@ -365,6 +526,29 @@ export const currentTemplate = (id: string): TemplateEntry | null =>
   BY_ID.get(id) ?? null;
 
 export const isTemplateId = (id: string): boolean => BY_ID.has(id);
+
+/**
+ * Whether an exported file was drawn by a renderer that has since changed.
+ *
+ * `rendererRevision` was declared and written to the ledger, and then read by
+ * nothing: fixing the drawing left every existing MP4 silently old, because the
+ * only thing that could make an export look stale was a newer bake. The player
+ * runs today's composition and the file does not, and nobody was told.
+ *
+ * `produced` is what the render row recorded at export time
+ * (`take_renders.params.rendererRevision`). Unknown is NOT stale: exports made
+ * before this was recorded cannot be compared, and claiming they are old would
+ * put an amber box on every video once, permanently.
+ */
+export function rendererChangedSince(produced: unknown, templateId: string): boolean {
+  if (typeof produced !== "string" || produced === "") return false;
+  const current = currentTemplate(templateId)?.rendererRevision;
+  return Boolean(current) && produced !== current;
+}
+
+/** What to record on a render so the check above has something to compare. */
+export const rendererRevisionOf = (templateId: string): string | null =>
+  currentTemplate(templateId)?.rendererRevision ?? null;
 
 export const templatesForTool = (toolKind: ToolKind): TemplateEntry[] =>
   TEMPLATES.filter((template) => template.toolKind === toolKind);
@@ -385,6 +569,9 @@ export function templateSpec(template: TemplateEntry): Record<string, unknown> {
     publishSurfaces: template.publishSurfaces,
     costProfile: template.costProfile,
     defaultRenders: template.defaultRenders,
+    // Which paintings this version could be made in. Ids only: the dressing
+    // (which pool track, which stock picture) is a default, not a promise.
+    artDirections: artDirectionIds(template),
     isBrandDefault: template.isBrandDefault,
     rerenderable: template.rerenderable,
   };

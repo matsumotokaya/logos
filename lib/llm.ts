@@ -23,6 +23,23 @@ import { LengthFinishReasonError } from "openai/error";
 // occasionally dies of an English sentence about a length limit reads as
 // corrupted data rather than as an exceeded size.
 
+/**
+ * Which model does the reading, the writing and the judging.
+ *
+ * One place, for the same reason as the budget below: it is a policy, not a
+ * per-call opinion. It was four — the brand-source inspector, the Brand Kit,
+ * the event reader and the narration writer each declared the same string —
+ * and raising the model meant finding all four. Missing one does not fail: the
+ * stages simply run on different models and the run log says so in a line
+ * nobody reads.
+ *
+ * `LLM_ENGINE` is the sentence the campaign progress log shows a user, so it
+ * is derived here rather than written out again.
+ */
+export const LLM_MODEL = "gpt-5.6-luna";
+export const LLM_PROVIDER = "OpenAI API";
+export const LLM_ENGINE = `OpenAI API（Chat Completions + structured outputs / ${LLM_MODEL}）`;
+
 export const LLM_BUDGET = {
   /**
    * Reasoning plus a structured answer of real size: reading a stack of

@@ -29,6 +29,7 @@ import { zipSync, type Zippable } from "fflate";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { stageBriefMaterials } from "@/lib/takes/materials";
 import { unlicensedDefaults } from "@/lib/assets/defaults";
+import { themeById } from "@/remotion/kit/theme";
 import { moduleClosure } from "./module-graph";
 import { projectFilename, projectSlug } from "./naming";
 import { projectReadme } from "./readme";
@@ -230,6 +231,33 @@ export async function buildProjectZip(
         const bytes = await readFile(path.join(root, "public", bgm)).catch(() => null);
         if (bytes) files[`${slug}/public/${bgm}`] = new Uint8Array(bytes);
         else delete staged.bgm;
+      }
+    }
+
+    // The ART DIRECTION's own assets, which no brief field names.
+    //
+    // `theme.endCard.video` is the footage the closing plate stands on, declared
+    // by the theme rather than by the brief — so the bgm branch above cannot see
+    // it and the recipient would get a project whose theme points at a file the
+    // zip never carried. It is not a broken zip either way (defaults.ts travels
+    // with its `licensed` flag, so the copied composition applies the same
+    // exclusion), but the dialog's job is to NAME what is being left out, and an
+    // exclusion nobody mentions is the kind of surprise this export exists to
+    // avoid.
+    const endCardVideo = themeById(
+      typeof (input.brief as { artDirection?: unknown }).artDirection === "string"
+        ? ((input.brief as { artDirection: string }).artDirection)
+        : undefined,
+    ).endCard?.video;
+    if (endCardVideo) {
+      const unlicensed = unlicensedDefaults([endCardVideo]);
+      if (unlicensed.length > 0) {
+        excluded.push(...unlicensed.map((asset) => asset.label));
+      } else {
+        const bytes = await readFile(path.join(root, "public", endCardVideo)).catch(
+          () => null,
+        );
+        if (bytes) files[`${slug}/public/${endCardVideo}`] = new Uint8Array(bytes);
       }
     }
 

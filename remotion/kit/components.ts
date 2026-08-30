@@ -124,7 +124,19 @@ export type SceneComponent = ComponentMeta &
      *  for plain kanji numerals, which read as bare bars at display size (一
      *  IS a bar); the box carries the visual mass and the number stays the
      *  subject. */
-    | { kind: "stat"; value: string; unit?: string; label?: string; variant?: "plain" | "seal" }
+    | {
+        kind: "stat";
+        value: string;
+        unit?: string;
+        label?: string;
+        /**
+         * `seal` boxes the numeral in a hairline square (for 一二三). `ordinal`
+         * sets it large and light with the unit riding beside it, no box (for
+         * 01 02 03). Which one an agenda uses is the theme's call
+         * (theme.ts `ornament.numerals`); the scene only says which of how many.
+         */
+        variant?: "plain" | "seal" | "ordinal";
+      }
     /** Dates need their own setting: the numerals, the weekday and the time are
      *  three different sizes in every well-set announcement. */
     | { kind: "datetime"; date: string; weekday?: string; time?: string }

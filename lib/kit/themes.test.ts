@@ -10,6 +10,12 @@ import {
   themeById,
 } from "@/remotion/kit/theme";
 import { groundIsDark, markPainting } from "@/remotion/kit/mark";
+import {
+  TEMPLATES,
+  artDirectionIds,
+  defaultArtDirection,
+} from "@/lib/templates/catalog";
+import { DEFAULT_ASSETS, unlicensedDefaults } from "@/lib/assets/defaults";
 
 test("未設定のアートディレクションは墨に落ちる", () => {
   // Every take that exists predates `brief.artDirection`, and one of them is a
@@ -87,6 +93,43 @@ test("スタンダードは明るい地に濃い文字、墨はその逆", () =>
   // direction the type needs. A darkening scrim under dark type is unreadable.
   assert.deepEqual(SUMI_THEME.backdrop.directional?.tint, [8, 6, 4]);
   assert.deepEqual(STANDARD_THEME.backdrop.directional?.tint, [247, 249, 252]);
+});
+
+test("数字と音の様式はテーマが持ち、墨は和、スタンダードは企業", () => {
+  // Both used to be the template's: 一二三 in a seal box and 拍子木・和太鼓 for
+  // every film, which on a corporate webinar are a costume. The theme names
+  // the register and the scene / cue sheet read it.
+  assert.equal(SUMI_THEME.ornament.numerals, "kanji-seal");
+  assert.equal(STANDARD_THEME.ornament.numerals, "arabic");
+  assert.equal(SUMI_THEME.sound.cues, "wa");
+  assert.equal(STANDARD_THEME.sound.cues, "corporate");
+});
+
+test("テンプレートが宣言するアートディレクションは全部存在し、先頭は既定レンダーと一致する", () => {
+  // The add dialog offers what the catalog declares (catalog.ts
+  // `artDirections`), so an id with no theme behind it would let a user order
+  // a painting nobody can paint — and `themeById` would quietly hand them 墨.
+  // The first entry is what a take gets when nobody chooses; the render row is
+  // written from `defaultRenders`, so the two must name the same painting.
+  // Only templates painted by the kit name a theme; product-cm's renderer has
+  // its own palette and declares none (`theme: ""`), which is not a gap here.
+  for (const template of TEMPLATES.filter((entry) => entry.toolKind === "video")) {
+    const ids = artDirectionIds(template);
+    for (const id of ids) {
+      assert.ok(id in THEMES, `${template.id}: アートディレクション ${id} のテーマが無い`);
+    }
+    if (template.artDirections) {
+      assert.ok(ids.length > 0, `${template.id}: 塗りを1つも宣言していない`);
+      assert.equal(
+        defaultArtDirection(template),
+        template.defaultRenders[0]?.theme,
+        `${template.id}: 先頭の塗りと defaultRenders の theme が食い違う`,
+      );
+    }
+  }
+  // The one template that chooses its painting today.
+  const eventCm = TEMPLATES.find((entry) => entry.id === "event-cm");
+  assert.deepEqual(eventCm && artDirectionIds(eventCm), [STANDARD_THEME.id, SUMI_THEME.id]);
 });
 
 test("組版はアートディレクションごとに違う", () => {
@@ -213,4 +256,58 @@ test("どのテーマも組版の言語を宣言する", () => {
       `${theme.id}: 組版の言語が宣言されていない`,
     );
   }
+});
+
+test("エンドカードの動画は、地の色で洗ってから使う", () => {
+  // The mark's treatment is derived from `palette.ground` (remotion/kit/mark.ts),
+  // so footage drawn at full presence makes that derivation a lie — a knocked-out
+  // white mark on a bright sky, or a near-black one on a dark one. The approved
+  // 和モダン film washes 0.58 of ink over its Fuji clip before the mark goes
+  // down; every art direction has to wash in ITS OWN ground for the same reason,
+  // and in the same direction.
+  for (const theme of Object.values(THEMES)) {
+    if (!theme.endCard) continue;
+    assert.ok(theme.endCard.video.length > 0, `${theme.id}: 動画のパスが空`);
+    const wash = theme.endCard.wash;
+    const rgb = /rgba?\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/.exec(wash);
+    assert.ok(rgb, `${theme.id}: wash は rgba() で書く（${wash}）`);
+    if (!rgb) continue;
+    const [, r, g, b, a] = rgb;
+    const washLuma = (Number(r) * 0.299 + Number(g) * 0.587 + Number(b) * 0.114) / 255;
+    assert.equal(
+      washLuma >= 0.5,
+      !groundIsDark(theme.palette.ground),
+      `${theme.id}: 地と逆の色で洗っている（マークが消える）`,
+    );
+    // Enough of it to actually decide the ground: the approved film uses 0.58.
+    assert.ok(
+      Number(a) >= 0.5,
+      `${theme.id}: wash が薄すぎて、地の色がマークの描き方を決められない（${a}）`,
+    );
+  }
+});
+
+test("承認済みの墨のエンドカードは、ラボの数字のまま", () => {
+  // Carried from labs/freehand/sake-2026/src/freehand/scenes.tsx, which is the
+  // film the client approved across three rounds. If these move, a delivered
+  // film changed.
+  assert.equal(SUMI_THEME.endCard?.grade, "saturate(0.85) brightness(0.85)");
+  assert.equal(SUMI_THEME.endCard?.wash, "rgba(8,6,4,0.58)");
+});
+
+test("清算されていない既定素材は、レンダーから外れる経路を持つ", () => {
+  // `unlicensedDefaults` had no caller until the first asset needed it. If this
+  // ever returns nothing for an unlicensed entry, the promise the BGM dialog
+  // makes (「書き出したMP4では無音になります」) is not kept by anything.
+  const unlicensed = DEFAULT_ASSETS.filter((asset) => !asset.licensed);
+  for (const asset of unlicensed) {
+    assert.deepEqual(
+      unlicensedDefaults([asset.src]).map((entry) => entry.id),
+      [asset.id],
+      `${asset.id}: 除外の対象として引けない`,
+    );
+  }
+  // And a cleared asset must never be excluded.
+  const cleared = DEFAULT_ASSETS.filter((asset) => asset.licensed).map((a) => a.src);
+  assert.deepEqual(unlicensedDefaults(cleared), []);
 });
