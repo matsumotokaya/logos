@@ -7,7 +7,9 @@
 // else. "やりすぎるとチープ" was the client's one-line brief for this layer,
 // so two scenes are deliberately silent: the promise (fourteen seconds that
 // want to be watched, not punctuated) and the end card (the film closes on
-// music alone; a hit there reads as a stinger from another genre).
+// music alone; a hit there reads as a stinger from another genre). The
+// corporate column silences a third — the opening (owner, 2026-08-30): the
+// standard film starts on the music alone.
 //
 // **`presence` is not a volume.** The pool's files are mastered 10 dB apart,
 // so a hand-picked volume per cue encodes the sample-maker's mastering as if
@@ -62,7 +64,10 @@ const PRESENCE = {
  */
 const SFX_TRIM = 0.7;
 
-const cue = (file: string, presence: number, atMs: number): SfxCue | null => {
+const cue = (file: string | null, presence: number, atMs: number): SfxCue | null => {
+  // A column may leave a moment to the music alone (null): the moment still
+  // exists in the template, this palette just declines to mark it.
+  if (!file) return null;
   const entry = SOUNDS[file];
   // A file missing from the catalog is a pool problem, not a film problem:
   // the cue silently stands down rather than pointing Audio at a 404.
@@ -81,7 +86,7 @@ const cue = (file: string, presence: number, atMs: number): SfxCue | null => {
  * columns; only the instrument changes. Two scenes stay silent in both — the
  * promise and the end card — for the reason in the file header.
  */
-const INSTRUMENTS: Record<ThemeSound["cues"], Record<"opening" | "title" | "chapter" | "arrival" | "closing", string>> = {
+const INSTRUMENTS: Record<ThemeSound["cues"], Record<"opening" | "title" | "chapter" | "arrival" | "closing", string | null>> = {
   // The 和モダン palette, approved on the delivered commission.
   wa: {
     // 拍子木: the two wooden blocks that open a performance — the one moment
@@ -110,7 +115,6 @@ const INSTRUMENTS: Record<ThemeSound["cues"], Record<"opening" | "title" | "chap
   // matches 和 by construction; it was the ringing). Current picks, measured:
   //
   //             dur    played tail (1s+)     和の対応
-  //   piano     1.67s  −49 dB                拍子木(→ n/a, dies at once)
   //   title1    1.73s  −46 dB                和太鼓ドン −48 dB
   //   switch2   1.90s  −62 dB                鈴 −60 dB
   //   spotlight 1.77s  −54 dB                和太鼓ドドン −60 dB
@@ -120,9 +124,13 @@ const INSTRUMENTS: Record<ThemeSound["cues"], Record<"opening" | "title" | "chap
   // rings past its moment: `npm run sfx:envelope` checks every column against
   // the approved envelope, and the numbers above come from it.
   corporate: {
-    // A single acoustic piano note over the intro — the one moment with no
-    // voice; acoustic like the 和 column, corporate in register.
-    opening: "piano-single1.mp3",
+    // No opening hit (owner, 2026-08-30). The standard film begins on the
+    // music alone: the piano note was the sheet's strongest presence landing
+    // inside the BGM's 20-frame ramp-in — the loudest cue at the film's
+    // quietest moment — and the owner judged the mark itself needs no
+    // punctuation. The 和 column keeps its 拍子木, which was approved on the
+    // delivered commission.
+    opening: null,
     // タイトル表示 — made for exactly this moment.
     title: "title1.mp3",
     // The scene-turn woosh: the corporate chapter idiom. Chapters and

@@ -325,11 +325,12 @@ export const TEMPLATES: TemplateEntry[] = [
     version: 1,
     toolKind: "video",
     briefSchemaVersion: 1,
-    // Bumped for the end card standing on footage, the second painting, and the
-    // corporate cue sheet (2026-08-27/28). Now that renders record what drew
-    // them (lib/takes/render.ts), a revision left behind would tell an export
-    // it was made by a build it was not.
-    rendererRevision: "remotion/event-cm@2026-08-28",
+    // Bumped for the end card standing on footage, the second painting, the
+    // corporate cue sheet (2026-08-27/28), and the standard opening falling
+    // silent (2026-08-30). Now that renders record what drew them
+    // (lib/takes/render.ts), a revision left behind would tell an export it
+    // was made by a build it was not.
+    rendererRevision: "remotion/event-cm@2026-08-30",
     summary:
       "イベント告知のナレーション駆動CM。ナレーションを先に書き、そのボイスのタイミングが画面の尺と並びを決めます。絵はアートディレクションで選びます——モダンジャパニーズ（墨黒×金×明朝・シネスコ帯・写真主役）か、スタンダード（白地×紺×ゴシック）。章の転換や登壇者の登場は効果音が刻みます。素材が無いスロットは設計済みのフォールバックで描かれます。",
     requires: "イベントの事実（EventBrief）と、そこから書いたナレーション",
