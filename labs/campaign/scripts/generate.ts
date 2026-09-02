@@ -35,21 +35,23 @@ interface CliArgs {
   desc?: string;
   shotsDir?: string;
   verify: boolean;
+  capture: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { url: null, verify: true };
+  const args: CliArgs = { url: null, verify: true, capture: true };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--name") args.name = argv[++i];
     else if (a === "--desc") args.desc = argv[++i];
     else if (a === "--shots") args.shotsDir = argv[++i];
     else if (a === "--no-verify") args.verify = false;
+    else if (a === "--no-capture") args.capture = false;
     else if (!a.startsWith("--")) args.url = a;
   }
   if (!args.url && !args.name) {
     console.error(
-      "Usage: npm run campaign -- <url> [--name NAME] [--desc TEXT] [--shots DIR] [--no-verify]"
+      "Usage: npm run campaign -- <url> [--name NAME] [--desc TEXT] [--shots DIR] [--no-verify] [--no-capture]"
     );
     process.exit(1);
   }
@@ -113,6 +115,7 @@ async function main() {
     },
     {
       verify: args.verify,
+      capture: args.capture,
       onProgress: (e) => {
         const mark = e.level === "success" ? "✓" : e.level === "warn" ? "⚠" : "…";
         console.log(`[${new Date().toISOString().slice(11, 19)}] ${mark} ${e.message}`);
@@ -132,7 +135,15 @@ async function main() {
       .join(" ");
     if (t) console.log(`tokens: ${t}`);
   }
-  console.log(`logo: ${kit.assets?.logo ? "captured" : "none (wordmark fallback)"}`);
+  console.log(
+    `logo: ${
+      kit.assets?.logo_svg
+        ? "captured (SVG vector)"
+        : kit.assets?.logo
+          ? "captured (PNG)"
+          : "none (wordmark fallback)"
+    }`,
+  );
   console.log(
     `palette: ${kit.brand.primary} / ${kit.brand.accent} on ${kit.brand.background} (${kit.brand.mode}, source=${kit.brand.palette_source})`
   );
@@ -166,6 +177,8 @@ async function main() {
     fs.writeFileSync(path.join(outDir, "lp.jpg"), Buffer.from(result.debug.lpShot, "base64"));
   if (kit.assets?.logo)
     fs.writeFileSync(path.join(outDir, "logo.png"), Buffer.from(kit.assets.logo.data, "base64"));
+  if (kit.assets?.logo_svg)
+    fs.writeFileSync(path.join(outDir, "logo.svg"), kit.assets.logo_svg);
 
   console.log(`\n完了: ${outDir}/`);
   console.log(`プレビュー: open ${path.join(outDir, "index.html")}`);

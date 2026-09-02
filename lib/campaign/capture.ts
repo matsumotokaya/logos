@@ -27,8 +27,23 @@ export interface SiteCapture {
   /** inline-SVG logo with computed fills baked in (vector master), when the
    *  detected logo element was an <svg> */
   logoSvg: string | null;
+  /** Top scored logo picks (crop + evidence), #1 first. logoImage/logoSvg stay
+   *  the deterministic #1; the runners-up exist for the VLM adjudicator. */
+  logoCandidates: CapturedLogoCandidate[];
   /** best-effort design guideline hints from computed CSS */
   designTokens: DesignTokens;
+}
+
+export interface CapturedLogoCandidate {
+  /** normalized PNG crop of the rendered element, base64 */
+  image: string | null;
+  /** inline-svg serialization (vector master) when the element was an <svg> */
+  svg: string | null;
+  /** referenced file URL when the element was an <img> */
+  src: string | null;
+  score: number;
+  /** one evidence line for the adjudicator */
+  note: string;
 }
 
 const NAV_TIMEOUT = 30_000;
@@ -332,22 +347,17 @@ const PICK_LOGO_ELEMENT = String.raw`(() => {
     if (area < 900 && !hasLogoName) score -= 2;   // hamburger-sized icons
     if (!hasLogoName && !inHomeLink && el.closest('button, [role="button"]')) score -= 2;
 
-    cands.push({ el, score, r, area });
+    cands.push({ el, score, r, area, hasLogoName, inHomeLink, vectorFile });
   }
   cands.sort((x, y) => y.score - x.score || y.area - x.area);
-  const best = cands[0];
-  if (!best || best.score < 3) return null;
+  if (!cands[0] || cands[0].score < 3) return null;
 
-  for (const n of Array.from(document.querySelectorAll("[data-logos-pick]"))) n.removeAttribute("data-logos-pick");
-  best.el.setAttribute("data-logos-pick", "1");
-
-  // Inline <svg> logo → serialize with computed fills/strokes inlined so the
+  // Inline <svg> → serialize with computed fills/strokes inlined so the
   // markup survives outside the page's stylesheets.
-  let svg = null;
-  if (best.el.tagName.toLowerCase() === "svg") {
+  const serialize = (el, r) => {
     try {
-      const clone = best.el.cloneNode(true);
-      const src = [best.el].concat(Array.from(best.el.querySelectorAll("*")));
+      const clone = el.cloneNode(true);
+      const src = [el].concat(Array.from(el.querySelectorAll("*")));
       const dst = [clone].concat(Array.from(clone.querySelectorAll("*")));
       for (let i = 0; i < src.length && i < dst.length; i++) {
         const c = getComputedStyle(src[i]);
@@ -365,24 +375,50 @@ const PICK_LOGO_ELEMENT = String.raw`(() => {
         d.removeAttribute("class");
       }
       clone.removeAttribute("data-logos-pick");
-      clone.setAttribute("width", String(Math.round(best.r.width)));
-      clone.setAttribute("height", String(Math.round(best.r.height)));
+      clone.setAttribute("width", String(Math.round(r.width)));
+      clone.setAttribute("height", String(Math.round(r.height)));
       clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-      svg = clone.outerHTML;
-      if (svg.length > 300000) svg = null;
+      const out = clone.outerHTML;
+      return out.length > 300000 ? null : out;
     } catch (e) {
-      svg = null;
+      return null;
     }
+  };
+
+  // Top 3 distinct-looking picks, each tagged for an element screenshot. The
+  // #1 heuristic pick stays the deterministic default; the runners-up exist so
+  // an adjudicator can overrule a mis-scored pick (VLM, choose-only).
+  for (const n of Array.from(document.querySelectorAll("[data-logos-pick]"))) n.removeAttribute("data-logos-pick");
+  const picks = [];
+  const usedSrc = new Set();
+  for (const cand of cands) {
+    if (picks.length >= 3 || cand.score < 3) break;
+    const tag = cand.el.tagName.toLowerCase();
+    const src = tag === "img"
+      ? (cand.el.currentSrc || cand.el.getAttribute("src") || null)
+      : null;
+    if (src && usedSrc.has(src)) continue; // same file rendered twice
+    if (src) usedSrc.add(src);
+    cand.el.setAttribute("data-logos-pick", String(picks.length + 1));
+    const alt = (cand.el.getAttribute && (cand.el.getAttribute("alt") || cand.el.getAttribute("aria-label"))) || "";
+    const marks = [];
+    if (cand.hasLogoName) marks.push("logo/brandの名前");
+    if (cand.inHomeLink) marks.push("ホームへのリンク内");
+    if (cand.vectorFile) marks.push("SVGファイル参照");
+    const note = "実画面の<" + tag + ">" +
+      (alt ? ' alt="' + alt.slice(0, 60) + '"' : "") +
+      " " + Math.round(cand.r.width) + "×" + Math.round(cand.r.height) +
+      "px @(" + Math.round(cand.r.left) + "," + Math.round(cand.r.top) + ")" +
+      (marks.length ? " — " + marks.join("・") : "");
+    picks.push({
+      tag,
+      score: cand.score,
+      svg: tag === "svg" ? serialize(cand.el, cand.r) : null,
+      src,
+      note,
+    });
   }
-
-  // <img> logo → also report the referenced file URL. The file itself beats
-  // any element screenshot: an .svg reference IS a vector master, and a
-  // raster file at natural resolution is sharper than the rendered box.
-  const src = best.el.tagName.toLowerCase() === "img"
-    ? (best.el.currentSrc || best.el.getAttribute("src") || null)
-    : null;
-
-  return { tag: best.el.tagName.toLowerCase(), score: best.score, svg, src };
+  return picks.length ? { picks } : null;
 })()`;
 
 async function toJpegBase64(png: Buffer, width: number, maxHeight = 3000): Promise<string> {
@@ -471,6 +507,12 @@ async function dominantColors(buf: Buffer): Promise<{ hex: string; share: number
   }
 }
 
+/** Public wrapper: normalize any decodable image (SVG included — sharp
+ *  rasterizes it) to a compact base64 PNG for VLM input and previews. */
+export async function normalizeLogoPng(buf: Buffer): Promise<string | null> {
+  return toLogoPng(buf);
+}
+
 /** Normalize a logo/favicon image to a compact PNG (max 512px wide). */
 async function toLogoPng(buf: Buffer): Promise<string | null> {
   try {
@@ -504,6 +546,24 @@ function rawToEvidence(
   };
 }
 
+/** page.evaluate, retried once when an in-page navigation (redirect, carousel
+ *  link, meta refresh) destroys the execution context mid-run. Without this a
+ *  single navigation kills the whole capture — screenshots, palette and logo. */
+async function evaluateSettled<T>(
+  page: import("playwright").Page,
+  script: string
+): Promise<T> {
+  try {
+    return (await page.evaluate(script)) as T;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/Execution context was destroyed|navigation/i.test(msg)) throw e;
+    await page.waitForLoadState("load", { timeout: 10_000 }).catch(() => {});
+    await page.waitForTimeout(1_200);
+    return (await page.evaluate(script)) as T;
+  }
+}
+
 export async function captureSite(
   url: string,
   opts: { faviconUrl?: string | null } = {}
@@ -533,7 +593,7 @@ export async function captureSite(
     }
     await page.waitForTimeout(1200);
 
-    const raw = (await page.evaluate(COLLECT_PAGE_COLORS)) as RawPageColors;
+    const raw = await evaluateSettled<RawPageColors>(page, COLLECT_PAGE_COLORS);
 
     const desktopPng = await page.screenshot({ type: "png" });
     const desktopShot = await toJpegBase64(desktopPng, 1024);
@@ -556,28 +616,34 @@ export async function captureSite(
       fullPage = null;
     }
 
-    // Logo: score all candidates in-page, screenshot the winner, and keep the
-    // inline-SVG vector when the logo element is an <svg>.
+    // Logo: score all candidates in-page, screenshot the top picks, and keep
+    // the inline-SVG vector when a logo element is an <svg>.
     let logoColors: { hex: string; share: number }[] = [];
     let logoImage: string | null = null;
     let logoSvg: string | null = null;
+    const logoCandidates: CapturedLogoCandidate[] = [];
     try {
-      const picked = (await page.evaluate(PICK_LOGO_ELEMENT)) as {
-        tag: string;
-        score: number;
-        svg: string | null;
-        src: string | null;
-      } | null;
-      if (picked) {
-        logoSvg = picked.svg;
+      const picked = await evaluateSettled<{
+        picks: {
+          tag: string;
+          score: number;
+          svg: string | null;
+          src: string | null;
+          note: string;
+        }[];
+      } | null>(page, PICK_LOGO_ELEMENT);
+      const picks = picked?.picks ?? [];
+      const primary = picks[0] ?? null;
+      if (primary) {
+        logoSvg = primary.svg;
 
         // <img src="…"> logo: fetch the referenced file through the page's
         // browser context. An .svg file is the vector master (same value as
         // an inline <svg>); any raster file at natural resolution beats the
         // rendered-size element screenshot below.
-        if (!logoSvg && picked.src) {
+        if (!logoSvg && primary.src) {
           try {
-            const abs = new URL(picked.src, page.url()).href;
+            const abs = new URL(primary.src, page.url()).href;
             const resp = await page.request.get(abs, { timeout: 10_000 });
             if (resp.ok()) {
               const body = await resp.body();
@@ -605,10 +671,27 @@ export async function captureSite(
           }
         }
 
-        const logoEl = page.locator('[data-logos-pick="1"]').first();
-        const png = await logoEl.screenshot({ type: "png" });
-        if (logoColors.length === 0) logoColors = await dominantColors(png);
-        if (!logoImage) logoImage = await toLogoPng(png);
+        for (let i = 0; i < picks.length; i++) {
+          const el = page.locator(`[data-logos-pick="${i + 1}"]`).first();
+          let crop: string | null = null;
+          try {
+            const png = await el.screenshot({ type: "png" });
+            crop = await toLogoPng(png);
+            if (i === 0) {
+              if (logoColors.length === 0) logoColors = await dominantColors(png);
+              if (!logoImage) logoImage = crop;
+            }
+          } catch {
+            // element gone or zero-sized — keep the candidate without a crop
+          }
+          logoCandidates.push({
+            image: crop,
+            svg: picks[i].svg,
+            src: picks[i].src,
+            score: picks[i].score,
+            note: picks[i].note,
+          });
+        }
       }
     } catch {
       // logo detection is best-effort
@@ -659,6 +742,7 @@ export async function captureSite(
       evidence: rawToEvidence(raw, logoColors, pixels),
       logoImage,
       logoSvg,
+      logoCandidates,
       designTokens: {
         body_font: raw.tokens?.bodyFont ?? null,
         heading_font: raw.tokens?.headingFont ?? null,

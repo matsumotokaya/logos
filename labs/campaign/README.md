@@ -63,7 +63,8 @@ npm run campaign -- --name "MyApp" --desc "説明" --shots ./materials  # PDFや
 
 ```
 ソース（URL / PDF / 画像 / テキスト）
-   ▼ Stage 1: ingest（スクレイピング・og:image） + capture（Playwrightで実画面レンダリング・証拠収集・ロゴ画像・デザイントークン）
+   ▼ Stage 1: ingest（スクレイピング・og:image・HTMLが宣言するロゴ候補） + capture（Playwrightで実画面レンダリング・証拠収集・ロゴ候補上位3件・デザイントークン）
+   ▼ Stage 1c: logo（候補の列挙は決定論、選定はVLM裁定=候補からの選択のみ。lib/campaign/logo-resolve.ts）
    ▼ Stage 2: palette（CIELABクラスタリング → 証拠付きパレット候補）
    ▼ Stage 3: creative（VLM裁定=候補からの選択のみ + OpenAI gpt-5.6-luna structured outputs）
 Service Brand Kit
@@ -78,6 +79,8 @@ Service Brand Kit
 ```
 
 assets / design_tokens はLLM出力ではなく、パイプラインが決定論的にマージする（`CampaignBrandKit`型）。Brand Kitのフィールドセット自体の妥当性検証は [docs/deep-research-prompts.md](docs/deep-research-prompts.md) §7 のリサーチプロンプトを参照。
+
+**ロゴの決め方（Stage 1c、2026-09-03）**: 候補の列挙は決定論——captureのページ内スコアリング上位3件（クロップ+実ファイル参照）と、静的HTMLが自己申告するファイル（JSON-LDの`Organization.logo`・meta・alt/classに logo/ロゴ を持つ`<img>`・apple-touch-icon。`lib/campaign/ingest.ts` の `extractDeclaredLogos`）。候補が2件以上あれば VLM が**選ぶだけ**の裁定を行う（`adjudicateLogo`。「どれも自社ロゴではない」= none も言える。提携団体ロゴ・Pマーク等の認証マークを排除するのはこの段）。**Chromiumが無いホストでもHTML宣言側の候補だけで動く**ので、本番ランタイムでもロゴが取れる。captureが選んだ#1と裁定が一致しない場合は裁定が勝ち、パレット証拠の `logoColors` も勝者に追従する。
 
 設計原則: **LLMには閉じたスキーマのJSONだけを出力させ、見た目の品質はテンプレート側で担保する**。雑な入力でも壊れない。ロゴス本体の思想でいえば、Brand Kitのコピー/パレット生成は「探索」、レンダラーは「保証」に相当する。
 

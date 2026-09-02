@@ -20,6 +20,24 @@ export interface RawServiceInfo {
    * the visible body copy often names the service but not its operator. */
   footerText: string;
   organizationHints: string[];
+  /** Logo files the static HTML itself declares (JSON-LD, meta, header imgs).
+   * Works without a browser — the production runtime has no Chromium. */
+  logoCandidates: DeclaredLogo[];
+}
+
+export type DeclaredLogoSource =
+  | "json-ld"
+  | "meta-logo"
+  | "named-img"
+  | "header-img"
+  | "apple-touch-icon";
+
+export interface DeclaredLogo {
+  url: string;
+  source: DeclaredLogoSource;
+  alt: string | null;
+  /** One line of evidence for the adjudicator ("header <img> alt=..."). */
+  note: string;
 }
 
 const UA =
@@ -81,6 +99,8 @@ export async function scrapeUrl(url: string): Promise<RawServiceInfo> {
     .trim()
     .slice(0, 3000);
   const organizationHints = extractOrganizationHints($, footerText);
+  // Before the destructive cleanup below — JSON-LD lives in <script> tags.
+  const logoCandidates = extractDeclaredLogos($, base);
 
   $("script, style, noscript, svg, nav, footer").remove();
   const bodyText = $("body").text().replace(/\s+/g, " ").trim().slice(0, 8000);
@@ -97,7 +117,120 @@ export async function scrapeUrl(url: string): Promise<RawServiceInfo> {
     bodyText,
     footerText,
     organizationHints,
+    logoCandidates,
   };
+}
+
+// ---------- Declared logo candidates (static HTML, no browser) ----------
+
+const LOGO_WORD = /logo|ロゴ/i;
+
+/** Enumerate the logo files the HTML itself points at, most trustworthy first:
+ * JSON-LD / meta self-declarations, then imgs that say "logo" in alt/class/src,
+ * then any masthead img, then the apple-touch-icon. Deterministic — the pick
+ * among them is the adjudicator's job (lib/campaign/logo-resolve). */
+export function extractDeclaredLogos(
+  $: cheerio.CheerioAPI,
+  base: URL,
+): DeclaredLogo[] {
+  const out: DeclaredLogo[] = [];
+  const seen = new Set<string>();
+  const push = (
+    href: string | null | undefined,
+    source: DeclaredLogoSource,
+    alt: string | null,
+    note: string,
+  ) => {
+    const url = resolveMaybe(href ?? null, base);
+    if (!url || !/^https?:/i.test(url)) return; // data:/blob: stay out
+    if (seen.has(url)) return;
+    seen.add(url);
+    out.push({ url, source, alt, note });
+  };
+
+  // 1. JSON-LD: Organization.logo / publisher.logo (string, {url}, ImageObject).
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const raw = $(el).html();
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as unknown;
+      const roots = Array.isArray(parsed) ? parsed : [parsed];
+      const entries: unknown[] = [];
+      for (const root of roots) {
+        entries.push(root);
+        const graph = (root as Record<string, unknown> | null)?.["@graph"];
+        if (Array.isArray(graph)) entries.push(...graph);
+      }
+      for (const entry of entries) {
+        if (!entry || typeof entry !== "object") continue;
+        const value = entry as Record<string, unknown>;
+        const logo = value.logo ?? (value.publisher as Record<string, unknown> | undefined)?.logo;
+        const url =
+          typeof logo === "string"
+            ? logo
+            : logo && typeof logo === "object"
+              ? (logo as Record<string, unknown>).url
+              : null;
+        if (typeof url === "string")
+          push(url, "json-ld", null, "JSON-LD が logo として宣言");
+      }
+    } catch {
+      // Invalid JSON-LD is common and should not block page ingestion.
+    }
+  });
+
+  // 2. Meta / link self-declarations.
+  push(
+    $('meta[property="og:logo"]').attr("content") ??
+      $('meta[itemprop="logo"]').attr("content"),
+    "meta-logo",
+    null,
+    "meta が logo として宣言",
+  );
+  push($('link[rel="logo"]').attr("href"), "meta-logo", null, "link rel=logo");
+
+  // 3. <img> elements, in confidence order. Named ("logo" in alt/class/src)
+  //    beats merely sitting in the masthead.
+  $("img").each((_, el) => {
+    if (out.length >= 12) return;
+    const img = $(el);
+    const src = img.attr("src") ?? img.attr("data-src");
+    if (!src) return;
+    const alt = img.attr("alt") ?? "";
+    const cls = `${img.attr("class") ?? ""} ${img.attr("id") ?? ""}`;
+    const named =
+      LOGO_WORD.test(alt) || LOGO_WORD.test(cls) || LOGO_WORD.test(src);
+    const inMasthead =
+      img.parents("header, nav").length > 0 ||
+      img
+        .parents()
+        .toArray()
+        .some((a) =>
+          /header|masthead|navbar|logo|brand/i.test(
+            `${$(a).attr("class") ?? ""} ${$(a).attr("id") ?? ""}`,
+          ),
+        );
+    const note = `${inMasthead ? "ヘッダー" : "ページ内"}の<img>${alt.trim() ? ` alt="${alt.trim().slice(0, 60)}"` : ""}`;
+    if (named) push(src, "named-img", alt || null, note);
+    else if (inMasthead) push(src, "header-img", alt || null, note);
+  });
+
+  // 4. apple-touch-icon: nearly always a decodable PNG of the mark.
+  push(
+    $('link[rel="apple-touch-icon"]').first().attr("href"),
+    "apple-touch-icon",
+    null,
+    "apple-touch-icon",
+  );
+
+  const order: Record<DeclaredLogoSource, number> = {
+    "json-ld": 0,
+    "meta-logo": 1,
+    "named-img": 2,
+    "header-img": 3,
+    "apple-touch-icon": 4,
+  };
+  return out.sort((a, b) => order[a.source] - order[b.source]).slice(0, 6);
 }
 
 function extractOrganizationHints(

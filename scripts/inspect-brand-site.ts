@@ -62,6 +62,13 @@ async function main() {
       capture.screenshots.fullPage ? "○" : "×"
     } / mobile ${capture.screenshots.mobile ? "○" : "×"}`,
   );
+
+  console.log(`\nロゴ候補（実画面 ${capture.logoCandidates.length}件）`);
+  for (const c of capture.logoCandidates) {
+    console.log(
+      `  score ${c.score}  ${c.note}${c.svg ? "（SVG）" : ""}${c.src ? `\n    file: ${c.src}` : ""}`,
+    );
+  }
 }
 
 main().catch((error) => {

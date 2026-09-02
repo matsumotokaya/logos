@@ -7,6 +7,7 @@ import {
   screenshotHtml,
   type SiteCapture,
 } from "./capture";
+import { resolveLogo, type LogoResolution } from "./logo-resolve";
 import { buildPaletteCandidates, type PaletteCandidate } from "./palette";
 import {
   generateBrandKit,
@@ -57,6 +58,10 @@ export interface PipelineOptions {
   onDraft?: (kit: CampaignBrandKit) => void;
   /** Stage 4 self-verification (needs capture + Chromium). Default true. */
   verify?: boolean;
+  /** Stage 1b rendered-page capture. Default true; false reproduces hosts
+   *  without Chromium (the production runtime) — the static path must still
+   *  find the logo. */
+  capture?: boolean;
 }
 
 export interface LlmUsageSummary {
@@ -136,7 +141,9 @@ export async function runCampaignPipeline(
 
   // Stage 1b: rendered-page evidence (Playwright).
   let capture: SiteCapture | null = null;
-  if (input.url) {
+  if (input.url && opts.capture === false) {
+    progress("capture: 実画面レンダリングを無効化して実行（Chromiumなし相当の経路）", "warn");
+  } else if (input.url) {
     progress("capture: Chromiumで実画面をレンダリング中…");
     capture = await captureSite(raw?.url ?? input.url, { faviconUrl: raw?.faviconUrl });
     if (capture) {
@@ -178,6 +185,75 @@ export async function runCampaignPipeline(
         "warn"
       );
     }
+  }
+
+  // Stage 1c: logo resolution. Enumeration is deterministic (rendered-page
+  // picks + files the HTML declares); the pick among them is judgment, so a
+  // VLM chooses when more than one candidate exists (choose-only — it can
+  // select or say "none", never invent). Works without Chromium: on hosts
+  // where capture is unavailable the declared files alone are adjudicated.
+  let resolvedLogo: LogoResolution | null = null;
+  if (
+    input.url &&
+    ((capture?.logoCandidates.length ?? 0) > 0 ||
+      (raw?.logoCandidates.length ?? 0) > 0)
+  ) {
+    const captureCount = capture?.logoCandidates.length ?? 0;
+    const declaredCount = raw?.logoCandidates.length ?? 0;
+    progress(
+      `logo: ロゴ候補を照合中…（実画面${captureCount}件・HTML宣言${declaredCount}件）`
+    );
+    resolvedLogo = await resolveLogo({ raw, capture });
+    if (resolvedLogo?.kind === "logo") {
+      track(resolvedLogo.usage);
+      progress(
+        resolvedLogo.adjudicated
+          ? `logo: ${resolvedLogo.examined}候補から確定（${resolvedLogo.sourceLabel}${resolvedLogo.svg ? "・SVGベクター" : ""}）— ${resolvedLogo.rationale}${resolvedLogo.usage ? `（${formatUsage(resolvedLogo.usage)}）` : ""}`
+          : `logo: 候補1件を採用（${resolvedLogo.sourceLabel}${resolvedLogo.svg ? "・SVGベクター" : ""}）`,
+        "success"
+      );
+    } else if (resolvedLogo?.kind === "none") {
+      track(resolvedLogo.usage);
+      progress(
+        `logo: どの候補もこのサイト自身のロゴではないと判定（ワードマークで代替）— ${resolvedLogo.rationale}`,
+        "warn"
+      );
+    } else {
+      progress("logo: 候補ファイルを取得できませんでした", "warn");
+    }
+  }
+
+  // What the kit will carry as the mark. No resolution ran → the capture's
+  // own heuristic result (favicon fallback included) stands, as before.
+  const finalLogo = {
+    image:
+      resolvedLogo?.kind === "logo"
+        ? resolvedLogo.image
+        : resolvedLogo?.kind === "none"
+          ? null
+          : (capture?.logoImage ?? null),
+    svg:
+      resolvedLogo?.kind === "logo"
+        ? resolvedLogo.svg
+        : resolvedLogo?.kind === "none"
+          ? null
+          : (capture?.logoSvg ?? null),
+  };
+  // The palette stage reads logo colors from the capture evidence; when the
+  // adjudicator picked a different mark than the heuristic, the evidence
+  // follows the decision.
+  if (capture && resolvedLogo?.kind === "logo" && resolvedLogo.colors.length > 0) {
+    capture.evidence.logoColors = resolvedLogo.colors;
+  }
+  if (input.url && resolvedLogo) {
+    opts.onPartial?.({
+      logo: {
+        logo: finalLogo.image
+          ? { data: finalLogo.image, media_type: "image/png" }
+          : null,
+        logo_svg: finalLogo.svg ?? null,
+      },
+    });
   }
 
   // Stage 2: deterministic palette candidates (rendered evidence + og:image).
@@ -227,10 +303,10 @@ export async function runCampaignPipeline(
   const assets: BrandAssets | null =
     capture || raw
       ? {
-          logo: capture?.logoImage
-            ? { data: capture.logoImage, media_type: "image/png" }
+          logo: finalLogo.image
+            ? { data: finalLogo.image, media_type: "image/png" }
             : null,
-          logo_svg: capture?.logoSvg ?? null,
+          logo_svg: finalLogo.svg ?? null,
           favicon_url: raw?.faviconUrl ?? null,
           og_image_url: raw?.ogImage ?? null,
           source_url: raw?.url ?? input.url,
