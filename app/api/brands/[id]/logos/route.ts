@@ -4,6 +4,11 @@
 // sits under the same brand_organization as this brand".
 
 import { guardLabsRequest } from "@/lib/labs-access";
+import {
+  LOGO_PREVIEW_COLUMNS,
+  logoPreviewUrl,
+  type LogoPreviewCandidate,
+} from "@/lib/brand/logo-preview";
 import { createServerSupabaseForToken, requireUser } from "@/lib/supabase/server";
 
 export type LogoSummary = {
@@ -61,7 +66,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const { data: logos, error: logosError } = await supabase
     .from("logos")
     .select(
-      "id, title, role, visibility, subject_entity_id, logo_candidates(id, is_primary, svg, media_type, file_path)",
+      `id, title, role, visibility, subject_entity_id, logo_candidates(${LOGO_PREVIEW_COLUMNS})`,
     )
     .in("subject_entity_id", subjectIds)
     .order("created_at", { ascending: true });
@@ -71,22 +76,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const summaries: LogoSummary[] = await Promise.all(
     (logos ?? []).map(async (row) => {
-      const candidates = (row.logo_candidates ?? []) as Array<{
-        id: string;
-        is_primary: boolean;
-        svg: string | null;
-        media_type: string;
-        file_path: string | null;
-      }>;
-      const primary = candidates.find((c) => c.is_primary) ?? candidates[0];
-      let previewUrl: string | null = null;
-      if (primary) {
-        if (primary.svg) {
-          previewUrl = `data:image/svg+xml;base64,${Buffer.from(primary.svg, "utf8").toString("base64")}`;
-        } else if (primary.file_path && primary.media_type.startsWith("image/")) {
-          previewUrl = await logoPreviewSignedUrl(supabase, primary.file_path);
-        }
-      }
+      // Shared resolver (lib/brand/logo-preview): svg inline, raster from R2.
+      // This route used to sign against a Supabase Storage bucket that does
+      // not exist, so every raster (file_path) logo rendered as "no logo".
+      const previewUrl = await logoPreviewUrl(
+        (row.logo_candidates ?? []) as LogoPreviewCandidate[],
+      );
       return {
         id: row.id as string,
         title: row.title as string,
@@ -103,16 +98,4 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     brand: { id: brand.id, name: brand.name },
     logos: summaries,
   });
-}
-
-async function logoPreviewSignedUrl(
-  supabase: ReturnType<typeof createServerSupabaseForToken>,
-  filePath: string,
-): Promise<string | null> {
-  try {
-    const { data } = await supabase.storage.from("logos").createSignedUrl(filePath, 3600);
-    return data?.signedUrl ?? null;
-  } catch {
-    return null;
-  }
 }

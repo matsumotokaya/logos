@@ -69,6 +69,30 @@ function provisionalWordmark(name: string, color: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 320"><rect width="960" height="320" rx="24" fill="#fff"/><text x="480" y="178" text-anchor="middle" dominant-baseline="middle" fill="${xml(color)}" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="700">${label}</text></svg>`;
 }
 
+/** The captured vector master, script-stripped, or null when the kit has none. */
+function capturedLogoSvg(kit: CampaignBrandKit): string | null {
+  const svg = kit.assets?.logo_svg;
+  if (!svg || !svg.trim()) return null;
+  const clean = svg.replace(/<script[\s\S]*?<\/script>/gi, "");
+  return clean.length <= 300_000 ? clean : null;
+}
+
+/** What findOrCreateLogo would store as the master right now. */
+type CapturedMaster =
+  | { kind: "svg"; svg: string }
+  | { kind: "raster"; data: string; mediaType: string }
+  | null;
+
+function capturedMaster(kit: CampaignBrandKit, allowCaptured: boolean): CapturedMaster {
+  if (!allowCaptured) return null;
+  const svg = capturedLogoSvg(kit);
+  if (svg) return { kind: "svg", svg };
+  const raster = kit.assets?.logo;
+  if (raster && isR2Configured())
+    return { kind: "raster", data: raster.data, mediaType: raster.media_type };
+  return null;
+}
+
 async function ensureCorporateBrand(
   supabase: SupabaseClient,
   userId: string,
@@ -388,7 +412,18 @@ async function findOrCreateLogo(
         logo.subject_entity_id === target.corporateBrandId &&
         logo.role === "corporate",
     );
-  if (reusable) return reusable.id as string;
+  if (reusable) {
+    // A brand keeps its logo row across runs — but a placeholder wordmark from
+    // an earlier degraded run (no Chromium, no capture) must not survive a run
+    // that DID capture the real mark, or the brand looks permanently logoless.
+    await upgradeWordmarkFallback(
+      supabase,
+      userId,
+      reusable.id as string,
+      capturedMaster(kit, allowCaptured),
+    );
+    return reusable.id as string;
+  }
 
   const logoId = newLogoId();
   const candidateId = randomUUID();
@@ -396,14 +431,17 @@ async function findOrCreateLogo(
   let mediaType = "image/svg+xml";
   let svg: string | null = null;
 
-  const captured = allowCaptured ? kit.assets?.logo : null;
-  if (captured && isR2Configured()) {
+  const master = capturedMaster(kit, allowCaptured);
+  if (master?.kind === "svg") {
+    // The vector master is this product's currency — store it as-is.
+    svg = master.svg;
+  } else if (master?.kind === "raster") {
     filePath = `logos/${logoId}/candidates/${candidateId}/master.png`;
-    mediaType = captured.media_type;
+    mediaType = master.mediaType;
     await putR2Object(
       filePath,
-      Buffer.from(captured.data, "base64"),
-      captured.media_type,
+      Buffer.from(master.data, "base64"),
+      master.mediaType,
       "private, max-age=0",
     );
   } else {
@@ -442,7 +480,7 @@ async function findOrCreateLogo(
     source_url: kit.assets?.source_url ?? null,
     asset_status: "provisional",
     provenance: {
-      source: captured ? "site_capture" : "generated_wordmark_fallback",
+      source: master ? "site_capture" : "generated_wordmark_fallback",
       confirmed: false,
     },
   });
@@ -459,6 +497,64 @@ async function findOrCreateLogo(
     detail: { source: "brand_generation", asset_status: "provisional" },
   });
   return logoId;
+}
+
+/**
+ * Replace a generated-wordmark placeholder with the real captured mark.
+ *
+ * Only touches the primary candidate, and only while its provenance still says
+ * `generated_wordmark_fallback` — a candidate a person confirmed, replaced or
+ * that already came from the site is never overwritten by a later run.
+ */
+async function upgradeWordmarkFallback(
+  supabase: SupabaseClient,
+  userId: string,
+  logoId: string,
+  master: CapturedMaster,
+): Promise<void> {
+  if (!master) return;
+  const { data: candidates, error } = await supabase
+    .from("logo_candidates")
+    .select("id, is_primary, provenance, file_path")
+    .eq("logo_id", logoId);
+  throwOn(error);
+  const primary =
+    (candidates ?? []).find((c) => c.is_primary) ?? (candidates ?? [])[0];
+  const provenance = (primary?.provenance ?? null) as {
+    source?: string;
+  } | null;
+  if (!primary || provenance?.source !== "generated_wordmark_fallback") return;
+
+  let patch: Record<string, unknown>;
+  if (master.kind === "svg") {
+    patch = { svg: master.svg, media_type: "image/svg+xml", file_path: null };
+  } else {
+    const filePath = `logos/${logoId}/candidates/${primary.id}/master.png`;
+    await putR2Object(
+      filePath,
+      Buffer.from(master.data, "base64"),
+      master.mediaType,
+      "private, max-age=0",
+    );
+    patch = { svg: null, media_type: master.mediaType, file_path: filePath };
+  }
+  const update = await supabase
+    .from("logo_candidates")
+    .update({
+      ...patch,
+      label: "サイトから取得（仮）",
+      provenance: { source: "site_capture", confirmed: false },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", primary.id);
+  throwOn(update.error);
+
+  await supabase.from("logo_activities").insert({
+    logo_id: logoId,
+    user_id: userId,
+    action: "file_updated",
+    detail: { source: "brand_generation", replaced: "generated_wordmark_fallback" },
+  });
 }
 
 export async function persistCampaignCatalog({

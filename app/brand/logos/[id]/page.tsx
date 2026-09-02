@@ -51,6 +51,8 @@ import {
   transferLogoToOrg,
   type Organization,
 } from "@/lib/org";
+import { ensureSession, supabase } from "@/lib/supabase/client";
+import type { LogoMasterPreview } from "@/app/api/logos/[logoId]/master/route";
 import AppHeader from "@/components/AppHeader";
 
 // Nice classes are edited as free text ("9, 35, 42") and parsed on save.
@@ -164,6 +166,15 @@ export default function LogoInfoPage({
   );
   // Orgs the viewer can transfer this logo into (owner/admin roles).
   const [adminOrgs, setAdminOrgs] = useState<Organization[]>([]);
+  // Raster master (a captured PNG/JPEG in R2 — no svg on the candidate).
+  // R2 is server-only, so the preview data URI comes from the master API.
+  // Keyed by logo id so a stale preview never shows for another logo.
+  const [rasterMasterState, setRasterMasterState] = useState<{
+    forId: string;
+    data: LogoMasterPreview;
+  } | null>(null);
+  const rasterMaster =
+    rasterMasterState?.forId === id ? rasterMasterState.data : null;
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -204,6 +215,32 @@ export default function LogoInfoPage({
       cancelled = true;
     };
   }, [id]);
+
+  const hasVectorMaster = Boolean(logo?.data.svg?.trim());
+  useEffect(() => {
+    if (!hasSupabase || !logo || hasVectorMaster) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await ensureSession().catch(() => {});
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        const res = await fetch(`/api/logos/${id}/master`, {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const body = (await res.json()) as LogoMasterPreview;
+        if (!cancelled) setRasterMasterState({ forId: id, data: body });
+      } catch {
+        // Preview only — the rest of the page works without it.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, logo, hasVectorMaster]);
 
   const transfer = async (orgId: string) => {
     const target = adminOrgs.find((o) => o.id === orgId);
@@ -838,14 +875,29 @@ export default function LogoInfoPage({
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="flex aspect-[4/3] w-full max-w-60 items-center justify-center rounded-lg border border-gray-200 bg-[#F1F3F4] p-6">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={svgToDataUri(logo.data.svg)}
-                alt={logo.title}
-                className="max-h-full w-2/3 object-contain"
-              />
+              {hasVectorMaster || rasterMaster?.previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={
+                    hasVectorMaster
+                      ? svgToDataUri(logo.data.svg)
+                      : (rasterMaster?.previewUrl ?? undefined)
+                  }
+                  alt={logo.title}
+                  className="max-h-full w-2/3 object-contain"
+                />
+              ) : (
+                <p className="text-center text-xs text-gray-400">
+                  プレビューを読み込み中…
+                </p>
+              )}
             </div>
             <div className="flex flex-col items-start gap-3">
+              {!hasVectorMaster && (
+                <p className="text-pretty text-xs text-gray-500">
+                  サイトから取得したラスター画像です。SVGを差し替えるとベクター正本になり、プレゼンテーションを生成できます。
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
@@ -865,13 +917,25 @@ export default function LogoInfoPage({
                   e.target.value = "";
                 }}
               />
-              <a
-                href={svgToDataUri(logo.data.svg)}
-                download={`${logo.title}.svg`}
-                className="text-sm text-gray-900 underline underline-offset-2"
-              >
-                SVGをダウンロード
-              </a>
+              {hasVectorMaster ? (
+                <a
+                  href={svgToDataUri(logo.data.svg)}
+                  download={`${logo.title}.svg`}
+                  className="text-sm text-gray-900 underline underline-offset-2"
+                >
+                  SVGをダウンロード
+                </a>
+              ) : (
+                rasterMaster?.previewUrl && (
+                  <a
+                    href={rasterMaster.previewUrl}
+                    download={`${logo.title}.${rasterMaster.mediaType?.includes("jpeg") ? "jpg" : "png"}`}
+                    className="text-sm text-gray-900 underline underline-offset-2"
+                  >
+                    画像をダウンロード
+                  </a>
+                )
+              )}
               {fileError && (
                 <p
                   aria-live="polite"
