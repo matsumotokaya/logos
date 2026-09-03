@@ -713,7 +713,10 @@ $$;
 -- 7. Account deletion: brands are counted and removed per workspace org.
 -- ---------------------------------------------------------------------------
 
-create or replace function private.account_deleted_brand_ids(p_user_id uuid, p_org_ids uuid[])
+-- The parameter keeps its existing name: CREATE OR REPLACE cannot rename an
+-- input parameter, and renaming it would mean dropping the function and
+-- restoring its grants for no gain.
+create or replace function private.account_deleted_brand_ids(p_user_id uuid, p_deleted_org_ids uuid[])
 returns uuid[]
 language sql
 stable security definer
@@ -721,7 +724,7 @@ set search_path to ''
 as $$
   select coalesce(array_agg(brand.id), '{}'::uuid[])
   from public.brand_entities brand
-  where brand.organization_id = any(p_org_ids);
+  where brand.organization_id = any(p_deleted_org_ids);
 $$;
 
 create or replace function public.delete_user_account(p_user_id uuid)
