@@ -73,10 +73,10 @@ public.organizations ◄──┘
 
 public.handles(ユーザー/組織の共有名前空間 — 層2 URL用)
 
-public.organizations (管理ワークスペース)
-    └── linked_org_id / 権限管理
-        public.brand_entities (現実世界)
-            organization ── business ── audience
+public.organizations (ワークスペース = v3の唯一のOrganization)
+    └── organization_id / メンバーシップと権限
+        public.brand_entities (ブランドの自由ツリー)
+            parent_brand_id で任意にネスト。brand_kind はラベル
 ```
 
 ## 4. ロールと権限マトリクス

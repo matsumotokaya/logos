@@ -53,9 +53,9 @@ CanonicalSlot → Take
 - `media`
 - `event`
 
-Brandの親子関係は`parent_brand_id`で表し、同じOrganization内に限定する。企業Brandは親を持たず、`is_primary_brand`は企業Brandだけが使える。対象顧客別の差分は別Brandを乱造せず`brand_variants`に置く。
+Brandの親子関係は`parent_brand_id`で表し、**同じワークスペース内に限る**。禁止されるのは自己参照・循環・別ワークスペースへのネストだけで、カテゴリーは構造を縛らない(`enforce_brand_membership`)。対象顧客別の差分は別Brandを乱造せず`brand_variants`に置く。
 
-ロゴ、Knowledge、Work、Take、MaterialはすべてBrandへ属する。Organizationを成果物の直接所有者にしない。
+ロゴ、Knowledge、Take、MaterialはすべてBrandへ属する。ワークスペースを成果物の直接所有者にしない。
 
 ### 2.1 ブランドトップ(`/brands/[id]`)
 
@@ -73,9 +73,9 @@ Organization詳細ページにはロゴ・パレット・タイポ等のBrand Pr
 
 代表的な`field_path`は`identity.*`、`visual.*`、`voice.*`、`audience.*`、`offer.*`、`evidence.*`。Takeのbriefは必要なKnowledgeだけを作成時に投影し、その後は独立して編集できる。
 
-## 4. Work、Material、Take
+## 4. MaterialとTake
 
-MaterialのscopeはBrand、Work、Takeのいずれか。R2オブジェクトのchecksumとサイズを保存し、`take_inputs`がroleとchecksumを固定する。レンダー時に「現在のBrand素材」を再解決せず、Takeが固定した入力だけを使う。
+Materialのscopeは**BrandかTakeの2段**(Workはv3で廃止し、イベントは子Brandになった)。R2オブジェクトのchecksumとサイズを保存し、`take_inputs`がroleとchecksumを固定する。レンダー時に「現在のBrand素材」を再解決せず、Takeが固定した入力だけを使う。
 
 **ファイルと情報は別の軸で分類する**(正本は [asset-normalization.md §5](asset-normalization.md))。
 
@@ -157,11 +157,10 @@ HTML/MP4はR2が正本で、ローカルファイルを配信フォールバッ�
 
 event-promo は **Take と `take_inputs` がペアで作成される**設計になっているが、R2 / DB に実際の material が無い状態で `brief` の `event/<slug>/...` 相対パスだけを持っていると、レンダラーは画像を読み込めず失敗する。完成済み「世界が恋する日本酒」Take は R2 に 13件の material と最新MP4 artifact が揃っている。
 
-`/brands/[id]/video` の「＋動画を追加」で **同じブランドの既存 event-promo Take** を選ぶと、新規Takeは RPC `clone_event_promo_take(p_source_take_id, p_new_take_id, p_created_by, p_work_id)`(migration 0047)で以下を引き継ぐ。
+`/brands/[id]/video` の「＋動画を追加」で **同じブランドの既存 event-promo Take** を選ぶと、新規Takeは RPC `clone_event_promo_take(p_source_take_id, p_new_take_id, p_created_by)`(migration 0047、0056で`p_work_id`を削除)で以下を引き継ぐ。
 
 - `brief` をソースJSONそのまま上書き(`material:` URI はすでにDB参照形式になっている)
 - `take_inputs`(role / material_id / checksum)を1件ずつ insert、`on conflict (take_id, material_id, role) do update` で material を再利用
-- 任意の `work_id` を新Takeに付け替え
 
 POST `/api/brands/{id}/videos` の `templateTakeId` パラメータがこの経路を駆動する。`briefSlug`(bundled seed ブリーフ)は互換のため残し、サブセレクト「下敷きにする動画」で同じワークスペース内の既存 event-promo Takeが選べる。
 
@@ -218,4 +217,4 @@ Supabase作業では必ずproject ref `xhbdfzceyfrxsmaixkne`を照合する。DB
 
 V3切替(migration 0056)でブランド世界を全消しした。保全した閉包は無い——納品済みの「世界が恋する日本酒」はJSONの参照物として [labs/event/sake-2026/](../labs/event/sake-2026/README.md) に落としてある。
 
-R2の不要オブジェクト確認は`npm run v2:prune-r2`(既定でdry-run)。**全消し直後は過去の実体が孤児として残っている**ので、実行すると消える。
+R2の不要オブジェクト確認は`npm run r2:prune`(既定でdry-run)。バケットを走査してDBが指していないキーを消す。**`defaults/` は除外する**——効果音と既定素材はコードが参照していてDBに行が無く、消すと復元できない。
