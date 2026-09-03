@@ -8,7 +8,7 @@
 //
 // The blocking rules are not invented here. Postgres already refuses to delete
 // a container that still holds something (`on delete restrict` on
-// brand_entities.brand_organization_id, takes.brand_id, works.brand_id,
+// brand_entities.organization_id, takes.brand_id,
 // brand_materials.brand_id) and `delete_take` (migration 0031) refuses while a
 // publication is live. This module restates those same rules in Japanese so the
 // menu can say them *before* the request, and the server can say them again

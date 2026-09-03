@@ -44,7 +44,7 @@ export async function duplicateTake(
   const { data: source, error: sourceError } = await supabase
     .from("takes")
     .select(
-      "id, brand_id, tool_kind, template_id, title, brief, baked_brief, baked_at, work_id, variant_id",
+      "id, brand_id, tool_kind, template_id, title, brief, baked_brief, baked_at, variant_id",
     )
     .eq("id", input.takeId)
     .eq("brand_id", input.brandId)
@@ -78,7 +78,6 @@ export async function duplicateTake(
     templateId: source.template_id as string,
     title,
     brief: source.brief,
-    workId: (source.work_id as string | null) ?? null,
     variantId: (source.variant_id as string | null) ?? null,
     createdBy: input.createdBy,
   });

@@ -1,7 +1,7 @@
-// Logos owned by the brand_entity's organization — the brand's library, viewed
-// from a single brand. Logos are recorded with subject_entity_id pointing at
-// the brand_entity that owns them, so the list reads "logos whose subject
-// sits under the same brand_organization as this brand".
+// Logos in this brand's workspace — the library, viewed from a single brand.
+// Logos are recorded with subject_entity_id pointing at the brand that owns
+// them, so the list reads "logos whose subject sits in the same workspace as
+// this brand".
 
 import { guardLabsRequest } from "@/lib/labs-access";
 import {
@@ -38,7 +38,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const { data: brand, error: brandError } = await supabase
     .from("brand_entities")
-    .select("id, name, brand_organization_id")
+    .select("id, name, organization_id")
     .eq("id", brandId)
     .maybeSingle();
   if (brandError) {
@@ -54,7 +54,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const { data: siblings, error: siblingsError } = await supabase
     .from("brand_entities")
     .select("id, name")
-    .eq("brand_organization_id", brand.brand_organization_id);
+    .eq("organization_id", brand.organization_id);
   if (siblingsError) {
     return Response.json({ error: "ライブラリを読み込めませんでした" }, { status: 500 });
   }

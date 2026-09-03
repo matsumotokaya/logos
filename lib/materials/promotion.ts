@@ -1,7 +1,7 @@
 // What a material's scope may become, and what to say when it may not.
 //
 // docs/asset-normalization.md §12 / §14-5. The rules are not this module's
-// invention — they are migration 0028's promotion trigger and its two update
+// invention — they are migration 0056's promotion trigger and its two update
 // policies, stated in Japanese. The screen is not the authority; the server
 // checks the same things again, and the database refuses regardless.
 //
@@ -9,8 +9,8 @@
 // database, the same split lib/brand-tree-actions.ts and
 // lib/event-cm/panel-actions.ts already use.
 
-/** take → work → brand. Widening only; the trigger refuses every narrowing. */
-export const SCOPE_RANK = { take: 1, work: 2, brand: 3 } as const;
+/** take → brand. Widening only; the trigger refuses every narrowing. */
+export const SCOPE_RANK = { take: 1, brand: 2 } as const;
 
 export type MaterialScope = keyof typeof SCOPE_RANK;
 
@@ -29,7 +29,7 @@ export type PromotionDecision =
  * pointing at the material keeps working — but 「戻せます」 would be false.
  */
 export function promotionTo(
-  material: { scope: string; work_id?: string | null },
+  material: { scope: string },
   target: string,
 ): PromotionDecision {
   if (!isMaterialScope(material.scope)) {
@@ -57,13 +57,6 @@ export function promotionTo(
   if (to < from) {
     return { can: false, reason: "素材のスコープは広げることしかできません" };
   }
-  if (target === "work" && !material.work_id) {
-    return {
-      can: false,
-      reason: "この素材はどの案件にも属していないので、案件へは上げられません",
-    };
-  }
-
   return { can: true, from: material.scope, to: target };
 }
 

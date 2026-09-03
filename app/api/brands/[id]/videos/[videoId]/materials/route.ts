@@ -43,7 +43,7 @@ async function loadTake(
 ) {
   const { data, error } = await supabase
     .from("takes")
-    .select("id, work_id, template_id")
+    .select("id, template_id")
     .eq("id", videoId)
     .eq("brand_id", brandId)
     .eq("tool_kind", "video")

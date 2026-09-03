@@ -74,6 +74,38 @@ $$;
 
 revoke all on function private.ensure_personal_org(uuid) from public, anon, authenticated;
 
+-- The app's entry point: resolve the caller's workspace, creating their
+-- personal one on first use. Takes no argument on purpose — a user id
+-- parameter would let any caller create an org owned by someone else.
+create or replace function public.ensure_my_workspace()
+returns uuid
+language plpgsql
+security definer
+set search_path to ''
+as $$
+declare
+  existing_org_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated.' using errcode = '42501';
+  end if;
+  -- An org the caller already belongs to beats creating a second one.
+  select m.org_id into existing_org_id
+  from public.org_members m
+  join public.organizations o on o.org_id = m.org_id
+  where m.user_id = auth.uid()
+  order by o.is_personal desc, o.created_at
+  limit 1;
+  if existing_org_id is not null then
+    return existing_org_id;
+  end if;
+  return private.ensure_personal_org(auth.uid());
+end;
+$$;
+
+revoke all on function public.ensure_my_workspace() from public, anon;
+grant execute on function public.ensure_my_workspace() to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- 3. Brand tree: brands belong to a workspace org, parent freely inside it.
 -- ---------------------------------------------------------------------------
@@ -773,6 +805,9 @@ begin
   end if;
   if to_regprocedure('private.ensure_personal_org(uuid)') is null then
     raise exception 'v3 cutover incomplete: ensure_personal_org is missing.';
+  end if;
+  if to_regprocedure('public.ensure_my_workspace()') is null then
+    raise exception 'v3 cutover incomplete: ensure_my_workspace is missing.';
   end if;
 end;
 $$;

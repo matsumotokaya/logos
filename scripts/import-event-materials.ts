@@ -4,9 +4,10 @@
 //   npx tsx --env-file=.env.local scripts/import-event-materials.ts \
 //     --take <take UUID> [--dry-run]
 //
-// This is intentionally a one-off, explicit port rather than a general upload
-// API. It proves the v2 invariant that one Work-scoped material can feed more
-// than one Take while keeping every input immutable and checksum-pinned.
+// This is intentionally an explicit port rather than a general upload API.
+// Materials land at BRAND scope so every Take under that brand can pin them —
+// v3 retired Work, so an event is a child Brand and its drop belongs to it
+// (docs/deliverable-architecture.md §19.2).
 
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -50,7 +51,7 @@ const MATERIALS: readonly MaterialSpec[] = [
   { role: "event.bgm", relativePath: "bgm.mp3", kind: "audio", mediaType: "audio/mpeg" },
 ];
 
-type TakeRow = { id: string; brand_id: string; work_id: string | null; title: string; brief: EventBrief; created_by: string | null };
+type TakeRow = { id: string; brand_id: string; title: string; brief: EventBrief; created_by: string | null };
 type MaterialRow = { id: string; provenance: { legacy_path?: string } | null };
 
 async function main() {
@@ -60,7 +61,7 @@ async function main() {
   const supabase = createAdminSupabase();
   const { data, error } = await supabase
     .from("takes")
-    .select("id, brand_id, work_id, title, brief, created_by, template_id")
+    .select("id, brand_id, title, brief, created_by, template_id")
     .eq("id", takeId)
     .eq("template_id", "event-promo")
     .maybeSingle();
@@ -77,27 +78,11 @@ async function main() {
     return;
   }
 
-  let workId = take.work_id;
-  if (!workId) {
-    const { data: work, error: workError } = await supabase
-      .from("works")
-      .insert({ brand_id: take.brand_id, name: take.title, status: "active", created_by: take.created_by })
-      .select("id")
-      .single();
-    if (workError || !work) throw new Error(workError?.message ?? "Workを作成できませんでした");
-    workId = work.id as string;
-    const { error: takeError } = await supabase
-      .from("takes")
-      .update({ work_id: workId, updated_at: new Date().toISOString() })
-      .eq("id", take.id);
-    if (takeError) throw new Error(`TakeへWorkを結びつけられませんでした: ${takeError.message}`);
-  }
-
   const { data: existing, error: existingError } = await supabase
     .from("brand_materials")
     .select("id, provenance")
     .eq("brand_id", take.brand_id)
-    .eq("work_id", workId)
+    .eq("scope", "brand")
     .contains("provenance", PROVENANCE);
   if (existingError) throw new Error(`既存素材を読めませんでした: ${existingError.message}`);
   const existingByPath = new Map(
@@ -111,14 +96,13 @@ async function main() {
     const checksum = createHash("sha256").update(bytes).digest("hex");
     let materialId = existingByPath.get(spec.relativePath);
     if (!materialId) {
-      const key = `brands/${take.brand_id}/works/${workId}/materials/${checksum}/${path.basename(spec.relativePath)}`;
+      const key = `brands/${take.brand_id}/materials/${checksum}/${path.basename(spec.relativePath)}`;
       await putR2Object(key, bytes, spec.mediaType, "private, max-age=31536000, immutable");
       const { data: material, error: materialError } = await supabase
         .from("brand_materials")
         .insert({
-          scope: "work",
+          scope: "brand",
           brand_id: take.brand_id,
-          work_id: workId,
           kind: spec.kind,
           label: path.basename(spec.relativePath),
           media_type: spec.mediaType,
@@ -154,7 +138,7 @@ async function main() {
     .eq("id", take.id);
   if (briefError) throw new Error(`briefを素材参照へ更新できませんでした: ${briefError.message}`);
 
-  console.log(`work: ${workId}\nregistered: ${materialIds.size}\nbrief: material references pinned`);
+  console.log(`registered: ${materialIds.size}\nbrief: material references pinned`);
 }
 
 function replaceSources(brief: EventBrief, materialIds: ReadonlyMap<string, { id: string }>): EventBrief {

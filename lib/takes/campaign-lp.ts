@@ -6,20 +6,25 @@ import type { CampaignJob } from "@/lib/campaign/jobs";
 import { appendBrandKnowledgeClaims } from "@/lib/brand/knowledge";
 import { createTake } from "./create";
 import { renderTake } from "./render";
-import { ensureCanonicalPublication } from "./publication";
 
-/** Persist one URL-generated Kit into v2 without turning generated copy into facts. */
-export async function createPublishedCampaignLp(
+/**
+ * Persist one URL-generated Kit as an LP Take, without turning generated copy
+ * into facts and without publishing it.
+ *
+ * Generation is a switch, publication is always an explicit act (v3 §19.4).
+ * This used to call ensureCanonicalPublication, which made the LP the one
+ * deliverable that went live the moment it existed.
+ */
+export async function createCampaignLpTake(
   supabase: SupabaseClient,
   input: {
     userId: string;
     brandId: string;
-    workId?: string | null;
     job: CampaignJob;
     kit: CampaignBrandKit;
   },
 ): Promise<{ takeId: string; urlPath: string }> {
-  const { userId, brandId, workId, job, kit } = input;
+  const { userId, brandId, job, kit } = input;
   const sourceRef = { campaign_job_id: job.id, source_url: job.input.url };
   const claims = [
     ["offering.name", kit.service.name],
@@ -64,7 +69,6 @@ export async function createPublishedCampaignLp(
   } else {
     const created = await createTake(supabase, {
       brandId,
-      workId,
       templateId: "campaign-lp",
       createdBy: userId,
       idempotencyKey: `campaign-job:${job.id}`,
@@ -86,18 +90,16 @@ export async function createPublishedCampaignLp(
   }
 
   const runId = await ensureTakeRun(supabase, takeId, userId, job);
-  if (!workId) {
-    const appended = await appendBrandKnowledgeClaims(supabase, {
-      brandId,
-      fields: claims,
-      sourceKind: "llm_structuring",
-      sourceRef,
-      userId,
-      runId,
-    });
-    if (!appended.ok) {
-      throw new Error(`Knowledge claimを保存できませんでした: ${appended.error}`);
-    }
+  const appended = await appendBrandKnowledgeClaims(supabase, {
+    brandId,
+    fields: claims,
+    sourceKind: "llm_structuring",
+    sourceRef,
+    userId,
+    runId,
+  });
+  if (!appended.ok) {
+    throw new Error(`Knowledge claimを保存できませんでした: ${appended.error}`);
   }
   if (!renderId) throw new Error("LP Renderが作成されませんでした");
   if (!renderIsReady) {
@@ -105,14 +107,8 @@ export async function createPublishedCampaignLp(
     if (!rendered.ok) throw new Error(rendered.error);
   }
 
-  const publication = await ensureCanonicalPublication(supabase, {
-    takeId,
-    renderId,
-    userId,
-    metadata: { campaign_job_id: job.id },
-  });
-  if (!publication.ok) throw new Error(`LPを公開できませんでした: ${publication.error}`);
-  return { takeId, urlPath: publication.urlPath };
+  // The management path, not a live URL: nothing is published here.
+  return { takeId, urlPath: `/brands/${brandId}/lp/${takeId}` };
 }
 
 async function readRenderState(

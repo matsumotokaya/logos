@@ -3,7 +3,6 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { newLogoId } from "@/lib/id";
-import type { UrlRegistrationScope } from "@/lib/brand-registration";
 import { deleteR2Object, isR2Configured, putR2Object } from "@/lib/r2";
 import { createServerSupabaseForToken } from "@/lib/supabase/server";
 import {
@@ -12,16 +11,16 @@ import {
 } from "@/lib/brand/knowledge";
 import type { CampaignJob } from "./jobs";
 import type { CampaignBrandKit } from "./schema";
-import { resolveSubjectPlacement, type BrandKind } from "./classification";
+import { resolveSubjectCategory, type BrandKind } from "./classification";
 import {
   normalizedCatalogWebsite,
   organizationCatalogSeed,
 } from "./catalog-seed";
 
 export type CampaignCatalogLink = {
+  /** The workspace the brand was filed in. */
   organizationId: string;
   brandId: string;
-  workId: string | null;
   publishedLpTakeId?: string;
   publishedLpPath?: string;
   /** @deprecated Kept while local job records and older clients are upgraded. */
@@ -45,10 +44,8 @@ type PersistCatalogInput = {
 
 type BrandTarget = {
   organizationId: string;
-  corporateBrandId: string;
   brandId: string;
   brandKind: BrandKind;
-  placement: "brand" | "work";
 };
 
 function throwOn(error: { message: string } | null): void {
@@ -83,8 +80,7 @@ type CapturedMaster =
   | { kind: "raster"; data: string; mediaType: string }
   | null;
 
-function capturedMaster(kit: CampaignBrandKit, allowCaptured: boolean): CapturedMaster {
-  if (!allowCaptured) return null;
+function capturedMaster(kit: CampaignBrandKit): CapturedMaster {
   const svg = capturedLogoSvg(kit);
   if (svg) return { kind: "svg", svg };
   const raster = kit.assets?.logo;
@@ -93,227 +89,77 @@ function capturedMaster(kit: CampaignBrandKit, allowCaptured: boolean): Captured
   return null;
 }
 
-async function ensureCorporateBrand(
+/** The caller's workspace, created on first use (migration 0056). */
+async function resolveWorkspace(supabase: SupabaseClient): Promise<string> {
+  const { data, error } = await supabase.rpc("ensure_my_workspace");
+  throwOn(error);
+  const organizationId = (data as string | null) ?? null;
+  if (!organizationId) throw new Error("ワークスペースを解決できませんでした");
+  return organizationId;
+}
+
+/**
+ * File the generated subject as a Brand — always a new one.
+ *
+ * v2 matched an existing row by the name the LLM produced, so 「BEST株式会社」
+ * and 「BEST」 became two organizations while a vague guess could merge two
+ * unrelated sites. Identity is the id now (§19.3): registering a URL always
+ * yields one new Brand, and the entry point is what offers to update an
+ * existing one instead. `source_url` is recorded so it can make that offer.
+ */
+async function createBrand(
   supabase: SupabaseClient,
   userId: string,
   organizationId: string,
-  seed: ReturnType<typeof organizationCatalogSeed>,
+  kit: CampaignBrandKit,
   sourceUrl: string | null,
+  brandKind: BrandKind,
 ): Promise<string> {
-  const existing = await supabase
-    .from("brand_entities")
-    .select("id")
-    .eq("brand_organization_id", organizationId)
-    .eq("brand_kind", "corporate")
-    .eq("is_primary_brand", true)
-    .limit(1)
-    .maybeSingle();
-  throwOn(existing.error);
-  if (existing.data) return existing.data.id as string;
-
   const brandId = randomUUID();
   const inserted = await supabase.from("brand_entities").insert({
     id: brandId,
-    name: seed.name,
-    website: seed.website,
-    description: seed.description,
-    status: "inferred",
-    source_kind: sourceUrl ? "scraped" : "uploaded",
-    provenance: {
-      system_key: "primary_corporate_brand",
-      organization_id: organizationId,
-    },
-    created_by: userId,
-    brand_organization_id: organizationId,
-    brand_kind: "corporate",
-    is_primary_brand: true,
-  });
-  throwOn(inserted.error);
-  return brandId;
-}
-
-async function findOrCreateOrganization(
-  supabase: SupabaseClient,
-  userId: string,
-  kit: CampaignBrandKit,
-  sourceUrl: string | null,
-  registrationScope: UrlRegistrationScope,
-): Promise<{ organizationId: string; corporateBrandId: string }> {
-  const inferred = kit.organization;
-  const seed = organizationCatalogSeed(kit, sourceUrl, registrationScope);
-  const existing = await supabase
-    .from("brand_organizations")
-    .select("id")
-    .eq("created_by", userId)
-    .eq("name", seed.name)
-    .limit(1)
-    .maybeSingle();
-  throwOn(existing.error);
-
-  const organizationId =
-    (existing.data?.id as string | undefined) ?? randomUUID();
-  if (!existing.data) {
-    const inserted = await supabase.from("brand_organizations").insert({
-      id: organizationId,
-      name: seed.name,
-      organization_kind: seed.organizationKind,
-      website: seed.website,
-      description: seed.description,
-      status: "inferred",
-      source_kind: sourceUrl ? "scraped" : "uploaded",
-      provenance: {
-        name: {
-          source:
-            seed.nameSource === "page_classification"
-              ? "user_classified_page"
-              : sourceUrl
-                ? "scraped_inferred"
-                : "uploaded_inferred",
-          confidence:
-            seed.nameSource === "page_classification"
-              ? "medium"
-              : (inferred?.confidence ?? "low"),
-          evidence: inferred?.evidence ?? null,
-        },
-        website: { source: sourceUrl ? "source_url" : "unknown" },
-      },
-      created_by: userId,
-    });
-    throwOn(inserted.error);
-  }
-
-  return {
-    organizationId,
-    corporateBrandId: await ensureCorporateBrand(
-      supabase,
-      userId,
-      organizationId,
-      seed,
-      sourceUrl,
-    ),
-  };
-}
-
-async function findOrCreateBrand(
-  supabase: SupabaseClient,
-  userId: string,
-  organizationId: string,
-  corporateBrandId: string,
-  kit: CampaignBrandKit,
-  sourceUrl: string | null,
-  brandKind: Exclude<BrandKind, "corporate">,
-): Promise<string> {
-  const existing = await supabase
-    .from("brand_entities")
-    .select("id")
-    .eq("created_by", userId)
-    .eq("brand_organization_id", organizationId)
-    .eq("brand_kind", brandKind)
-    .eq("name", kit.service.name)
-    .limit(1)
-    .maybeSingle();
-  throwOn(existing.error);
-  if (existing.data) return existing.data.id as string;
-
-  const brandId = randomUUID();
-  const inserted = await supabase.from("brand_entities").insert({
-    id: brandId,
-    name: kit.service.name,
+    name: kit.service.name || kit.organization?.name || "名称未設定のブランド",
     website: normalizedCatalogWebsite(kit.service.url ?? sourceUrl),
     industry: kit.service.industry,
     description: kit.service.description,
     status: "inferred",
     source_kind: sourceUrl ? "scraped" : "uploaded",
+    source_url: normalizedCatalogWebsite(sourceUrl) || null,
     provenance: {
       name: { source: "generation_brand_kit", confidence: "medium" },
       description: { source: "generation_brand_kit", confidence: "medium" },
-      parent_brand_id: {
-        source: "organization_primary_brand",
-        confidence: kit.organization?.confidence ?? "low",
+      brand_kind: {
+        source: "generation_classification",
+        confidence: kit.classification?.confidence ?? "low",
       },
     },
     created_by: userId,
-    brand_organization_id: organizationId,
+    organization_id: organizationId,
     brand_kind: brandKind,
-    parent_brand_id: corporateBrandId,
   });
   throwOn(inserted.error);
   return brandId;
 }
 
+/** The Brand the user picked in the entry form, when they picked one. */
 async function selectedBrandTarget(
   supabase: SupabaseClient,
   brandId: string,
-  placement: "brand" | "work",
 ): Promise<BrandTarget> {
   const selected = await supabase
     .from("brand_entities")
-    .select("id, brand_organization_id, brand_kind")
+    .select("id, organization_id, brand_kind")
     .eq("id", brandId)
-    .in("brand_kind", [
-      "corporate",
-      "business",
-      "service",
-      "product",
-      "media",
-      "event",
-    ])
     .maybeSingle();
   throwOn(selected.error);
-  if (!selected.data?.brand_organization_id || !selected.data.brand_kind) {
+  if (!selected.data?.organization_id) {
     throw new Error("選択したブランドを確認できませんでした");
   }
-
-  const corporate = await supabase
-    .from("brand_entities")
-    .select("id")
-    .eq("brand_organization_id", selected.data.brand_organization_id)
-    .eq("brand_kind", "corporate")
-    .eq("is_primary_brand", true)
-    .limit(1)
-    .maybeSingle();
-  throwOn(corporate.error);
-  if (!corporate.data) {
-    throw new Error("企業ブランドを確認できませんでした");
-  }
-
   return {
-    organizationId: selected.data.brand_organization_id as string,
-    corporateBrandId: corporate.data.id as string,
+    organizationId: selected.data.organization_id as string,
     brandId: selected.data.id as string,
-    brandKind: selected.data.brand_kind as BrandTarget["brandKind"],
-    placement,
+    brandKind: (selected.data.brand_kind as BrandKind | null) ?? "business",
   };
-}
-
-async function findOrCreateWork(
-  supabase: SupabaseClient,
-  userId: string,
-  brandId: string,
-  job: CampaignJob,
-  kit: CampaignBrandKit,
-): Promise<string> {
-  const existing = await supabase
-    .from("works")
-    .select("id")
-    .eq("brand_id", brandId)
-    .eq("created_by", userId)
-    .eq("name", kit.service.name)
-    .limit(1)
-    .maybeSingle();
-  throwOn(existing.error);
-  if (existing.data) return existing.data.id as string;
-
-  const workId = randomUUID();
-  const inserted = await supabase.from("works").insert({
-    id: workId,
-    brand_id: brandId,
-    name: kit.service.name || `生成 ${job.id.slice(0, 8)}`,
-    status: "active",
-    created_by: userId,
-  });
-  throwOn(inserted.error);
-  return workId;
 }
 
 async function saveCatalogKnowledge(
@@ -355,37 +201,30 @@ async function saveCatalogKnowledge(
     { field_path: "tone.theme", layer: "expression", value: kit.theme, confidence: "suggested" },
   ];
 
-  const factsByBrand = new Map<string, AppendKnowledgeField[]>();
-  factsByBrand.set(target.corporateBrandId, organizationFields);
-  if (target.placement !== "work") {
-    factsByBrand.set(target.brandId, [
-      ...(factsByBrand.get(target.brandId) ?? []),
-      ...serviceFields,
-    ]);
-  }
-  for (const [brandId, fields] of factsByBrand) {
-    const result = await appendBrandKnowledgeClaims(supabase, {
-      brandId,
-      fields,
-      sourceKind: "llm_structuring",
-      sourceRef,
-      userId,
-    });
-    if (!result.ok) throw new Error(result.error);
-  }
-  if (target.placement !== "work") {
-    const result = await appendBrandKnowledgeClaims(supabase, {
-      brandId: target.brandId,
-      fields: expressionFields,
-      sourceKind:
-        kit.brand.palette_source === "extracted"
-          ? "url_extraction"
-          : "llm_generation",
-      sourceRef,
-      userId,
-    });
-    if (!result.ok) throw new Error(result.error);
-  }
+  // One Brand carries both: the operator facts describe who runs it, and in
+  // v3 there is no separate corporate Brand to hang them on. They stay claims
+  // rather than becoming the workspace's identity — the workspace is the
+  // user's container, not the scraped company (§19.2).
+  const facts = await appendBrandKnowledgeClaims(supabase, {
+    brandId: target.brandId,
+    fields: [...organizationFields, ...serviceFields],
+    sourceKind: "llm_structuring",
+    sourceRef,
+    userId,
+  });
+  if (!facts.ok) throw new Error(facts.error);
+
+  const expression = await appendBrandKnowledgeClaims(supabase, {
+    brandId: target.brandId,
+    fields: expressionFields,
+    sourceKind:
+      kit.brand.palette_source === "extracted"
+        ? "url_extraction"
+        : "llm_generation",
+    sourceRef,
+    userId,
+  });
+  if (!expression.ok) throw new Error(expression.error);
 }
 
 async function findOrCreateLogo(
@@ -393,36 +232,28 @@ async function findOrCreateLogo(
   userId: string,
   target: BrandTarget,
   kit: CampaignBrandKit,
-  allowCaptured = true,
 ): Promise<string> {
-  const subjectIds = Array.from(
-    new Set([target.brandId, target.corporateBrandId]),
-  );
+  // A freshly created Brand has no logo; a Brand the user picked may already
+  // have one, and re-registering into it must not add a second.
   const existing = await supabase
     .from("logos")
-    .select("id, subject_entity_id, role")
-    .in("subject_entity_id", subjectIds)
+    .select("id")
+    .eq("subject_entity_id", target.brandId)
     .order("created_at", { ascending: true })
-    .limit(20);
+    .limit(1)
+    .maybeSingle();
   throwOn(existing.error);
-  const reusable =
-    existing.data?.find((logo) => logo.subject_entity_id === target.brandId) ??
-    existing.data?.find(
-      (logo) =>
-        logo.subject_entity_id === target.corporateBrandId &&
-        logo.role === "corporate",
-    );
-  if (reusable) {
-    // A brand keeps its logo row across runs — but a placeholder wordmark from
-    // an earlier degraded run (no Chromium, no capture) must not survive a run
-    // that DID capture the real mark, or the brand looks permanently logoless.
+  if (existing.data) {
+    // A placeholder wordmark from an earlier degraded run (no Chromium, no
+    // capture) must not survive a run that DID capture the real mark, or the
+    // brand looks permanently logoless.
     await upgradeWordmarkFallback(
       supabase,
       userId,
-      reusable.id as string,
-      capturedMaster(kit, allowCaptured),
+      existing.data.id as string,
+      capturedMaster(kit),
     );
-    return reusable.id as string;
+    return existing.data.id as string;
   }
 
   const logoId = newLogoId();
@@ -431,7 +262,7 @@ async function findOrCreateLogo(
   let mediaType = "image/svg+xml";
   let svg: string | null = null;
 
-  const master = capturedMaster(kit, allowCaptured);
+  const master = capturedMaster(kit);
   if (master?.kind === "svg") {
     // The vector master is this product's currency — store it as-is.
     svg = master.svg;
@@ -446,7 +277,7 @@ async function findOrCreateLogo(
     );
   } else {
     svg = provisionalWordmark(
-      target.brandKind === "corporate"
+      target.brandKind === "corporate" || target.brandKind === "organization"
         ? (kit.organization?.name ?? kit.service.name)
         : kit.service.name,
       kit.brand.primary,
@@ -460,10 +291,13 @@ async function findOrCreateLogo(
     updated_by: userId,
     subject_entity_id: target.brandId,
     title:
-      target.brandKind === "corporate"
+      target.brandKind === "corporate" || target.brandKind === "organization"
         ? (kit.organization?.name ?? kit.service.name)
         : kit.service.name,
-    role: target.brandKind === "corporate" ? "corporate" : "service",
+    role:
+      target.brandKind === "corporate" || target.brandKind === "organization"
+        ? "corporate"
+        : "service",
     logo_type: "combination",
     visibility: "draft",
   });
@@ -565,63 +399,39 @@ export async function persistCampaignCatalog({
 }: PersistCatalogInput): Promise<CampaignCatalogLink> {
   const supabase = createServerSupabaseForToken(accessToken);
   const sourceUrl = job.input.url;
-  const classification = resolveSubjectPlacement(
+  const category = resolveSubjectCategory(
     kit.classification,
     job.input.registrationScope,
   );
-  const registrationScope: UrlRegistrationScope =
-    classification.brandKind === "corporate" ? "organization" : "business";
 
-  let target: BrandTarget;
-  if (job.input.brandEntityId) {
-    target = await selectedBrandTarget(
-      supabase,
-      job.input.brandEntityId,
-      classification.placement,
-    );
-  } else {
-    const base = await findOrCreateOrganization(
-      supabase,
-      userId,
-      kit,
-      sourceUrl,
-      registrationScope,
-    );
-    const useCorporateBrand =
-      classification.brandKind === "corporate" ||
-      classification.placement === "work";
-    const brandId = useCorporateBrand
-      ? base.corporateBrandId
-      : await findOrCreateBrand(
-          supabase,
-          userId,
-          base.organizationId,
-          base.corporateBrandId,
-          kit,
-          sourceUrl,
-          classification.brandKind as Exclude<BrandKind, "corporate">,
-        );
-    target = {
-      ...base,
-      brandId,
-      brandKind: useCorporateBrand ? "corporate" : classification.brandKind,
-      placement: classification.placement,
-    };
-  }
+  // Either the user pointed at a Brand they already have, or this registration
+  // makes a new one. There is no third path that guesses which existing row
+  // this "really" is (§19.3).
+  const target: BrandTarget = job.input.brandEntityId
+    ? await selectedBrandTarget(supabase, job.input.brandEntityId)
+    : await (async () => {
+        const organizationId = await resolveWorkspace(supabase);
+        return {
+          organizationId,
+          brandId: await createBrand(
+            supabase,
+            userId,
+            organizationId,
+            kit,
+            sourceUrl,
+            category.brandKind,
+          ),
+          brandKind: category.brandKind,
+        };
+      })();
 
-  const isWork = target.placement === "work";
   await saveCatalogKnowledge(supabase, userId, target, job, kit);
-
-  const workId = isWork
-    ? await findOrCreateWork(supabase, userId, target.brandId, job, kit)
-    : null;
-  const logoId = await findOrCreateLogo(supabase, userId, target, kit, !isWork);
+  const logoId = await findOrCreateLogo(supabase, userId, target, kit);
   const now = new Date().toISOString();
 
   return {
     organizationId: target.organizationId,
     brandId: target.brandId,
-    workId,
     businessId: target.brandId,
     campaignId: job.id,
     logoId,

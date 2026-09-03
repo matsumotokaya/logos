@@ -15,11 +15,10 @@ export async function ensureProductCmTake(
   if (!input.job.kit) throw new Error("Product CMのBrand Kitがありません");
 
   let brandId = input.brandId ?? null;
-  let workId: string | null = input.job.catalog?.workId ?? null;
   if (!brandId) {
     const { data: lpTake, error } = await supabase
       .from("takes")
-      .select("brand_id, work_id")
+      .select("brand_id")
       .eq("template_id", "campaign-lp")
       .contains("brief", { campaignJobId: input.job.id })
       .order("created_at", { ascending: false })
@@ -27,13 +26,11 @@ export async function ensureProductCmTake(
       .maybeSingle();
     if (error) throw new Error(`LP Takeを確認できませんでした: ${error.message}`);
     brandId = (lpTake?.brand_id as string | undefined) ?? input.job.catalog?.brandId ?? null;
-    workId = (lpTake?.work_id as string | null | undefined) ?? workId;
   }
   if (!brandId) throw new Error("Product CMを所属させるBrandがありません");
 
   const created = await createTake(supabase, {
     brandId,
-    workId,
     templateId: "product-cm",
     createdBy: input.userId,
     idempotencyKey: `product-cm-job:${input.job.id}`,

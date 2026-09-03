@@ -83,7 +83,7 @@ export async function PATCH(
   // for the wrong thing.
   const current = await supabase
     .from("brand_materials")
-    .select("id, scope, work_id")
+    .select("id, scope")
     .eq("id", materialId)
     .eq("brand_id", brandId)
     .maybeSingle();
