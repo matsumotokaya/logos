@@ -12,16 +12,14 @@
 
 ## 現在の状態
 
-- **URL→ロゴ取得を再設計した（2026-09-03）**。原因は取得ではなく表示だった: ロゴ一覧APIが存在しないSupabase Storageバケットに署名していて、R2にあるPNGロゴが常にnullになっていた。共有ヘルパー（lib/brand/logo-preview.ts）へ統一済み。あわせてStage 1c（ロゴ候補の決定論列挙+VLM裁定、lib/campaign/logo-resolve.ts）を追加し、Chromiumが無い本番でもHTML宣言からロゴが取れる。best24.co.jpでcapture有り/無し両経路とも実証済み（詳細は labs/campaign/README.md §2）
-- ロゴ詳細ページはラスターマスターを表示できる（/api/logos/[id]/master 新設）。SVG差し替えが正本化の導線
-- catalog: 仮ワードマークで作られた既存ロゴは、次の成功した生成で実ロゴに昇格する（upgradeWordmarkFallback）。**この昇格はまだ実運用で未確認**
+- **v3エンティティモデルを決定・正本化した（2026-09-03）**: Organization=ワークスペース（brand_organizations廃止）、Brand単一エンティティの自由ツリー、Work廃止、同一性はIDのみ・更新は「再取り込み」で明示、生成=スイッチ/公開=明示。**正本は docs/deliverable-architecture.md §19**。実装は未着手。実験データは全消しでよい（依頼者合意）
+- URL→ロゴ取得は再設計済み（同日）: 表示バグ修正+Stage 1c（候補列挙+VLM裁定、Chromium無しでも動く）。best24.co.jpで両経路実証済み。依頼者がUIでロゴ表示を確認済み
 - イベント紹介動画(event-cm): `sumi` は承認済み。`standard` は**静止画しか確認していない**
-- 入っているデータはすべてサンプル。既存 Take の整合やバックフィルは不要
 
 ## 次の作業
 
-1. **ロゴ取得の結果をUIで確認する**（依頼主が確認予定）: トップ`/`からbest24.co.jp等を生成→ /brands のロゴ一覧・ロゴ詳細でロゴが表示されること
-2. **`standard` を1本通しで焼いて、映像の良し悪しを見る**。`npm run event-cm:walkthrough`（LLM と TTS を呼ぶので課金あり）
+1. **v3実装のフェーズ1**: v3スキーマのmigrationドラフト→依頼者レビュー→承認後に適用（§19.6の順。リモートDB書き込みは毎回明示承認）
+2. `standard` を1本通しで焼いて、映像の良し悪しを見る。`npm run event-cm:walkthrough`（LLM と TTS を呼ぶので課金あり）
 
 ## 判断待ち
 
