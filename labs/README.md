@@ -67,7 +67,7 @@
 | [Workflow Lab](workflow/README.md) | `/labs/workflow` | 保証 | ✅ 稼働中(Phase 1) | 決定論的合成+プロツール連携(旧称 Image Lab。旧URL `/labs/image` はリダイレクト) |
 | [Generative Lab](generative/README.md) | `/labs/generative` | 探索 | ✅ 稼働中(Phase E1) | 生成AIハーネス: 3エンジン・表現テンプレート・ダイヤル4軸・逸脱スコアボード・ショートビデオ |
 | [Campaign Lab](campaign/README.md) | `/campaigns` へ卒業(旧URLはリダイレクト) | 統合 | 🎓 卒業(2026-07-20) | 複数ソース → Service Brand Kit → セールスページ。30秒CM動画は `/campaigns` 上で開発継続 |
-| Event PV | `/labs/event`(正規の置き場所は `/brands/[id]/video/[videoId]`) | 統合 | ✅ 稼働中(v1) | イベント・セミナー軸の30秒PV。ナレーションなし・BGMとタイポで成立させ、**素材ゼロでも完成品が出る**ことを要件にしたテンプレート。詳細は[ルートREADMEの「イベントPVテンプレート」](../README.md#イベントpvテンプレートevent-promo) |
+| Event PV | `/labs/event`(正規の置き場所は `/brands/[id]/video/[videoId]`) | 統合 | ✅ 稼働中(v1) | イベント・セミナー軸の30秒PV。ナレーションなし・BGMとタイポで成立させ、**素材ゼロでも完成品が出る**ことを要件にしたテンプレート。詳細は[ルートREADMEの「イベントPVテンプレート」](../README.md#イベントpvテンプレートevent-promo)。**納品済みイベントの参照物は [event/sake-2026/](event/sake-2026/README.md)** — 次のイベントはここのブリーフと素材割り当てを写して作る |
 | [Freehand Lab](freehand/README.md) | —(画面を持たない) | 探索 | ✅ 稼働中(1本目 `sake-2026` の Phase B を持ち帰り済み) | テンプレートの制約を外して1本作り、**差分から要件を取る**。言葉・BGM・構成はそのままで、**デザインとアニメーションと素材の使い方だけ**を作り直す。持ち帰り方は現物を見てから決める(成果: event-cm =「イベント紹介動画 - モダンジャパニーズ」) |
 
 ## ディレクトリ構成

@@ -1,0 +1,1460 @@
+[
+  {
+    "take": {
+      "id": "844e6245-5fd6-4dd5-91b1-e100f30410b9",
+      "title": "金融教育を、じっくり考える夜",
+      "tool_kind": "video",
+      "template_id": "event-cm",
+      "template_version": 1,
+      "brief_schema_version": 1,
+      "status": "ready",
+      "created_at": "2026-08-29T16:29:16.408945+00:00"
+    },
+    "brief": {
+      "bgm": "defaults/bgm/shine-through-tokyo.mp3",
+      "cta": "詳細・お申し込みはこちら",
+      "logos": [
+        {
+          "src": {
+            "$material": "0effe5bc-acea-4e6b-8ab4-d7bd4b57bcec",
+            "label": "WealthPark Lab.svg",
+            "repoPath": null,
+            "inGit": false
+          },
+          "name": "WealthPark Lab"
+        }
+      ],
+      "theme": {
+        "palette": {
+          "text": "#000000",
+          "primary": "#080808",
+          "background": "#ffffff"
+        },
+        "bodyFont": "Zen Kaku Gothic New",
+        "headingFont": "Zen Kaku Gothic New"
+      },
+      "title": "金融教育を、じっくり考える夜",
+      "voice": {
+        "audio": {
+          "$material": "2a6feaa9-42aa-423d-b678-1d09bff0da3d",
+          "label": "イベント紹介動画のボイス",
+          "repoPath": null,
+          "inGit": false
+        },
+        "track": {
+          "mock": false,
+          "voice": "Puck",
+          "scenes": [
+            {
+              "role": "title",
+              "text": "金融教育を、じっくり考える夜。トークシリーズです。",
+              "startMs": 0,
+              "durationMs": 4440
+            },
+            {
+              "role": "value",
+              "text": "数字の向こう側にある、判断の根拠を持ち帰る。少人数で、深く考える夜です。",
+              "startMs": 5340,
+              "durationMs": 7400
+            },
+            {
+              "role": "program",
+              "text": "三つのプログラムで、判断の根を考えます。お金の歴史。貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+              "index": 0,
+              "startMs": 13640,
+              "durationMs": 11280
+            },
+            {
+              "role": "program",
+              "text": "そもそも投資とは何か。投機や賭けと何が違うのか、判断の基準になる考え方を整理します。",
+              "index": 1,
+              "startMs": 25820,
+              "durationMs": 7440
+            },
+            {
+              "role": "program",
+              "text": "投資の種類。株式、不動産、債券、金。それぞれが何に賭けているのかを並べて見ます。",
+              "index": 2,
+              "startMs": 34160,
+              "durationMs": 8560
+            },
+            {
+              "role": "guests",
+              "text": "山田太郎さん。経営者の視点で、投資を深く考えます。",
+              "startMs": 43620,
+              "durationMs": 5200
+            },
+            {
+              "role": "cta",
+              "text": "10月2日、金曜日、夜7時スタート。詳細・お申し込みはこちら。",
+              "startMs": 49720,
+              "durationMs": 6040
+            }
+          ],
+          "totalMs": 56260,
+          "version": 1,
+          "captions": [
+            {
+              "text": "金融教育を、じっくり考える夜。",
+              "endMs": 2664,
+              "startMs": 0
+            },
+            {
+              "text": "トークシリーズです。",
+              "endMs": 5340,
+              "startMs": 2664
+            },
+            {
+              "text": "数字の向こう側にある、判断の根拠を持ち帰る。",
+              "endMs": 9745,
+              "startMs": 5340
+            },
+            {
+              "text": "少人数で、深く考える夜です。",
+              "endMs": 13640,
+              "startMs": 9745
+            },
+            {
+              "text": "三つのプログラムで、判断の根を考えます。",
+              "endMs": 17099,
+              "startMs": 13640
+            },
+            {
+              "text": "お金の歴史。",
+              "endMs": 18302,
+              "startMs": 17099
+            },
+            {
+              "text": "貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+              "endMs": 25820,
+              "startMs": 18302
+            },
+            {
+              "text": "そもそも投資とは何か。",
+              "endMs": 27878,
+              "startMs": 25820
+            },
+            {
+              "text": "投機や賭けと何が違うのか、判断の基準になる考え方を整理します。",
+              "endMs": 34160,
+              "startMs": 27878
+            },
+            {
+              "text": "投資の種類。",
+              "endMs": 35558,
+              "startMs": 34160
+            },
+            {
+              "text": "株式、不動産、債券、金。",
+              "endMs": 38528,
+              "startMs": 35558
+            },
+            {
+              "text": "それぞれが何に賭けているのかを並べて見ます。",
+              "endMs": 43620,
+              "startMs": 38528
+            },
+            {
+              "text": "山田太郎さん。",
+              "endMs": 45180,
+              "startMs": 43620
+            },
+            {
+              "text": "経営者の視点で、投資を深く考えます。",
+              "endMs": 49720,
+              "startMs": 45180
+            },
+            {
+              "text": "10月2日、金曜日、夜7時スタート。",
+              "endMs": 53311,
+              "startMs": 49720
+            },
+            {
+              "text": "詳細・お申し込みはこちら。",
+              "endMs": 56260,
+              "startMs": 53311
+            }
+          ],
+          "provider": "gemini",
+          "sampleRate": 24000,
+          "generatedAt": "2026-08-29T17:45:36.069Z"
+        }
+      },
+      "guests": [
+        {
+          "name": "山田太郎",
+          "role": "株式会社サンプル\n代表取締役CEO",
+          "photo": {
+            "src": "defaults/portraits/light-02-navy-knit.jpg"
+          }
+        },
+        {
+          "name": "山田花子",
+          "role": "WealthPark Lab\n広報",
+          "photo": {
+            "src": "defaults/portraits/light-03-grey-cardigan.jpg"
+          }
+        }
+      ],
+      "visuals": {
+        "value": {
+          "src": "defaults/stills/light-desk-notebook.jpg"
+        },
+        "closing": {
+          "src": "defaults/stills/light-venue-lobby.jpg"
+        },
+        "programs": {
+          "src": "defaults/stills/light-seminar-table.jpg"
+        }
+      },
+      "footnote": null,
+      "narrator": "male-2",
+      "programs": [
+        {
+          "title": "お金の歴史"
+        },
+        {
+          "title": "そもそも投資とは何か"
+        },
+        {
+          "title": "投資の種類"
+        }
+      ],
+      "schedule": {
+        "fee": null,
+        "date": "2026.10.2",
+        "time": "19:00 START",
+        "venue": null,
+        "weekday": "FRI"
+      },
+      "subtitle": "〜これからの選択を、根っこから〜",
+      "narration": {
+        "angle": "お金と投資を根っこから見つめ、これからの判断に使える考え方を持ち帰る30秒です。",
+        "scenes": [
+          {
+            "role": "title",
+            "text": "金融教育を、じっくり考える夜。トークシリーズです。"
+          },
+          {
+            "role": "value",
+            "text": "数字の向こう側にある、判断の根拠を持ち帰る。少人数で、深く考える夜です。"
+          },
+          {
+            "role": "program",
+            "text": "三つのプログラムで、判断の根を考えます。お金の歴史。貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+            "index": 0
+          },
+          {
+            "role": "program",
+            "text": "そもそも投資とは何か。投機や賭けと何が違うのか、判断の基準になる考え方を整理します。",
+            "index": 1
+          },
+          {
+            "role": "program",
+            "text": "投資の種類。株式、不動産、債券、金。それぞれが何に賭けているのかを並べて見ます。",
+            "index": 2
+          },
+          {
+            "role": "guests",
+            "text": "山田太郎さん。経営者の視点で、投資を深く考えます。"
+          },
+          {
+            "role": "cta",
+            "text": "10月2日、金曜日、夜7時スタート。詳細・お申し込みはこちら。"
+          }
+        ],
+        "source": "llm",
+        "version": 1,
+        "updatedAt": "2026-08-29T16:28:53.761Z"
+      },
+      "presenter": "WealthPark Lab",
+      "valueChip": "少人数で、深く",
+      "provenance": {
+        "bgm": {
+          "origin": "user"
+        },
+        "cta": {
+          "origin": "inferred"
+        },
+        "logos": {
+          "origin": "brand"
+        },
+        "theme": {
+          "origin": "brand"
+        },
+        "title": {
+          "note": "業種「金融教育メディア」からセミナーを想定",
+          "origin": "inferred"
+        },
+        "voice": {
+          "origin": "inferred"
+        },
+        "guests": {
+          "note": "登壇者は見本の氏名・所属・見本写真を仮置き。実在しません",
+          "origin": "inferred"
+        },
+        "programs": {
+          "note": "セミナーの一般的な進行",
+          "origin": "inferred"
+        },
+        "subtitle": {
+          "origin": "inferred"
+        },
+        "narration": {
+          "note": "テンプレートの下書き。資料を読むと書き直されます",
+          "origin": "inferred"
+        },
+        "presenter": {
+          "origin": "brand"
+        },
+        "valueChip": {
+          "origin": "inferred"
+        },
+        "valueLines": {
+          "origin": "inferred"
+        },
+        "seriesLabel": {
+          "origin": "inferred"
+        },
+        "theme.accent": {
+          "note": "このブランドはアクセントを持たないため、テーマの色を使う",
+          "origin": "inferred"
+        },
+        "schedule.date": {
+          "note": "今日から4週間後以降の最初の金曜日",
+          "origin": "inferred"
+        },
+        "schedule.time": {
+          "note": "セミナーに多い開始時刻",
+          "origin": "inferred"
+        },
+        "visuals.value": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        },
+        "guests.0.photo": {
+          "note": "テンプレートの見本写真",
+          "origin": "inferred"
+        },
+        "guests.1.photo": {
+          "note": "テンプレートの見本写真",
+          "origin": "inferred"
+        },
+        "visuals.closing": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        },
+        "visuals.programs": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        }
+      },
+      "valueLines": [
+        "数字の向こう側にある、",
+        "判断の根拠を持ち帰る。"
+      ],
+      "seriesLabel": "トークシリーズ",
+      "artDirection": "standard",
+      "guestsHeading": "登壇者",
+      "programsHeading": "3つのプログラム"
+    },
+    "bakedBrief": {
+      "bgm": "defaults/bgm/shine-through-tokyo.mp3",
+      "cta": "詳細・お申し込みはこちら",
+      "logos": [
+        {
+          "src": {
+            "$material": "0effe5bc-acea-4e6b-8ab4-d7bd4b57bcec",
+            "label": "WealthPark Lab.svg",
+            "repoPath": null,
+            "inGit": false
+          },
+          "name": "WealthPark Lab"
+        }
+      ],
+      "theme": {
+        "palette": {
+          "text": "#000000",
+          "primary": "#080808",
+          "background": "#ffffff"
+        },
+        "bodyFont": "Zen Kaku Gothic New",
+        "headingFont": "Zen Kaku Gothic New"
+      },
+      "title": "金融教育を、じっくり考える夜",
+      "voice": {
+        "audio": {
+          "$material": "2a6feaa9-42aa-423d-b678-1d09bff0da3d",
+          "label": "イベント紹介動画のボイス",
+          "repoPath": null,
+          "inGit": false
+        },
+        "track": {
+          "mock": false,
+          "voice": "Puck",
+          "scenes": [
+            {
+              "role": "title",
+              "text": "金融教育を、じっくり考える夜。トークシリーズです。",
+              "startMs": 0,
+              "durationMs": 4440
+            },
+            {
+              "role": "value",
+              "text": "数字の向こう側にある、判断の根拠を持ち帰る。少人数で、深く考える夜です。",
+              "startMs": 5340,
+              "durationMs": 7400
+            },
+            {
+              "role": "program",
+              "text": "三つのプログラムで、判断の根を考えます。お金の歴史。貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+              "index": 0,
+              "startMs": 13640,
+              "durationMs": 11280
+            },
+            {
+              "role": "program",
+              "text": "そもそも投資とは何か。投機や賭けと何が違うのか、判断の基準になる考え方を整理します。",
+              "index": 1,
+              "startMs": 25820,
+              "durationMs": 7440
+            },
+            {
+              "role": "program",
+              "text": "投資の種類。株式、不動産、債券、金。それぞれが何に賭けているのかを並べて見ます。",
+              "index": 2,
+              "startMs": 34160,
+              "durationMs": 8560
+            },
+            {
+              "role": "guests",
+              "text": "山田太郎さん。経営者の視点で、投資を深く考えます。",
+              "startMs": 43620,
+              "durationMs": 5200
+            },
+            {
+              "role": "cta",
+              "text": "10月2日、金曜日、夜7時スタート。詳細・お申し込みはこちら。",
+              "startMs": 49720,
+              "durationMs": 6040
+            }
+          ],
+          "totalMs": 56260,
+          "version": 1,
+          "captions": [
+            {
+              "text": "金融教育を、じっくり考える夜。",
+              "endMs": 2664,
+              "startMs": 0
+            },
+            {
+              "text": "トークシリーズです。",
+              "endMs": 5340,
+              "startMs": 2664
+            },
+            {
+              "text": "数字の向こう側にある、判断の根拠を持ち帰る。",
+              "endMs": 9745,
+              "startMs": 5340
+            },
+            {
+              "text": "少人数で、深く考える夜です。",
+              "endMs": 13640,
+              "startMs": 9745
+            },
+            {
+              "text": "三つのプログラムで、判断の根を考えます。",
+              "endMs": 17099,
+              "startMs": 13640
+            },
+            {
+              "text": "お金の歴史。",
+              "endMs": 18302,
+              "startMs": 17099
+            },
+            {
+              "text": "貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+              "endMs": 25820,
+              "startMs": 18302
+            },
+            {
+              "text": "そもそも投資とは何か。",
+              "endMs": 27878,
+              "startMs": 25820
+            },
+            {
+              "text": "投機や賭けと何が違うのか、判断の基準になる考え方を整理します。",
+              "endMs": 34160,
+              "startMs": 27878
+            },
+            {
+              "text": "投資の種類。",
+              "endMs": 35558,
+              "startMs": 34160
+            },
+            {
+              "text": "株式、不動産、債券、金。",
+              "endMs": 38528,
+              "startMs": 35558
+            },
+            {
+              "text": "それぞれが何に賭けているのかを並べて見ます。",
+              "endMs": 43620,
+              "startMs": 38528
+            },
+            {
+              "text": "山田太郎さん。",
+              "endMs": 45180,
+              "startMs": 43620
+            },
+            {
+              "text": "経営者の視点で、投資を深く考えます。",
+              "endMs": 49720,
+              "startMs": 45180
+            },
+            {
+              "text": "10月2日、金曜日、夜7時スタート。",
+              "endMs": 53311,
+              "startMs": 49720
+            },
+            {
+              "text": "詳細・お申し込みはこちら。",
+              "endMs": 56260,
+              "startMs": 53311
+            }
+          ],
+          "provider": "gemini",
+          "sampleRate": 24000,
+          "generatedAt": "2026-08-29T17:45:36.069Z"
+        }
+      },
+      "guests": [
+        {
+          "name": "山田太郎",
+          "role": "株式会社サンプル\n代表取締役CEO",
+          "photo": {
+            "src": "defaults/portraits/light-02-navy-knit.jpg"
+          }
+        },
+        {
+          "name": "山田花子",
+          "role": "WealthPark Lab\n広報",
+          "photo": {
+            "src": "defaults/portraits/light-03-grey-cardigan.jpg"
+          }
+        }
+      ],
+      "visuals": {
+        "value": {
+          "src": "defaults/stills/light-desk-notebook.jpg"
+        },
+        "closing": {
+          "src": "defaults/stills/light-venue-lobby.jpg"
+        },
+        "programs": {
+          "src": "defaults/stills/light-seminar-table.jpg"
+        }
+      },
+      "footnote": null,
+      "narrator": "male-2",
+      "programs": [
+        {
+          "title": "お金の歴史"
+        },
+        {
+          "title": "そもそも投資とは何か"
+        },
+        {
+          "title": "投資の種類"
+        }
+      ],
+      "schedule": {
+        "fee": null,
+        "date": "2026.10.2",
+        "time": "19:00 START",
+        "venue": null,
+        "weekday": "FRI"
+      },
+      "subtitle": "〜これからの選択を、根っこから〜",
+      "narration": {
+        "angle": "お金と投資を根っこから見つめ、これからの判断に使える考え方を持ち帰る30秒です。",
+        "scenes": [
+          {
+            "role": "title",
+            "text": "金融教育を、じっくり考える夜。トークシリーズです。"
+          },
+          {
+            "role": "value",
+            "text": "数字の向こう側にある、判断の根拠を持ち帰る。少人数で、深く考える夜です。"
+          },
+          {
+            "role": "program",
+            "text": "三つのプログラムで、判断の根を考えます。お金の歴史。貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+            "index": 0
+          },
+          {
+            "role": "program",
+            "text": "そもそも投資とは何か。投機や賭けと何が違うのか、判断の基準になる考え方を整理します。",
+            "index": 1
+          },
+          {
+            "role": "program",
+            "text": "投資の種類。株式、不動産、債券、金。それぞれが何に賭けているのかを並べて見ます。",
+            "index": 2
+          },
+          {
+            "role": "guests",
+            "text": "山田太郎さん。経営者の視点で、投資を深く考えます。"
+          },
+          {
+            "role": "cta",
+            "text": "10月2日、金曜日、夜7時スタート。詳細・お申し込みはこちら。"
+          }
+        ],
+        "source": "llm",
+        "version": 1,
+        "updatedAt": "2026-08-29T16:28:53.761Z"
+      },
+      "presenter": "WealthPark Lab",
+      "valueChip": "少人数で、深く",
+      "provenance": {
+        "bgm": {
+          "origin": "user"
+        },
+        "cta": {
+          "origin": "inferred"
+        },
+        "logos": {
+          "origin": "brand"
+        },
+        "theme": {
+          "origin": "brand"
+        },
+        "title": {
+          "note": "業種「金融教育メディア」からセミナーを想定",
+          "origin": "inferred"
+        },
+        "voice": {
+          "origin": "inferred"
+        },
+        "guests": {
+          "note": "登壇者は見本の氏名・所属・見本写真を仮置き。実在しません",
+          "origin": "inferred"
+        },
+        "programs": {
+          "note": "セミナーの一般的な進行",
+          "origin": "inferred"
+        },
+        "subtitle": {
+          "origin": "inferred"
+        },
+        "narration": {
+          "note": "テンプレートの下書き。資料を読むと書き直されます",
+          "origin": "inferred"
+        },
+        "presenter": {
+          "origin": "brand"
+        },
+        "valueChip": {
+          "origin": "inferred"
+        },
+        "valueLines": {
+          "origin": "inferred"
+        },
+        "seriesLabel": {
+          "origin": "inferred"
+        },
+        "theme.accent": {
+          "note": "このブランドはアクセントを持たないため、テーマの色を使う",
+          "origin": "inferred"
+        },
+        "schedule.date": {
+          "note": "今日から4週間後以降の最初の金曜日",
+          "origin": "inferred"
+        },
+        "schedule.time": {
+          "note": "セミナーに多い開始時刻",
+          "origin": "inferred"
+        },
+        "visuals.value": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        },
+        "guests.0.photo": {
+          "note": "テンプレートの見本写真",
+          "origin": "inferred"
+        },
+        "guests.1.photo": {
+          "note": "テンプレートの見本写真",
+          "origin": "inferred"
+        },
+        "visuals.closing": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        },
+        "visuals.programs": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        }
+      },
+      "valueLines": [
+        "数字の向こう側にある、",
+        "判断の根拠を持ち帰る。"
+      ],
+      "seriesLabel": "トークシリーズ",
+      "artDirection": "standard",
+      "guestsHeading": "登壇者",
+      "programsHeading": "3つのプログラム"
+    },
+    "inputs": [
+      {
+        "role": "logo",
+        "id": "0effe5bc-acea-4e6b-8ab4-d7bd4b57bcec",
+        "label": "WealthPark Lab.svg",
+        "kind": "logo",
+        "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/materials/d0f46d83b7bb28fafb140b84ccdba4b9a966d826f21ae7d967220ae7a3ea21bc/logo.svg",
+        "repoPath": null,
+        "inGit": false
+      },
+      {
+        "role": "event_cm_voice",
+        "id": "2a6feaa9-42aa-423d-b678-1d09bff0da3d",
+        "label": "イベント紹介動画のボイス",
+        "kind": "audio",
+        "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/844e6245-5fd6-4dd5-91b1-e100f30410b9/materials/event_cm_voice-a6efe88f0411490f.wav",
+        "repoPath": null,
+        "inGit": false
+      }
+    ],
+    "deliverables": [
+      {
+        "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/844e6245-5fd6-4dd5-91b1-e100f30410b9/renders/cfe85ffb-02e6-4297-8569-f94fccf10fdb/video-20260830010051868.mp4",
+        "mediaType": "video/mp4",
+        "bytes": 20947815,
+        "durationMs": null,
+        "createdAt": "2026-08-30T01:00:55.808136+00:00"
+      }
+    ]
+  },
+  {
+    "take": {
+      "id": "4bebfebb-dae3-4191-a89d-c5459f4b0ec8",
+      "title": "金融教育を、じっくり考える夜",
+      "tool_kind": "video",
+      "template_id": "event-cm",
+      "template_version": 1,
+      "brief_schema_version": 1,
+      "status": "draft",
+      "created_at": "2026-08-30T03:02:15.138219+00:00"
+    },
+    "brief": {
+      "bgm": "defaults/bgm/shine-through-tokyo.mp3",
+      "cta": "詳細・お申し込みはこちら",
+      "logos": [
+        {
+          "src": {
+            "$material": "0effe5bc-acea-4e6b-8ab4-d7bd4b57bcec",
+            "label": "WealthPark Lab.svg",
+            "repoPath": null,
+            "inGit": false
+          },
+          "name": "WealthPark Lab"
+        }
+      ],
+      "theme": {
+        "palette": {
+          "text": "#000000",
+          "primary": "#080808",
+          "background": "#ffffff"
+        },
+        "bodyFont": "Zen Kaku Gothic New",
+        "headingFont": "Zen Kaku Gothic New"
+      },
+      "title": "金融教育を、じっくり考える夜",
+      "voice": {
+        "audio": {
+          "$material": "a26bc0b5-ecee-42cf-a863-a6eb42071bcd",
+          "label": "イベント紹介動画のボイス",
+          "repoPath": null,
+          "inGit": false
+        },
+        "track": {
+          "mock": false,
+          "voice": "Aoede",
+          "scenes": [
+            {
+              "role": "title",
+              "text": "金融教育を、じっくり考える夜。トークシリーズ。",
+              "startMs": 0,
+              "durationMs": 4400
+            },
+            {
+              "role": "value",
+              "text": "数字の向こう側にある、判断の根拠を持ち帰る。少人数で、深く考える夜です。",
+              "startMs": 5300,
+              "durationMs": 7240
+            },
+            {
+              "role": "program",
+              "text": "三つを通して、判断の土台を考えます。お金の歴史。貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+              "index": 0,
+              "startMs": 13440,
+              "durationMs": 10800
+            },
+            {
+              "role": "program",
+              "text": "そもそも投資とは何か。投機や賭けとの差と、判断の基準を整理します。",
+              "index": 1,
+              "startMs": 25140,
+              "durationMs": 6240
+            },
+            {
+              "role": "program",
+              "text": "投資の種類。株式、不動産、債券、金が何に賭けているのか、見比べます。",
+              "index": 2,
+              "startMs": 32280,
+              "durationMs": 6400
+            },
+            {
+              "role": "guests",
+              "text": "代表取締役CEO、山田太郎さん。経営の視点で語ります。",
+              "startMs": 39580,
+              "durationMs": 6280
+            },
+            {
+              "role": "cta",
+              "text": "十月二日、金曜日、夜七時。詳細を確認して、お申し込みください。",
+              "startMs": 46760,
+              "durationMs": 6440
+            }
+          ],
+          "totalMs": 53700,
+          "version": 1,
+          "captions": [
+            {
+              "text": "金融教育を、じっくり考える夜。",
+              "endMs": 2829,
+              "startMs": 0
+            },
+            {
+              "text": "トークシリーズ。",
+              "endMs": 5300,
+              "startMs": 2829
+            },
+            {
+              "text": "数字の向こう側にある、判断の根拠を持ち帰る。",
+              "endMs": 9610,
+              "startMs": 5300
+            },
+            {
+              "text": "少人数で、深く考える夜です。",
+              "endMs": 13440,
+              "startMs": 9610
+            },
+            {
+              "text": "三つを通して、判断の土台を考えます。",
+              "endMs": 16547,
+              "startMs": 13440
+            },
+            {
+              "text": "お金の歴史。",
+              "endMs": 17731,
+              "startMs": 16547
+            },
+            {
+              "text": "貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+              "endMs": 25140,
+              "startMs": 17731
+            },
+            {
+              "text": "そもそも投資とは何か。",
+              "endMs": 27275,
+              "startMs": 25140
+            },
+            {
+              "text": "投機や賭けとの差と、判断の基準を整理します。",
+              "endMs": 32280,
+              "startMs": 27275
+            },
+            {
+              "text": "投資の種類。",
+              "endMs": 33499,
+              "startMs": 32280
+            },
+            {
+              "text": "株式、不動産、債券、金が何に賭けているのか、見比べます。",
+              "endMs": 39580,
+              "startMs": 33499
+            },
+            {
+              "text": "代表取締役CEO、山田太郎さん。",
+              "endMs": 43309,
+              "startMs": 39580
+            },
+            {
+              "text": "経営の視点で語ります。",
+              "endMs": 46760,
+              "startMs": 43309
+            },
+            {
+              "text": "十月二日、金曜日、夜七時。",
+              "endMs": 49641,
+              "startMs": 46760
+            },
+            {
+              "text": "詳細を確認して、お申し込みください。",
+              "endMs": 53700,
+              "startMs": 49641
+            }
+          ],
+          "provider": "gemini",
+          "sampleRate": 24000,
+          "generatedAt": "2026-08-30T03:06:33.141Z"
+        }
+      },
+      "guests": [
+        {
+          "name": "山田太郎",
+          "role": "株式会社サンプル\n代表取締役CEO",
+          "photo": {
+            "src": "defaults/portraits/light-02-navy-knit.jpg"
+          }
+        },
+        {
+          "name": "山田花子",
+          "role": "WealthPark Lab\n広報",
+          "photo": {
+            "src": "defaults/portraits/light-03-grey-cardigan.jpg"
+          }
+        }
+      ],
+      "visuals": {
+        "value": {
+          "src": "defaults/stills/light-desk-notebook.jpg"
+        },
+        "closing": {
+          "src": "defaults/stills/light-venue-lobby.jpg"
+        },
+        "programs": {
+          "src": "defaults/stills/light-seminar-table.jpg"
+        }
+      },
+      "footnote": null,
+      "narrator": "female-2",
+      "programs": [
+        {
+          "title": "お金の歴史"
+        },
+        {
+          "title": "そもそも投資とは何か"
+        },
+        {
+          "title": "投資の種類"
+        }
+      ],
+      "schedule": {
+        "fee": null,
+        "date": "2026.10.2",
+        "time": "19:00 START",
+        "venue": null,
+        "weekday": "FRI"
+      },
+      "subtitle": "〜これからの選択を、根っこから〜",
+      "narration": {
+        "angle": "お金の歴史から投資の見方までたどり、数字の向こう側にある判断の根拠を持ち帰る夜を約束します。",
+        "scenes": [
+          {
+            "role": "title",
+            "text": "金融教育を、じっくり考える夜。トークシリーズ。"
+          },
+          {
+            "role": "value",
+            "text": "数字の向こう側にある、判断の根拠を持ち帰る。少人数で、深く考える夜です。"
+          },
+          {
+            "role": "program",
+            "text": "三つを通して、判断の土台を考えます。お金の歴史。貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+            "index": 0
+          },
+          {
+            "role": "program",
+            "text": "そもそも投資とは何か。投機や賭けとの差と、判断の基準を整理します。",
+            "index": 1
+          },
+          {
+            "role": "program",
+            "text": "投資の種類。株式、不動産、債券、金が何に賭けているのか、見比べます。",
+            "index": 2
+          },
+          {
+            "role": "guests",
+            "text": "代表取締役CEO、山田太郎さん。経営の視点で語ります。"
+          },
+          {
+            "role": "cta",
+            "text": "十月二日、金曜日、夜七時。詳細を確認して、お申し込みください。"
+          }
+        ],
+        "source": "llm",
+        "version": 1,
+        "updatedAt": "2026-08-30T03:01:55.643Z"
+      },
+      "presenter": "WealthPark Lab",
+      "valueChip": "少人数で、深く",
+      "provenance": {
+        "bgm": {
+          "note": "テンプレートの既定BGM",
+          "origin": "inferred"
+        },
+        "cta": {
+          "origin": "inferred"
+        },
+        "logos": {
+          "origin": "brand"
+        },
+        "theme": {
+          "origin": "brand"
+        },
+        "title": {
+          "note": "業種「金融教育メディア」からセミナーを想定",
+          "origin": "inferred"
+        },
+        "voice": {
+          "origin": "inferred"
+        },
+        "guests": {
+          "note": "登壇者は見本の氏名・所属・見本写真を仮置き。実在しません",
+          "origin": "inferred"
+        },
+        "programs": {
+          "note": "セミナーの一般的な進行",
+          "origin": "inferred"
+        },
+        "subtitle": {
+          "origin": "inferred"
+        },
+        "narration": {
+          "note": "テンプレートの下書き。資料を読むと書き直されます",
+          "origin": "inferred"
+        },
+        "presenter": {
+          "origin": "brand"
+        },
+        "valueChip": {
+          "origin": "inferred"
+        },
+        "valueLines": {
+          "origin": "inferred"
+        },
+        "seriesLabel": {
+          "origin": "inferred"
+        },
+        "theme.accent": {
+          "note": "このブランドはアクセントを持たないため、テーマの色を使う",
+          "origin": "inferred"
+        },
+        "schedule.date": {
+          "note": "今日から4週間後以降の最初の金曜日",
+          "origin": "inferred"
+        },
+        "schedule.time": {
+          "note": "セミナーに多い開始時刻",
+          "origin": "inferred"
+        },
+        "visuals.value": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        },
+        "guests.0.photo": {
+          "note": "テンプレートの見本写真",
+          "origin": "inferred"
+        },
+        "guests.1.photo": {
+          "note": "テンプレートの見本写真",
+          "origin": "inferred"
+        },
+        "visuals.closing": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        },
+        "visuals.programs": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        }
+      },
+      "valueLines": [
+        "数字の向こう側にある、",
+        "判断の根拠を持ち帰る。"
+      ],
+      "seriesLabel": "トークシリーズ",
+      "artDirection": "standard",
+      "guestsHeading": "登壇者",
+      "programsHeading": "3つのプログラム"
+    },
+    "bakedBrief": {
+      "bgm": "defaults/bgm/shine-through-tokyo.mp3",
+      "cta": "詳細・お申し込みはこちら",
+      "logos": [
+        {
+          "src": {
+            "$material": "0effe5bc-acea-4e6b-8ab4-d7bd4b57bcec",
+            "label": "WealthPark Lab.svg",
+            "repoPath": null,
+            "inGit": false
+          },
+          "name": "WealthPark Lab"
+        }
+      ],
+      "theme": {
+        "palette": {
+          "text": "#000000",
+          "primary": "#080808",
+          "background": "#ffffff"
+        },
+        "bodyFont": "Zen Kaku Gothic New",
+        "headingFont": "Zen Kaku Gothic New"
+      },
+      "title": "金融教育を、じっくり考える夜",
+      "voice": {
+        "audio": {
+          "$material": "a26bc0b5-ecee-42cf-a863-a6eb42071bcd",
+          "label": "イベント紹介動画のボイス",
+          "repoPath": null,
+          "inGit": false
+        },
+        "track": {
+          "mock": false,
+          "voice": "Aoede",
+          "scenes": [
+            {
+              "role": "title",
+              "text": "金融教育を、じっくり考える夜。トークシリーズ。",
+              "startMs": 0,
+              "durationMs": 4400
+            },
+            {
+              "role": "value",
+              "text": "数字の向こう側にある、判断の根拠を持ち帰る。少人数で、深く考える夜です。",
+              "startMs": 5300,
+              "durationMs": 7240
+            },
+            {
+              "role": "program",
+              "text": "三つを通して、判断の土台を考えます。お金の歴史。貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+              "index": 0,
+              "startMs": 13440,
+              "durationMs": 10800
+            },
+            {
+              "role": "program",
+              "text": "そもそも投資とは何か。投機や賭けとの差と、判断の基準を整理します。",
+              "index": 1,
+              "startMs": 25140,
+              "durationMs": 6240
+            },
+            {
+              "role": "program",
+              "text": "投資の種類。株式、不動産、債券、金が何に賭けているのか、見比べます。",
+              "index": 2,
+              "startMs": 32280,
+              "durationMs": 6400
+            },
+            {
+              "role": "guests",
+              "text": "代表取締役CEO、山田太郎さん。経営の視点で語ります。",
+              "startMs": 39580,
+              "durationMs": 6280
+            },
+            {
+              "role": "cta",
+              "text": "十月二日、金曜日、夜七時。詳細を確認して、お申し込みください。",
+              "startMs": 46760,
+              "durationMs": 6440
+            }
+          ],
+          "totalMs": 53700,
+          "version": 1,
+          "captions": [
+            {
+              "text": "金融教育を、じっくり考える夜。",
+              "endMs": 2829,
+              "startMs": 0
+            },
+            {
+              "text": "トークシリーズ。",
+              "endMs": 5300,
+              "startMs": 2829
+            },
+            {
+              "text": "数字の向こう側にある、判断の根拠を持ち帰る。",
+              "endMs": 9610,
+              "startMs": 5300
+            },
+            {
+              "text": "少人数で、深く考える夜です。",
+              "endMs": 13440,
+              "startMs": 9610
+            },
+            {
+              "text": "三つを通して、判断の土台を考えます。",
+              "endMs": 16547,
+              "startMs": 13440
+            },
+            {
+              "text": "お金の歴史。",
+              "endMs": 17731,
+              "startMs": 16547
+            },
+            {
+              "text": "貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+              "endMs": 25140,
+              "startMs": 17731
+            },
+            {
+              "text": "そもそも投資とは何か。",
+              "endMs": 27275,
+              "startMs": 25140
+            },
+            {
+              "text": "投機や賭けとの差と、判断の基準を整理します。",
+              "endMs": 32280,
+              "startMs": 27275
+            },
+            {
+              "text": "投資の種類。",
+              "endMs": 33499,
+              "startMs": 32280
+            },
+            {
+              "text": "株式、不動産、債券、金が何に賭けているのか、見比べます。",
+              "endMs": 39580,
+              "startMs": 33499
+            },
+            {
+              "text": "代表取締役CEO、山田太郎さん。",
+              "endMs": 43309,
+              "startMs": 39580
+            },
+            {
+              "text": "経営の視点で語ります。",
+              "endMs": 46760,
+              "startMs": 43309
+            },
+            {
+              "text": "十月二日、金曜日、夜七時。",
+              "endMs": 49641,
+              "startMs": 46760
+            },
+            {
+              "text": "詳細を確認して、お申し込みください。",
+              "endMs": 53700,
+              "startMs": 49641
+            }
+          ],
+          "provider": "gemini",
+          "sampleRate": 24000,
+          "generatedAt": "2026-08-30T03:06:33.141Z"
+        }
+      },
+      "guests": [
+        {
+          "name": "山田太郎",
+          "role": "株式会社サンプル\n代表取締役CEO",
+          "photo": {
+            "src": "defaults/portraits/light-02-navy-knit.jpg"
+          }
+        },
+        {
+          "name": "山田花子",
+          "role": "WealthPark Lab\n広報",
+          "photo": {
+            "src": "defaults/portraits/light-03-grey-cardigan.jpg"
+          }
+        }
+      ],
+      "visuals": {
+        "value": {
+          "src": "defaults/stills/light-desk-notebook.jpg"
+        },
+        "closing": {
+          "src": "defaults/stills/light-venue-lobby.jpg"
+        },
+        "programs": {
+          "src": "defaults/stills/light-seminar-table.jpg"
+        }
+      },
+      "footnote": null,
+      "narrator": "female-2",
+      "programs": [
+        {
+          "title": "お金の歴史"
+        },
+        {
+          "title": "そもそも投資とは何か"
+        },
+        {
+          "title": "投資の種類"
+        }
+      ],
+      "schedule": {
+        "fee": null,
+        "date": "2026.10.2",
+        "time": "19:00 START",
+        "venue": null,
+        "weekday": "FRI"
+      },
+      "subtitle": "〜これからの選択を、根っこから〜",
+      "narration": {
+        "angle": "お金の歴史から投資の見方までたどり、数字の向こう側にある判断の根拠を持ち帰る夜を約束します。",
+        "scenes": [
+          {
+            "role": "title",
+            "text": "金融教育を、じっくり考える夜。トークシリーズ。"
+          },
+          {
+            "role": "value",
+            "text": "数字の向こう側にある、判断の根拠を持ち帰る。少人数で、深く考える夜です。"
+          },
+          {
+            "role": "program",
+            "text": "三つを通して、判断の土台を考えます。お金の歴史。貨幣がどう生まれ、資本主義を経て、投資という仕組みが発明されたのかをたどります。",
+            "index": 0
+          },
+          {
+            "role": "program",
+            "text": "そもそも投資とは何か。投機や賭けとの差と、判断の基準を整理します。",
+            "index": 1
+          },
+          {
+            "role": "program",
+            "text": "投資の種類。株式、不動産、債券、金が何に賭けているのか、見比べます。",
+            "index": 2
+          },
+          {
+            "role": "guests",
+            "text": "代表取締役CEO、山田太郎さん。経営の視点で語ります。"
+          },
+          {
+            "role": "cta",
+            "text": "十月二日、金曜日、夜七時。詳細を確認して、お申し込みください。"
+          }
+        ],
+        "source": "llm",
+        "version": 1,
+        "updatedAt": "2026-08-30T03:01:55.643Z"
+      },
+      "presenter": "WealthPark Lab",
+      "valueChip": "少人数で、深く",
+      "provenance": {
+        "bgm": {
+          "note": "テンプレートの既定BGM",
+          "origin": "inferred"
+        },
+        "cta": {
+          "origin": "inferred"
+        },
+        "logos": {
+          "origin": "brand"
+        },
+        "theme": {
+          "origin": "brand"
+        },
+        "title": {
+          "note": "業種「金融教育メディア」からセミナーを想定",
+          "origin": "inferred"
+        },
+        "voice": {
+          "origin": "inferred"
+        },
+        "guests": {
+          "note": "登壇者は見本の氏名・所属・見本写真を仮置き。実在しません",
+          "origin": "inferred"
+        },
+        "programs": {
+          "note": "セミナーの一般的な進行",
+          "origin": "inferred"
+        },
+        "subtitle": {
+          "origin": "inferred"
+        },
+        "narration": {
+          "note": "テンプレートの下書き。資料を読むと書き直されます",
+          "origin": "inferred"
+        },
+        "presenter": {
+          "origin": "brand"
+        },
+        "valueChip": {
+          "origin": "inferred"
+        },
+        "valueLines": {
+          "origin": "inferred"
+        },
+        "seriesLabel": {
+          "origin": "inferred"
+        },
+        "theme.accent": {
+          "note": "このブランドはアクセントを持たないため、テーマの色を使う",
+          "origin": "inferred"
+        },
+        "schedule.date": {
+          "note": "今日から4週間後以降の最初の金曜日",
+          "origin": "inferred"
+        },
+        "schedule.time": {
+          "note": "セミナーに多い開始時刻",
+          "origin": "inferred"
+        },
+        "visuals.value": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        },
+        "guests.0.photo": {
+          "note": "テンプレートの見本写真",
+          "origin": "inferred"
+        },
+        "guests.1.photo": {
+          "note": "テンプレートの見本写真",
+          "origin": "inferred"
+        },
+        "visuals.closing": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        },
+        "visuals.programs": {
+          "note": "テンプレートの既定画像",
+          "origin": "inferred"
+        }
+      },
+      "valueLines": [
+        "数字の向こう側にある、",
+        "判断の根拠を持ち帰る。"
+      ],
+      "seriesLabel": "トークシリーズ",
+      "artDirection": "standard",
+      "guestsHeading": "登壇者",
+      "programsHeading": "3つのプログラム"
+    },
+    "inputs": [
+      {
+        "role": "logo",
+        "id": "0effe5bc-acea-4e6b-8ab4-d7bd4b57bcec",
+        "label": "WealthPark Lab.svg",
+        "kind": "logo",
+        "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/materials/d0f46d83b7bb28fafb140b84ccdba4b9a966d826f21ae7d967220ae7a3ea21bc/logo.svg",
+        "repoPath": null,
+        "inGit": false
+      },
+      {
+        "role": "event_cm_voice",
+        "id": "a26bc0b5-ecee-42cf-a863-a6eb42071bcd",
+        "label": "イベント紹介動画のボイス",
+        "kind": "audio",
+        "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/4bebfebb-dae3-4191-a89d-c5459f4b0ec8/materials/event_cm_voice-b6d2554e823ce4ca.wav",
+        "repoPath": null,
+        "inGit": false
+      }
+    ],
+    "deliverables": []
+  }
+]

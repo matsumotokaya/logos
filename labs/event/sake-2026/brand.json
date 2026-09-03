@@ -1,0 +1,92 @@
+{
+  "brand": {
+    "id": "e764a262-e344-4e77-bff4-14d066d072f2",
+    "name": "WealthPark Lab",
+    "brand_kind": "business",
+    "website": "https://wealthpark-lab.com",
+    "industry": "金融教育メディア",
+    "location": "",
+    "description": "WealthPark研究所は、投資の本質をテーマに記事、対談、金融経済教育プログラムなどを発信する情報メディアです。資産運用にとどまらず、寄付、文化資産、相続、教育などを扱い、投資を人生や社会との関わりから考える視点を提供しています。"
+  },
+  "works": [
+    {
+      "id": "c3b0c461-89bc-49a9-8b56-884aaa5909d0",
+      "name": "世界が恋する日本酒",
+      "status": "active",
+      "starts_on": null,
+      "ends_on": null
+    }
+  ],
+  "knowledgeValues": [
+    {
+      "field_path": "palette.primary",
+      "value": "#080808",
+      "confidence": "adopted",
+      "decided_by": "1f5ac5b3-15d9-41a3-b70e-f95775f3f1fc",
+      "updated_at": "2026-08-11T09:25:58.129913+00:00"
+    },
+    {
+      "field_path": "palette.background",
+      "value": "#ffffff",
+      "confidence": "adopted",
+      "decided_by": "1f5ac5b3-15d9-41a3-b70e-f95775f3f1fc",
+      "updated_at": "2026-08-11T09:25:58.129913+00:00"
+    },
+    {
+      "field_path": "palette.surface",
+      "value": "#f7f7f7",
+      "confidence": "adopted",
+      "decided_by": "1f5ac5b3-15d9-41a3-b70e-f95775f3f1fc",
+      "updated_at": "2026-08-11T09:25:58.129913+00:00"
+    },
+    {
+      "field_path": "palette.text",
+      "value": "#000000",
+      "confidence": "adopted",
+      "decided_by": "1f5ac5b3-15d9-41a3-b70e-f95775f3f1fc",
+      "updated_at": "2026-08-11T09:25:58.129913+00:00"
+    },
+    {
+      "field_path": "typography.body_font",
+      "value": "Zen Kaku Gothic New",
+      "confidence": "adopted",
+      "decided_by": "1f5ac5b3-15d9-41a3-b70e-f95775f3f1fc",
+      "updated_at": "2026-08-11T09:25:58.129913+00:00"
+    },
+    {
+      "field_path": "typography.heading_font",
+      "value": "Zen Kaku Gothic New",
+      "confidence": "adopted",
+      "decided_by": "1f5ac5b3-15d9-41a3-b70e-f95775f3f1fc",
+      "updated_at": "2026-08-11T09:25:58.129913+00:00"
+    },
+    {
+      "field_path": "tokens.button_radius",
+      "value": "0px",
+      "confidence": "adopted",
+      "decided_by": "1f5ac5b3-15d9-41a3-b70e-f95775f3f1fc",
+      "updated_at": "2026-08-11T09:25:58.129913+00:00"
+    },
+    {
+      "field_path": "tokens.button_padding",
+      "value": "20px 30px",
+      "confidence": "adopted",
+      "decided_by": "1f5ac5b3-15d9-41a3-b70e-f95775f3f1fc",
+      "updated_at": "2026-08-11T09:25:58.129913+00:00"
+    },
+    {
+      "field_path": "tokens.section_spacing",
+      "value": "64px",
+      "confidence": "adopted",
+      "decided_by": "1f5ac5b3-15d9-41a3-b70e-f95775f3f1fc",
+      "updated_at": "2026-08-11T09:25:58.129913+00:00"
+    },
+    {
+      "field_path": "tokens.container_width",
+      "value": "1000px",
+      "confidence": "adopted",
+      "decided_by": "1f5ac5b3-15d9-41a3-b70e-f95775f3f1fc",
+      "updated_at": "2026-08-11T09:25:58.129913+00:00"
+    }
+  ]
+}

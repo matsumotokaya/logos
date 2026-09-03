@@ -1,0 +1,1116 @@
+{
+  "take": {
+    "id": "920d4cfe-3843-4a6c-b538-7238e79707d2",
+    "title": "世界が恋する日本酒",
+    "tool_kind": "video",
+    "template_id": "event-cm",
+    "template_version": 1,
+    "brief_schema_version": 1,
+    "status": "ready",
+    "created_at": "2026-08-15T01:54:16.657052+00:00"
+  },
+  "brief": {
+    "bgm": {
+      "$material": "5fe6a63d-52fd-4e76-9a66-e9c0f4d1b533",
+      "label": "bgm.mp3",
+      "repoPath": "public/event/sake-2026/bgm.mp3",
+      "inGit": false
+    },
+    "cta": "詳細・お申し込みはこちら",
+    "logos": [
+      {
+        "src": {
+          "$material": "0effe5bc-acea-4e6b-8ab4-d7bd4b57bcec",
+          "label": "WealthPark Lab.svg",
+          "repoPath": null,
+          "inGit": false
+        },
+        "name": "WealthPark Lab"
+      },
+      {
+        "src": {
+          "$material": "1d7ea61e-2a1c-4e12-9fb8-a5c0af4bc7e5",
+          "label": "leopalace21.jpg",
+          "repoPath": null,
+          "inGit": false
+        },
+        "name": "leopalace21",
+        "treatment": "light"
+      },
+      {
+        "src": {
+          "$material": "337073e8-6e5e-430d-984a-d60f2521080a",
+          "label": "ft_logo.png",
+          "repoPath": null,
+          "inGit": false
+        },
+        "name": "〆張鶴",
+        "treatment": "light"
+      }
+    ],
+    "theme": {
+      "palette": {
+        "text": "#000000",
+        "primary": "#080808",
+        "background": "#ffffff"
+      },
+      "bodyFont": "Zen Kaku Gothic New",
+      "headingFont": "Zen Kaku Gothic New"
+    },
+    "title": "世界が恋する日本酒",
+    "voice": {
+      "audio": {
+        "$material": "6099a32b-26c5-45e9-b73e-268f4042b2cd",
+        "label": "イベント紹介動画のボイス",
+        "repoPath": null,
+        "inGit": false
+      },
+      "track": {
+        "mock": false,
+        "voice": "Aoede",
+        "scenes": [
+          {
+            "role": "title",
+            "text": "レオパレス21とWealthPark Labが贈る、文化資本と投資シリーズ第3弾。世界が恋する日本酒。",
+            "startMs": 0,
+            "durationMs": 9600
+          },
+          {
+            "role": "value",
+            "text": "日本の国酒である日本酒。2026 Miss SAKE 2名とともに、百貨店では出会えない特別な日本酒を味わいながら、その楽しみ方や、世界で高まる日本酒の価値をアップデートしてみませんか。",
+            "startMs": 10500,
+            "durationMs": 14480
+          },
+          {
+            "role": "program",
+            "text": "このイベントでは、3つのプログラムで楽しみ方を深めます。まず、百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング。様々な日本酒を五感で感じていただけます。",
+            "index": 0,
+            "startMs": 25880,
+            "durationMs": 13600
+          },
+          {
+            "role": "program",
+            "text": "2つ目はトークセッションです。しめはりつる、宮尾酒造十一代目当主と、Miss SAKE 代表理事が、知られざる日本酒業界の舞台裏と世界への広がりについて語ります。",
+            "index": 1,
+            "startMs": 40380,
+            "durationMs": 12160
+          },
+          {
+            "role": "program",
+            "text": "3つ目はワークショップです。2026 Miss SAKE 2名とともに、日本酒の楽しみ方を広げる2つのワークショップで、飲み順、味わいの表現、テイスティングのコツについて学びます。",
+            "index": 2,
+            "startMs": 53440,
+            "durationMs": 13480
+          },
+          {
+            "role": "guests",
+            "text": "200年以上の歴史を誇る、新潟・村上の名門酒蔵、宮尾酒造の十一代目当主、宮尾佳明氏と、日本酒の海外普及と日本文化の次世代への継承を担う、一般社団法人 Miss SAKE 代表理事、大西美香氏をゲストに招いての開催となります。",
+            "startMs": 67820,
+            "durationMs": 18600
+          },
+          {
+            "role": "cta",
+            "text": "一杯の日本酒から始まる、新しい出会いと学び。レオパレス21とオーナー様、そしてオーナー様同士の新たな繋がりを育む、特別な午後をご提案します。",
+            "startMs": 87320,
+            "durationMs": 12680
+          }
+        ],
+        "totalMs": 100500,
+        "version": 1,
+        "captions": [
+          {
+            "text": "レオパレス21とWealthPark Labが贈る、文化資本と投資シリーズ第3弾。",
+            "endMs": 7543,
+            "startMs": 0
+          },
+          {
+            "text": "世界が恋する日本酒。",
+            "endMs": 10500,
+            "startMs": 7543
+          },
+          {
+            "text": "日本の国酒である日本酒。",
+            "endMs": 12527,
+            "startMs": 10500
+          },
+          {
+            "text": "2026 Miss SAKE 2名とともに、百貨店では出会えない特別な日本酒を味わいながら、その楽しみ方や、世界で高まる日本酒の価値をアップデートしてみませんか。",
+            "endMs": 25880,
+            "startMs": 12527
+          },
+          {
+            "text": "このイベントでは、3つのプログラムで楽しみ方を深めます。",
+            "endMs": 30463,
+            "startMs": 25880
+          },
+          {
+            "text": "まず、百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング。",
+            "endMs": 36228,
+            "startMs": 30463
+          },
+          {
+            "text": "様々な日本酒を五感で感じていただけます。",
+            "endMs": 40380,
+            "startMs": 36228
+          },
+          {
+            "text": "2つ目はトークセッションです。",
+            "endMs": 42729,
+            "startMs": 40380
+          },
+          {
+            "text": "しめはりつる、宮尾酒造十一代目当主と、Miss SAKE 代表理事が、知られざる日本酒業界の舞台裏と世界への広がりについて語ります。",
+            "endMs": 53440,
+            "startMs": 42729
+          },
+          {
+            "text": "3つ目はワークショップです。",
+            "endMs": 55641,
+            "startMs": 53440
+          },
+          {
+            "text": "2026 Miss SAKE 2名とともに、日本酒の楽しみ方を広げる2つのワークショップで、飲み順、味わいの表現、テイスティングのコツについて学びます。",
+            "endMs": 67820,
+            "startMs": 55641
+          },
+          {
+            "text": "200年以上の歴史を誇る、新潟・村上の名門酒蔵、宮尾酒造の十一代目当主、宮尾佳明氏と、日本酒の海外普及と日本文化の次世代への継承を担う、一般社団法人 Miss SAKE 代表理事、大西美香氏をゲストに招いての開催となります。",
+            "endMs": 87320,
+            "startMs": 67820
+          },
+          {
+            "text": "一杯の日本酒から始まる、新しい出会いと学び。",
+            "endMs": 91437,
+            "startMs": 87320
+          },
+          {
+            "text": "レオパレス21とオーナー様、そしてオーナー様同士の新たな繋がりを育む、特別な午後をご提案します。",
+            "endMs": 100500,
+            "startMs": 91437
+          }
+        ],
+        "provider": "gemini",
+        "sampleRate": 24000,
+        "generatedAt": "2026-08-17T08:56:57.274Z"
+      }
+    },
+    "guests": [
+      {
+        "name": "宮尾佳明",
+        "role": "宮尾酒造 十一代目当主",
+        "photo": {
+          "src": {
+            "$material": "1b9fc170-0711-4c1f-bcd0-4c85eaee684f",
+            "label": "miyao.jpg",
+            "repoPath": "public/event/sake-2026/photos/miyao.jpg",
+            "inGit": false
+          },
+          "focus": {
+            "x": 0.68,
+            "y": 0.5
+          }
+        }
+      },
+      {
+        "name": "大西美香",
+        "role": "一般社団法人Miss SAKE 代表理事",
+        "photo": {
+          "src": {
+            "$material": "139efcd6-c07c-4394-bef7-6972fe2349d7",
+            "label": "onishi.jpg",
+            "repoPath": "public/event/sake-2026/photos/onishi.jpg",
+            "inGit": false
+          },
+          "focus": {
+            "x": 0.5,
+            "y": 0.5
+          }
+        }
+      }
+    ],
+    "visuals": {
+      "value": {
+        "src": {
+          "$material": "dd98eda3-2ce2-4438-ae3c-200d2529f1eb",
+          "label": "sake/AdobeStock_122637388.jpeg",
+          "repoPath": null,
+          "inGit": false
+        },
+        "focus": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "closing": {
+        "src": {
+          "$material": "7c973727-2e60-4c16-b8fa-19254e624bf8",
+          "label": "sake/AdobeStock_473760969.jpeg",
+          "repoPath": null,
+          "inGit": false
+        },
+        "focus": {
+          "x": 0.5,
+          "y": 0.38
+        }
+      },
+      "programs": {
+        "src": {
+          "$material": "52c9a84e-458a-41ce-a802-287350419eef",
+          "label": "sake/AdobeStock_1894358160.jpeg",
+          "repoPath": null,
+          "inGit": false
+        },
+        "focus": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      }
+    },
+    "footnote": null,
+    "programs": [
+      {
+        "title": "百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング"
+      },
+      {
+        "title": "〆張鶴・宮尾酒造十一代目当主と、Miss SAKE代表理事が語る、知られざる日本酒業界の舞台裏と世界への広がり"
+      },
+      {
+        "title": "2026 Miss SAKE 2名と学ぶ、日本酒の楽しみ方を広げる2つのワークショップ（飲み順・味わいの表現・テイスティングのコツ）"
+      }
+    ],
+    "schedule": {
+      "fee": null,
+      "date": "2026年10月3日",
+      "time": "13:00〜16:00（予定）",
+      "venue": "中野坂上 ボードルーム",
+      "weekday": "土"
+    },
+    "subtitle": "世界へつながる、文化資本への投資",
+    "narration": {
+      "angle": "少人数で日本酒を深く学び、味わい、日本文化を楽しむ仲間とのつながりへ導く30秒です。",
+      "scenes": [
+        {
+          "role": "title",
+          "text": "レオパレス21とWealthPark Labが贈る、文化資本と投資シリーズ第3弾。世界が恋する日本酒。"
+        },
+        {
+          "role": "value",
+          "text": "日本の国酒である日本酒。2026 Miss SAKE 2名とともに、百貨店では出会えない特別な日本酒を味わいながら、その楽しみ方や、世界で高まる日本酒の価値をアップデートしてみませんか。"
+        },
+        {
+          "role": "program",
+          "text": "このイベントでは、3つのプログラムで楽しみ方を深めます。まず、百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング。様々な日本酒を五感で感じていただけます。",
+          "index": 0
+        },
+        {
+          "role": "program",
+          "text": "2つ目はトークセッションです。しめはりつる、宮尾酒造十一代目当主と、Miss SAKE 代表理事が、知られざる日本酒業界の舞台裏と世界への広がりについて語ります。",
+          "index": 1
+        },
+        {
+          "role": "program",
+          "text": "3つ目はワークショップです。2026 Miss SAKE 2名とともに、日本酒の楽しみ方を広げる2つのワークショップで、飲み順、味わいの表現、テイスティングのコツについて学びます。",
+          "index": 2
+        },
+        {
+          "role": "guests",
+          "text": "200年以上の歴史を誇る、新潟・村上の名門酒蔵、宮尾酒造の十一代目当主、宮尾佳明氏と、日本酒の海外普及と日本文化の次世代への継承を担う、一般社団法人 Miss SAKE 代表理事、大西美香氏をゲストに招いての開催となります。"
+        },
+        {
+          "role": "cta",
+          "text": "一杯の日本酒から始まる、新しい出会いと学び。レオパレス21とオーナー様、そしてオーナー様同士の新たな繋がりを育む、特別な午後をご提案します。"
+        }
+      ],
+      "source": "human",
+      "version": 1,
+      "updatedAt": "2026-08-17T08:55:52.818Z"
+    },
+    "presenter": "レオパレス21 × WealthPark Lab",
+    "valueChip": "少人数で、深く",
+    "provenance": {
+      "bgm": {
+        "origin": "user"
+      },
+      "cta": {
+        "origin": "inferred"
+      },
+      "logos": {
+        "note": "透過の明るいマークなのでそのまま置きました",
+        "origin": "inferred",
+        "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+      },
+      "theme": {
+        "origin": "brand"
+      },
+      "title": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "guests": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "programs": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "subtitle": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "presenter": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "valueChip": {
+        "origin": "inferred"
+      },
+      "valueLines": {
+        "origin": "extracted",
+        "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+      },
+      "seriesLabel": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "theme.accent": {
+        "note": "このブランドはアクセントを持たないため、テーマの色を使う",
+        "origin": "inferred"
+      },
+      "schedule.date": {
+        "origin": "extracted",
+        "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+      },
+      "schedule.time": {
+        "origin": "extracted",
+        "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+      },
+      "visuals.value": {
+        "note": "木枡に入った日本酒と酒器が写っている。",
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、sake/AdobeStock_2078450052.jpeg、sake/AdobeStock_473760969.jpeg、sake/AdobeStock_96941827.jpeg、貼り付けたテキスト、sake/AdobeStock_1858867289.jpeg、sake/AdobeStock_122637388.jpeg、sake/AdobeStock_2004753626.jpeg"
+      },
+      "schedule.venue": {
+        "origin": "extracted",
+        "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+      },
+      "guests[0].photo": {
+        "note": "ファイル名から「宮尾佳明」と確認",
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "guests[1].photo": {
+        "note": "ファイル名から「大西美香」と確認",
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "visuals.closing": {
+        "note": "男性が木枡を手に日本酒の香りを確認している。",
+        "origin": "inferred",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、sake/AdobeStock_2078450052.jpeg、sake/AdobeStock_473760969.jpeg、sake/AdobeStock_96941827.jpeg、貼り付けたテキスト、sake/AdobeStock_1858867289.jpeg、sake/AdobeStock_122637388.jpeg、sake/AdobeStock_2004753626.jpeg"
+      },
+      "visuals.programs": {
+        "note": "徳利からグラスへ日本酒を注いでいる。",
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、sake/AdobeStock_2078450052.jpeg、sake/AdobeStock_473760969.jpeg、sake/AdobeStock_96941827.jpeg、貼り付けたテキスト、sake/AdobeStock_1858867289.jpeg、sake/AdobeStock_122637388.jpeg、sake/AdobeStock_2004753626.jpeg"
+      }
+    },
+    "valueLines": [
+      "日本酒をより深く楽しめる教養を身につける",
+      "日本文化の魅力を再発見する",
+      "文化を楽しめる仲間との出会い"
+    ],
+    "seriesLabel": "「文化資本と投資」シリーズ 第3弾",
+    "guestsHeading": "登壇者",
+    "factsUpdatedAt": "2026-08-17T05:50:10.213Z",
+    "programsHeading": "3つのプログラム"
+  },
+  "bakedBrief": {
+    "bgm": {
+      "$material": "5fe6a63d-52fd-4e76-9a66-e9c0f4d1b533",
+      "label": "bgm.mp3",
+      "repoPath": "public/event/sake-2026/bgm.mp3",
+      "inGit": false
+    },
+    "cta": "詳細・お申し込みはこちら",
+    "logos": [
+      {
+        "src": {
+          "$material": "0effe5bc-acea-4e6b-8ab4-d7bd4b57bcec",
+          "label": "WealthPark Lab.svg",
+          "repoPath": null,
+          "inGit": false
+        },
+        "name": "WealthPark Lab"
+      },
+      {
+        "src": {
+          "$material": "1d7ea61e-2a1c-4e12-9fb8-a5c0af4bc7e5",
+          "label": "leopalace21.jpg",
+          "repoPath": null,
+          "inGit": false
+        },
+        "name": "leopalace21",
+        "treatment": "light"
+      },
+      {
+        "src": {
+          "$material": "337073e8-6e5e-430d-984a-d60f2521080a",
+          "label": "ft_logo.png",
+          "repoPath": null,
+          "inGit": false
+        },
+        "name": "〆張鶴",
+        "treatment": "light"
+      }
+    ],
+    "theme": {
+      "palette": {
+        "text": "#000000",
+        "primary": "#080808",
+        "background": "#ffffff"
+      },
+      "bodyFont": "Zen Kaku Gothic New",
+      "headingFont": "Zen Kaku Gothic New"
+    },
+    "title": "世界が恋する日本酒",
+    "voice": {
+      "audio": {
+        "$material": "6099a32b-26c5-45e9-b73e-268f4042b2cd",
+        "label": "イベント紹介動画のボイス",
+        "repoPath": null,
+        "inGit": false
+      },
+      "track": {
+        "mock": false,
+        "voice": "Aoede",
+        "scenes": [
+          {
+            "role": "title",
+            "text": "レオパレス21とWealthPark Labが贈る、文化資本と投資シリーズ第3弾。世界が恋する日本酒。",
+            "startMs": 0,
+            "durationMs": 9600
+          },
+          {
+            "role": "value",
+            "text": "日本の国酒である日本酒。2026 Miss SAKE 2名とともに、百貨店では出会えない特別な日本酒を味わいながら、その楽しみ方や、世界で高まる日本酒の価値をアップデートしてみませんか。",
+            "startMs": 10500,
+            "durationMs": 14480
+          },
+          {
+            "role": "program",
+            "text": "このイベントでは、3つのプログラムで楽しみ方を深めます。まず、百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング。様々な日本酒を五感で感じていただけます。",
+            "index": 0,
+            "startMs": 25880,
+            "durationMs": 13600
+          },
+          {
+            "role": "program",
+            "text": "2つ目はトークセッションです。しめはりつる、宮尾酒造十一代目当主と、Miss SAKE 代表理事が、知られざる日本酒業界の舞台裏と世界への広がりについて語ります。",
+            "index": 1,
+            "startMs": 40380,
+            "durationMs": 12160
+          },
+          {
+            "role": "program",
+            "text": "3つ目はワークショップです。2026 Miss SAKE 2名とともに、日本酒の楽しみ方を広げる2つのワークショップで、飲み順、味わいの表現、テイスティングのコツについて学びます。",
+            "index": 2,
+            "startMs": 53440,
+            "durationMs": 13480
+          },
+          {
+            "role": "guests",
+            "text": "200年以上の歴史を誇る、新潟・村上の名門酒蔵、宮尾酒造の十一代目当主、宮尾佳明氏と、日本酒の海外普及と日本文化の次世代への継承を担う、一般社団法人 Miss SAKE 代表理事、大西美香氏をゲストに招いての開催となります。",
+            "startMs": 67820,
+            "durationMs": 18600
+          },
+          {
+            "role": "cta",
+            "text": "一杯の日本酒から始まる、新しい出会いと学び。レオパレス21とオーナー様、そしてオーナー様同士の新たな繋がりを育む、特別な午後をご提案します。",
+            "startMs": 87320,
+            "durationMs": 12680
+          }
+        ],
+        "totalMs": 100500,
+        "version": 1,
+        "captions": [
+          {
+            "text": "レオパレス21とWealthPark Labが贈る、文化資本と投資シリーズ第3弾。",
+            "endMs": 7543,
+            "startMs": 0
+          },
+          {
+            "text": "世界が恋する日本酒。",
+            "endMs": 10500,
+            "startMs": 7543
+          },
+          {
+            "text": "日本の国酒である日本酒。",
+            "endMs": 12527,
+            "startMs": 10500
+          },
+          {
+            "text": "2026 Miss SAKE 2名とともに、百貨店では出会えない特別な日本酒を味わいながら、その楽しみ方や、世界で高まる日本酒の価値をアップデートしてみませんか。",
+            "endMs": 25880,
+            "startMs": 12527
+          },
+          {
+            "text": "このイベントでは、3つのプログラムで楽しみ方を深めます。",
+            "endMs": 30463,
+            "startMs": 25880
+          },
+          {
+            "text": "まず、百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング。",
+            "endMs": 36228,
+            "startMs": 30463
+          },
+          {
+            "text": "様々な日本酒を五感で感じていただけます。",
+            "endMs": 40380,
+            "startMs": 36228
+          },
+          {
+            "text": "2つ目はトークセッションです。",
+            "endMs": 42729,
+            "startMs": 40380
+          },
+          {
+            "text": "しめはりつる、宮尾酒造十一代目当主と、Miss SAKE 代表理事が、知られざる日本酒業界の舞台裏と世界への広がりについて語ります。",
+            "endMs": 53440,
+            "startMs": 42729
+          },
+          {
+            "text": "3つ目はワークショップです。",
+            "endMs": 55641,
+            "startMs": 53440
+          },
+          {
+            "text": "2026 Miss SAKE 2名とともに、日本酒の楽しみ方を広げる2つのワークショップで、飲み順、味わいの表現、テイスティングのコツについて学びます。",
+            "endMs": 67820,
+            "startMs": 55641
+          },
+          {
+            "text": "200年以上の歴史を誇る、新潟・村上の名門酒蔵、宮尾酒造の十一代目当主、宮尾佳明氏と、日本酒の海外普及と日本文化の次世代への継承を担う、一般社団法人 Miss SAKE 代表理事、大西美香氏をゲストに招いての開催となります。",
+            "endMs": 87320,
+            "startMs": 67820
+          },
+          {
+            "text": "一杯の日本酒から始まる、新しい出会いと学び。",
+            "endMs": 91437,
+            "startMs": 87320
+          },
+          {
+            "text": "レオパレス21とオーナー様、そしてオーナー様同士の新たな繋がりを育む、特別な午後をご提案します。",
+            "endMs": 100500,
+            "startMs": 91437
+          }
+        ],
+        "provider": "gemini",
+        "sampleRate": 24000,
+        "generatedAt": "2026-08-17T08:56:57.274Z"
+      }
+    },
+    "guests": [
+      {
+        "name": "宮尾佳明",
+        "role": "宮尾酒造 十一代目当主",
+        "photo": {
+          "src": {
+            "$material": "1b9fc170-0711-4c1f-bcd0-4c85eaee684f",
+            "label": "miyao.jpg",
+            "repoPath": "public/event/sake-2026/photos/miyao.jpg",
+            "inGit": false
+          },
+          "focus": {
+            "x": 0.68,
+            "y": 0.5
+          }
+        }
+      },
+      {
+        "name": "大西美香",
+        "role": "一般社団法人Miss SAKE 代表理事",
+        "photo": {
+          "src": {
+            "$material": "139efcd6-c07c-4394-bef7-6972fe2349d7",
+            "label": "onishi.jpg",
+            "repoPath": "public/event/sake-2026/photos/onishi.jpg",
+            "inGit": false
+          },
+          "focus": {
+            "x": 0.5,
+            "y": 0.5
+          }
+        }
+      }
+    ],
+    "visuals": {
+      "value": {
+        "src": {
+          "$material": "dd98eda3-2ce2-4438-ae3c-200d2529f1eb",
+          "label": "sake/AdobeStock_122637388.jpeg",
+          "repoPath": null,
+          "inGit": false
+        },
+        "focus": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "closing": {
+        "src": {
+          "$material": "7c973727-2e60-4c16-b8fa-19254e624bf8",
+          "label": "sake/AdobeStock_473760969.jpeg",
+          "repoPath": null,
+          "inGit": false
+        },
+        "focus": {
+          "x": 0.5,
+          "y": 0.38
+        }
+      },
+      "programs": {
+        "src": {
+          "$material": "52c9a84e-458a-41ce-a802-287350419eef",
+          "label": "sake/AdobeStock_1894358160.jpeg",
+          "repoPath": null,
+          "inGit": false
+        },
+        "focus": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      }
+    },
+    "footnote": null,
+    "programs": [
+      {
+        "title": "百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング"
+      },
+      {
+        "title": "〆張鶴・宮尾酒造十一代目当主と、Miss SAKE代表理事が語る、知られざる日本酒業界の舞台裏と世界への広がり"
+      },
+      {
+        "title": "2026 Miss SAKE 2名と学ぶ、日本酒の楽しみ方を広げる2つのワークショップ（飲み順・味わいの表現・テイスティングのコツ）"
+      }
+    ],
+    "schedule": {
+      "fee": null,
+      "date": "2026年10月3日",
+      "time": "13:00〜16:00（予定）",
+      "venue": "中野坂上 ボードルーム",
+      "weekday": "土"
+    },
+    "subtitle": "世界へつながる、文化資本への投資",
+    "narration": {
+      "angle": "少人数で日本酒を深く学び、味わい、日本文化を楽しむ仲間とのつながりへ導く30秒です。",
+      "scenes": [
+        {
+          "role": "title",
+          "text": "レオパレス21とWealthPark Labが贈る、文化資本と投資シリーズ第3弾。世界が恋する日本酒。"
+        },
+        {
+          "role": "value",
+          "text": "日本の国酒である日本酒。2026 Miss SAKE 2名とともに、百貨店では出会えない特別な日本酒を味わいながら、その楽しみ方や、世界で高まる日本酒の価値をアップデートしてみませんか。"
+        },
+        {
+          "role": "program",
+          "text": "このイベントでは、3つのプログラムで楽しみ方を深めます。まず、百貨店には並ばない、蔵出しの特別な日本酒5種類をテイスティング。様々な日本酒を五感で感じていただけます。",
+          "index": 0
+        },
+        {
+          "role": "program",
+          "text": "2つ目はトークセッションです。しめはりつる、宮尾酒造十一代目当主と、Miss SAKE 代表理事が、知られざる日本酒業界の舞台裏と世界への広がりについて語ります。",
+          "index": 1
+        },
+        {
+          "role": "program",
+          "text": "3つ目はワークショップです。2026 Miss SAKE 2名とともに、日本酒の楽しみ方を広げる2つのワークショップで、飲み順、味わいの表現、テイスティングのコツについて学びます。",
+          "index": 2
+        },
+        {
+          "role": "guests",
+          "text": "200年以上の歴史を誇る、新潟・村上の名門酒蔵、宮尾酒造の十一代目当主、宮尾佳明氏と、日本酒の海外普及と日本文化の次世代への継承を担う、一般社団法人 Miss SAKE 代表理事、大西美香氏をゲストに招いての開催となります。"
+        },
+        {
+          "role": "cta",
+          "text": "一杯の日本酒から始まる、新しい出会いと学び。レオパレス21とオーナー様、そしてオーナー様同士の新たな繋がりを育む、特別な午後をご提案します。"
+        }
+      ],
+      "source": "human",
+      "version": 1,
+      "updatedAt": "2026-08-17T08:55:52.818Z"
+    },
+    "presenter": "レオパレス21 × WealthPark Lab",
+    "valueChip": "少人数で、深く",
+    "provenance": {
+      "bgm": {
+        "origin": "user"
+      },
+      "cta": {
+        "origin": "inferred"
+      },
+      "logos": {
+        "note": "透過の明るいマークなのでそのまま置きました",
+        "origin": "inferred",
+        "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+      },
+      "theme": {
+        "origin": "brand"
+      },
+      "title": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "guests": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "programs": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "subtitle": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "presenter": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "valueChip": {
+        "origin": "inferred"
+      },
+      "valueLines": {
+        "origin": "extracted",
+        "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+      },
+      "seriesLabel": {
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "theme.accent": {
+        "note": "このブランドはアクセントを持たないため、テーマの色を使う",
+        "origin": "inferred"
+      },
+      "schedule.date": {
+        "origin": "extracted",
+        "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+      },
+      "schedule.time": {
+        "origin": "extracted",
+        "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+      },
+      "visuals.value": {
+        "note": "木枡に入った日本酒と酒器が写っている。",
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、sake/AdobeStock_2078450052.jpeg、sake/AdobeStock_473760969.jpeg、sake/AdobeStock_96941827.jpeg、貼り付けたテキスト、sake/AdobeStock_1858867289.jpeg、sake/AdobeStock_122637388.jpeg、sake/AdobeStock_2004753626.jpeg"
+      },
+      "schedule.venue": {
+        "origin": "extracted",
+        "source": "kv_11.jpg、onishi.jpg、kv_10.jpg、miyao.jpg、leopalace21.jpg、ft_logo.png、kv_8.jpg、kv_3.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、ChatGPT Image 2026年7月14日 14_15_25.png、sake/AdobeStock_2078450052.jpeg、貼り付けたテキスト"
+      },
+      "guests[0].photo": {
+        "note": "ファイル名から「宮尾佳明」と確認",
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "guests[1].photo": {
+        "note": "ファイル名から「大西美香」と確認",
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、貼り付けたテキスト"
+      },
+      "visuals.closing": {
+        "note": "男性が木枡を手に日本酒の香りを確認している。",
+        "origin": "inferred",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、sake/AdobeStock_2078450052.jpeg、sake/AdobeStock_473760969.jpeg、sake/AdobeStock_96941827.jpeg、貼り付けたテキスト、sake/AdobeStock_1858867289.jpeg、sake/AdobeStock_122637388.jpeg、sake/AdobeStock_2004753626.jpeg"
+      },
+      "visuals.programs": {
+        "note": "徳利からグラスへ日本酒を注いでいる。",
+        "origin": "extracted",
+        "source": "onishi.jpg、miyao.jpg、leopalace21.jpg、kato.jpg、sake/AdobeStock_1894358160.jpeg、sake/AdobeStock_2078450052.jpeg、sake/AdobeStock_473760969.jpeg、sake/AdobeStock_96941827.jpeg、貼り付けたテキスト、sake/AdobeStock_1858867289.jpeg、sake/AdobeStock_122637388.jpeg、sake/AdobeStock_2004753626.jpeg"
+      }
+    },
+    "valueLines": [
+      "日本酒をより深く楽しめる教養を身につける",
+      "日本文化の魅力を再発見する",
+      "文化を楽しめる仲間との出会い"
+    ],
+    "seriesLabel": "「文化資本と投資」シリーズ 第3弾",
+    "guestsHeading": "登壇者",
+    "factsUpdatedAt": "2026-08-17T05:50:10.213Z",
+    "programsHeading": "3つのプログラム"
+  },
+  "inputs": [
+    {
+      "role": "logo",
+      "id": "0effe5bc-acea-4e6b-8ab4-d7bd4b57bcec",
+      "label": "WealthPark Lab.svg",
+      "kind": "logo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/materials/d0f46d83b7bb28fafb140b84ccdba4b9a966d826f21ae7d967220ae7a3ea21bc/logo.svg",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "bcebd473-f71b-4fba-9b60-de3d6f057fb4",
+      "label": "貼り付けたテキスト",
+      "kind": "document",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/c8391b6017009824617dba9ae10c4046be40b52f0384a357e14b519139c6a5fe",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "5fe6a63d-52fd-4e76-9a66-e9c0f4d1b533",
+      "label": "bgm.mp3",
+      "kind": "audio",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/beec56e62f67e6355521c9ad992e483728fe94282060cab490f63bf926c33739",
+      "repoPath": "public/event/sake-2026/bgm.mp3",
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "4a6e75a5-e97f-4205-861f-9123939bf6ff",
+      "label": "kato.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/d0e6750a83a16a7a3816935329f25875641a1e53452159594013a8ce6d478c1c",
+      "repoPath": "public/event/sake-2026/photos/kato.jpg",
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "1d7ea61e-2a1c-4e12-9fb8-a5c0af4bc7e5",
+      "label": "leopalace21.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/464f1e0a64ccd7357440ada364a9ac9ad25610af3a42e4bbd9a1539bfe38773b",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "1b9fc170-0711-4c1f-bcd0-4c85eaee684f",
+      "label": "miyao.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/78ca1c6cf6743c6db5db836068a27e3054eaedd06597cc4c6e885b7d6d7d1cdc",
+      "repoPath": "public/event/sake-2026/photos/miyao.jpg",
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "139efcd6-c07c-4394-bef7-6972fe2349d7",
+      "label": "onishi.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/984843b3f51b2c69b9b3691957a117021e45ddecf9347bda9332a8f167a65e2c",
+      "repoPath": "public/event/sake-2026/photos/onishi.jpg",
+      "inGit": false
+    },
+    {
+      "role": "event_cm_voice",
+      "id": "ff27f448-e76a-4b34-a991-cb937a1ff079",
+      "label": "イベント紹介動画の読み上げ",
+      "kind": "audio",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/event_cm_voice-98ad4cbebfe32d0f.wav",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "52c9a84e-458a-41ce-a802-287350419eef",
+      "label": "sake/AdobeStock_1894358160.jpeg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/acabaa3ac12f1ce7be0d5727f6de13ca93104a0457400dd12137b741f8ea304f",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "7c973727-2e60-4c16-b8fa-19254e624bf8",
+      "label": "sake/AdobeStock_473760969.jpeg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/d13697c26a9038c8a006d068a73cb6f72297952349b0a4ce784b46f37e61605a",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "dce42aa9-8c4d-4769-ac64-c3ee8c5e07e5",
+      "label": "sake/AdobeStock_1858867289.jpeg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/093753391f326d14e2caf3aa3157473c7a726b3cbaa1e3850fcd115394f1a3a4",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "6efda177-18e7-4fe7-b8f4-6a20898c5115",
+      "label": "sake/AdobeStock_2078450052.jpeg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/a85de52076f86c08a2754f9b3c313c25b5208698db681d93b8087004f8c4ab31",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "df0edd3d-ae9e-417b-bd13-10ddd81c2dd1",
+      "label": "sake/AdobeStock_2004753626.jpeg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/a89318adbc21a63d456c2d791881cb186297a1411b9964bf61a1fed9ba710e75",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "dd98eda3-2ce2-4438-ae3c-200d2529f1eb",
+      "label": "sake/AdobeStock_122637388.jpeg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/3eddd35239d9378bb3c70f5c5ecf4fcc4b0e9b534789cfa95e4ab109d2575658",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "97cdc179-c749-406a-ab56-e89cfe8ad2a3",
+      "label": "sake/AdobeStock_96941827.jpeg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/521f6b45fc575bef338b52b4ab950da8cc5141f410c1776fbe52de64333cfb5a",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "event_cm_voice",
+      "id": "39cba725-d87e-4485-97da-0ef13bfdcdb9",
+      "label": "イベント紹介動画の読み上げ",
+      "kind": "audio",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/event_cm_voice-ed501adbdf0cc9f6.wav",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "event_cm_voice",
+      "id": "eec44e9b-cf09-439e-b764-f168e151d812",
+      "label": "イベント紹介動画の読み上げ",
+      "kind": "audio",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/event_cm_voice-86dca0adf2827f8d.wav",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "68fe5963-acb7-4b0a-ac90-637dc49d9077",
+      "label": "ChatGPT Image 2026年7月14日 14_15_25.png",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/aa691cc16276a1adab6799c679e50e97c785447955a9ca3ace9c4beba5486904",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "da8fcd7d-ee95-4957-9b1a-f4be0f188a1d",
+      "label": "Miss-sake_赤ロゴ-1536x542.webp",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/d29af74a00308b4b1f16f134c263c1569ab2f39aa92a91a9fb280a62fdfbcc48",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "efa4cd25-1548-489d-8288-3111005aa0d1",
+      "label": "logo.png",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/2f1c9f9273cc71ecfcc38a5d632c23e2f0a51587b06244d8d023a8c005078835",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "337073e8-6e5e-430d-984a-d60f2521080a",
+      "label": "ft_logo.png",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/7fe33697e8568ca6c0c3c2af884b390a3fde28e1ab6d38f57a65616f877635ed",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "33df1d63-be72-4eab-9698-296a94b97285",
+      "label": "kv_8.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/b43d9430400099ceba9a7035a4546eb88d37d5aff97052802e57eb3c12be1bf5",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "34bdcc44-a8c2-4a2e-922b-e43f1260b0ce",
+      "label": "kv_3.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/84b538bef4383cd998b3a1875f1e9a898fa31c1cd90e7178ea6b54a01bba4b18",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "f445a8f2-eba3-4a5b-98a9-255a9555e69a",
+      "label": "kv_2.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/baf0a075f2fecd5bfec75d8f0da098d3127f0cdb9094b7f450819bbfc4f362be",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "1b58f9f6-c167-45eb-826b-1f53b4b8e6b9",
+      "label": "kv_10.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/8a634b1e572a08b1716e9b7f29813eba86bcdb261bfcef5e7b9941e5640856b2",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "brief_source",
+      "id": "04575e91-4edb-4371-8a3b-a1cf669d0d2d",
+      "label": "kv_11.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/04665a8a3144eab8ce2ff8582ee543dc86c51458d784587133d5d1dddf05a33d",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "event_cm_voice",
+      "id": "e408e451-5d3b-4c0a-bbb4-81e47b39328e",
+      "label": "イベント紹介動画の読み上げ",
+      "kind": "audio",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/event_cm_voice-3000f0881fabd8b8.wav",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "event_cm_voice",
+      "id": "e07729e5-445c-43b5-a546-a2b851bc7e31",
+      "label": "イベント紹介動画のボイス",
+      "kind": "audio",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/event_cm_voice-dfd724ef40471fc9.wav",
+      "repoPath": null,
+      "inGit": false
+    },
+    {
+      "role": "event_cm_voice",
+      "id": "6099a32b-26c5-45e9-b73e-268f4042b2cd",
+      "label": "イベント紹介動画のボイス",
+      "kind": "audio",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/materials/event_cm_voice-d305bef5bf02b080.wav",
+      "repoPath": null,
+      "inGit": false
+    }
+  ],
+  "deliverables": [
+    {
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/920d4cfe-3843-4a6c-b538-7238e79707d2/renders/15370a21-65b9-4e53-b4e5-bac90d50b2bd/video-20260816053053652.mp4",
+      "mediaType": "video/mp4",
+      "bytes": 16163161,
+      "durationMs": null,
+      "createdAt": "2026-08-16T05:30:55.903808+00:00"
+    }
+  ]
+}

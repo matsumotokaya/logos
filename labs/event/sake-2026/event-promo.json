@@ -1,0 +1,327 @@
+{
+  "take": {
+    "id": "2b73e433-ba47-4253-841f-0cae18c101c6",
+    "title": "テスト: 世界が恋する日本酒 v2",
+    "tool_kind": "video",
+    "template_id": "event-promo",
+    "template_version": 1,
+    "brief_schema_version": 1,
+    "status": "ready",
+    "created_at": "2026-08-10T14:33:11.742199+00:00"
+  },
+  "brief": {
+    "bgm": {
+      "$material": "168537b3-2140-4361-9665-9d02abc308bc",
+      "label": "bgm.mp3",
+      "repoPath": "public/event/sake-2026/bgm.mp3",
+      "inGit": false
+    },
+    "cta": "詳細・お申し込みはこちら",
+    "logos": [
+      {
+        "src": {
+          "$material": "b8f31835-d91d-4d4a-a4e5-4649100fc644",
+          "label": "leopalace21.png",
+          "repoPath": "public/event/sake-2026/logos/leopalace21.png",
+          "inGit": true
+        },
+        "name": "レオパレス21",
+        "scale": 0.82
+      },
+      {
+        "src": {
+          "$material": "5981f269-967a-423e-9214-e97f40a98819",
+          "label": "wealthpark-lab.svg",
+          "repoPath": "public/event/sake-2026/logos/wealthpark-lab.svg",
+          "inGit": true
+        },
+        "name": "WealthPark Lab",
+        "scale": 0.8,
+        "treatment": "invert"
+      },
+      {
+        "src": {
+          "$material": "7b507558-3be4-4009-a8d4-e3aa69434904",
+          "label": "shimeharitsuru.png",
+          "repoPath": "public/event/sake-2026/logos/shimeharitsuru.png",
+          "inGit": true
+        },
+        "name": "〆張鶴",
+        "scale": 1.25
+      },
+      {
+        "src": {
+          "$material": "dc969c10-06a6-49cd-a972-8785f3b3cfc9",
+          "label": "miss-sake.png",
+          "repoPath": "public/event/sake-2026/logos/miss-sake.png",
+          "inGit": true
+        },
+        "name": "Miss SAKE",
+        "scale": 1.35
+      }
+    ],
+    "title": "世界が恋する日本酒",
+    "guests": [
+      {
+        "name": "宮尾 佳明",
+        "role": "宮尾酒造 十一代目当主",
+        "photo": {
+          "src": {
+            "$material": "1f452670-487e-4318-88bf-55a0edda4ff2",
+            "label": "miyao.jpg",
+            "repoPath": "public/event/sake-2026/photos/miyao.jpg",
+            "inGit": false
+          },
+          "zoom": 2.1,
+          "focus": {
+            "x": 0.68,
+            "y": 0.3
+          }
+        }
+      },
+      {
+        "name": "大西 美香",
+        "role": "一社）Miss SAKE 代表理事",
+        "photo": {
+          "src": {
+            "$material": "f198b13f-0aea-41b5-892d-e2673eb6c63e",
+            "label": "onishi.jpg",
+            "repoPath": "public/event/sake-2026/photos/onishi.jpg",
+            "inGit": false
+          },
+          "zoom": 2,
+          "focus": {
+            "x": 0.52,
+            "y": 0.27
+          }
+        }
+      },
+      {
+        "name": "加藤 航介",
+        "role": "モデレーター\nWealthPark研究所 代表",
+        "photo": {
+          "src": {
+            "$material": "31043664-9920-4453-901c-76ea3172434b",
+            "label": "kato.jpg",
+            "repoPath": "public/event/sake-2026/photos/kato.jpg",
+            "inGit": false
+          },
+          "zoom": 1.9,
+          "focus": {
+            "x": 0.47,
+            "y": 0.3
+          }
+        }
+      }
+    ],
+    "visuals": {
+      "value": {
+        "src": {
+          "$material": "e7aca406-ea41-4779-b9d2-046d5cddf01e",
+          "label": "pour-lanterns.jpg",
+          "repoPath": "public/event/sake-2026/photos/pour-lanterns.jpg",
+          "inGit": false
+        },
+        "focus": {
+          "x": 0.5,
+          "y": 0.45
+        }
+      },
+      "inkArt": {
+        "$material": "6df72650-e2b8-4134-851e-87ea330fdb5f",
+        "label": "sake-kanji.png",
+        "repoPath": "public/event/sake-2026/art/sake-kanji.png",
+        "inGit": false
+      },
+      "closing": {
+        "src": {
+          "$material": "366c7d29-b35e-41bd-8235-1197082e3266",
+          "label": "masu.jpg",
+          "repoPath": "public/event/sake-2026/photos/masu.jpg",
+          "inGit": false
+        },
+        "focus": {
+          "x": 0.45,
+          "y": 0.5
+        }
+      },
+      "texture": {
+        "$material": "857fd3b2-04fc-448d-95db-8e4ec9442521",
+        "label": "slate.jpg",
+        "repoPath": "public/event/sake-2026/photos/slate.jpg",
+        "inGit": false
+      },
+      "programs": {
+        "src": {
+          "$material": "f09d814a-12ae-4ce7-bc13-f11cb169d74e",
+          "label": "brewer.jpg",
+          "repoPath": "public/event/sake-2026/photos/brewer.jpg",
+          "inGit": false
+        },
+        "focus": {
+          "x": 0.55,
+          "y": 0.68
+        }
+      }
+    },
+    "footnote": "20歳以上より参加可・お一人からご家族まで歓迎",
+    "programs": [
+      {
+        "title": "蔵出しの特別な日本酒5種類をテイスティング"
+      },
+      {
+        "title": "十一代目当主 × Miss SAKE代表理事が語る、日本酒業界の舞台裏"
+      },
+      {
+        "title": "2026 Miss SAKE 2名と学ぶ、楽しみ方を広げるワークショップ"
+      }
+    ],
+    "schedule": {
+      "fee": null,
+      "date": "2026.10.2",
+      "time": "17:00 START",
+      "venue": null,
+      "weekday": "FRI"
+    },
+    "sideCopy": "特別な日本酒を楽しみながら、日本の文化資本の未来を考える",
+    "subtitle": "〜次世代へつなぐ、文化資本への投資〜",
+    "presenter": "レオパレス21 × WealthPark Lab",
+    "valueChip": "特別な5種を、テイスティングで",
+    "valueLines": [
+      "百貨店には並ばない、",
+      "蔵出しの特別な日本酒。"
+    ],
+    "seriesLabel": "「文化資本と投資」シリーズ 第3弾",
+    "guestsHeading": "ゲスト",
+    "programsHeading": "3つのプログラム"
+  },
+  "bakedBrief": null,
+  "inputs": [
+    {
+      "role": "event.logo.leopalace21",
+      "id": "b8f31835-d91d-4d4a-a4e5-4649100fc644",
+      "label": "leopalace21.png",
+      "kind": "logo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/c0d5f7d561acec5e33e0a83fd28c951ee27212acc4dc083892f90b56f011e320/leopalace21.png",
+      "repoPath": "public/event/sake-2026/logos/leopalace21.png",
+      "inGit": true
+    },
+    {
+      "role": "event.logo.wealthpark-lab",
+      "id": "5981f269-967a-423e-9214-e97f40a98819",
+      "label": "wealthpark-lab.svg",
+      "kind": "logo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/991bbc81b48204465a7102acce6601a71454dfc292681e79c6b04780e7885311/wealthpark-lab.svg",
+      "repoPath": "public/event/sake-2026/logos/wealthpark-lab.svg",
+      "inGit": true
+    },
+    {
+      "role": "event.logo.shimeharitsuru",
+      "id": "7b507558-3be4-4009-a8d4-e3aa69434904",
+      "label": "shimeharitsuru.png",
+      "kind": "logo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/7fe33697e8568ca6c0c3c2af884b390a3fde28e1ab6d38f57a65616f877635ed/shimeharitsuru.png",
+      "repoPath": "public/event/sake-2026/logos/shimeharitsuru.png",
+      "inGit": true
+    },
+    {
+      "role": "event.logo.miss-sake",
+      "id": "dc969c10-06a6-49cd-a972-8785f3b3cfc9",
+      "label": "miss-sake.png",
+      "kind": "logo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/12f4b349761194211294f0216b5a129981fa9ada7211e4bdd975eae8d1f3fdd1/miss-sake.png",
+      "repoPath": "public/event/sake-2026/logos/miss-sake.png",
+      "inGit": true
+    },
+    {
+      "role": "event.guest.miyao",
+      "id": "1f452670-487e-4318-88bf-55a0edda4ff2",
+      "label": "miyao.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/b7337349fe96d914f984a96d3e3b1934b3b85d499ceb9b6da36924cff66e19fa/miyao.jpg",
+      "repoPath": "public/event/sake-2026/photos/miyao.jpg",
+      "inGit": false
+    },
+    {
+      "role": "event.guest.onishi",
+      "id": "f198b13f-0aea-41b5-892d-e2673eb6c63e",
+      "label": "onishi.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/0573a7f414a9a2658b665a6555af375222ab1ef9f2fe2f752df89c7e0fee7bae/onishi.jpg",
+      "repoPath": "public/event/sake-2026/photos/onishi.jpg",
+      "inGit": false
+    },
+    {
+      "role": "event.guest.kato",
+      "id": "31043664-9920-4453-901c-76ea3172434b",
+      "label": "kato.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/d6f93fd8e0fdde75c15c728fbfb167771724a658ea0fa30bf80ac233c332bdf0/kato.jpg",
+      "repoPath": "public/event/sake-2026/photos/kato.jpg",
+      "inGit": false
+    },
+    {
+      "role": "event.visual.ink-art",
+      "id": "6df72650-e2b8-4134-851e-87ea330fdb5f",
+      "label": "sake-kanji.png",
+      "kind": "illustration",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/9c04023d2a67867ae2ddae4074d5abc7fe64f0280ac9e8bf2d7abdd1d4e92e36/sake-kanji.png",
+      "repoPath": "public/event/sake-2026/art/sake-kanji.png",
+      "inGit": false
+    },
+    {
+      "role": "event.visual.value",
+      "id": "e7aca406-ea41-4779-b9d2-046d5cddf01e",
+      "label": "pour-lanterns.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/5011d7a1b3ff1451944809b0d41f34f72d725386969120b41dc683e19bab9511/pour-lanterns.jpg",
+      "repoPath": "public/event/sake-2026/photos/pour-lanterns.jpg",
+      "inGit": false
+    },
+    {
+      "role": "event.visual.programs",
+      "id": "f09d814a-12ae-4ce7-bc13-f11cb169d74e",
+      "label": "brewer.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/e9007f9b588f84d14fb2d8f0fdcde058f89cff4a83f1d368774b82f5220167db/brewer.jpg",
+      "repoPath": "public/event/sake-2026/photos/brewer.jpg",
+      "inGit": false
+    },
+    {
+      "role": "event.visual.closing",
+      "id": "366c7d29-b35e-41bd-8235-1197082e3266",
+      "label": "masu.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/f116ee0b35121376deec41387e622736d806910a8dc43d7b7b189e5589efd686/masu.jpg",
+      "repoPath": "public/event/sake-2026/photos/masu.jpg",
+      "inGit": false
+    },
+    {
+      "role": "event.visual.texture",
+      "id": "857fd3b2-04fc-448d-95db-8e4ec9442521",
+      "label": "slate.jpg",
+      "kind": "photo",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/fbdfbffd293d08e56e6aa4db88ec60e090747a7a578eea004708ff854cb45c49/slate.jpg",
+      "repoPath": "public/event/sake-2026/photos/slate.jpg",
+      "inGit": false
+    },
+    {
+      "role": "event.bgm",
+      "id": "168537b3-2140-4361-9665-9d02abc308bc",
+      "label": "bgm.mp3",
+      "kind": "audio",
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/works/c3b0c461-89bc-49a9-8b56-884aaa5909d0/materials/beec56e62f67e6355521c9ad992e483728fe94282060cab490f63bf926c33739/bgm.mp3",
+      "repoPath": "public/event/sake-2026/bgm.mp3",
+      "inGit": false
+    }
+  ],
+  "deliverables": [
+    {
+      "r2Key": "brands/e764a262-e344-4e77-bff4-14d066d072f2/takes/2b73e433-ba47-4253-841f-0cae18c101c6/renders/49c5b418-b3ed-4b35-a898-7700ca0f5b9c/video-20260810143355665.mp4",
+      "mediaType": "video/mp4",
+      "bytes": 9308518,
+      "durationMs": null,
+      "createdAt": "2026-08-10T14:33:57.603245+00:00"
+    }
+  ]
+}
