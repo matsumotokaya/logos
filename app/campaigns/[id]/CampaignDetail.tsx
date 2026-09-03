@@ -396,13 +396,7 @@ export default function CampaignDetail({
                   className="mb-4 flex flex-wrap items-center gap-2 text-[11px] text-ink-muted"
                 >
                   <Link
-                    href={
-                      brandId
-                        ? `/brands/${brandId}`
-                        : catalogOrganizationId
-                          ? `/organizations/${catalogOrganizationId}`
-                          : "/brands"
-                    }
+                    href={brandId ? `/brands/${brandId}` : "/brands"}
                     className="hover:text-ink"
                   >
                     {registrationScope === "organization"

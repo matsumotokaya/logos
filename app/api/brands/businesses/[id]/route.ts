@@ -39,27 +39,8 @@ function website(value: unknown): string {
   return url.href.replace(/\/$/, "");
 }
 
-type OrganizationRow = {
-  id: string;
-  name: string;
-  status: BusinessDetail["status"];
-  created_by: string | null;
-  linked_org_id: string | null;
-};
-
-function manageableOrganizations(
-  rows: OrganizationRow[],
-  userId: string,
-  managedWorkspaceIds: Set<string>,
-): BusinessDetail["availableOrganizations"] {
-  return rows
-    .filter(
-      (row) =>
-        row.created_by === userId ||
-        (row.linked_org_id !== null && managedWorkspaceIds.has(row.linked_org_id)),
-    )
-    .map((row) => ({ id: row.id, name: row.name, status: row.status }));
-}
+/** A workspace (v3 §19.2). RLS already limits these to the caller's own. */
+type OrganizationRow = { org_id: string; name: string };
 
 export async function GET(
   req: Request,
@@ -74,18 +55,9 @@ export async function GET(
   const entityResult = await supabase
     .from("brand_entities")
     .select(
-      "id, name, brand_organization_id, brand_kind, parent_brand_id, website, industry, location, description, status, updated_at",
+      "id, name, organization_id, brand_kind, parent_brand_id, website, industry, location, description, status, updated_at",
     )
     .eq("id", id)
-    .in("brand_kind", [
-      "corporate",
-      "business",
-      "service",
-      "product",
-      "media",
-      "event",
-      "audience",
-    ])
     .maybeSingle();
   if (entityResult.error) {
     return Response.json({ error: "事業を取得できませんでした" }, { status: 500 });
@@ -94,10 +66,10 @@ export async function GET(
     return Response.json({ error: "事業が見つかりません" }, { status: 404 });
   }
 
-  const parentId = entityResult.data.brand_organization_id as string | null;
+  const parentId = entityResult.data.organization_id as string | null;
   if (!parentId) {
     return Response.json(
-      { error: "この事業にはOrganizationが設定されていません" },
+      { error: "このブランドにはワークスペースが設定されていません" },
       { status: 409 },
     );
   }
@@ -126,8 +98,8 @@ export async function GET(
       .eq("brand_kind", "audience")
       .order("created_at", { ascending: true }),
     supabase
-      .from("brand_organizations")
-      .select("id, name, status, created_by, linked_org_id")
+      .from("organizations")
+      .select("org_id, name")
       .order("created_at", { ascending: true }),
     supabase
       .from("org_members")
@@ -148,23 +120,31 @@ export async function GET(
   }
 
   const organizations = (organizationsResult.data ?? []) as OrganizationRow[];
-  const parent = organizations.find((organization) => organization.id === parentId);
+  const parent = organizations.find((organization) => organization.org_id === parentId);
   if (!parent) {
     return Response.json(
-      { error: "所属するOrganizationを取得できませんでした" },
+      { error: "所属するワークスペースを取得できませんでした" },
       { status: 409 },
     );
   }
+  // Only workspaces the caller manages could receive a brand. Moving between
+  // workspaces is not implemented yet, so this list is informational.
   const managedWorkspaceIds = new Set(
     (membershipsResult.data ?? []).map((membership) => membership.org_id as string),
   );
-  const availableOrganizations = manageableOrganizations(
-    organizations,
-    user.id,
-    managedWorkspaceIds,
-  );
-  if (!availableOrganizations.some((organization) => organization.id === parent.id)) {
-    availableOrganizations.unshift({ id: parent.id, name: parent.name, status: parent.status });
+  const availableOrganizations = organizations
+    .filter((organization) => managedWorkspaceIds.has(organization.org_id))
+    .map((organization) => ({
+      id: organization.org_id,
+      name: organization.name,
+      status: "confirmed" as BusinessDetail["status"],
+    }));
+  if (!availableOrganizations.some((organization) => organization.id === parent.org_id)) {
+    availableOrganizations.unshift({
+      id: parent.org_id,
+      name: parent.name,
+      status: "confirmed",
+    });
   }
 
   const row = entityResult.data;
@@ -179,7 +159,7 @@ export async function GET(
     description: (row.description as string) ?? "",
     status: row.status as BusinessDetail["status"],
     updatedAt: row.updated_at as string,
-    parentOrganization: { id: parent.id, name: parent.name },
+    parentOrganization: { id: parent.org_id, name: parent.name },
     profile: Object.keys(knowledgeProfile).length > 0
       ? {
           inheritsParent: true,
@@ -235,62 +215,22 @@ export async function PATCH(
     const importedBrand = parseBrandImport(body.brandImport);
     const name = text(body.name, "事業名", 160);
     if (!name) throw new Error("事業名を入力してください");
-    const parentOrganizationId = text(
-      body.parentOrganizationId,
-      "取り込み先Organization",
-      64,
-    );
-    if (!parentOrganizationId) throw new Error("取り込み先Organizationを選択してください");
-
     const current = await supabase
       .from("brand_entities")
-      .select("brand_organization_id, brand_kind, parent_brand_id, provenance")
+      .select("organization_id, brand_kind, parent_brand_id, provenance")
       .eq("id", id)
-      .in("brand_kind", [
-        "corporate",
-        "business",
-        "service",
-        "product",
-        "media",
-        "event",
-        "audience",
-      ])
       .maybeSingle();
-    if (current.error) throw new Error("事業を確認できませんでした");
+    if (current.error) throw new Error("ブランドを確認できませんでした");
     if (!current.data) {
-      return Response.json({ error: "事業が見つかりません" }, { status: 404 });
-    }
-
-    const target = await supabase
-      .from("brand_organizations")
-      .select("id, linked_org_id")
-      .eq("id", parentOrganizationId)
-      .maybeSingle();
-    if (target.error || !target.data) {
-      throw new Error("取り込み先Organizationを確認できませんでした");
+      return Response.json({ error: "ブランドが見つかりません" }, { status: 404 });
     }
 
     const now = new Date().toISOString();
     const fields = ["name", "website", "industry", "location", "description"];
-    const parentChanged =
-      current.data.brand_organization_id !== parentOrganizationId;
-    if (parentChanged && current.data.brand_kind === "corporate") {
-      throw new Error("企業ブランドは所属Organizationから移動できません");
-    }
-    if (parentChanged && current.data.brand_kind === "audience") {
-      throw new Error("対象別ブランドは親となる事業ブランドから移動してください");
-    }
-    const targetCorporate = await supabase
-      .from("brand_entities")
-      .select("id")
-      .eq("brand_organization_id", parentOrganizationId)
-      .eq("brand_kind", "corporate")
-      .eq("is_primary_brand", true)
-      .limit(1)
-      .maybeSingle();
-    if (targetCorporate.error || !targetCorporate.data) {
-      throw new Error("移動先の企業ブランドを確認できませんでした");
-    }
+    // A brand stays in the workspace it was created in, and its place in the
+    // tree is set by dragging it (parent_brand_id), not by this form. v2 moved
+    // brands between real-world organizations here and reparented them onto a
+    // corporate brand; neither entity exists in v3.
     const provenance = {
       ...((current.data.provenance as Record<string, unknown> | null) ?? {}),
       ...Object.fromEntries(
@@ -299,27 +239,12 @@ export async function PATCH(
           { source: "user_confirmed", confirmed_at: now, confirmed_by: user.id },
         ]),
       ),
-      ...(parentChanged
-        ? {
-            brand_organization_id: {
-              source: "user_reparented",
-              confirmed_at: now,
-              confirmed_by: user.id,
-            },
-          }
-        : {}),
     };
 
     const updated = await supabase
       .from("brand_entities")
       .update({
         name,
-        brand_organization_id: parentOrganizationId,
-        parent_brand_id:
-          current.data.brand_kind === "business"
-            ? targetCorporate.data.id
-            : current.data.parent_brand_id,
-        linked_org_id: target.data.linked_org_id,
         website: website(body.website),
         industry: text(body.industry, "業種", 160),
         location: text(body.location, "所在地", 240),
@@ -330,25 +255,10 @@ export async function PATCH(
         updated_at: now,
       })
       .eq("id", id)
-      .in("brand_kind", [
-        "corporate",
-        "business",
-        "service",
-        "product",
-        "media",
-        "event",
-        "audience",
-      ])
       .select("id")
       .maybeSingle();
-    if (updated.error) {
-      throw new Error(
-        parentChanged
-          ? "このOrganizationへ事業を取り込む権限がありません"
-          : "事業を保存できませんでした",
-      );
-    }
-    if (!updated.data) throw new Error("この事業を編集する権限がありません");
+    if (updated.error) throw new Error("ブランドを保存できませんでした");
+    if (!updated.data) throw new Error("このブランドを編集する権限がありません");
 
     // Assets are applied after the entity update so a rejected edit never
     // leaves a refreshed logo attached to stale brand facts.
@@ -367,7 +277,7 @@ export async function PATCH(
     return Response.json(
       {
         ok: true,
-        parentChanged,
+        parentChanged: false,
         profile: savedBrand?.profile ?? null,
         logo: savedBrand?.logo ?? null,
       },
@@ -404,7 +314,7 @@ export async function DELETE(
   try {
     const brand = await supabase
       .from("brand_entities")
-      .select("id, name, brand_organization_id")
+      .select("id, name, organization_id")
       .eq("id", id)
       .maybeSingle();
     if (brand.error) throw new Error("ブランドを確認できませんでした");
@@ -412,9 +322,8 @@ export async function DELETE(
       return Response.json({ error: "ブランドが見つかりません" }, { status: 404 });
     }
 
-    const [takes, works, materials, logos, children] = await Promise.all([
+    const [takes, materials, logos, children] = await Promise.all([
       supabase.from("takes").select("id", { count: "exact", head: true }).eq("brand_id", id),
-      supabase.from("works").select("id", { count: "exact", head: true }).eq("brand_id", id),
       supabase
         .from("brand_materials")
         .select("id", { count: "exact", head: true })
@@ -429,13 +338,12 @@ export async function DELETE(
         .eq("parent_brand_id", id),
     ]);
     const countError =
-      takes.error ?? works.error ?? materials.error ?? logos.error ?? children.error;
+      takes.error ?? materials.error ?? logos.error ?? children.error;
     if (countError) throw new Error("関連データを確認できませんでした");
 
     const blocking: string[] = [];
     if ((logos.count ?? 0) > 0) blocking.push(`ロゴ${logos.count}件`);
     if ((takes.count ?? 0) > 0) blocking.push(`動画・LP${takes.count}件`);
-    if ((works.count ?? 0) > 0) blocking.push(`Work${works.count}件`);
     if ((materials.count ?? 0) > 0) blocking.push(`素材${materials.count}件`);
     if ((children.count ?? 0) > 0) blocking.push(`子ブランド${children.count}件`);
     if (blocking.length > 0) {
@@ -462,7 +370,7 @@ export async function DELETE(
     }
 
     return Response.json(
-      { ok: true, organizationId: brand.data.brand_organization_id },
+      { ok: true, organizationId: brand.data.organization_id },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

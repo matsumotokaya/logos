@@ -1,6 +1,5 @@
 "use client";
 
-import { Menu } from "@base-ui/react/menu";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type {
@@ -43,20 +42,6 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
-function MoreIcon() {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      aria-hidden="true"
-      className="size-4"
-    >
-      <circle cx="4" cy="10" r="1.25" />
-      <circle cx="10" cy="10" r="1.25" />
-      <circle cx="16" cy="10" r="1.25" />
-    </svg>
-  );
-}
 
 function ExternalIcon() {
   return (
@@ -299,32 +284,6 @@ export default function BusinessManagerClient() {
                         <span className="truncate">{organization.name}</span>
                       </button>
 
-                      <Menu.Root>
-                        <Menu.Trigger
-                          aria-label={`${organization.name}のメニュー`}
-                          className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-ink/5 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                        >
-                          <MoreIcon />
-                        </Menu.Trigger>
-                        <Menu.Portal>
-                          <Menu.Positioner
-                            side="bottom"
-                            align="end"
-                            sideOffset={6}
-                            className="z-50 outline-none"
-                          >
-                            <Menu.Popup className="w-52 rounded-xl border border-hairline bg-paper p-1.5 shadow-lg outline-none">
-                              <Menu.LinkItem
-                                href={`/organizations/${organization.id}`}
-                                closeOnClick
-                                className="flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm outline-none data-[highlighted]:bg-ink/5"
-                              >
-                                Organization詳細を開く
-                              </Menu.LinkItem>
-                            </Menu.Popup>
-                          </Menu.Positioner>
-                        </Menu.Portal>
-                      </Menu.Root>
                     </div>
 
                     <ul
@@ -412,12 +371,7 @@ function BusinessPane({
           className="flex flex-wrap items-center gap-2 text-xs text-ink-muted"
           aria-label="現在の事業階層"
         >
-          <Link
-            href={`/organizations/${organization.id}`}
-            className="hover:text-ink"
-          >
-            {organization.name}
-          </Link>
+          <span>{organization.name}</span>
           <span aria-hidden="true">/</span>
           <span className="font-semibold text-ink">{business.name}</span>
         </nav>

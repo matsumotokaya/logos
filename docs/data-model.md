@@ -1,9 +1,9 @@
 # Logos data model
 
-更新日: 2026-08-13
-ステータス: **V2稼働構造の正本**
+更新日: 2026-09-03
+ステータス: **V3稼働構造の正本**
 
-V2の設計・移行判断の履歴は [schema-v2.md](old/schema-v2.md)、アカウントとRLSの原則は [account-design.md](account-design.md)、成果物アーキテクチャの背景は [deliverable-architecture.md](deliverable-architecture.md) を参照する。本書はmigration 0046適用後の現在形だけを記す。
+V2の設計・移行判断の履歴は [schema-v2.md](old/schema-v2.md)、V3への作り替えの決定は [deliverable-architecture.md](deliverable-architecture.md) §19、アカウントとRLSの原則は [account-design.md](account-design.md) を参照する。本書はmigration 0056適用後の現在形だけを記す。
 
 既存Brandへロゴを追加するときは`create_brand_logo_with_presentation`を使い、Logo・primary Candidate・`logo-presentation@1` Take・HTML Render・`logo_presentation` canonical slotを同一transactionで作る。単独ロゴ取り込み用の`create_logo_with_presentation`だけが未所属用Brandを補完する。
 
@@ -12,14 +12,12 @@ V2の設計・移行判断の履歴は [schema-v2.md](old/schema-v2.md)、アカ
 ## 1. 中心モデル
 
 ```text
-Organization
-  └── Brand
+Organization(ワークスペース = public.organizations)
+  └── Brand(自由ツリー。parent_brand_id で任意にネスト)
         ├── BrandKnowledge claims / adopted values
         ├── BrandVariant
         ├── Logo → Candidate / Lockup / Variant / Mockup
-        ├── Work
-        │     ├── BrandMaterial
-        │     └── Take
+        ├── BrandMaterial
         └── Take
               ├── pinned TakeInput → BrandMaterial
               ├── TakeRun
@@ -30,24 +28,24 @@ TemplateVersion ← Take
 CanonicalSlot → Take
 ```
 
-- `brand_organizations`は会社・個人・非営利など、実世界の所有コンテナ。
-- `brand_entities`は市場に向けて一貫した名前・ロゴ・表現を持つBrand。全行に`brand_kind`と`brand_organization_id`が必須。
-- `works`はイベントや施策など、複数成果物が同じ素材を共有する仕事単位。
+- `public.organizations`はワークスペース(テナント)。メンバー・権限・課金・上限はここに張る。実世界の会社を表す器ではない。
+- `brand_entities`は利用者が作れる唯一のエンティティ。全行に`organization_id`(ワークスペース)が必須で、`parent_brand_id`で自由にネストする。`brand_kind`は付け替え可能なカテゴリー。
 - `takes`はLP・動画・ロゴプレゼンなど、編集可能な成果物の版固定された実体。
 - `take_renders`は出力条件、`render_artifacts`はR2に置かれた不変成果物。採用中の成果物だけを`latest_artifact_id`で指す。
 
-旧`brand_profiles`、`brand_generation_runs`、`brand_assets`、`campaigns`系、`logo_presentations`は存在しない。互換読み・二重書きも行わない。
+旧`brand_profiles`、`brand_generation_runs`、`brand_assets`、`campaigns`系、`logo_presentations`、`brand_organizations`、`works`は存在しない。互換読み・二重書きも行わない。
 
 ## 2. OrganizationとBrand
 
-`brand_organizations`は現実世界の所有コンテナ(会社・個人・非営利など)で、**メタ情報(name / website / industry / location / description / status / kind)の純粋な入れ物**として扱う。Organization自体にはロゴ・配色・タイポなどのBrand資産を持たない。
+`public.organizations`は**ワークサペース**——Stripeのビジネス切り替えと同じ「世界」の単位。メンバー(`org_members`)・招待・権限・将来の課金と上限はすべてここに張る。**実世界の会社ではない**ので、スクレープで分かった運営会社はBrandのKnowledge claimとして持つ。初回利用時に個人ワークスペースが1つ自動でできる(`public.ensure_my_workspace()`)。
 
-- **任意に親Organizationを持てる**(`parent_organization_id`)。ホールディングス配下のグループ会社をN階層で表現可能
-- アクセス権は親子関係から継承しない。各行の`linked_org_id`をRLSが直接評価する
-- Organization一覧ページ(`/organizations/[id]`)はメタ情報と**子Organizations / Brandsの一覧**を表示するだけで、Brand Profile(palette / design tokens / logos)を混在させない
+`brand_entities`は1つのワークスペースに属し、`parent_brand_id`で自由にネストする。**ツリーは利用者の整理であり、組織構造でも継承でもない**。禁止されるのは自己参照・循環・別ワークスペースへのネストだけ(`enforce_brand_membership`)。
 
-`brand_entities.brand_kind`は次の6種。
+`brand_entities.source_url`は登録したURLで、**一意ではない**。同じURLのBrandはいくつでも並存でき、入口が「登録済みです。更新しますか」と聞く材料にだけ使う。同一性は`id`だけが持つ。
 
+`brand_entities.brand_kind`は次の7種。表示ラベルであり、構造を決めない。
+
+- `organization`
 - `corporate`
 - `business`
 - `service`
@@ -165,7 +163,7 @@ event-promo は **Take と `take_inputs` がペアで作成される**設計に�
 - `take_inputs`(role / material_id / checksum)を1件ずつ insert、`on conflict (take_id, material_id, role) do update` で material を再利用
 - 任意の `work_id` を新Takeに付け替え
 
-POST `/api/brands/{id}/videos` の `templateTakeId` パラメータがこの経路を駆動する。`briefSlug`(bundled seed ブリーフ)は互換のため残し、サブセレクト「下敷きにする動画」で brand_organizations 配下の既存 event-promo Takeが選べる。
+POST `/api/brands/{id}/videos` の `templateTakeId` パラメータがこの経路を駆動する。`briefSlug`(bundled seed ブリーフ)は互換のため残し、サブセレクト「下敷きにする動画」で同じワークスペース内の既存 event-promo Takeが選べる。
 
 ### 5.2 動画パイプライン(動画詳細の4ステージ)
 
@@ -196,8 +194,8 @@ POST `/api/brands/{id}/videos` の `templateTakeId` パラメータがこの経�
 
 | 対象 | 削除を止めるもの | 一緒に消えるもの |
 | --- | --- | --- |
-| `brand_organizations` | 子Organization、配下の`brand_entities` | (行のみ。DELETE `/api/brands/[id]` が自分のprimary corporate Brandだけを同時に消す) |
-| `brand_entities` | `takes` / `works` / `brand_materials`。加えて`logos.subject_entity_id`と`brand_entities.parent_brand_id`は`set null`なので、**APIが先に数えて拒否する**(でないと到達不能な行が残る) | Knowledge claims/values、`brand_variants`、`brand_access_grants`、`canonical_slots` |
+| `organizations`(ワークスペース) | 配下の`brand_entities`(`on delete restrict`) | 退会時のみ`delete_user_account`が中身ごと消す |
+| `brand_entities` | `takes` / `brand_materials`。加えて`logos.subject_entity_id`と`brand_entities.parent_brand_id`は`set null`なので、**APIが先に数えて拒否する**(でないと到達不能な行が残る) | Knowledge claims/values、`brand_variants`、`brand_access_grants`、`canonical_slots` |
 | `takes` | 参照している`canonical_slots`、`live`な`publications` | `take_renders` → `render_artifacts`、`take_inputs`、`take_runs`、take scopeの`brand_materials` |
 | `logos` | — | `logo_candidates`、tags/credits/trademarks、`logo_activities`、`canonical_slots`、プレゼンTake |
 
@@ -209,22 +207,15 @@ POST `/api/brands/{id}/videos` の `templateTakeId` パラメータがこの経�
 
 ## 9. RLSと所有権
 
-- 閲覧: Brand Organizationを閲覧できる利用者、Brand共有を受けた利用者、対象Logoを閲覧できる利用者。
-- 編集: Organizationのowner/admin、またはBrand/Logoに明示された編集権限。
+- 閲覧: そのBrandのワークスペースのメンバー、Brand共有を受けた利用者、対象Logoを閲覧できる利用者。
+- 編集: ワークスペースのowner/admin/editor、またはBrand/Logoに明示された編集権限。
 - Runの入力URL、コスト、エラーは編集者以上に限定する。
 - 公開Artifactは署名・公開ルートから配信し、R2自体は非公開。
 
 Supabase作業では必ずproject ref `xhbdfzceyfrxsmaixkne`を照合する。DB書き込みはSQLと影響範囲をレビューし、明示承認を得てから行う。
 
-## 10. 現在の保全データ
+## 10. 現在のデータ
 
-V2切替時にダミーデータを削除し、次の閉包だけを保全した。
+V3切替(migration 0056)でブランド世界を全消しした。保全した閉包は無い——納品済みの「世界が恋する日本酒」はJSONの参照物として [labs/event/sake-2026/](../labs/event/sake-2026/README.md) に落としてある。
 
-- Organization: WealthPark
-- Primary Brand: WealthPark (`corporate`)
-- Brand: WealthPark Lab (`business`)
-- Work / Take: 世界が恋する日本酒
-- pinned Material: 13点
-- ready MP4 Artifact: 1点
-
-整合性確認は`npm run v2:audit`、R2の不要オブジェクト確認は`npm run v2:prune-r2`で行う。後者は既定でdry-run。
+R2の不要オブジェクト確認は`npm run v2:prune-r2`(既定でdry-run)。**全消し直後は過去の実体が孤児として残っている**ので、実行すると消える。
