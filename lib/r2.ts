@@ -2,6 +2,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   NoSuchKey,
   PutObjectCommand,
   S3Client,
@@ -161,6 +162,37 @@ function isNotFound(error: unknown): boolean {
   const status = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata
     ?.httpStatusCode;
   return status === 404;
+}
+
+/**
+ * Every object in the bucket, following pagination to the end.
+ *
+ * Only a sweep needs this: the app addresses objects by the key it stored on
+ * the row. Deleting a row does not delete its object, so finding what nothing
+ * points at any more means asking the bucket rather than the database.
+ */
+export async function listR2Objects(
+  prefix?: string,
+): Promise<{ key: string; bytes: number }[]> {
+  const config = readConfig();
+  if (!config) return [];
+
+  const out: { key: string; bytes: number }[] = [];
+  let token: string | undefined;
+  do {
+    const page = await client().send(
+      new ListObjectsV2Command({
+        Bucket: config.bucketName,
+        Prefix: prefix,
+        ContinuationToken: token,
+      }),
+    );
+    for (const object of page.Contents ?? []) {
+      if (object.Key) out.push({ key: object.Key, bytes: object.Size ?? 0 });
+    }
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+  return out;
 }
 
 export async function deleteR2Object(key: string): Promise<void> {
