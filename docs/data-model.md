@@ -7,7 +7,7 @@ V2の設計・移行判断の履歴は [schema-v2.md](old/schema-v2.md)、V3へ�
 
 既存Brandへロゴを追加するときは`create_brand_logo_with_presentation`を使い、Logo・primary Candidate・`logo-presentation@1` Take・HTML Render・`logo_presentation` canonical slotを同一transactionで作る。単独ロゴ取り込み用の`create_logo_with_presentation`だけが未所属用Brandを補完する。
 
-ロゴ正本の管理は`/logos/[id]`、プレゼン編集は`/logos/[id]/presentation`、閲覧は`/p/[id]`に分ける。`/p/[id]`は現時点ではLogo visibility + RLSに従う閲覧面であり、将来の明示的なPublication/live URLやユーザー指定URLを管理画面へ混ぜない。
+ロゴの本体は`/brands/[id]/logos/[logoId]`(プレゼンテーション。編集権限があれば編集可)、ロゴについての文字の頁は`/brands/[id]/logos/[logoId]/info`、閲覧は`/p/[id]`に分ける。動画・LPも同じ形で、本体のURLに`/info`を付けたものが詳細になる(旧`/logos/[id]`は`/info`へ転送)。`/p/[id]`は現時点ではLogo visibility + RLSに従う閲覧面であり、将来の明示的なPublication/live URLやユーザー指定URLを管理画面へ混ぜない。
 
 ## 1. 中心モデル
 
@@ -65,7 +65,7 @@ Brandの親子関係は`parent_brand_id`で表し、**同じワークスペー�
 2. 採用済みデザインルール(`brand_knowledge_values` から palette / typography / voice のうち known field のみ)
 3. 3タイル(動画 / LP / ロゴ) — 各 `/brands/[id]/{videos,lps,logos}` へのエントリ
 
-Organization詳細ページにはロゴ・パレット・タイポ等のBrand Profileを表示しない。Brand Profileは `/logos/[id]` 配下のLogoInfoPageでロゴ単位に表示する。
+Organization詳細ページにはロゴ・パレット・タイポ等のBrand Profileを表示しない。Brand Profileは `/brands/[id]/logos/[logoId]/info` のLogoInfoPageでロゴ単位に表示する。
 
 ## 3. BrandKnowledge
 

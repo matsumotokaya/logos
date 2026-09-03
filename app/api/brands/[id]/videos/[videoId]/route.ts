@@ -75,7 +75,7 @@ export async function GET(
       render.latest_artifact_id
         ? supabase
             .from("render_artifacts")
-            .select("r2_key, created_at")
+            .select("r2_key, created_at, bytes")
             .eq("id", render.latest_artifact_id)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
@@ -190,6 +190,7 @@ export async function GET(
         video: {
           render: renderState,
           mp4Url,
+          mp4Bytes: artifact?.bytes ?? null,
           id: take.id,
           brandId: take.brand_id,
           brandName:

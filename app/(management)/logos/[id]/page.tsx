@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 
-// Legacy /logos/[id] redirect — the canonical logo detail page now lives under
-// /brands/[brandId]/logos/[logoId]. We resolve the logo's subject_entity_id
-// and use it as the brand id in the redirect target. A logo with no subject
-// has no canonical brand to redirect to, so it falls back to the home page.
+// Legacy /logos/[id] redirect — the logo's text page now lives under
+// /brands/[brandId]/logos/[logoId]/info (the path without /info opens the
+// presentation). We resolve the logo's subject_entity_id and use it as the
+// brand id in the redirect target. A logo with no subject has no canonical
+// brand to redirect to, so it falls back to the home page.
 
 export const metadata: Metadata = {
   title: "ロゴ詳細・編集",
@@ -29,7 +30,7 @@ export default async function ManagedLogoPage({
       const subject = rows[0]?.subject_entity_id;
       if (subject) {
         const { redirect } = await import("next/navigation");
-        redirect(`/brands/${subject}/logos/${id}`);
+        redirect(`/brands/${subject}/logos/${id}/info`);
       }
     }
   }

@@ -3,7 +3,7 @@
 // Presentation permalink. The reserved id "sample" renders the built-in
 // sample logo without persisting anything.
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { requestAuthDialog, useAuth } from "@/lib/auth";
@@ -16,6 +16,9 @@ import Presentation from "@/components/Presentation";
 type State =
   | { status: "loading" }
   | { status: "missing" }
+  // A stored logo whose master is a raster (no svg). The presentation would
+  // run on a placeholder mark, so the host shows something else instead.
+  | { status: "raster" }
   | {
       status: "ready";
       logo: LogoData;
@@ -30,10 +33,19 @@ export default function PresentationPage({
   params,
   embedded = false,
   editable = false,
+  resetHref,
+  resetLabel,
+  rasterFallback,
 }: {
   params: Promise<{ id: string }>;
   embedded?: boolean;
   editable?: boolean;
+  /** Where the header button goes when embedded. Default: the logo's info page. */
+  resetHref?: string;
+  resetLabel?: string;
+  /** Rendered instead of the presentation when the master has no svg. Without
+   *  it the presentation runs on a placeholder mark, as `/p/[id]` always has. */
+  rasterFallback?: ReactNode;
 }) {
   const { id } = use(params);
   const router = useRouter();
@@ -41,6 +53,9 @@ export default function PresentationPage({
   const { dict } = useI18n();
   const [state, setState] = useState<State>({ status: "loading" });
   const [pres, setPres] = useState<LogoPresentation | null>(null);
+  // Only whether a fallback exists decides the branch; the node itself is not
+  // a reason to reload the logo.
+  const hasRasterFallback = rasterFallback !== undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +78,9 @@ export default function PresentationPage({
         }
       } else {
         const stored = await repo.getLogo(id);
-        if (stored) {
+        if (stored && hasRasterFallback && !stored.data.svg?.trim()) {
+          next = { status: "raster" };
+        } else if (stored) {
           // The contact button targets the first credit with an email address.
           const contactEmail = stored.allowContact
             ? (stored.credits.find((c) => c.contact.includes("@"))?.contact ??
@@ -90,7 +107,7 @@ export default function PresentationPage({
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, hasRasterFallback]);
 
   const handleCommitEdits = async ({
     name,
@@ -129,6 +146,10 @@ export default function PresentationPage({
     return <main className="min-h-dvh bg-paper" />;
   }
 
+  if (state.status === "raster") {
+    return <>{rasterFallback}</>;
+  }
+
   if (state.status === "missing") {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center bg-paper px-6 text-ink">
@@ -155,8 +176,10 @@ export default function PresentationPage({
       name={state.name}
       mockupLogoId={id === "sample" ? undefined : id}
       mockupCandidateId={state.mockupCandidateId ?? undefined}
-      onReset={() => router.push(embedded ? `/logos/${id}` : "/")}
-      resetLabel={embedded ? "ロゴ詳細" : undefined}
+      onReset={() =>
+        router.push(resetHref ?? (embedded ? `/logos/${id}` : "/"))
+      }
+      resetLabel={resetLabel ?? (embedded ? "ロゴ詳細" : undefined)}
       contactEmail={state.contactEmail}
       presentation={pres}
       canEdit={editable && state.stored && state.canEdit}

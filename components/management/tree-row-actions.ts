@@ -124,6 +124,21 @@ export function pathAfterDelete(target: TreeTarget): string {
   }
 }
 
+/** The text page of secondary facts about a leaf (format, size, public URL).
+ *  Brands have no such page: a Brand's facts are its knowledge claims. */
+export function infoPath(target: TreeTarget): string | null {
+  switch (target.kind) {
+    case "brand":
+      return null;
+    case "logo":
+      return `/brands/${target.brandId}/logos/${target.id}/info`;
+    case "video":
+      return `/brands/${target.brandId}/video/${target.id}/info`;
+    case "lp":
+      return `/brands/${target.brandId}/lp/${target.id}/info`;
+  }
+}
+
 /** Whether the current pathname is showing the row that just disappeared. */
 export function viewingTarget(pathname: string, target: TreeTarget): boolean {
   switch (target.kind) {
@@ -135,9 +150,9 @@ export function viewingTarget(pathname: string, target: TreeTarget): boolean {
     case "logo":
       return pathname.includes(`/logos/${target.id}`) || pathname === `/logos/${target.id}`;
     case "video":
-      return pathname === `/brands/${target.brandId}/video/${target.id}`;
+      return pathname.startsWith(`/brands/${target.brandId}/video/${target.id}`);
     case "lp":
-      return pathname === `/brands/${target.brandId}/lp/${target.id}`;
+      return pathname.startsWith(`/brands/${target.brandId}/lp/${target.id}`);
   }
 }
 

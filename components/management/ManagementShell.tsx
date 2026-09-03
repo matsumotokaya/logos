@@ -28,6 +28,7 @@ import TreeDeleteDialog, {
 import {
   deleteTreeNode,
   duplicateTreeNode,
+  infoPath,
   pathAfterDelete,
   pathAfterDuplicate,
   viewingTarget,
@@ -260,7 +261,7 @@ const regionId = `${prefix}-brand-${brand.id}`;
                   <div className="min-w-0 flex-1">
                     <TreeLink
                       href={`/brands/${brand.id}/logos/${logo.id}`}
-                      active={pathname === `/brands/${brand.id}/logos/${logo.id}`}
+                      active={pathname.startsWith(`/brands/${brand.id}/logos/${logo.id}`)}
                       depth={2}
                       onNavigate={onNavigate}
                     >
@@ -314,7 +315,7 @@ const regionId = `${prefix}-brand-${brand.id}`;
                     <div className="min-w-0 flex-1">
                       <TreeLink
                         href={videoPath}
-                        active={pathname === videoPath}
+                        active={pathname.startsWith(videoPath)}
                         depth={2}
                         onNavigate={onNavigate}
                       >
@@ -387,7 +388,7 @@ const regionId = `${prefix}-brand-${brand.id}`;
                     <div className="min-w-0 flex-1">
                       <TreeLink
                         href={lpPath}
-                        active={pathname === lpPath}
+                        active={pathname.startsWith(lpPath)}
                         depth={2}
                         onNavigate={onNavigate}
                       >
@@ -705,6 +706,14 @@ export default function ManagementShell({ children }: { children: ReactNode }) {
 
   const handleAction = useCallback(
     (target: TreeTarget, action: TreeActionId) => {
+      if (action === "info") {
+        const path = infoPath(target);
+        if (path) {
+          setMobileOpen(false);
+          router.push(path);
+        }
+        return;
+      }
       if (action === "delete") {
         setPendingDelete(target);
         setAtRiskMaterials(null);
@@ -714,7 +723,7 @@ export default function ManagementShell({ children }: { children: ReactNode }) {
       }
       void runDuplicate(target);
     },
-    [runDuplicate],
+    [runDuplicate, router],
   );
 
   const confirmDelete = useCallback(async () => {

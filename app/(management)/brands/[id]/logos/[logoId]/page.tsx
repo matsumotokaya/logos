@@ -1,37 +1,31 @@
-"use client";
+import type { Metadata } from "next";
+import PresentationPage from "@/app/p/[id]/page";
+import RasterLogoView from "./RasterLogoView";
 
-// The brand-scoped logo detail page. Embeds the canonical LogoInfoPage so
-// every edit surface — basic info, asset registry, presentation mapping —
-// lives in one place. The brand id appears in breadcrumbs and as a return
-// target; the global /logos/[id] route redirects here.
+// The logo row opens the logo itself: the presentation, large, with its use
+// cases, editable by whoever may edit it. The text page about the logo (format,
+// owner, trademarks…) is one level down at ./info, reached from the sidebar's
+// row menu — the same shape every leaf in the tree has.
 
-import { use } from "react";
-import Link from "next/link";
-import LogoInfoPage from "@/app/brand/logos/[id]/page";
+export const metadata: Metadata = {
+  title: "ロゴプレゼンテーション",
+  robots: { index: false, follow: false },
+};
 
-export default function BrandLogoDetailPage({
+export default async function BrandLogoPage({
   params,
 }: {
-  params: Promise<{ brandId: string; logoId: string }>;
+  params: Promise<{ id: string; logoId: string }>;
 }) {
-  // React.use() resolves the segment params. The page reads them only after
-  // they are settled, so the embedded LogoInfoPage receives a stable id.
-  const { brandId, logoId } = use(params);
-
+  const { id, logoId } = await params;
   return (
-    <div className="flex flex-col gap-4">
-      <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-2 px-6 pt-6 text-xs text-ink-muted">
-        <Link href={`/brands/${brandId}/logos`} className="hover:text-ink">
-          ← ロゴ一覧
-        </Link>
-        <Link href={`/brands/${brandId}`} className="hover:text-ink">
-          ブランドトップ
-        </Link>
-      </div>
-      <LogoInfoPage
-        params={Promise.resolve({ id: logoId })}
-        embedded
-      />
-    </div>
+    <PresentationPage
+      params={Promise.resolve({ id: logoId })}
+      embedded
+      editable
+      resetHref={`/brands/${id}/logos`}
+      resetLabel="ロゴ一覧"
+      rasterFallback={<RasterLogoView brandId={id} logoId={logoId} />}
+    />
   );
 }

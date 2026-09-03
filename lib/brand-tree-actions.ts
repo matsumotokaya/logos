@@ -22,7 +22,7 @@
 
 export type TreeNodeKind = "brand" | "logo" | "video" | "lp";
 
-export type TreeActionId = "duplicate" | "delete";
+export type TreeActionId = "info" | "duplicate" | "delete";
 
 export interface TreeAction {
   id: TreeActionId;
@@ -49,6 +49,17 @@ const deleteAction = (label: string, blockedReason: string | null): TreeAction =
   label,
   blockedReason,
   danger: true,
+});
+
+// Every leaf has two faces: the thing itself (the presentation, the player,
+// the LP preview) is what the row opens, and a text page of secondary facts
+// about it (format, size, length, public URL) sits behind this item. The menu
+// is that page's only entrance — the facts are not worth a button on the face.
+const infoAction = (): TreeAction => ({
+  id: "info",
+  label: "詳細",
+  blockedReason: null,
+  danger: false,
 });
 
 const duplicateAction = (blockedReason: string | null = null): TreeAction => ({
@@ -78,12 +89,13 @@ export function logoActions(): TreeAction[] {
   // entity with its own presentation Take. That is a real feature, but not a
   // menu item away — until it exists, offering it disabled would be a lie
   // about what is coming.
-  return [deleteAction("ロゴを削除", null)];
+  return [infoAction(), deleteAction("ロゴを削除", null)];
 }
 
 export function takeActions(kind: "video" | "lp", facts: TakeActionFacts): TreeAction[] {
   const noun = kind === "video" ? "動画" : "LP";
   return [
+    infoAction(),
     duplicateAction(),
     deleteAction(
       `${noun}を削除`,

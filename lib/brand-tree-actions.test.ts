@@ -57,6 +57,26 @@ test("削除の確認文は名前から始まる1つの文になる", () => {
   assert.match(deletionConsequence("video", "x"), /MP4/);
 });
 
+test("ロゴ・動画・LPは詳細を先頭に持ち、ブランドは持たない", () => {
+  // The info page is the row's only way in, so every leaf offers it, and it
+  // sits first because it is the one item that destroys nothing.
+  for (const actions of [
+    logoActions(),
+    takeActions("video", { published: true }),
+    takeActions("lp", { published: false }),
+  ]) {
+    assert.equal(actions[0]?.id, "info");
+    assert.equal(actions[0]?.blockedReason, null);
+    assert.equal(actions[0]?.danger, false);
+  }
+  assert.equal(
+    brandActions({ logoCount: 0, videoCount: 0, lpCount: 0 }).some(
+      (action) => action.id === "info",
+    ),
+    false,
+  );
+});
+
 test("削除は常に danger、複製は常にそうでない", () => {
   const actions = takeActions("video", { published: false });
   assert.equal(actions.find((action) => action.id === "delete")?.danger, true);
