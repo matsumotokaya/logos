@@ -56,13 +56,11 @@ export async function deleteTreeNode(
 
   const query = materials ? `?materials=${materials}` : "";
   const path =
-    target.kind === "organization"
-      ? `/api/brands/${target.id}`
-      : target.kind === "brand"
-        ? `/api/brands/businesses/${target.id}`
-        : target.kind === "video"
-          ? `/api/brands/${target.brandId}/videos/${target.id}${query}`
-          : `/api/brands/${target.brandId}/lps/${target.id}${query}`;
+    target.kind === "brand"
+      ? `/api/brands/businesses/${target.id}`
+      : target.kind === "video"
+        ? `/api/brands/${target.brandId}/videos/${target.id}${query}`
+        : `/api/brands/${target.brandId}/lps/${target.id}${query}`;
 
   let response: Response;
   try {
@@ -115,10 +113,8 @@ export async function duplicateTreeNode(target: TreeTarget): Promise<DuplicateRe
 /** The page to land on when the row you deleted was the page you were on. */
 export function pathAfterDelete(target: TreeTarget): string {
   switch (target.kind) {
-    case "organization":
-      return "/brands";
     case "brand":
-      return target.organizationId ? `/organizations/${target.organizationId}` : "/brands";
+      return "/brands";
     case "logo":
       return `/brands/${target.brandId}/logos`;
     case "video":
@@ -131,8 +127,6 @@ export function pathAfterDelete(target: TreeTarget): string {
 /** Whether the current pathname is showing the row that just disappeared. */
 export function viewingTarget(pathname: string, target: TreeTarget): boolean {
   switch (target.kind) {
-    case "organization":
-      return pathname.startsWith(`/organizations/${target.id}`);
     case "brand":
       return (
         pathname === `/brands/${target.id}` ||

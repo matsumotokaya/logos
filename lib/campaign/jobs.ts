@@ -43,6 +43,9 @@ export interface CampaignJob {
     hasText: boolean;
     /** Existing business/audience selected from the brand catalog. */
     brandEntityId?: string | null;
+    /** The workspace the new Brand belongs in. Absent means "the caller's
+     *  default", which is what ensure_my_workspace() resolves. */
+    organizationId?: string | null;
     /** Where a newly supplied URL should contribute its inferred brand data. */
     registrationScope?: UrlRegistrationScope;
   };

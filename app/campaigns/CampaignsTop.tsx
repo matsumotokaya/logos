@@ -19,6 +19,7 @@ import type {
 import { analyzeSvg } from "@/lib/svg";
 import { createStoredLogo, repo } from "@/lib/store";
 import { newLogoId } from "@/lib/id";
+import { readCurrentWorkspaceId } from "@/lib/workspace";
 import {
   requestAuthDialog,
   useAuth,
@@ -408,6 +409,10 @@ export default function CampaignsTop() {
             data: f.data,
           })),
           brandEntityId: selectedBusiness?.business.id,
+          // The world the user is in. Without it the server falls back to
+          // whichever workspace it resolves first, which may not be the one
+          // they were looking at.
+          organizationId: readCurrentWorkspaceId() ?? undefined,
         }),
       });
       const json = ((await res.json().catch(() => null)) ?? {}) as {

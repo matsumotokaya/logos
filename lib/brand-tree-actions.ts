@@ -20,7 +20,7 @@
 // their own subordinates (a take's renders and artifacts, a logo's candidates
 // and presentation), which is what the cascades already do.
 
-export type TreeNodeKind = "organization" | "brand" | "logo" | "video" | "lp";
+export type TreeNodeKind = "brand" | "logo" | "video" | "lp";
 
 export type TreeActionId = "duplicate" | "delete";
 
@@ -33,16 +33,6 @@ export interface TreeAction {
 }
 
 /** What the sidebar knows about an Organization without asking the server. */
-export interface OrganizationActionFacts {
-  /** Brands that would have to move elsewhere first (everything but the
-   *  Organization's own primary corporate brand, which is deleted with it). */
-  movableBrandCount: number;
-  /** Logos on the brands that *would* be deleted with the Organization. */
-  retainedLogoCount: number;
-  /** Videos and LPs on those same brands. */
-  retainedAssetCount: number;
-}
-
 export interface BrandActionFacts {
   logoCount: number;
   videoCount: number;
@@ -67,22 +57,6 @@ const duplicateAction = (blockedReason: string | null = null): TreeAction => ({
   blockedReason,
   danger: false,
 });
-
-export function organizationActions(facts: OrganizationActionFacts): TreeAction[] {
-  // Duplicating an Organization is not offered: it is a pure container of
-  // metadata, so a copy of one is an empty shell with a confusing name. The
-  // thing people mean by "copy this company" is a new Brand under it.
-  let blocked: string | null = null;
-  if (facts.movableBrandCount > 0) {
-    blocked = `ブランド${facts.movableBrandCount}件を別のOrganizationへ移すか削除してください`;
-  } else if (facts.retainedLogoCount > 0 || facts.retainedAssetCount > 0) {
-    const parts: string[] = [];
-    if (facts.retainedLogoCount > 0) parts.push(`ロゴ${facts.retainedLogoCount}件`);
-    if (facts.retainedAssetCount > 0) parts.push(`動画・LP${facts.retainedAssetCount}件`);
-    blocked = `${parts.join("と")}を削除してください`;
-  }
-  return [deleteAction("Organizationを削除", blocked)];
-}
 
 export function brandActions(facts: BrandActionFacts): TreeAction[] {
   // Same reasoning as Organizations: a Brand's value is its knowledge, logos
@@ -124,8 +98,6 @@ export function takeActions(kind: "video" | "lp", facts: TakeActionFacts): TreeA
 export function deletionConsequence(kind: TreeNodeKind, name: string): string {
   const subject = `「${name}」`;
   switch (kind) {
-    case "organization":
-      return `${subject}と、そのOrganizationが持つ企業ブランドを削除します。`;
     case "brand":
       return `${subject}と、採用済みのデザインルール・ブランド知識・共有設定を削除します。`;
     case "logo":

@@ -51,6 +51,7 @@ type GenerateBody = {
   pastedText?: string;
   files?: { kind?: string; mediaType?: string; data?: string }[];
   brandEntityId?: string;
+  organizationId?: string;
 };
 
 function parseFiles(raw: GenerateBody["files"]): SourceFile[] {
@@ -106,6 +107,7 @@ export async function POST(req: Request) {
   let files: SourceFile[];
   let body: GenerateBody;
   let brandEntityId: string | null = null;
+  let organizationId: string | null = null;
   try {
     body = (await req.json()) as GenerateBody;
     url = parseUrl(body.url);
@@ -122,6 +124,21 @@ export async function POST(req: Request) {
       if (entityError || !entity)
         throw new Error("選択した事業を利用できません");
       brandEntityId = entity.id as string;
+    }
+    // The workspace the client was showing. Checked against membership rather
+    // than trusted: it decides which world a new Brand appears in.
+    if (typeof body.organizationId === "string" && body.organizationId.trim()) {
+      const candidateOrgId = body.organizationId.trim();
+      const supabase = createServerSupabaseForToken(user.token);
+      const { data: membership, error: membershipError } = await supabase
+        .from("org_members")
+        .select("org_id")
+        .eq("org_id", candidateOrgId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (membershipError || !membership)
+        throw new Error("選択したワークスペースを利用できません");
+      organizationId = membership.org_id as string;
     }
     if (
       typeof body.pastedText === "string" &&
@@ -151,6 +168,7 @@ export async function POST(req: Request) {
     fileKinds: files.map((file) => file.kind),
     hasText: Boolean(body.pastedText?.trim()),
     brandEntityId,
+    organizationId,
   });
 
   // Detached run: progress and result live in the job store, not in this

@@ -410,7 +410,11 @@ export async function persistCampaignCatalog({
   const target: BrandTarget = job.input.brandEntityId
     ? await selectedBrandTarget(supabase, job.input.brandEntityId)
     : await (async () => {
-        const organizationId = await resolveWorkspace(supabase);
+        // The workspace the user was looking at when they submitted. Without
+        // it a brand lands in whichever workspace ensure_my_workspace picks,
+        // which is not necessarily the world on their screen.
+        const organizationId =
+          job.input.organizationId ?? (await resolveWorkspace(supabase));
         return {
           organizationId,
           brandId: await createBrand(

@@ -12,14 +12,15 @@ import type {
 } from "@/lib/brand-hierarchy";
 import { cn } from "@/lib/cn";
 import { BRAND_TREE_REFRESH_EVENT } from "@/lib/brand-events";
+import { readCurrentWorkspaceId, resolveWorkspace } from "@/lib/workspace";
 import {
   brandActions,
   logoActions,
-  organizationActions,
   takeActions,
   type TreeActionId,
 } from "@/lib/brand-tree-actions";
 import RowActionsMenu from "./RowActionsMenu";
+import WorkspaceMenu from "./WorkspaceMenu";
 import TreeDeleteDialog, {
   type AtRiskMaterial,
   type MaterialChoice,
@@ -110,41 +111,6 @@ function activeBrandId(
   }
 
   return null;
-}
-
-function countBrands(organizations: BrandOrganizationSummary[]) {
-  return organizations.reduce(
-    (total, organization) => total + organization.brands.length,
-    0,
-  );
-}
-
-/** What blocks this Organization's deletion, counted from the tree the sidebar
- *  already has. The DELETE route counts the same things again — this is the
- *  sentence in the menu, not the authority. */
-function organizationFacts(organization: BrandOrganizationSummary) {
-  // The Organization's own primary corporate brand goes with it (that is what
-  // the DELETE route removes); every other brand has to be moved first.
-  const retained = organization.brands.filter(
-    (brand) => brand.kind === "corporate" && brand.isPrimary,
-  );
-  return {
-    movableBrandCount: organization.brands.length - retained.length,
-    retainedLogoCount: retained.reduce(
-      (total, brand) =>
-        total +
-        brand.logos.filter((logo) => logo.subjectEntityId === brand.id).length,
-      0,
-    ),
-    retainedAssetCount: retained.reduce(
-      (total, brand) =>
-        total +
-        brand.assets.filter(
-          (asset) => asset.kind === "video" || asset.kind === "lp",
-        ).length,
-      0,
-    ),
-  };
 }
 
 function TreeLink({
@@ -458,124 +424,73 @@ const regionId = `${prefix}-brand-${brand.id}`;
 }
 
 function ManagementTree({
-  organizations,
+  organization,
   pathname,
-  expandedOrganizations,
   expandedBusinesses,
   prefix,
-  onToggleOrganization,
   onToggleBusiness,
   onNavigate,
   onAction,
 }: {
-  organizations: BrandOrganizationSummary[];
+  organization: BrandOrganizationSummary;
   pathname: string;
-  expandedOrganizations: Set<string>;
   expandedBusinesses: Set<string>;
   prefix: string;
-  onToggleOrganization: (id: string) => void;
   onToggleBusiness: (id: string) => void;
   onNavigate: () => void;
   onAction: (target: TreeTarget, action: TreeActionId) => void;
 }) {
+  // One workspace at a time: the organization names the pane above this tree
+  // (§19.2), so what is listed here is brands, and inside each of them the
+  // logos, videos and LPs. The organization level used to be the tree's root,
+  // which put every world on screen at once and cost a level of nesting for a
+  // choice that is really a switch.
   return (
-    <nav aria-label="Organization、事業、ブランドアセット">
-      {/* Rules between organizations, and again between the brands inside one:
-          without them the flattened tree reads as a single run of links. */}
+    <nav aria-label="ブランドと成果物">
+      {/* Rules between the brands: without them the flattened tree reads as a
+          single run of links. */}
       <ul className="divide-y divide-hairline">
-        {organizations.map((organization) => {
-          const open = expandedOrganizations.has(organization.id);
-          const regionId = `${prefix}-organization-${organization.id}`;
-          return (
-            <li key={organization.id} className="py-3 first:pt-0 last:pb-0">
-              <div className="flex min-w-0 items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => onToggleOrganization(organization.id)}
-                  aria-expanded={open}
-                  aria-controls={regionId}
-                  aria-label={`${organization.name}の項目を${open ? "閉じる" : "開く"}`}
-                  className="flex size-7 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-ink/5 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                >
-                  <ChevronIcon open={open} />
-                </button>
-                <div className="min-w-0 flex-1">
-                  {/* The workspace is the container the tree is drawn inside,
-                      not a page: v3 retired the organization detail screen, and
-                      members/roles live in /brand. */}
-                  <span className="block truncate px-2 py-1.5 text-sm font-semibold text-ink">
-                    {organization.name}
-                  </span>
-                </div>
-                <RowActionsMenu
-                  label={organization.name}
-                  actions={organizationActions(organizationFacts(organization))}
-                  onSelect={(action) =>
-                    onAction(
-                      {
-                        kind: "organization",
-                        id: organization.id,
-                        name: organization.name,
-                      },
-                      action,
-                    )
-                  }
-                />
-              </div>
-
-              <ul
-                id={regionId}
-                hidden={!open}
-                className="mt-1 divide-y divide-hairline/70 border-l border-hairline pl-3"
-              >
-                {organization.brands.map((brand) => (
-                  <BrandTree
-                    key={brand.id}
-                    brand={brand}
-                    pathname={pathname}
-                    open={expandedBusinesses.has(brand.id)}
-                    prefix={prefix}
-                    onToggle={() => onToggleBusiness(brand.id)}
-                    onNavigate={onNavigate}
-                    onAction={onAction}
-                  />
-                ))}
-                {organization.brands.length === 0 ? (
-                  <li className="px-7 py-1.5 text-pretty text-xs text-ink-faint">
-                    登録情報はまだありません
-                  </li>
-                ) : null}
-              </ul>
-            </li>
-          );
-        })}
+        {organization.brands.map((brand) => (
+          <BrandTree
+            key={brand.id}
+            brand={brand}
+            pathname={pathname}
+            open={expandedBusinesses.has(brand.id)}
+            prefix={prefix}
+            onToggle={() => onToggleBusiness(brand.id)}
+            onNavigate={onNavigate}
+            onAction={onAction}
+          />
+        ))}
       </ul>
+      {organization.brands.length === 0 ? (
+        <p className="px-2 py-1.5 text-pretty text-xs text-ink-faint">
+          このワークスペースにはまだブランドがありません。
+        </p>
+      ) : null}
     </nav>
   );
 }
 
 function SidebarContent({
-  organizations,
+  organization,
   pathname,
   loading,
   error,
-  expandedOrganizations,
   expandedBusinesses,
   prefix,
-  onToggleOrganization,
   onToggleBusiness,
   onNavigate,
   onRetry,
   onAction,
 }: {
-  organizations: BrandOrganizationSummary[];
+  /** The workspace being viewed; null while loading or when the user has none. */
+  organization: BrandOrganizationSummary | null;
   pathname: string;
   loading: boolean;
   error: string | null;
-  expandedOrganizations: Set<string>;
   expandedBusinesses: Set<string>;
   prefix: string;
-  onToggleOrganization: (id: string) => void;
   onToggleBusiness: (id: string) => void;
   onNavigate: () => void;
   onRetry: () => void;
@@ -587,16 +502,27 @@ function SidebarContent({
     <div className="p-5 pb-28">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
+          {/* The workspace names the pane. "ブランド管理" said what the screen
+              was for; the organization says which world you are in, which is
+              the thing that changes and the thing you can get wrong. */}
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+            Workspace
+          </p>
           <h2 className="truncate text-balance font-display text-lg font-semibold">
-            ブランド管理
+            {organization?.name?.trim() || "名称未設定のワークスペース"}
           </h2>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {!loading && !error ? (
+          {!loading && !error && organization ? (
             <span className="tabular-nums text-xs text-ink-faint">
-              {countBrands(organizations)}ブランド
+              {organization.brands.length}ブランド
             </span>
           ) : null}
+          <WorkspaceMenu
+            name={organization?.name?.trim() || "ワークスペース"}
+            workspaceId={organization?.id ?? null}
+            onNavigate={onNavigate}
+          />
           <Link
             href="/"
             onClick={onNavigate}
@@ -633,14 +559,12 @@ function SidebarContent({
               もう一度読み込む
             </button>
           </div>
-        ) : organizations.length > 0 ? (
+        ) : organization ? (
           <ManagementTree
-            organizations={organizations}
+            organization={organization}
             pathname={pathname}
-            expandedOrganizations={expandedOrganizations}
             expandedBusinesses={expandedBusinesses}
             prefix={prefix}
-            onToggleOrganization={onToggleOrganization}
             onToggleBusiness={onToggleBusiness}
             onNavigate={onNavigate}
             onAction={onAction}
@@ -648,7 +572,7 @@ function SidebarContent({
         ) : (
           <div>
             <p className="text-pretty text-xs text-ink-muted">
-              Organizationはまだ登録されていません。
+              所属しているワークスペースがありません。
             </p>
             <Link
               href="/"
@@ -686,9 +610,11 @@ export default function ManagementShell({ children }: { children: ReactNode }) {
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(
     null,
   );
-  const [expandedOrganizations, setExpandedOrganizations] = useState<
-    Set<string>
-  >(() => new Set());
+  // Which world we are in. Read once on mount because localStorage is not
+  // available while the server renders this component.
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(
+    null,
+  );
   const [expandedBusinesses, setExpandedBusinesses] = useState<Set<string>>(
     () => new Set(),
   );
@@ -707,13 +633,6 @@ export default function ManagementShell({ children }: { children: ReactNode }) {
       }
       const nextOrganizations = body.organizations;
       setOrganizations(nextOrganizations);
-      setExpandedOrganizations(
-        (current) =>
-          new Set([
-            ...current,
-            ...nextOrganizations.map((organization) => organization.id),
-          ]),
-      );
       const brandId = activeBrandId(pathname, nextOrganizations);
       if (brandId) {
         setExpandedBusinesses((current) => new Set([...current, brandId]));
@@ -745,6 +664,17 @@ export default function ManagementShell({ children }: { children: ReactNode }) {
     window.addEventListener(BRAND_TREE_REFRESH_EVENT, refresh);
     return () => window.removeEventListener(BRAND_TREE_REFRESH_EVENT, refresh);
   }, [load]);
+
+  // localStorage is unreadable during the server render, so the choice arrives
+  // one paint late. Until it does the first workspace shows, which is also the
+  // fallback for a stored id that no longer resolves. The listener keeps a
+  // second tab in step after a switch.
+  useEffect(() => {
+    const sync = () => setCurrentWorkspaceId(readCurrentWorkspaceId());
+    sync();
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
 
   // A success notice is not worth a permanent place on screen; an error is not
   // worth losing before it has been read. Both go after the same delay because
@@ -817,15 +747,6 @@ export default function ManagementShell({ children }: { children: ReactNode }) {
     }
   }, [pendingDelete, materialChoice, load, pathname, router]);
 
-  const toggleOrganization = (id: string) => {
-    setExpandedOrganizations((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
   const toggleBusiness = (id: string) => {
     setExpandedBusinesses((current) => {
       const next = new Set(current);
@@ -835,14 +756,16 @@ export default function ManagementShell({ children }: { children: ReactNode }) {
     });
   };
 
+  // A stored id the user can no longer see falls back to the first workspace
+  // rather than emptying the pane (resolveWorkspace).
+  const workspace = resolveWorkspace(organizations, currentWorkspaceId);
+
   const sidebarProps = {
-    organizations,
+    organization: workspace,
     pathname,
     loading,
     error,
-    expandedOrganizations,
     expandedBusinesses,
-    onToggleOrganization: toggleOrganization,
     onToggleBusiness: toggleBusiness,
     onRetry: () => void load(),
     onAction: handleAction,
