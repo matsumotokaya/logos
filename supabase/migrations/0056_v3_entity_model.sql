@@ -74,9 +74,54 @@ $$;
 
 revoke all on function private.ensure_personal_org(uuid) from public, anon, authenticated;
 
+-- The app's entry point: resolve the caller's workspace, creating their
+-- personal one on first use. Takes no argument on purpose — a user id
+-- parameter would let any caller create an org owned by someone else.
+create or replace function public.ensure_my_workspace()
+returns uuid
+language plpgsql
+security definer
+set search_path to ''
+as $$
+declare
+  existing_org_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated.' using errcode = '42501';
+  end if;
+  -- An org the caller already belongs to beats creating a second one.
+  select m.org_id into existing_org_id
+  from public.org_members m
+  join public.organizations o on o.org_id = m.org_id
+  where m.user_id = auth.uid()
+  order by o.is_personal desc, o.created_at
+  limit 1;
+  if existing_org_id is not null then
+    return existing_org_id;
+  end if;
+  return private.ensure_personal_org(auth.uid());
+end;
+$$;
+
+revoke all on function public.ensure_my_workspace() from public, anon;
+grant execute on function public.ensure_my_workspace() to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- 3. Brand tree: brands belong to a workspace org, parent freely inside it.
 -- ---------------------------------------------------------------------------
+
+-- Postgres refuses to drop a column that a policy, trigger or constraint names,
+-- so every dependent on the three retired columns goes first. Each one is
+-- recreated below against organization_id; nothing is silently lost.
+--   brand_organization_id → policies brand_entities_insert / _update, and the
+--                           membership trigger's UPDATE OF column list
+--   is_primary_brand      → the same trigger, plus the primary-brand check
+drop policy if exists brand_entities_insert on public.brand_entities;
+drop policy if exists brand_entities_update on public.brand_entities;
+drop trigger if exists brand_entities_enforce_brand_membership
+  on public.brand_entities;
+alter table public.brand_entities
+  drop constraint if exists brand_entities_primary_brand_check;
 
 alter table public.brand_entities
   add column organization_id uuid references public.organizations(org_id) on delete restrict,
@@ -115,8 +160,6 @@ create index if not exists brand_entities_source_url_idx
 
 -- Tree rules shrink to: same workspace, no self-parent, no cycles.
 -- (The corporate/primary special cases are gone — labels are not structure.)
--- The existing trigger brand_entities_enforce_brand_membership keeps firing;
--- only the function body changes.
 create or replace function public.enforce_brand_membership()
 returns trigger
 language plpgsql
@@ -161,6 +204,13 @@ begin
   return new;
 end;
 $$;
+
+-- Recreated with the v3 column list: brand_kind is a label that gates nothing,
+-- so only a move (organization_id) or a reparent needs checking.
+create trigger brand_entities_enforce_brand_membership
+  before insert or update of organization_id, parent_brand_id
+  on public.brand_entities
+  for each row execute function public.enforce_brand_membership();
 
 -- ---------------------------------------------------------------------------
 -- 4. Access helpers now read the brand's workspace org directly.
@@ -239,11 +289,22 @@ as $$
   );
 $$;
 
-drop policy if exists brand_entities_insert on public.brand_entities;
+-- Both policies were dropped in §3 because they named brand_organization_id.
 create policy brand_entities_insert on public.brand_entities
   for insert to authenticated
   with check (
     created_by = auth.uid()
+    and private.has_org_role(
+      organization_id,
+      array['owner','admin','editor']::public.org_role[]
+    )
+  );
+
+create policy brand_entities_update on public.brand_entities
+  for update to authenticated
+  using (private.can_manage_brand_entity(id))
+  with check (
+    private.can_manage_brand_entity(id)
     and private.has_org_role(
       organization_id,
       array['owner','admin','editor']::public.org_role[]
@@ -256,9 +317,15 @@ create policy brand_entities_insert on public.brand_entities
 
 alter table public.takes drop column work_id;
 
+-- Same rule as §3: the constraint and the promotion trigger both name
+-- work_id, so they go before the column and are recreated after it.
 alter table public.brand_materials
   drop constraint if exists materials_scope_owner;
+drop trigger if exists brand_materials_enforce_promotion
+  on public.brand_materials;
+
 alter table public.brand_materials drop column work_id;
+
 alter table public.brand_materials
   add constraint materials_scope_owner check (
     (scope = 'brand' and take_id is null)
@@ -297,6 +364,11 @@ begin
   return new;
 end;
 $$;
+
+create trigger brand_materials_enforce_promotion
+  before update of scope, take_id, brand_id
+  on public.brand_materials
+  for each row execute function private.enforce_material_promotion();
 
 drop function if exists public.delete_work(uuid, text);
 drop table public.works;
@@ -641,7 +713,10 @@ $$;
 -- 7. Account deletion: brands are counted and removed per workspace org.
 -- ---------------------------------------------------------------------------
 
-create or replace function private.account_deleted_brand_ids(p_user_id uuid, p_org_ids uuid[])
+-- The parameter keeps its existing name: CREATE OR REPLACE cannot rename an
+-- input parameter, and renaming it would mean dropping the function and
+-- restoring its grants for no gain.
+create or replace function private.account_deleted_brand_ids(p_user_id uuid, p_deleted_org_ids uuid[])
 returns uuid[]
 language sql
 stable security definer
@@ -649,7 +724,7 @@ set search_path to ''
 as $$
   select coalesce(array_agg(brand.id), '{}'::uuid[])
   from public.brand_entities brand
-  where brand.organization_id = any(p_org_ids);
+  where brand.organization_id = any(p_deleted_org_ids);
 $$;
 
 create or replace function public.delete_user_account(p_user_id uuid)
@@ -773,6 +848,29 @@ begin
   end if;
   if to_regprocedure('private.ensure_personal_org(uuid)') is null then
     raise exception 'v3 cutover incomplete: ensure_personal_org is missing.';
+  end if;
+  if to_regprocedure('public.ensure_my_workspace()') is null then
+    raise exception 'v3 cutover incomplete: ensure_my_workspace is missing.';
+  end if;
+  -- Dropping a column takes its policies and triggers with it, so prove the
+  -- rebuilt ones are back rather than trusting the order above.
+  if (select count(*) from pg_policy
+      where polrelid = 'public.brand_entities'::regclass) <> 4 then
+    raise exception 'v3 cutover incomplete: brand_entities should have 4 policies.';
+  end if;
+  if not exists (
+    select 1 from pg_trigger
+    where tgrelid = 'public.brand_entities'::regclass
+      and tgname = 'brand_entities_enforce_brand_membership'
+  ) then
+    raise exception 'v3 cutover incomplete: the brand membership trigger is missing.';
+  end if;
+  if not exists (
+    select 1 from pg_trigger
+    where tgrelid = 'public.brand_materials'::regclass
+      and tgname = 'brand_materials_enforce_promotion'
+  ) then
+    raise exception 'v3 cutover incomplete: the material promotion trigger is missing.';
   end if;
 end;
 $$;

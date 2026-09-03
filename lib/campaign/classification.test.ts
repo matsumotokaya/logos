@@ -1,47 +1,39 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveSubjectPlacement } from "./classification";
+import { resolveSubjectCategory } from "./classification";
 
-test("独自ブランドを持つ製品はproduct Brandになる", () => {
+test("分類が返したカテゴリーをそのまま採る", () => {
   assert.deepEqual(
-    resolveSubjectPlacement({
+    resolveSubjectCategory({
       brand_kind: "product",
       placement: "brand",
       confidence: "high",
       rationale: "独自ロゴがある",
     }),
-    { brandKind: "product", placement: "brand", confidence: "high" },
+    { brandKind: "product", confidence: "high" },
   );
 });
 
-test("単発イベントは親Brand配下のWorkになる", () => {
+test("placementはもう読まない（v3でBrandは常に1つ立つ）", () => {
+  // 旧モデルでは placement=work が「Brandを作らない」を意味した。
   assert.deepEqual(
-    resolveSubjectPlacement({
+    resolveSubjectCategory({
       brand_kind: "event",
       placement: "work",
       confidence: "medium",
       rationale: "単開催のセミナー",
     }),
-    { brandKind: "event", placement: "work", confidence: "medium" },
+    { brandKind: "event", confidence: "medium" },
   );
 });
 
-test("corporateとWorkの矛盾はBrandへ正規化する", () => {
-  assert.deepEqual(
-    resolveSubjectPlacement({
-      brand_kind: "corporate",
-      placement: "work",
-      confidence: "low",
-      rationale: "分類が矛盾",
-    }),
-    { brandKind: "corporate", placement: "brand", confidence: "low" },
-  );
-});
-
-test("削除前のダイアログで作ったジョブも読める", () => {
-  assert.deepEqual(resolveSubjectPlacement(undefined, "organization"), {
+test("分類が無ければ旧スコープから最小限を埋める", () => {
+  assert.deepEqual(resolveSubjectCategory(undefined, "organization"), {
     brandKind: "corporate",
-    placement: "brand",
+    confidence: "low",
+  });
+  assert.deepEqual(resolveSubjectCategory(undefined, "business"), {
+    brandKind: "business",
     confidence: "low",
   });
 });

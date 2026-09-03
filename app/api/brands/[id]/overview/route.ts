@@ -49,7 +49,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     supabase
       .from("brand_entities")
       .select(
-        "id, name, brand_kind, brand_organization_id, website, industry, location, description, updated_at",
+        "id, name, brand_kind, organization_id, parent_brand_id, website, industry, location, description, updated_at",
       )
       .eq("id", brandId)
       .maybeSingle(),
@@ -82,7 +82,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     id: row.id as string,
     name: row.name as string,
     brandKind: (row.brand_kind as string) ?? "",
-    brandOrganizationId: (row.brand_organization_id as string) ?? "",
+    brandOrganizationId: (row.organization_id as string) ?? "",
     website: (row.website as string) ?? "",
     industry: (row.industry as string) ?? "",
     location: (row.location as string) ?? "",

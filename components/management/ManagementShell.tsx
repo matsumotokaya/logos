@@ -500,13 +500,12 @@ function ManagementTree({
                   <ChevronIcon open={open} />
                 </button>
                 <div className="min-w-0 flex-1">
-                  <TreeLink
-                    href={`/organizations/${organization.id}`}
-                    active={pathname === `/organizations/${organization.id}`}
-                    onNavigate={onNavigate}
-                  >
+                  {/* The workspace is the container the tree is drawn inside,
+                      not a page: v3 retired the organization detail screen, and
+                      members/roles live in /brand. */}
+                  <span className="block truncate px-2 py-1.5 text-sm font-semibold text-ink">
                     {organization.name}
-                  </TreeLink>
+                  </span>
                 </div>
                 <RowActionsMenu
                   label={organization.name}

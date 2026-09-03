@@ -806,14 +806,6 @@ export default function CampaignsTop() {
                             </span>
                           </summary>
                           <ul className="mb-2 ml-3 border-l border-hairline pl-3">
-                            <li>
-                              <Link
-                                href={`/organizations/${organization.id}`}
-                                className="block rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-ink/[0.04] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                              >
-                                Organization概要
-                              </Link>
-                            </li>
                             {organization.brands.map((business) => (
                               <li key={business.id}>
                                 <Link
@@ -891,12 +883,6 @@ export default function CampaignsTop() {
                         <span className="text-[10px] text-ink-faint">
                           オーガニゼーション
                         </span>
-                        <Link
-                          href={`/organizations/${organization.id}`}
-                          className="rounded-full border border-hairline px-3 py-1.5 text-[10px] font-semibold text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                        >
-                          詳細を編集
-                        </Link>
                       </div>
                     </header>
 

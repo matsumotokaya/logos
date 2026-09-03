@@ -22,14 +22,11 @@ test("すでに基盤にあるものは、そう言って断る", () => {
   assert.ok(decision.can === false && decision.reason.includes("すでに"));
 });
 
-test("案件に属していない素材は、案件へは上げられない", () => {
-  // work スコープは work_id を要求する（0028 の materials_scope_owner）。
-  const without = promotionTo({ scope: "take", work_id: null }, "work");
-  assert.equal(without.can, false);
-  assert.ok(without.can === false && without.reason.includes("案件"));
-
-  const with_ = promotionTo({ scope: "take", work_id: "w-1" }, "work");
-  assert.equal(with_.can, true);
+test("v3のスコープは take と brand の2段だけ", () => {
+  // work スコープは 0056 で廃止した（イベントは子Brandになった）。
+  assert.equal(isMaterialScope("work"), false);
+  assert.equal(promotionTo({ scope: "take" }, "work").can, false);
+  assert.equal(promotionTo({ scope: "take" }, "brand").can, true);
 });
 
 test("知らないスコープは受け付けない", () => {

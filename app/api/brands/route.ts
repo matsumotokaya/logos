@@ -14,21 +14,20 @@ import {
   requireUser,
 } from "@/lib/supabase/server";
 
+// The workspace, not a scraped company (v3 §19.2): public.organizations is the
+// tenant boundary, so it carries membership and a name — not a legal identity.
 type OrganizationRow = {
-  id: string;
+  org_id: string;
   name: string;
-  organization_kind: BrandOrganizationSummary["organizationKind"];
-  website: string;
-  description: string;
-  status: BrandRecordStatus;
+  website: string | null;
+  description: string | null;
 };
 
 type BrandRow = {
   id: string;
-  brand_organization_id: string;
+  organization_id: string;
   parent_brand_id: string | null;
   brand_kind: BrandSummary["kind"];
-  is_primary_brand: boolean;
   name: string;
   website: string;
   industry: string;
@@ -76,12 +75,11 @@ export async function GET(req: Request) {
   const user = await requireUser(req);
   const supabase = createServerSupabaseForToken(user.token);
 
+  // RLS returns only the workspaces this user belongs to.
   const organizationResult = await supabase
-    .from("brand_organizations")
-    .select("id, name, organization_kind, website, description, status")
-    // Newest first: the left pane is a work surface, so what was just
-    // registered has to be at the top instead of scrolling off the bottom.
-    .order("created_at", { ascending: false });
+    .from("organizations")
+    .select("org_id, name, website, description")
+    .order("created_at", { ascending: true });
   if (organizationResult.error) {
     return Response.json(
       { error: "Organizationを取得できませんでした" },
@@ -97,22 +95,15 @@ export async function GET(req: Request) {
     );
   }
 
-  const organizationIds = organizations.map((organization) => organization.id);
+  const organizationIds = organizations.map((organization) => organization.org_id);
   const brandResult = await supabase
     .from("brand_entities")
     .select(
-      "id, brand_organization_id, parent_brand_id, brand_kind, is_primary_brand, name, website, industry, description, status",
+      "id, organization_id, parent_brand_id, brand_kind, name, website, industry, description, status",
     )
-    .in("brand_organization_id", organizationIds)
-    .in("brand_kind", [
-      "corporate",
-      "business",
-      "service",
-      "product",
-      "media",
-      "event",
-      "audience",
-    ])
+    .in("organization_id", organizationIds)
+    // Newest first: the left pane is a work surface, so what was just
+    // registered has to be at the top instead of scrolling off the bottom.
     .order("created_at", { ascending: false });
   if (brandResult.error) {
     return Response.json(
@@ -128,12 +119,12 @@ export async function GET(req: Request) {
       {
         organizations: organizations.map(
           (organization): BrandOrganizationSummary => ({
-            id: organization.id,
+            id: organization.org_id,
             name: organization.name,
-            organizationKind: organization.organization_kind,
-            website: organization.website,
-            description: organization.description,
-            status: organization.status,
+            organizationKind: null,
+            website: organization.website ?? "",
+            description: organization.description ?? "",
+            status: "confirmed",
             logos: [],
             brands: [],
             businesses: [],
@@ -254,10 +245,10 @@ export async function GET(req: Request) {
       });
     const summary: BrandSummary = {
       id: brand.id,
-      organizationId: brand.brand_organization_id,
+      organizationId: brand.organization_id,
       parentBrandId: brand.parent_brand_id,
       kind: brand.brand_kind,
-      isPrimary: brand.is_primary_brand,
+      isPrimary: false,
       name: brand.name,
       website: brand.website,
       industry: brand.industry,
@@ -271,26 +262,25 @@ export async function GET(req: Request) {
       assets: brandAssets,
       campaigns,
     };
-    const current = summariesByOrganization.get(brand.brand_organization_id) ?? [];
+    const current = summariesByOrganization.get(brand.organization_id) ?? [];
     current.push(summary);
-    summariesByOrganization.set(brand.brand_organization_id, current);
+    summariesByOrganization.set(brand.organization_id, current);
   }
 
   const result = organizations.map(
     (organization): BrandOrganizationSummary => {
       const organizationBrands =
-        summariesByOrganization.get(organization.id) ?? [];
-      const corporate = organizationBrands.find(
-        (brand) => brand.kind === "corporate" && brand.isPrimary,
-      );
+        summariesByOrganization.get(organization.org_id) ?? [];
+      // A workspace has no logo of its own; the tree shows the logos of the
+      // brands inside it. (v2 lifted the primary corporate brand's logos here.)
       return {
-        id: organization.id,
+        id: organization.org_id,
         name: organization.name,
-        organizationKind: organization.organization_kind,
-        website: organization.website,
-        description: organization.description,
-        status: organization.status,
-        logos: corporate?.logos ?? [],
+        organizationKind: null,
+        website: organization.website ?? "",
+        description: organization.description ?? "",
+        status: "confirmed" as BrandRecordStatus,
+        logos: [],
         brands: organizationBrands,
         businesses: organizationBrands.filter(
           (brand) => brand.kind !== "corporate",

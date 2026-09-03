@@ -27,7 +27,6 @@ export interface CreateTakeInput {
   templateId: string;
   brief: unknown;
   title?: string;
-  workId?: string | null;
   variantId?: string | null;
   /**
    * The painting the take's renders are made in (a theme id), when the
@@ -79,7 +78,6 @@ export async function createTake(
   const request = {
     brandId: input.brandId,
     variantId: input.variantId ?? null,
-    workId: input.workId ?? null,
     toolKind: template.toolKind,
     templateId: template.id,
     templateVersion: template.version,
@@ -96,7 +94,6 @@ export async function createTake(
   const { data, error } = await supabase.rpc("create_v2_take", {
     p_brand_id: input.brandId,
     p_variant_id: input.variantId ?? null,
-    p_work_id: input.workId ?? null,
     p_tool_kind: template.toolKind,
     p_template_id: template.id,
     p_template_version: template.version,

@@ -81,7 +81,7 @@ export async function GET(
 
   const take = await supabase
     .from("takes")
-    .select("id, work_id, template_id, brief")
+    .select("id, template_id, brief")
     .eq("id", videoId)
     .eq("brand_id", brandId)
     .eq("tool_kind", "video")
@@ -103,9 +103,7 @@ export async function GET(
     .order("created_at", { ascending: true });
 
   const [own, base] = await Promise.all([
-    take.data.work_id
-      ? ownQuery.or(`take_id.eq.${take.data.id},work_id.eq.${take.data.work_id}`)
-      : ownQuery.eq("take_id", take.data.id),
+    ownQuery.eq("take_id", take.data.id),
     supabase
       .from("brand_materials")
       .select(COLUMNS)

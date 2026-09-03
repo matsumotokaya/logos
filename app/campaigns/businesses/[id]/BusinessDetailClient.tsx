@@ -623,12 +623,7 @@ export default function BusinessDetailClient({ id }: { id: string }) {
           ブランド一覧
         </Link>
         <span aria-hidden="true">/</span>
-        <Link
-          href={`/organizations/${detail.parentOrganization.id}`}
-          className="underline underline-offset-4 hover:text-ink"
-        >
-          {detail.parentOrganization.name}
-        </Link>
+        <span>{detail.parentOrganization.name}</span>
       </div>
 
       <header className="mt-6 flex flex-wrap items-start justify-between gap-4 border-b border-hairline pb-6">

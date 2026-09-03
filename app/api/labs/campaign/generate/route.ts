@@ -20,7 +20,7 @@ import {
 import type { SourceFile } from "@/lib/campaign/creative";
 import { runCampaignPipeline } from "@/lib/campaign/pipeline";
 import { persistCampaignCatalog } from "@/lib/campaign/catalog";
-import { createPublishedCampaignLp } from "@/lib/takes/campaign-lp";
+import { createCampaignLpTake } from "@/lib/takes/campaign-lp";
 import {
   createCampaignJob,
   appendCampaignStep,
@@ -190,12 +190,11 @@ export async function POST(req: Request) {
           kit: result.kit,
         });
         saveCampaignCatalog(job.id, catalog);
-        const v2 = await createPublishedCampaignLp(
+        const v2 = await createCampaignLpTake(
           createServerSupabaseForToken(user.token),
           {
             userId: user.id,
             brandId: catalog.brandId,
-            workId: catalog.workId,
             job: completedJob,
             kit: result.kit,
           },
@@ -206,7 +205,7 @@ export async function POST(req: Request) {
           publishedLpPath: v2.urlPath,
         });
         appendCampaignStep(job.id, {
-          message: `catalog: ${result.kit.organization?.name ?? "運営組織（未確認）"} / ${result.kit.service.name} に登録、LP公開: ${v2.urlPath}`,
+          message: `catalog: 「${result.kit.service.name}」をブランドとして登録、LPを作成: ${v2.urlPath}（公開はしていません）`,
           level: "success",
         });
       } catch (error) {

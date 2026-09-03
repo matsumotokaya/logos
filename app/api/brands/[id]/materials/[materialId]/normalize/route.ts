@@ -38,14 +38,13 @@ export const NORMALIZED_ROLE = "normalized";
 
 /** What a normalisation needs to read off the original's row. */
 const COLUMNS =
-  "id, brand_id, scope, work_id, take_id, kind, label, media_type, r2_key, width, height, " +
+  "id, brand_id, scope, take_id, kind, label, media_type, r2_key, width, height, " +
   "opaque, ink_ratio, trim_width, trim_height, category, category_source";
 
 interface MaterialRow {
   id: string;
   brand_id: string;
   scope: string;
-  work_id: string | null;
   take_id: string | null;
   kind: string;
   label: string;
@@ -177,7 +176,6 @@ export async function POST(
       // and widening it would promote something nobody promoted.
       scope: row.scope,
       brand_id: row.brand_id,
-      work_id: row.work_id,
       take_id: row.take_id,
       kind: row.kind,
       // The name the file arrived with, unchanged (§8.1): the displayed name is
