@@ -18,7 +18,7 @@
 
 ## 次の作業
 
-1. **v3実装のフェーズ1**: v3スキーマのmigrationドラフト→依頼者レビュー→承認後に適用（§19.6の順。リモートDB書き込みは毎回明示承認）
+1. **v3 migration の適用**: ドラフトは `supabase/migrations/0056_v3_entity_model.sql`（コミット済み・**未適用**）。依頼者レビュー→明示承認→apply_migration。データは全消しされる。`create_v2_take` / `clone_event_promo_take` のシグネチャが変わるため、**フェーズ2のコード改修（catalog・入り口・/brandsツリー）と同時に切り替える**
 2. `standard` を1本通しで焼いて、映像の良し悪しを見る。`npm run event-cm:walkthrough`（LLM と TTS を呼ぶので課金あり）
 
 ## 判断待ち
