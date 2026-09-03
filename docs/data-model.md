@@ -3,7 +3,7 @@
 更新日: 2026-09-03
 ステータス: **V3稼働構造の正本**
 
-V2の設計・移行判断の履歴は [schema-v2.md](old/schema-v2.md)、V3への作り替えの決定は [deliverable-architecture.md](deliverable-architecture.md) §19、アカウントとRLSの原則は [account-design.md](account-design.md) を参照する。本書はmigration 0056適用後の現在形だけを記す。
+V2の設計・移行判断の履歴は [schema-v2.md](old/schema-v2.md)、V3への作り替えの決定は [deliverable-architecture.md](deliverable-architecture.md) §19、アカウントとRLSの原則は [account-design.md](account-design.md) を参照する。本書はmigration 0056(2026-09-03適用済み)後の現在形だけを記す。
 
 既存Brandへロゴを追加するときは`create_brand_logo_with_presentation`を使い、Logo・primary Candidate・`logo-presentation@1` Take・HTML Render・`logo_presentation` canonical slotを同一transactionで作る。単独ロゴ取り込み用の`create_logo_with_presentation`だけが未所属用Brandを補完する。
 
